@@ -4,8 +4,8 @@
  * Docs: https://novofon.github.io/call_api/ | https://novofon.github.io/data_api/
  */
 
-const DATA_API_URL = 'https://dataapi-jsonrpc.novofon.ru/api/v2.0';
-const CALL_API_URL = 'https://callapi-jsonrpc.novofon.ru/api/v4.0';
+const DATA_API_URL = 'https://dataapi-jsonrpc.novofon.ru/v2.0';
+const CALL_API_URL = 'https://callapi-jsonrpc.novofon.ru/v4.0';
 
 export interface NovofonCredentials {
   apiKey: string;
