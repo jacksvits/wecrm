@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import http from 'http';
 import { Router } from 'express';
@@ -38,9 +39,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use('/uploads', express.static('/app/uploads'));
+app.use('/uploads/avatars', express.static('/app/uploads/avatars'));
 
 app.get('/api/events', authMiddleware, (req, res) => {
   const user = (req as any).user;

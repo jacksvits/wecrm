@@ -11,9 +11,12 @@ export function Avatar({ name, avatar, size = 32, style }: AvatarProps) {
   const [error, setError] = useState(false);
 
   if (avatar && !error) {
+    const src = avatar.startsWith('data:') || avatar.startsWith('http')
+      ? avatar
+      : `${window.location.origin}${avatar}`;
     return (
       <img
-        src={avatar}
+        src={src}
         alt={name}
         onError={() => setError(true)}
         style={{

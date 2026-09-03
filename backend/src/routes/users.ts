@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import fs from 'fs';
+import path from 'path';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
@@ -84,9 +86,23 @@ router.post('/avatar', authMiddleware, async (req: AuthRequest, res) => {
     if (!image.startsWith('data:image/')) {
       return res.status(400).json({ error: 'Неверный формат изображения' });
     }
+    // Extract base64 data and save as file
+    const match = image.match(/^data:image\/(\w+);base64,(.+)$/);
+    if (!match) {
+      return res.status(400).json({ error: 'Неверный формат изображения' });
+    }
+    const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+    const base64Data = match[2];
+    const avatarDir = '/app/uploads/avatars';
+    if (!fs.existsSync(avatarDir)) {
+      fs.mkdirSync(avatarDir, { recursive: true });
+    }
+    const filePath = path.join(avatarDir, `${req.user!.id}.${ext}`);
+    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+    const avatarUrl = `/uploads/avatars/${req.user!.id}.${ext}`;
     const user = await prisma.user.update({
       where: { id: req.user!.id },
-      data: { avatar: image },
+      data: { avatar: avatarUrl },
       select: { id: true, name: true, email: true, username: true, avatar: true, role: true, allowedPages: true, darkTheme: true, emails: true },
     });
     res.json(user);
@@ -98,6 +114,12 @@ router.post('/avatar', authMiddleware, async (req: AuthRequest, res) => {
 
 router.delete('/avatar', authMiddleware, async (req: AuthRequest, res) => {
   try {
+    // Delete avatar file if exists
+    const avatarDir = '/app/uploads/avatars';
+    const files = fs.readdirSync(avatarDir).filter(f => f.startsWith(req.user!.id + '.'));
+    for (const file of files) {
+      fs.unlinkSync(path.join(avatarDir, file));
+    }
     const user = await prisma.user.update({
       where: { id: req.user!.id },
       data: { avatar: null },
