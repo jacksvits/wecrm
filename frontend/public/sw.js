@@ -41,7 +41,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then((res) => {
-          if (res && res.ok) return res;
+          if (res && res.status === 200) return res;
           throw new Error('Network failed for index.html');
         })
         .catch(() => caches.match(event.request))
@@ -62,7 +62,7 @@ self.addEventListener('fetch', (event) => {
 async function networkFirstWithCacheFallback(request) {
   try {
     const networkResponse = await fetch(request);
-    if (networkResponse && networkResponse.ok) {
+    if (networkResponse && networkResponse.status === 200) {
       try {
         const clone = networkResponse.clone();
         const cache = await caches.open(CACHE_NAME);
@@ -87,7 +87,7 @@ async function cacheFirstWithNetworkFallback(request) {
   if (cached) return cached;
   try {
     const networkResponse = await fetch(request);
-    if (networkResponse && networkResponse.ok) {
+    if (networkResponse && networkResponse.status === 200) {
       try {
         const clone = networkResponse.clone();
         const cache = await caches.open(CACHE_NAME);
