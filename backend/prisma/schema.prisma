@@ -230,6 +230,8 @@ model TaskAssignee {
   createdAt DateTime @default(now())
 
   @@unique([taskId, userId])
+  @@index([userId])
+  @@index([taskId, userId])
   @@map("task_assignees")
 }
 
@@ -243,6 +245,8 @@ model TaskCurator {
   createdAt DateTime @default(now())
 
   @@unique([taskId, userId])
+  @@index([userId])
+  @@index([taskId, userId])
   @@map("task_curators")
 }
 
