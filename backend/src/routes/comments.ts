@@ -13,7 +13,7 @@ const createSchema = z.object({
   isInternal: z.boolean().optional(),
 });
 
-router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) => {
+router.post(/:taskId/comments, authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { taskId } = req.params;
     const { content, attachmentIds, isInternal } = createSchema.parse(req.body);
@@ -137,13 +137,60 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
       }
     }
 
+    // ===== VK Group integration: send reply back to VK =====
+    // Отправляем только если задача привязана к ВК и комментарий не внутренний
+    if (task.vkPeerId && task.vkGroupId && !isInternal) {
+      try {
+        const vkSettings = await prisma.vkGroupSettings.findFirst({
+          where: { groupId: task.vkGroupId, isActive: true },
+        });
+
+        if (vkSettings?.accessToken) {
+          const authorName = req.user!.name || 'Сотрудник';
+          let vkMessageText = `${authorName}:\n${content}`;
+
+          // Добавляем ссылки на вложения, если есть
+          const fileAttachments = await prisma.fileAttachment.findMany({
+            where: { entityType: 'comment', entityId: comment.id },
+          });
+
+          if (fileAttachments.length > 0) {
+            vkMessageText += '\n\n📎 Вложения:';
+            for (const file of fileAttachments) {
+              const fileUrl = `https://welans.cc${file.path}`;
+              vkMessageText += `\n${file.originalName}: ${fileUrl}`;
+            }
+          }
+
+          const randomId = Date.now() + Math.floor(Math.random() * 1000);
+          const vkUrl = `https://api.vk.com/method/messages.send?peer_id=${task.vkPeerId}&message=${encodeURIComponent(vkMessageText)}&random_id=${randomId}&access_token=${vkSettings.accessToken}&v=5.199`;
+
+          console.log('[VK Comment Send] Sending reply to peer', task.vkPeerId, 'text:', vkMessageText.substring(0, 100));
+
+          const vkResponse = await fetch(vkUrl, { method: 'POST' });
+          const vkData = await vkResponse.json();
+
+          if (vkData.error) {
+            console.error('[VK Comment Send] VK API error:', vkData.error.error_msg, '(code', vkData.error.error_code, ')');
+          } else {
+            console.log('[VK Comment Send] Sent successfully, msg_id:', vkData.response);
+          }
+        } else {
+          console.log('[VK Comment Send] No active VK settings for group', task.vkGroupId);
+        }
+      } catch (vkErr: any) {
+        console.error('[VK Comment Send] Error:', vkErr.message || vkErr);
+      }
+    }
+    // ======================================================
+
     res.json(comment);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 });
 
-router.get('/:taskId/comments', authMiddleware, async (req, res) => {
+router.get(/:taskId/comments, authMiddleware, async (req, res) => {
   try {
     const { taskId } = req.params;
     const comments = await prisma.comment.findMany({
@@ -159,7 +206,7 @@ router.get('/:taskId/comments', authMiddleware, async (req, res) => {
   }
 });
 
-router.delete('/:taskId/comments/:commentId', authMiddleware, async (req, res) => {
+router.delete(/:taskId/comments/:commentId, authMiddleware, async (req, res) => {
   try {
     const { commentId } = req.params;
     const comment = await prisma.comment.findUnique({
