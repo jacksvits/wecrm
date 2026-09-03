@@ -1,0 +1,83 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: crm_secret_2026
+      POSTGRES_DB: wecrm
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm -d wecrm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgresql://crm:crm_secret_2026@db:5432/wecrm?schema=public
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      VAPID_PUBLIC_KEY: BBDb3f-KC_ZFFEP6fu2eQ6mNPBVUtn-O1IZme1ZX7Ug8W9JXHFiwzlXeyDEt4n2I7f2NWIII4QLyAJZ7ESZdzSs
+      VAPID_PRIVATE_KEY: duhNuxTRJLTYidASQ8jDpR1OQb7U3zUATxACkV855sA
+      VAPID_SUBJECT: mailto:admin@welans.cc
+      PORT: 4000
+      NODE_ENV: production
+      NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt
+      VK_CLIENT_ID: "54736647"
+      VK_CLIENT_SECRET: "l7d4RoIFcqdzmgLzt3nf"
+      VK_REDIRECT_URI: "https://welans.cc/api/vk/callback"
+      BEGET_LOGIN: "softboeg"
+      BEGET_PASSWORD: "nyBNQofDm96"
+      TOCHKA_CLIENT_ID: "4146da5f3ccc42d6a2e725a08062d8e7"
+      TOCHKA_CLIENT_SECRET: "e90a2e242aad441596da65e889d96dad"
+      TOCHKA_REDIRECT_URI: "https://welans.cc/api/tochka/auth-url"
+      TSX_DISABLE_CACHE: "1"
+      TOCHKA_ACCESS_TOKEN: ""
+      FRONTEND_URL: "https://welans.cc"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - /mnt/nfs/wecrm-uploads:/app/uploads
+      - ./backend/data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - /mnt/nfs/wecrm-uploads:/usr/share/nginx/html/uploads:ro
+    restart: unless-stopped
+
+  email-worker:
+    build: ./backend
+    command: sh -c "npx prisma generate && npx tsx src/worker.ts"
+    environment:
+      DATABASE_URL: postgresql://crm:crm_secret_2026@db:5432/wecrm?schema=public
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      NODE_ENV: production
+      NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - /mnt/nfs/wecrm-uploads:/app/uploads
+      - ./backend/prisma:/app/prisma:ro
+    restart: unless-stopped
+volumes:
+  pgdata:

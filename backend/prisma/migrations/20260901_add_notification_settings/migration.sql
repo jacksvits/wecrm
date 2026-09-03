@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN "push_enabled" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "users" ADD COLUMN "notify_task" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "users" ADD COLUMN "notify_comment" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "users" ADD COLUMN "notify_chat" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "users" ADD COLUMN "notify_call" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "users" ADD COLUMN "notify_deal" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "users" ADD COLUMN "notify_news" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "users" ADD COLUMN "sound_enabled" BOOLEAN NOT NULL DEFAULT true;

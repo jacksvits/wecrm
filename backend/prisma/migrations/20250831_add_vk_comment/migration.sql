@@ -1,0 +1,1 @@
+ALTER TABLE "Comment" ADD COLUMN vk_message_id INTEGER UNIQUE;

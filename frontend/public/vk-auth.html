@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>VK Auth</title>
+  <script src="https://unpkg.com/@vkid/sdk@2.0.0/dist/index.js"></script>
+</head>
+<body>
+  <div id="vk-auth"></div>
+  <script>
+    const VKID = window.VKIDSDK;
+    const oauth = new VKID.OAuth2({
+      app: 54736647,
+      redirectUrl: 'https://welans.cc/api/vk/callback',
+      state: 'random123',
+    });
+    oauth.login().then(data => {
+      console.log('VK auth success', data);
+    }).catch(err => {
+      console.error('VK auth error', err);
+    });
+  </script>
+</body>
+</html>
