@@ -39,7 +39,7 @@ const createSchema = z.object({
 
 router.get('/', async (req, res) => {
   try {
-    const { type, search, kind } = req.query;
+    const { type, search, kind, page, limit } = req.query;
     const where: any = {};
     if (type) where.type = type;
     if (kind) where.kind = kind;
@@ -52,15 +52,23 @@ router.get('/', async (req, res) => {
         { inn: { contains: search as string, mode: 'insensitive' } },
       ];
     }
-    const contacts = await prisma.contact.findMany({
-      where,
-      include: {
-        _count: { select: { deals: true, tasks: true, employees: true } },
-        organization: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    res.json(contacts);
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(limit as string) || 50));
+    const skip = (pageNum - 1) * pageSize;
+    const [contacts, totalCount] = await Promise.all([
+      prisma.contact.findMany({
+        where,
+        skip,
+        take: pageSize,
+        include: {
+          _count: { select: { deals: true, tasks: true, employees: true } },
+          organization: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.contact.count({ where }),
+    ]);
+    res.json({ contacts, totalCount, page: pageNum, pageSize });
   } catch (err: any) {
     console.error('[Contacts GET] Error:', err.message);
     res.status(500).json({ error: err.message });

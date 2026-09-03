@@ -36,7 +36,6 @@ services:
       TOCHKA_CLIENT_ID: "4146da5f3ccc42d6a2e725a08062d8e7"
       TOCHKA_CLIENT_SECRET: "e90a2e242aad441596da65e889d96dad"
       TOCHKA_REDIRECT_URI: "https://welans.cc/api/tochka/auth-url"
-      TSX_DISABLE_CACHE: "1"
       TOCHKA_ACCESS_TOKEN: ""
       FRONTEND_URL: "https://welans.cc"
     depends_on:

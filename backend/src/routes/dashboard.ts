@@ -62,52 +62,57 @@ router.get('/activities', async (req, res) => {
     },
   });
 
-  const enriched = await Promise.all(
-    activities.map(async (a) => {
-      let entityName: string | null = null;
+  // Batch-загрузка названий сущностей вместо N+1 запросов
+  const taskIds: string[] = [];
+  const dealIds: string[] = [];
+  const contactIds: string[] = [];
+  const projectIds: string[] = [];
 
-      if (a.entity === 'task') {
-        if (a.task?.title) {
-          entityName = a.task.title;
-        } else {
-          const task = await prisma.task.findUnique({
-            where: { id: a.entityId },
-            select: { title: true },
-          });
-          entityName = task?.title ?? null;
-        }
-      } else if (a.entity === 'deal') {
-        const deal = await prisma.deal.findUnique({
-          where: { id: a.entityId },
-          select: { title: true },
-        });
-        entityName = deal?.title ?? null;
-      } else if (a.entity === 'contact') {
-        const contact = await prisma.contact.findUnique({
-          where: { id: a.entityId },
-          select: { name: true },
-        });
-        entityName = contact?.name ?? null;
-      } else if (a.entity === 'project') {
-        const project = await prisma.project.findUnique({
-          where: { id: a.entityId },
-          select: { name: true },
-        });
-        entityName = project?.name ?? null;
-      } else if (a.entity === 'comment') {
-        const task = await prisma.task.findUnique({
-          where: { id: a.entityId },
-          select: { title: true },
-        });
-        entityName = task?.title ?? null;
-      }
+  for (const a of activities) {
+    if (a.entity === 'task' && !a.task?.title) taskIds.push(a.entityId);
+    else if (a.entity === 'deal') dealIds.push(a.entityId);
+    else if (a.entity === 'contact') contactIds.push(a.entityId);
+    else if (a.entity === 'project') projectIds.push(a.entityId);
+    else if (a.entity === 'comment') taskIds.push(a.entityId);
+  }
 
-      return {
-        ...a,
-        entityName,
-      };
-    })
-  );
+  const [tasksMap, dealsMap, contactsMap, projectsMap] = await Promise.all([
+    taskIds.length > 0
+      ? prisma.task.findMany({ where: { id: { in: taskIds } }, select: { id: true, title: true } })
+      : Promise.resolve([]),
+    dealIds.length > 0
+      ? prisma.deal.findMany({ where: { id: { in: dealIds } }, select: { id: true, title: true } })
+      : Promise.resolve([]),
+    contactIds.length > 0
+      ? prisma.contact.findMany({ where: { id: { in: contactIds } }, select: { id: true, name: true } })
+      : Promise.resolve([]),
+    projectIds.length > 0
+      ? prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, name: true } })
+      : Promise.resolve([]),
+  ]);
+
+  const taskTitleMap = new Map(tasksMap.map(t => [t.id, t.title]));
+  const dealTitleMap = new Map(dealsMap.map(d => [d.id, d.title]));
+  const contactNameMap = new Map(contactsMap.map(c => [c.id, c.name]));
+  const projectNameMap = new Map(projectsMap.map(p => [p.id, p.name]));
+
+  const enriched = activities.map((a) => {
+    let entityName: string | null = null;
+
+    if (a.entity === 'task') {
+      entityName = a.task?.title ?? taskTitleMap.get(a.entityId) ?? null;
+    } else if (a.entity === 'deal') {
+      entityName = dealTitleMap.get(a.entityId) ?? null;
+    } else if (a.entity === 'contact') {
+      entityName = contactNameMap.get(a.entityId) ?? null;
+    } else if (a.entity === 'project') {
+      entityName = projectNameMap.get(a.entityId) ?? null;
+    } else if (a.entity === 'comment') {
+      entityName = taskTitleMap.get(a.entityId) ?? null;
+    }
+
+    return { ...a, entityName };
+  });
 
   res.json(enriched);
 });
