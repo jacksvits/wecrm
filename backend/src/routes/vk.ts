@@ -100,9 +100,12 @@ router.post('/id-auth', async (req, res) => {
       return res.status(400).json({ error: 'Missing code, device_id, state or code_verifier' });
     }
 
+    const tokenController = new AbortController();
+    const tokenTimeout = setTimeout(() => tokenController.abort(), 20000);
     const tokenRes = await fetch('https://id.vk.ru/oauth2/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      signal: tokenController.signal,
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
@@ -113,6 +116,7 @@ router.post('/id-auth', async (req, res) => {
         code_verifier,
       }),
     });
+    clearTimeout(tokenTimeout);
     const tokenData = await tokenRes.json();
     if (tokenData.error) {
       console.error('[VK ID Auth] Token exchange error:', tokenData);
@@ -124,14 +128,18 @@ router.post('/id-auth', async (req, res) => {
       return res.status(400).json({ error: 'Failed to obtain access token from VK ID' });
     }
 
+    const userController = new AbortController();
+    const userTimeout = setTimeout(() => userController.abort(), 20000);
     const userRes = await fetch('https://id.vk.ru/oauth2/user_info', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': `Bearer ${access_token}`,
       },
+      signal: userController.signal,
       body: new URLSearchParams({ client_id: VK_CLIENT_ID }),
     });
+    clearTimeout(userTimeout);
     const userData = await userRes.json();
     console.log('[VK ID Auth] userData:', JSON.stringify(userData));
 
@@ -205,6 +213,12 @@ router.post('/id-auth', async (req, res) => {
     });
   } catch (err: any) {
     console.error('[VK ID Auth Error]', err);
+    const isTimeout = err.name === 'AbortError' || err.name === 'ConnectTimeoutError' ||
+                      err.message?.includes('timeout') || err.message?.includes('ETIMEDOUT') ||
+                      err.cause?.name === 'ConnectTimeoutError' || err.cause?.code === 'ETIMEDOUT';
+    if (isTimeout) {
+      return res.status(503).json({ error: 'VK ID сервер временно недоступен. Попробуйте ещё раз.' });
+    }
     res.status(500).json({ error: err.message || 'VK ID auth failed' });
   }
 });
