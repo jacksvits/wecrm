@@ -55,10 +55,12 @@ router.get('/', async (req, res) => {
     const pageNum = Math.max(1, parseInt(page as string) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(limit as string) || 50));
     const skip = (pageNum - 1) * pageSize;
+    const usePagination = !!(page || limit);
     const [contacts, totalCount] = await Promise.all([
       prisma.contact.findMany({
         where,
-        skip,
+        skip: usePagination ? skip : undefined,
+        take: usePagination ? pageSize : undefined,
         take: pageSize,
         include: {
           _count: { select: { deals: true, tasks: true, employees: true } },
