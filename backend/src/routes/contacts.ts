@@ -68,7 +68,11 @@ router.get('/', async (req, res) => {
       }),
       prisma.contact.count({ where }),
     ]);
-    res.json({ contacts, totalCount, page: pageNum, pageSize });
+    if (page || limit) {
+      res.json({ contacts, totalCount, page: pageNum, pageSize });
+    } else {
+      res.json(contacts);
+    }
   } catch (err: any) {
     console.error('[Contacts GET] Error:', err.message);
     res.status(500).json({ error: err.message });
