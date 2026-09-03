@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { sendPushToUser } from '../lib/push.js';
 
 const router = Router();
 const MAX_API_BASE = 'https://platform-api2.max.ru';
@@ -57,7 +58,7 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
     notifyUserIds.add(task.creatorId);
     notifyUserIds.delete(req.user!.id);
 
-    // Create notifications
+    // Create in-app notifications
     for (const userId of notifyUserIds) {
       try {
         await prisma.notification.create({
@@ -72,6 +73,19 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
         });
       } catch (e) {
         console.error('Failed to create notification:', e);
+      }
+    }
+
+    // Send push notifications to assignees, curators and creator
+    for (const userId of notifyUserIds) {
+      try {
+        await sendPushToUser(userId, {
+          title: 'Новый комментарий',
+          body: `${req.user!.name || 'Пользователь'} добавил комментарий к задаче "${task.title}"`,
+          url: '/tasks/' + task.id,
+        }, 'comment');
+      } catch (e) {
+        console.error('Failed to send push notification:', e);
       }
     }
 
