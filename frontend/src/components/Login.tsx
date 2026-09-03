@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { sha256 } from "js-sha256"
 import { useAuth } from '../hooks/useAuth'
 
 const API_URL = ''
@@ -12,11 +13,10 @@ function generateCodeVerifier(): string {
   return result
 }
 
-async function generateCodeChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(verifier)
-  const digest = await crypto.subtle.digest('SHA-256', data)
-  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+function generateCodeChallenge(verifier: string): string {
+  const hash = sha256(verifier)
+  const bytes = new Uint8Array(hash.match(/.{2}/g)!.map(byte => parseInt(byte, 16)))
+  return btoa(String.fromCharCode(...bytes))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '')
