@@ -77,6 +77,38 @@ router.patch('/:id', adminOnly, async (req: AuthRequest, res) => {
   }
 });
 
+// Avatar routes must be defined BEFORE /:id to avoid "avatar" being treated as user id
+router.post('/avatar', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { image } = z.object({ image: z.string().min(1) }).parse(req.body);
+    if (!image.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Неверный формат изображения' });
+    }
+    const user = await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { avatar: image },
+      select: { id: true, name: true, email: true, username: true, avatar: true, role: true, allowedPages: true, darkTheme: true, emails: true },
+    });
+    res.json(user);
+  } catch (err: any) {
+    console.error('[Avatar Upload] Error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.delete('/avatar', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const user = await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { avatar: null },
+      select: { id: true, name: true, email: true, username: true, avatar: true, role: true, allowedPages: true, darkTheme: true, emails: true },
+    });
+    res.json(user);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
   try {
     if (req.params.id === req.user?.id) {
@@ -118,39 +150,6 @@ router.post('/heartbeat', authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-router.post('/avatar', authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    const { image } = z.object({ image: z.string().min(1) }).parse(req.body);
-    if (!image.startsWith('data:image/')) {
-      return res.status(400).json({ error: 'Неверный формат изображения' });
-    }
-    const user = await prisma.user.update({
-      where: { id: req.user!.id },
-      data: { avatar: image },
-      select: { id: true, name: true, email: true, username: true, avatar: true, role: true, allowedPages: true, darkTheme: true, emails: true },
-    });
-    res.json(user);
-  } catch (err: any) {
-    console.error('[Avatar Upload] Error:', err.message);
-    res.status(400).json({ error: err.message });
-  }
-});
-
-router.delete('/avatar', authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    const user = await prisma.user.update({
-      where: { id: req.user!.id },
-      data: { avatar: null },
-      select: { id: true, name: true, email: true, username: true, avatar: true, role: true, allowedPages: true, darkTheme: true, emails: true },
-    });
-    res.json(user);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-export default router;
-
 router.get('/push-status', adminOnly, async (_req, res) => {
   try {
     const users = await prisma.user.findMany({
@@ -180,3 +179,5 @@ router.get('/push-status', adminOnly, async (_req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+export default router;
