@@ -13,7 +13,7 @@ const createSchema = z.object({
   isInternal: z.boolean().optional(),
 });
 
-router.post(/:taskId/comments, authMiddleware, async (req: AuthRequest, res) => {
+router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { taskId } = req.params;
     const { content, attachmentIds, isInternal } = createSchema.parse(req.body);
@@ -190,7 +190,7 @@ router.post(/:taskId/comments, authMiddleware, async (req: AuthRequest, res) => 
   }
 });
 
-router.get(/:taskId/comments, authMiddleware, async (req, res) => {
+router.get('/:taskId/comments', authMiddleware, async (req, res) => {
   try {
     const { taskId } = req.params;
     const comments = await prisma.comment.findMany({
@@ -206,7 +206,7 @@ router.get(/:taskId/comments, authMiddleware, async (req, res) => {
   }
 });
 
-router.delete(/:taskId/comments/:commentId, authMiddleware, async (req, res) => {
+router.delete('/:taskId/comments/:commentId', authMiddleware, async (req, res) => {
   try {
     const { commentId } = req.params;
     const comment = await prisma.comment.findUnique({
