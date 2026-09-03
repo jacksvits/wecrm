@@ -61,7 +61,6 @@ router.get('/', async (req, res) => {
         where,
         skip: usePagination ? skip : undefined,
         take: usePagination ? pageSize : undefined,
-        take: pageSize,
         include: {
           _count: { select: { deals: true, tasks: true, employees: true } },
           organization: { select: { id: true, name: true } },

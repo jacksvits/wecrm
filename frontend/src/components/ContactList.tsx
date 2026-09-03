@@ -40,6 +40,11 @@ export function ContactList() {
   const [kindFilter, setKindFilter] = useState<'all' | 'contact' | 'organization'>('all');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const PAGE_SIZE = 50;
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [mergeTargetId, setMergeTargetId] = useState<string>('');
   const [showImportModal, setShowImportModal] = useState(false);
@@ -100,11 +105,18 @@ export function ContactList() {
   });
 
   useEffect(() => {
-    loadContacts();
+    loadContacts(true);
     loadOrganizations();
   }, []);
 
-  const loadContacts = () => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadContacts(true);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const loadContacts = async (reset = false) => {
     const params = kindFilter !== 'all' ? `kind=${kindFilter}` : '';
     api.contacts.list(params).then(setContacts);
   };
@@ -114,7 +126,7 @@ export function ContactList() {
   };
 
   useEffect(() => {
-    loadContacts();
+    loadContacts(true);
   }, [kindFilter]);
 
   useEffect(() => {
@@ -550,6 +562,30 @@ export function ContactList() {
       )}
 
       {isMobile || viewMode === 'cards' ? <CardView /> : <ListView />}
+
+      {hasMore && (
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <button
+            onClick={() => loadContacts(false)}
+            disabled={loading}
+            style={{ padding: "8px 24px", borderRadius: 12, border: "1px solid var(--border-color)", background: "var(--bg-card)", cursor: "pointer", fontSize: 14 }}
+          >
+            {loading ? "Загрузка..." : `Загрузить еще (${contacts.length} из ${totalCount})`}
+          </button>
+        </div>
+      )}
+
+      {hasMore && (
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <button
+            onClick={() => loadContacts(false)}
+            disabled={loading}
+            style={{ padding: "8px 24px", borderRadius: 12, border: "1px solid var(--border-color)", background: "var(--bg-card)", cursor: "pointer", fontSize: 14 }}
+          >
+            {loading ? "Загрузка..." : `Загрузить еще (${contacts.length} из ${totalCount})`}
+          </button>
+        </div>
+      )}
 
       {sortedContacts.length === 0 && (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 14 }}>Контакты не найдены</div>
