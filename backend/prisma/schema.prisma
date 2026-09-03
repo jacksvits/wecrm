@@ -209,6 +209,14 @@ model Task {
 
   transactions TaskTransaction[]
 
+  @@index([status])
+  @@index([status, dueDate])
+  @@index([price])
+  @@index([createdAt])
+  @@index([projectId])
+  @@index([contactId])
+  @@index([parentId])
+  @@index([creatorId])
   @@map("tasks")
 }
 

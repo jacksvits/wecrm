@@ -78,7 +78,9 @@ router.get('/activities', async (req, res) => {
 
   const [tasksMap, dealsMap, contactsMap, projectsMap] = await Promise.all([
     taskIds.length > 0
-      ? prisma.task.findMany({ where: { id: { in: taskIds } }, select: { id: true, title: true } })
+      ? prisma.task.findMany({
+    take: 100,
+    orderBy: { createdAt: 'desc' }, where: { id: { in: taskIds } }, select: { id: true, title: true } })
       : Promise.resolve([]),
     dealIds.length > 0
       ? prisma.deal.findMany({ where: { id: { in: dealIds } }, select: { id: true, title: true } })
@@ -119,6 +121,8 @@ router.get('/activities', async (req, res) => {
 
 router.get('/task-finances', async (req, res) => {
   const tasks = await prisma.task.findMany({
+    take: 100,
+    orderBy: { createdAt: 'desc' },
     where: { price: { gt: 0 } },
     include: { transactions: true },
   });
