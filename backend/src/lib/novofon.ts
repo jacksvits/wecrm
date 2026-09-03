@@ -45,7 +45,7 @@ async function jsonRpcRequest<T = any>(
     id: `req_${Date.now()}`,
     method,
     params: {
-      user_key: credentials.apiKey, access_token: credentials.apiSecret,
+      access_token: credentials.apiSecret,
       ...params,
     },
   };
