@@ -94,27 +94,60 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  webhook-updater:
+  ngrok:
+    image: ngrok/ngrok:latest
+    command:
+      - "http"
+      - "backend:4000"
+      - "--region=eu"
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    ports:
+      - "4040:4040"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4040/api/tunnels || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  telegram-webhook-monitor:
     image: alpine/curl:latest
     command: >
       sh -c "
-        echo 'Waiting for ngrok...' &&
-        sleep 20 &&
-        NGROK_URL=\$$(curl -s http://ngrok:4040/api/tunnels | grep -oP 'https://[a-z0-9-]+\\.ngrok-free\\.app' | head -1) &&
-        if [ -n \"\$NGROK_URL\" ] && [ -n \"\$TELEGRAM_BOT_TOKEN\" ]; then
-          echo \"Updating webhook to: \$NGROK_URL/api/telegram/webhook\" &&
-          curl -s \"https://api.telegram.org/bot\$TELEGRAM_BOT_TOKEN/setWebhook?url=\$NGROK_URL/api/telegram/webhook\" &&
-          echo 'Webhook updated successfully';
-        else
-          echo 'ERROR: NGROK_URL or TELEGRAM_BOT_TOKEN not set';
-        fi &&
-        tail -f /dev/null
+        echo '[Webhook Monitor] Starting...' &&
+        LAST_URL='' &&
+        while true; do
+          sleep 30 &&
+          NGROK_URL=\$$(wget -qO- http://ngrok:4040/api/tunnels 2>/dev/null | grep -oP 'https://[a-z0-9-]+\\.ngrok-free\\.app' | head -1) &&
+          if [ -z \"\$NGROK_URL\" ]; then
+            echo '[Webhook Monitor] ngrok URL not available yet, retrying...' &&
+            continue;
+          fi &&
+          if [ \"\$NGROK_URL\" != \"\$LAST_URL\" ]; then
+            echo \"[Webhook Monitor] URL changed: \$LAST_URL -> \$NGROK_URL\" &&
+            if [ -n \"\$TELEGRAM_BOT_TOKEN\" ]; then
+              RESULT=\$$(wget -qO- \"https://api.telegram.org/bot\$TELEGRAM_BOT_TOKEN/setWebhook?url=\$NGROK_URL/api/telegram/webhook\" 2>/dev/null) &&
+              echo \"[Webhook Monitor] Webhook updated: \$RESULT\" &&
+              LAST_URL=\$\$NGROK_URL;
+            else
+              echo '[Webhook Monitor] ERROR: TELEGRAM_BOT_TOKEN not set';
+            fi;
+          else
+            echo \"[Webhook Monitor] URL unchanged: \$NGROK_URL\";
+          fi;
+        done
       "
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     depends_on:
-      - ngrok
-    restart: "no"
+      ngrok:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   pgdata:
