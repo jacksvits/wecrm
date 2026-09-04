@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { webpush } from '../lib/push.js';
+import { webpush, sendPushToUser } from '../lib/push.js';
 
 const router = Router();
 
@@ -46,6 +46,26 @@ router.post('/unsubscribe', async (req: AuthRequest, res) => {
       where: { endpoint, userId: req.user!.id },
     });
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Тестовое push-уведомление
+router.post('/test', async (req: AuthRequest, res) => {
+  try {
+    const { userId, title, body } = req.body;
+    const targetUserId = userId || req.user!.id;
+    await sendPushToUser(
+      targetUserId,
+      {
+        title: title || 'Тестовое уведомление',
+        body: body || 'Push-уведомления работают!',
+        url: '/',
+      },
+      'task'
+    );
+    res.json({ success: true, message: 'Push отправлен' });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { sendPushToAllUsers } from '../lib/push.js';
+import { sendPushToAllUsers, sendPushToUser } from '../lib/push.js';
 import { broadcast, broadcastToUsers } from '../lib/events.js';
 
 const router = Router();
@@ -118,6 +118,23 @@ router.post('/', async (req: AuthRequest, res) => {
       ).catch(err => {
         console.error('[Chat Push] Failed to send push notifications:', err);
       });
+    } else {
+      // Отправляем push-уведомления получателям личного сообщения
+      const authorName = message.author?.name || 'Пользователь';
+      for (const recipientId of recipientIds) {
+        if (recipientId === req.user!.id) continue;
+        sendPushToUser(
+          recipientId,
+          {
+            title: `Личное сообщение от ${authorName}`,
+            body: content.length > 100 ? content.slice(0, 100) + '...' : content,
+            url: '/',
+          },
+          'chat'
+        ).catch(err => {
+          console.error(`[Chat Push] Failed to send private push to ${recipientId}:`, err);
+        });
+      }
     }
 
     // Broadcast через SSE для обновления чата

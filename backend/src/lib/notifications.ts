@@ -65,6 +65,31 @@ export async function notifyTaskAssignees(
   );
 }
 
+export async function notifyTaskCurators(
+  taskId: string,
+  payload: { title: string; body: string; url?: string },
+  excludeUserId?: string
+) {
+  const curators = await prisma.taskCurator.findMany({
+    where: { taskId },
+    select: { userId: true },
+  });
+  const targets = curators.map(c => c.userId).filter(id => id !== excludeUserId);
+  return Promise.all(
+    targets.map(uid =>
+      createNotification({
+        userId: uid,
+        type: 'task',
+        title: payload.title,
+        body: payload.body,
+        entityType: 'task',
+        entityId: taskId,
+        url: payload.url,
+      })
+    )
+  );
+}
+
 export async function notifyTaskCreator(
   taskId: string,
   payload: { title: string; body: string; url?: string }
