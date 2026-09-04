@@ -44,7 +44,7 @@ export function GlobalChat() {
     latestIdRef.current = messages[messages.length - 1]?.id;
   }, [messages]);
 
-  // Загружаем список пользователей и по умолчанию выбираем всех получателей
+  // Загружаем список пользователей
   useEffect(() => {
     api.users.list().then(all => {
       const assignable = all.filter(u => {
@@ -53,8 +53,9 @@ export function GlobalChat() {
         return role?.isAssignable !== false;
       });
       setUsers(assignable);
-      // По умолчанию все пользователи выбраны как получатели
-      setRecipientIds(assignable.map(u => u.id));
+      // По умолчанию режим "Всем" — recipientIds пустой
+      setRecipientIds([]);
+      setIsAllSelected(true);
     }).catch(() => {});
   }, [user?.id]);
 
@@ -147,7 +148,9 @@ export function GlobalChat() {
       setText('');
       setPendingAttachments([]);
       setReplyTo(null);
+      // После отправки возвращаем режим "Всем" по умолчанию
       setRecipientIds([]);
+      setIsAllSelected(true);
     } catch (e: any) {
       alert(e.message || 'Ошибка отправки');
     } finally {
@@ -191,8 +194,26 @@ export function GlobalChat() {
     setPendingAttachments((prev) => [...prev, attachment]);
   };
 
+  // Выбор конкретного получателя: снимаем режим "Всем", добавляем/убираем ID
   const toggleRecipient = (id: string) => {
-    setRecipientIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    setIsAllSelected(false);
+    setRecipientIds(prev => {
+      if (prev.includes(id)) {
+        const next = prev.filter(x => x !== id);
+        // Если сняли последнюю галочку — вернуться в режим "Всем"
+        if (next.length === 0) {
+          setIsAllSelected(true);
+        }
+        return next;
+      }
+      return [...prev, id];
+    });
+  };
+
+  // Выбор режима "Всем": сбрасываем все выбранные аватарки
+  const handleSelectAll = () => {
+    setIsAllSelected(true);
+    setRecipientIds([]);
   };
 
   const getReactionGroups = (reactions?: Array<{ id: string; emoji: string; userId: string; user?: { name: string } }>) => {
@@ -618,11 +639,12 @@ export function GlobalChat() {
         </div>
       )}
 
-      {/* Панель выбора получателей — аватарки пользователей */}
+      {/* Панель выбора получателей — кнопка "Всем" + аватарки пользователей */}
       {users.length > 0 && (
         <div style={{
           display: 'flex',
           justifyContent: 'center',
+          alignItems: 'center',
           gap: 10,
           marginTop: 8,
           marginBottom: 6,
@@ -630,8 +652,60 @@ export function GlobalChat() {
           flexShrink: 0,
           padding: '0 4px',
         }}>
+          {/* Кнопка "Всем" — слева от аватарок */}
+          <button
+            onClick={handleSelectAll}
+            disabled={isAllSelected}
+            title="Отправить всем"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              cursor: isAllSelected ? 'default' : 'pointer',
+              transition: 'all 0.2s ease',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              opacity: isAllSelected ? 1 : 0.6,
+            }}
+          >
+            <div style={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              background: isAllSelected
+                ? 'linear-gradient(135deg, #007aff 0%, #5856d6 100%)'
+                : 'var(--bg-input, rgba(0,0,0,0.08))',
+              color: isAllSelected ? '#fff' : 'var(--text-muted, rgba(255,255,255,0.4))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 12,
+              fontWeight: 700,
+              border: isAllSelected
+                ? '2.5px solid #007aff'
+                : '2.5px solid transparent',
+              boxShadow: isAllSelected
+                ? '0 0 0 2px rgba(0,122,255,0.25), 0 3px 10px rgba(0,122,255,0.35)'
+                : '0 2px 6px rgba(0,0,0,0.15)',
+              transition: 'all 0.2s ease',
+            }}>
+              Всем
+            </div>
+            <span style={{
+              fontSize: 9,
+              color: isAllSelected ? '#007aff' : 'var(--text-muted, rgba(255,255,255,0.4))',
+              marginTop: 3,
+              fontWeight: isAllSelected ? 600 : 400,
+              transition: 'color 0.2s ease',
+            }}>
+              Всем
+            </span>
+          </button>
+
           {users.map(u => {
-            const selected = recipientIds.includes(u.id);
+            // Аватарка выбрана только когда isAllSelected = false и ID в списке
+            const selected = !isAllSelected && recipientIds.includes(u.id);
             return (
               <div
                 key={u.id}
