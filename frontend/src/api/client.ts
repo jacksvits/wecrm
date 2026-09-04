@@ -30,6 +30,13 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     getMyChat: () => fetchApi('/api/max/my-chat'),
     linkChat: (chatId: string) => fetchApi('/api/max/link-chat', { method: 'POST', body: JSON.stringify({ chatId }) }),
   },
+  telegram: {
+    getSettings: () => fetchApi('/api/telegram/settings'),
+    saveSettings: (data: any) => fetchApi('/api/telegram/settings', { method: 'POST', body: JSON.stringify(data) }),
+    sendMessage: (chatId: string, text: string) => fetchApi('/api/telegram/send', { method: 'POST', body: JSON.stringify({ chatId, text }) }),
+    getMyChat: () => fetchApi('/api/telegram/my-chat'),
+    linkChat: (chatId: string) => fetchApi('/api/telegram/link-chat', { method: 'POST', body: JSON.stringify({ chatId }) }),
+  },
   beget: {
     account: () => fetchApi('/api/beget/account'),
     domains: () => fetchApi('/api/beget/domains'),
