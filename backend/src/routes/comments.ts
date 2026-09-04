@@ -51,11 +51,21 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
       });
     }
 
-    // Send push notifications to assignees and curators
+    // Send push notifications to assignees, curators, creator and admins
     const notifyUserIds = new Set<string>();
     task.assignees.forEach(a => notifyUserIds.add(a.userId));
     task.curators.forEach(c => notifyUserIds.add(c.userId));
     notifyUserIds.add(task.creatorId);
+    
+    // Add admins to notifications
+    const admins = await prisma.user.findMany({
+      where: {
+        role: { name: 'admin' },
+      },
+      select: { id: true },
+    });
+    admins.forEach(a => notifyUserIds.add(a.id));
+    
     notifyUserIds.delete(req.user!.id);
 
     // Create in-app notifications
