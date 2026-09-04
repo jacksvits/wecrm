@@ -17,6 +17,7 @@ export function GlobalChat() {
   const [isDark, setIsDark] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [recipientIds, setRecipientIds] = useState<string[]>([]);
+  const [isAllSelected, setIsAllSelected] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
   const [showReactionsFor, setShowReactionsFor] = useState<string | null>(null);
   const [hoveredMsg, setHoveredMsg] = useState<string | null>(null);
