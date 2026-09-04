@@ -87,7 +87,7 @@ export function TaskList() {
     api.users.list().then(setUsers);
     api.projects.list("flat=true").then(setProjects);
     api.statuses.list("task").then(setStatuses);
-  }, [filter, assigneeFilter, projectFilter, contactFilter, search, sortBy]);
+  }, [filter, assigneeFilter, projectFilter, contactFilter, search, sortBy, hideCompleted]);
   const loadTasks = () => {
     let params = new URLSearchParams();
     if (filter !== "all") params.set("filter", filter);
@@ -111,6 +111,13 @@ export function TaskList() {
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Reload tasks when window gets focus (e.g. returning from detail page)
+  useEffect(() => {
+    const handleFocus = () => loadTasks();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   // Force kanban view on mobile
