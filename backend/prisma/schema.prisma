@@ -16,6 +16,7 @@ model Role {
   sortOrder     Int      @default(0)
   allowedPages  String[] @default([]) @map("allowedpages")
   isAssignable  Boolean  @default(true) @map("isassignable")
+  canAccessChat Boolean  @default(true) @map("can_access_chat")
   notifyOnNewTask    Boolean @default(true)  @map("notify_on_new_task")
   notifyOnNewDeal    Boolean @default(false) @map("notify_on_new_deal")
   notifyOnNewComment Boolean @default(false) @map("notify_on_new_comment")

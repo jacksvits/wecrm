@@ -20,6 +20,9 @@ const createSchema = z.object({
 router.get('/', async (req: AuthRequest, res) => {
   const { afterId } = req.query;
   const userId = req.user!.id;
+  if (req.user?.canAccessChat === false) {
+    return res.status(403).json({ error: 'Доступ к чату запрещён' });
+  }
 
   const messages = await prisma.chatMessage.findMany({
     where: afterId
@@ -69,6 +72,9 @@ router.get('/', async (req: AuthRequest, res) => {
 router.post('/', async (req: AuthRequest, res) => {
   try {
     const { content, replyToId, recipientIds, attachmentIds } = createSchema.parse(req.body);
+    if (req.user?.canAccessChat === false) {
+      return res.status(403).json({ error: 'Доступ к чату запрещён' });
+    }
 
     const message = await prisma.chatMessage.create({
       data: {
@@ -158,6 +164,10 @@ router.post('/:id/react', async (req: AuthRequest, res) => {
   const messageId = req.params.id;
   const userId = req.user!.id;
 
+  if (req.user?.canAccessChat === false) {
+    return res.status(403).json({ error: 'Доступ к чату запрещён' });
+  }
+
   const message = await prisma.chatMessage.findUnique({ where: { id: messageId } });
   if (!message) {
     return res.status(404).json({ error: 'Сообщение не найдено' });
@@ -198,6 +208,10 @@ router.post('/:id/react', async (req: AuthRequest, res) => {
 
 // Удалить своё сообщение (мягкое удаление)
 router.delete('/:id', async (req: AuthRequest, res) => {
+  if (req.user?.canAccessChat === false) {
+    return res.status(403).json({ error: 'Доступ к чату запрещён' });
+  }
+
   const message = await prisma.chatMessage.findUnique({
     where: { id: req.params.id },
   });

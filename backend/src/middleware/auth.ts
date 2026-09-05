@@ -9,6 +9,7 @@ export interface AuthRequest extends Request {
     name: string;
     role: string;
     allowedPages?: string[];
+    canAccessChat?: boolean;
   };
 }
 
@@ -43,6 +44,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       name: user.name || user.email.split('@')[0],
       role: user.role?.name || 'user',
       allowedPages: user.role?.allowedPages || [],
+      canAccessChat: user.role?.canAccessChat ?? true,
     };
     next();
   } catch {

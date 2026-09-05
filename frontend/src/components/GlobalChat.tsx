@@ -10,6 +10,18 @@ const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
 export function GlobalChat() {
   const { user } = useAuth();
+  const userRole = typeof user?.role === 'string' ? null : user?.role;
+  const canAccessChat = userRole?.canAccessChat !== false;
+
+  if (!canAccessChat) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', gap: 12 }}>
+        <div style={{ fontSize: 40 }}>🔒</div>
+        <div style={{ fontSize: 16, fontWeight: 500 }}>Доступ к чату ограничен</div>
+        <div style={{ fontSize: 13, opacity: 0.7 }}>Обратитесь к администратору</div>
+      </div>
+    );
+  }
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -51,6 +63,7 @@ export function GlobalChat() {
       const assignable = all.filter(u => {
         if (u.id === user?.id) return false;
         const role = typeof u.role === 'string' ? null : u.role;
+        if (role?.canAccessChat === false) return false;
         return role?.isAssignable !== false;
       });
       setUsers(assignable);
