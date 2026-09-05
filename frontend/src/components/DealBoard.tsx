@@ -84,6 +84,23 @@ export function DealBoard() {
 
   const getStageLabel = (name: string) => statuses.find(s => s.name === name)?.label || name;
 
+  const getStatusStyle = (name: string) => {
+    const s = statuses.find(st => st.name === name);
+    return s ? { bg: s.color, text: s.textColor } : { bg: '#f0f0f0', text: '#666' };
+  };
+
+  const getDealBackground = (statusColor: string) => {
+    const hex = statusColor.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, 0.08)`;
+  };
+
+  const getDealBorderLeft = (statusColor: string) => {
+    return `3px solid ${statusColor}`;
+  };
+
   const filteredContacts = contacts.filter(c => {
     if (!contactSearch.trim()) return true;
     const q = contactSearch.toLowerCase();
@@ -107,28 +124,37 @@ export function DealBoard() {
         <h2 style={{ margin: 0, fontSize: 18 }}>Воронка продаж</h2>
         <button onClick={openCreate} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>+ Создать сделку</button>
       </div>
-      <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch' }}>
-        {statuses.map(stage => (
-          <div key={stage.name} style={{ minWidth: 260, flex: 1, flexShrink: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, padding: '8px 0' }}>
-              <span style={{ fontSize: 13, fontWeight: 500 }}>{stage.label}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{dealsByStage(stage.name).length}</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {dealsByStage(stage.name).map(deal => (
-                <div key={deal.id} style={{ padding: 16, borderRadius: 16, border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer', position: 'relative', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
-                  <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4 }}>
-                    <button onClick={() => openEdit(deal)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>✏️</button>
-                    <button onClick={() => handleDelete(deal.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>🗑</button>
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, paddingRight: 40 }}>{deal.title}</div>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>₽{deal.value.toLocaleString()}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{deal.contact?.name} · {deal.probability}%</div>
+      <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch', minHeight: 400, alignItems: 'flex-start' }}>
+        {statuses.map(stage => {
+          const stageDeals = dealsByStage(stage.name);
+          const isEmpty = stageDeals.length === 0;
+          const st = getStatusStyle(stage.name);
+          return (
+            <div key={stage.name} style={{ minWidth: isEmpty ? 48 : 280, flex: isEmpty ? '0 0 auto' : 1, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, transition: 'all 0.2s ease' }}>
+              <div style={{ display: 'flex', justifyContent: isEmpty ? 'center' : 'space-between', alignItems: 'center', padding: isEmpty ? '12px 4px' : '8px 0', background: isEmpty ? stage.color : 'transparent', borderRadius: isEmpty ? 12 : 0, writingMode: isEmpty ? 'vertical-rl' : 'horizontal-tb', textOrientation: isEmpty ? 'mixed' : 'initial', minHeight: isEmpty ? 120 : 'auto' }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: isEmpty ? stage.textColor : 'inherit', letterSpacing: isEmpty ? '0.05em' : 'normal' }}>{stage.label}</span>
+                {!isEmpty && (
+                  <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, background: stage.color, color: stage.textColor }}>{stageDeals.length}</span>
+                )}
+              </div>
+              {!isEmpty && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {stageDeals.map(deal => (
+                    <div key={deal.id} style={{ padding: 14, borderRadius: 14, border: '1px solid var(--border-color)', background: getDealBackground(st.bg), borderLeft: getDealBorderLeft(st.bg), cursor: 'pointer', position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
+                      <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4 }}>
+                        <button onClick={() => openEdit(deal)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>✏️</button>
+                        <button onClick={() => handleDelete(deal.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>🗑</button>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, paddingRight: 40, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.title}</div>
+                      <div style={{ fontSize: 14, fontWeight: 500 }}>₽{deal.value.toLocaleString()}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{deal.contact?.name} · {deal.probability}%</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(16px, env(safe-area-inset-top, 0)) max(16px, env(safe-area-inset-right, 0)) max(16px, env(safe-area-inset-bottom, 0)) max(16px, env(safe-area-inset-left, 0))' }}>
