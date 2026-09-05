@@ -14,6 +14,7 @@ const createSchema = z.object({
   endDate: z.string().datetime().optional(),
   parentId: z.string().optional(),
   isLocked: z.boolean().optional(),
+  contactIds: z.array(z.string()).optional().default([]),
 });
 
 const updateSchema = z.object({
@@ -24,6 +25,7 @@ const updateSchema = z.object({
   endDate: z.string().datetime().optional(),
   parentId: z.string().optional().nullable(),
   isLocked: z.boolean().optional(),
+  contactIds: z.array(z.string()).optional(),
 });
 
 router.get('/', async (req, res) => {
@@ -46,6 +48,7 @@ router.get('/', async (req, res) => {
     include: {
       _count: { select: { tasks: true, deals: true } },
       tasks: { select: { status: true } },
+      contacts: { include: { contact: { select: { id: true, name: true, kind: true } } } },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -70,6 +73,7 @@ router.get('/:id', async (req, res) => {
     include: {
       tasks: { select: { id: true, title: true, status: true, priority: true } },
       deals: { select: { id: true, title: true, value: true, stage: true } },
+      contacts: { include: { contact: { select: { id: true, name: true, kind: true, company: true } } } },
       children: {
         include: {
           _count: { select: { tasks: true, deals: true } },
@@ -89,12 +93,19 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const data = createSchema.parse(req.body);
+    const { contactIds, ...rest } = data;
     const project = await prisma.project.create({
       data: {
-        ...data,
+        ...rest,
         startDate: data.startDate ? new Date(data.startDate) : undefined,
         endDate: data.endDate ? new Date(data.endDate) : undefined,
         parentId: data.parentId || undefined,
+        contacts: contactIds?.length ? {
+          create: contactIds.map(cid => ({ contact: { connect: { id: cid } } })),
+        } : undefined,
+      },
+      include: {
+        contacts: { include: { contact: { select: { id: true, name: true, kind: true } } } },
       },
     });
     res.status(201).json(project);
@@ -122,13 +133,29 @@ router.patch('/:id', async (req, res) => {
         return res.status(400).json({ error: 'Cannot set a descendant as parent' });
       }
     }
+    const { contactIds, ...restData } = data;
+    const updateData: any = {
+      ...restData,
+      startDate: data.startDate ? new Date(data.startDate) : undefined,
+      endDate: data.endDate ? new Date(data.endDate) : undefined,
+      parentId: data.parentId === null ? null : data.parentId || undefined,
+    };
+
+    if (contactIds !== undefined) {
+      await prisma.contactProject.deleteMany({ where: { projectId: req.params.id } });
+      if (contactIds.length > 0) {
+        await prisma.contactProject.createMany({
+          data: contactIds.map((cid: string) => ({ contactId: cid, projectId: req.params.id })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
     const project = await prisma.project.update({
       where: { id: req.params.id },
-      data: {
-        ...data,
-        startDate: data.startDate ? new Date(data.startDate) : undefined,
-        endDate: data.endDate ? new Date(data.endDate) : undefined,
-        parentId: data.parentId === null ? null : data.parentId || undefined,
+      data: updateData,
+      include: {
+        contacts: { include: { contact: { select: { id: true, name: true, kind: true } } } },
       },
     });
     res.json(project);

@@ -35,6 +35,7 @@ const createSchema = z.object({
   legalAddress: z.string().optional().nullable(),
   position: z.string().optional().or(z.literal(null)),
   organizationId: z.string().optional().or(z.literal(null)),
+  projectIds: z.array(z.string()).optional().default([]),
 });
 
 router.get('/', async (req, res) => {
@@ -64,6 +65,7 @@ router.get('/', async (req, res) => {
         include: {
           _count: { select: { deals: true, tasks: true, employees: true } },
           organization: { select: { id: true, name: true } },
+          projects: { include: { project: { select: { id: true, name: true, status: true } } } },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -90,6 +92,7 @@ router.get('/:id', async (req, res) => {
         tasks: { orderBy: { createdAt: 'desc' } },
         employees: { orderBy: { name: 'asc' } },
         organization: { select: { id: true, name: true, inn: true, phone: true } },
+        projects: { include: { project: { select: { id: true, name: true, status: true } } } },
       },
     });
     if (!contact) {
@@ -120,7 +123,17 @@ router.post('/', async (req, res) => {
       payload.ogrn = null;
       payload.legalAddress = null;
     }
-    const contact = await prisma.contact.create({ data: payload });
+    const contact = await prisma.contact.create({
+      data: {
+        ...payload,
+        projects: data.projectIds?.length ? {
+          create: data.projectIds.map(pid => ({ project: { connect: { id: pid } } })),
+        } : undefined,
+      },
+      include: {
+        projects: { include: { project: { select: { id: true, name: true, status: true } } } },
+      },
+    });
     res.status(201).json(contact);
   } catch (err: any) {
     console.error('[Contacts POST] Error:', err.message);
@@ -153,9 +166,25 @@ router.patch('/:id', async (req: AuthRequest, res) => {
       data.ogrn = null;
       data.legalAddress = null;
     }
+    const { projectIds, ...restData } = data;
+    const updateData: any = { ...restData };
+
+    if (projectIds !== undefined) {
+      await prisma.contactProject.deleteMany({ where: { contactId: req.params.id } });
+      if (projectIds.length > 0) {
+        await prisma.contactProject.createMany({
+          data: projectIds.map((pid: string) => ({ contactId: req.params.id, projectId: pid })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
     const contact = await prisma.contact.update({
       where: { id: req.params.id },
-      data,
+      data: updateData,
+      include: {
+        projects: { include: { project: { select: { id: true, name: true, status: true } } } },
+      },
     });
     res.json(contact);
   } catch (err: any) {

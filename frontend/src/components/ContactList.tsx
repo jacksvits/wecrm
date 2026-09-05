@@ -6,7 +6,7 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
-import { Contact } from '../types';
+import { Contact, Project } from '../types';
 
 interface ContactType {
   id: string;
@@ -33,6 +33,7 @@ export function ContactList() {
   const location = useLocation();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [organizations, setOrganizations] = useState<Contact[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState('createdAtDesc');
@@ -102,11 +103,13 @@ export function ContactList() {
     legalAddress: '',
     position: '',
     organizationId: '',
+    projectIds: [] as string[],
   });
 
   useEffect(() => {
     loadContacts(true);
     loadOrganizations();
+    api.projects.list('flat=true').then(setProjects);
   }, []);
 
   useEffect(() => {
@@ -151,6 +154,7 @@ export function ContactList() {
     setForm({
       name: '', emails: [''], phones: [''], company: '', type: 'client', kind: 'contact',
       tags: '', notes: '', inn: '', ogrn: '', legalAddress: '', position: '', organizationId: '',
+      projectIds: [],
     });
     setShowModal(true);
   };
@@ -171,6 +175,7 @@ export function ContactList() {
       legalAddress: contact.legalAddress || '',
       position: contact.position || '',
       organizationId: contact.organizationId || '',
+      projectIds: contact.projects?.map(p => p.project.id) || [],
     });
     setShowModal(true);
   };
@@ -182,6 +187,7 @@ export function ContactList() {
       emails: form.emails.filter(Boolean),
       phones: form.phones.filter(Boolean),
       tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
+      projectIds: form.projectIds,
     };
     if (form.kind === 'organization') {
       data.position = null;
@@ -656,6 +662,22 @@ export function ContactList() {
                 ))}
               </select>
               <input placeholder="Теги (через запятую)" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }} />
+              <div>
+                <label style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>Проекты</label>
+                <select
+                  multiple
+                  value={form.projectIds}
+                  onChange={e => {
+                    const options = Array.from(e.target.selectedOptions).map(o => o.value);
+                    setForm({ ...form, projectIds: options });
+                  }}
+                  style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14, width: '100%', minHeight: 80 }}
+                >
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
               <div style={{ marginBottom: 12 }}>
                 <label style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>Заметки</label>
                 <ReactQuill

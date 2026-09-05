@@ -30,7 +30,7 @@ export function ContactDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [contact, setContact] = useState<Contact | null>(null);
-  const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'deals'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'deals' | 'projects'>('info');
   const [loading, setLoading] = useState(true);
   const [contactTypes, setContactTypes] = useState<ContactType[]>([]);
 
@@ -85,7 +85,7 @@ export function ContactDetail() {
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border-color)' }}>
-        {[{ key: 'info' as const, label: 'Основная информация' }, { key: 'tasks' as const, label: `Задачи (${contact._count?.tasks || 0})` }, { key: 'deals' as const, label: `Сделки (${contact._count?.deals || 0})` }].map((tab) => (
+        {[{ key: 'info' as const, label: 'Основная информация' }, { key: 'tasks' as const, label: `Задачи (${contact._count?.tasks || 0})` }, { key: 'deals' as const, label: `Сделки (${contact._count?.deals || 0})` }, { key: 'projects' as const, label: `Проекты (${contact.projects?.length || 0})` }].map((tab) => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{ padding: '10px 20px', border: 'none', borderBottom: activeTab === tab.key ? '2px solid #1565c0' : '2px solid transparent', background: 'transparent', color: activeTab === tab.key ? '#1565c0' : 'var(--text-muted)', fontWeight: activeTab === tab.key ? 600 : 400, cursor: 'pointer', fontSize: 14, transition: 'all 0.15s' }}>{tab.label}</button>
         ))}
       </div>
@@ -225,6 +225,17 @@ export function ContactDetail() {
               </div>
             </div>
           )) : <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Нет сделок</div>}
+        </div>
+      )}
+
+      {activeTab === 'projects' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {contact.projects && contact.projects.length > 0 ? contact.projects.map((cp) => (
+            <div key={cp.project.id} onClick={() => navigate(`/projects?highlight=${cp.project.id}`)} style={{ padding: 14, borderRadius: 12, border: '1px solid var(--border-color)', cursor: 'pointer', background: 'var(--bg-card)', transition: 'background 0.15s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#fafafa'} onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-card)'}>
+              <div style={{ fontWeight: 500, fontSize: 14 }}>{cp.project.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Статус: {cp.project.status}</div>
+            </div>
+          )) : <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Нет проектов</div>}
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
-import { Project, Status } from '../types';
+import { Project, Status, Contact } from '../types';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -13,13 +13,15 @@ export function ProjectList() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [preselectedParentId, setPreselectedParentId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const defaultStatus = statuses.find(s => s.isDefault)?.name || statuses[0]?.name || 'active';
-  const [form, setForm] = useState({ name: '', description: '', status: defaultStatus, startDate: '', endDate: '', parentId: '', isLocked: false });
+  const [form, setForm] = useState({ name: '', description: '', status: defaultStatus, startDate: '', endDate: '', parentId: '', isLocked: false, contactIds: [] as string[] });
 
   useEffect(() => {
     loadProjects();
     api.projects.list('flat=true').then(setFlatProjects);
     api.statuses.list('project').then(setStatuses);
+    api.contacts.list().then(setContacts);
   }, []);
 
   const loadProjects = () => api.projects.list().then(setProjects);
@@ -37,7 +39,7 @@ export function ProjectList() {
   const openCreate = (parentId?: string) => {
     setEditingId(null);
     setPreselectedParentId(parentId || null);
-    setForm({ name: '', description: '', status: defaultStatus, startDate: '', endDate: '', parentId: parentId || '', isLocked: false });
+    setForm({ name: '', description: '', status: defaultStatus, startDate: '', endDate: '', parentId: parentId || '', isLocked: false, contactIds: [] });
     setShowModal(true);
   };
 
@@ -52,6 +54,7 @@ export function ProjectList() {
       endDate: project.endDate ? project.endDate.slice(0, 10) : '',
       parentId: project.parentId || '',
       isLocked: project.isLocked || false,
+      contactIds: project.contacts?.map(c => c.contact.id) || [],
     });
     setShowModal(true);
   };
@@ -60,6 +63,7 @@ export function ProjectList() {
     e.preventDefault();
     const data = {
       ...form,
+      contactIds: form.contactIds,
       startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
       endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
     };
@@ -147,6 +151,22 @@ export function ProjectList() {
               </select>
               <input type='date' placeholder='Дата начала' value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)' }} />
               <input type='date' placeholder='Дата окончания' value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)' }} />
+              <div>
+                <label style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>Контакты</label>
+                <select
+                  multiple
+                  value={form.contactIds}
+                  onChange={e => {
+                    const options = Array.from(e.target.selectedOptions).map(o => o.value);
+                    setForm({ ...form, contactIds: options });
+                  }}
+                  style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', fontSize: 14, width: '100%', minHeight: 80 }}
+                >
+                  {contacts.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} {c.company ? `(${c.company})` : ''}</option>
+                  ))}
+                </select>
+              </div>
               <select value={form.parentId} onChange={e => setForm({ ...form, parentId: e.target.value })} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)' }}>
                 <option value=''>— Родительский проект —</option>
                 {flatProjects.filter(p => p.id !== editingId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
