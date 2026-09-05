@@ -93,21 +93,6 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
-
-  ngrok:
-    image: ngrok/ngrok:latest
-    command:
-      - "http"
-      - "backend:4000"
-      - "--region=eu"
-    environment:
-      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
-    ports:
-      - "4040:4040"
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4040/api/tunnels || exit 1"]
       interval: 10s
