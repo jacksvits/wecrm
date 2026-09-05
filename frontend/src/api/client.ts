@@ -96,7 +96,5 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     delete: (id: string) => fetchApi(`/api/notes/${id}`, { method: 'DELETE' }),
   },
   get: (path: string): Promise<any> => fetchApi(path),
-  notes: { list: (q?: string): Promise<Note[]> => fetchApi(`/api/notes${q ? `?q=${encodeURIComponent(q)}` : }`), get: (id: string): Promise<Note> => fetchApi(`/api/notes/${id}`), create: (data: Partial<Note>) => fetchApi(/api/notes, { method: POST, body: JSON.stringify(data) }), update: (id: string, data: Partial<Note>) => fetchApi(`/api/notes/${id}`, { method: PATCH, body: JSON.stringify(data) }), delete: (id: string) => fetchApi(`/api/notes/${id}`, { method: DELETE }), },
-  get: (path: string): Promise<any> => fetchApi(path),
 
 };
