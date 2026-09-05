@@ -34,7 +34,7 @@ import pskovlineRoutes from './routes/pskovline.js';
 import cameraRoutes from './routes/camera.js';
 import taskFinanceRoutes from './routes/task-finances.js';
 import contactTypeRoutes from './routes/contact-types.js';
-
+import notesRouter from './routes/notes.js';
 dotenv.config();
 
 const app = express();
@@ -92,6 +92,7 @@ app.use('/api/beget', begetRoutes);
 app.use('/api/tochka', tochkaRoutes);
 app.use('/api/pskovline', pskovlineRoutes);
 app.use('/api/camera', cameraRoutes);
+app.use('/api/notes', notesRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', connections: getActiveConnections(), time: new Date().toISOString() }));
 

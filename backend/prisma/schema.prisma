@@ -73,13 +73,13 @@ model User {
   attachments     FileAttachment[]
   telephonySettings TelephonySettings[]
   maxUserChats      MaxUserChat[]
-  telegramUserChats TelegramUserChat[]
-  telegramSettings  TelegramSettings[]
   taskHistory       TaskHistory[]
   vkGroupSettings   VkGroupSettings[]
   maxSettings       MaxSettings[]
 
   news            News[]
+  notes           Note[]
+  telegramSettings TelegramSettings[]
   @@map("users")
 }
 
@@ -111,8 +111,6 @@ model Contact {
   vkUserId    Int?     @unique @map("vk_user_id")
   maxChatId        String?  @unique @map("max_chat_id")
   maxUserId        String?  @map("max_user_id")
-  telegramChatId   String?  @unique @map("telegram_chat_id")
-  telegramUserId   String?  @map("telegram_user_id")
   avatarUrl        String?  @map("avatar_url")
   description      String?  @map("description")
   lastActivityTime DateTime? @map("last_activity_time")
@@ -203,11 +201,6 @@ model Task {
   maxChatId    String? @map("max_chat_id")
   maxUserId    String? @map("max_user_id")
   maxMessageId String? @unique @map("max_message_id")
-
-  // Telegram integration fields
-  telegramChatId    String? @map("telegram_chat_id")
-  telegramUserId   String? @map("telegram_user_id")
-  telegramMessageId String? @unique @map("telegram_message_id")
 
   // Finance fields
   budget       Float?   @default(0)
@@ -306,7 +299,6 @@ model Comment {
 
   vkMessageId  Int?    @unique @map("vk_message_id")
   maxMessageId String? @unique @map("max_message_id")
-  telegramMessageId String? @unique @map("telegram_message_id")
   isInternal   Boolean @default(false) @map("is_internal")
 
   @@map("comments")
@@ -572,37 +564,20 @@ model MaxUserChat {
   @@map("max_user_chats")
 }
 
-model TelegramSettings {
-  id                String   @id @default(cuid())
-  isActive          Boolean  @default(false) @map("is_active")
-  botToken          String   @map("bot_token")
-  chatId            String?  @map("chat_id")
-  botUsername       String?  @map("bot_username")
-  webhookUrl        String?  @map("webhook_url")
-  autoNotify        Boolean  @default(true) @map("auto_notify")
-  notifyOn          String[] @default(["task", "comment"]) @map("notify_on")
-  defaultCreatorId  String?  @map("default_creator_id")
-  defaultCreator    User?    @relation(fields: [defaultCreatorId], references: [id])
-  assigneeIds       String[] @default([]) @map("assignee_ids")
-  autoCreateContact Boolean  @default(true) @map("auto_create_contact")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt @map("updated_at")
-
-  @@map("telegram_settings")
-}
-
-model TelegramUserChat {
+model Note {
   id        String   @id @default(cuid())
-  chatId    String   @unique @map("chat_id")
-  userId    String?  @map("user_id")
-  user      User?    @relation(fields: [userId], references: [id])
-  username  String?  @map("username")
-  firstName String?  @map("first_name")
-  lastName  String?  @map("last_name")
-  createdAt DateTime @default(now())
+  title     String
+  content   String
+  color     String   @default("#f0f0f0")
+  tags      String[] @default([])
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("telegram_user_chats")
+  @@index([userId])
+  @@index([createdAt])
+  @@map("notes")
 }
 
 model NewsCategory {
@@ -684,6 +659,26 @@ model NewsHistory {
 }
 
 
+
+model TelegramSettings {
+  id                String   @id @default(cuid())
+  isActive          Boolean  @default(false) @map("is_active")
+  botToken          String   @map("bot_token")
+  chatId            String?  @map("chat_id")
+  botUsername       String?  @map("bot_username")
+  webhookUrl        String?  @map("webhook_url")
+  autoNotify        Boolean  @default(true) @map("auto_notify")
+  notifyOn          String[] @default(["task", "comment"]) @map("notify_on")
+  defaultCreatorId  String?  @map("default_creator_id")
+  assigneeIds       String[] @default([]) @map("assignee_ids")
+  autoCreateContact Boolean  @default(true) @map("auto_create_contact")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  userId            String?  @map("user_id")
+  user              User?    @relation(fields: [userId], references: [id])
+
+  @@map("telegram_settings")
+}
 
 model PskovlineBalance {
   id        String   @id @default(cuid())

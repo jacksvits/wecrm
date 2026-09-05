@@ -36,4 +36,4 @@ export interface SmsMessage {
   contact?: { id: string; name: string } | null;
   receivedAt: string;
   createdAt: string;
-}
+}export interface Note { id: string; title: string; content: string; color: string; isPinned: boolean; userId: string; user?: { id: string; name: string; avatar?: string }; createdAt: string; updatedAt: string; }
