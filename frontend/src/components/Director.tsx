@@ -1173,6 +1173,7 @@ export function Director() {
           position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
           background: "rgba(0,0,0,0.4)", zIndex: 100,
           display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "max(16px, env(safe-area-inset-top, 0)) max(16px, env(safe-area-inset-right, 0)) max(16px, env(safe-area-inset-bottom, 0)) max(16px, env(safe-area-inset-left, 0))",
         }} onClick={() => setShowPskovlineSettings(false)}>
           <div style={{
             background: "var(--bg-card)", borderRadius: 16, padding: 24,
@@ -1312,6 +1313,7 @@ export function Director() {
           position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
           background: "rgba(0,0,0,0.4)", zIndex: 100,
           display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "max(16px, env(safe-area-inset-top, 0)) max(16px, env(safe-area-inset-right, 0)) max(16px, env(safe-area-inset-bottom, 0)) max(16px, env(safe-area-inset-left, 0))",
         }} onClick={() => setEditingCameraIndex(null)}>
           <div style={{
             background: "var(--bg-card)", borderRadius: 16, padding: 24,
@@ -1482,7 +1484,7 @@ export function Director() {
         >
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "12px 20px", background: "rgba(0,0,0,0.8)",
+            padding: "calc(12px + env(safe-area-inset-top, 0)) 20px 12px", background: "rgba(0,0,0,0.8)",
           }}>
             <span style={{ color: "#fff", fontSize: 15, fontWeight: 500 }}>{fullscreenCamera.label}</span>
             <button

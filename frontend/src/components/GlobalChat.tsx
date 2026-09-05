@@ -795,7 +795,7 @@ export function GlobalChat() {
         gap: 10,
         alignItems: 'flex-end',
         marginTop: 8,
-        padding: '10px 0',
+        padding: '10px 0 calc(10px + env(safe-area-inset-bottom, 0))',
         flexShrink: 0,
       }}>
         <FileUpload entityType="chat" entityId="global" onUpload={handleFileUpload} isDark={isDark} variant="button" multiple={true} />

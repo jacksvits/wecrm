@@ -2379,6 +2379,7 @@ export function TaskDetail() {
             alignItems: "center",
             justifyContent: "center",
             cursor: "zoom-out",
+            padding: "env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0)",
           }}
         >
           {" "}
@@ -2389,8 +2390,8 @@ export function TaskDetail() {
             }}
             style={{
               position: "absolute",
-              top: 20,
-              right: 20,
+              top: "calc(20px + env(safe-area-inset-top, 0))",
+              right: "calc(20px + env(safe-area-inset-right, 0))",
               background: "none",
               border: "none",
               color: "#fff",

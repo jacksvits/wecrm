@@ -243,7 +243,7 @@ export function Login() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 10000,
-          padding: 16,
+          padding: 'max(16px, env(safe-area-inset-top, 0)) max(16px, env(safe-area-inset-right, 0)) max(16px, env(safe-area-inset-bottom, 0)) max(16px, env(safe-area-inset-left, 0))',
         }}>
           <div style={{
             width: '100%',
