@@ -1,0 +1,735 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  label         String
+  color         String   @default("#f0f0f0")
+  textColor     String   @default("#666")
+  sortOrder     Int      @default(0)
+  allowedPages  String[] @default([]) @map("allowedpages")
+  isAssignable  Boolean  @default(true) @map("isassignable")
+  notifyOnNewTask    Boolean @default(true)  @map("notify_on_new_task")
+  notifyOnNewDeal    Boolean @default(false) @map("notify_on_new_deal")
+  notifyOnNewComment Boolean @default(false) @map("notify_on_new_comment")
+  notifyOnNewChat    Boolean @default(false) @map("notify_on_new_chat")
+  notifyOnNewCall    Boolean @default(false) @map("notify_on_new_call")
+  notifyOnNewNews    Boolean @default(false) @map("notify_on_new_news")
+  createdAt     DateTime @default(now())
+  users         User[]
+
+  @@map("roles")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String?  @unique
+  password  String
+  name      String
+  avatar    String?
+  emails    String[] @default([])
+  roleId    String?
+  role      Role?    @relation(fields: [roleId], references: [id])
+  hideCompletedTasks Boolean @default(true)
+  darkTheme         Boolean @default(false)
+  canBeCurator      Boolean @default(false) @map("can_be_curator")
+  lastActiveAt DateTime? @map("last_active_at")
+  allowedPages String[] @default([]) @map("allowed_pages")
+
+  // Notification settings
+  pushEnabled       Boolean @default(true) @map("push_enabled")
+  notifyTask        Boolean @default(true) @map("notify_task")
+  notifyComment     Boolean @default(true) @map("notify_comment")
+  notifyChat        Boolean @default(true) @map("notify_chat")
+  notifyCall        Boolean @default(true) @map("notify_call")
+  notifyDeal        Boolean @default(true) @map("notify_deal")
+  notifyNews        Boolean @default(true) @map("notify_news")
+  soundEnabled      Boolean @default(true) @map("sound_enabled")
+
+  // Novofon extension (internal number)
+  novofonExtension String? @map("novofon_extension")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  taskAssignments TaskAssignee[]
+  taskCurations   TaskCurator[]
+  createdTasks    Task[]         @relation("CreatedTasks")
+  comments        Comment[]
+  activities      Activity[]
+  pushSubscriptions PushSubscription[]
+  notifications Notification[]
+  chatMessages    ChatMessage[] @relation("AuthoredMessages")
+  messageRecipients ChatMessageRecipient[]
+  chatReactions    ChatReaction[]
+  attachments     FileAttachment[]
+  telephonySettings TelephonySettings[]
+  maxUserChats      MaxUserChat[]
+  taskHistory       TaskHistory[]
+  vkGroupSettings   VkGroupSettings[]
+  maxSettings       MaxSettings[]
+
+  news            News[]
+  notes           Note[]
+  @@map("users")
+}
+
+model ContactType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  label     String
+  color     String   @default("#f0f0f0")
+  textColor String   @default("#666") @map("text_color")
+  sortOrder Int      @default(0)     @map("sort_order")
+  isActive  Boolean  @default(true)  @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("contact_types")
+}
+
+model Contact {
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  emails      String[] @default([])
+  phones      String[] @default([])
+  company     String?
+  type        String   @default("client")
+  kind        String   @default("contact") // contact | organization
+  tags        String[] @default([])
+  notes       String?
+  vkUserId    Int?     @unique @map("vk_user_id")
+  maxChatId        String?  @unique @map("max_chat_id")
+  maxUserId        String?  @map("max_user_id")
+  avatarUrl        String?  @map("avatar_url")
+  description      String?  @map("description")
+  lastActivityTime DateTime? @map("last_activity_time")
+  createdAt        DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Organization-specific fields
+  inn         String?
+  ogrn        String?
+  legalAddress String? @map("legal_address")
+
+  // Contact-specific fields
+  position    String?
+  organizationId String? @map("organization_id")
+  organization   Contact? @relation("ContactOrganization", fields: [organizationId], references: [id])
+  employees      Contact[] @relation("ContactOrganization")
+
+  deals       Deal[]
+  tasks       Task[]
+  calls       Call[]
+  smsMessages SmsMessage[]
+
+  @@map("contacts")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      String   @default("active")
+  startDate   DateTime?
+  endDate     DateTime?
+  progress    Int      @default(0)
+  isLocked    Boolean  @default(false) @map("is_locked")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parentId    String?  @map("parent_id")
+  parent      Project? @relation("ProjectHierarchy", fields: [parentId], references: [id])
+  children    Project[] @relation("ProjectHierarchy")
+
+  tasks       Task[]
+  deals       Deal[]
+
+  @@map("projects")
+}
+
+model Task {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  status        String   @default("open")
+  priority      String   @default("medium")
+  dueDate       DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  creatorId     String
+  creator       User     @relation("CreatedTasks", fields: [creatorId], references: [id])
+  projectId     String?
+  project       Project? @relation(fields: [projectId], references: [id])
+  contactId     String?
+  contact       Contact? @relation(fields: [contactId], references: [id])
+  dealId        String?
+  deal          Deal?    @relation(fields: [dealId], references: [id])
+
+  parentId      String?  @map("parent_id")
+  parent        Task?    @relation("TaskHierarchy", fields: [parentId], references: [id])
+  children      Task[]   @relation("TaskHierarchy")
+
+  assignees     TaskAssignee[]
+  curators      TaskCurator[]
+  comments      Comment[]
+  activities    Activity[]
+  history       TaskHistory[]
+  calls         Call[]
+
+  // Email integration fields
+  emailMessageId String? @unique
+  sourceEmail    String?
+
+  // VK Group integration fields
+  vkPeerId     Int?    @map("vk_peer_id")
+  vkGroupId    Int?    @map("vk_group_id")
+  vkMessageId  Int?    @unique @map("vk_message_id")
+
+  // MAX integration fields
+  maxChatId    String? @map("max_chat_id")
+  maxUserId    String? @map("max_user_id")
+  maxMessageId String? @unique @map("max_message_id")
+
+  // Finance fields
+  budget       Float?   @default(0)
+  price        Float?   @default(0)
+
+  // Ticket number (unique numeric identifier)
+  ticketNumber Int      @unique @default(autoincrement()) @map("ticket_number")
+
+  transactions TaskTransaction[]
+
+  @@index([status])
+  @@index([status, dueDate])
+  @@index([price])
+  @@index([createdAt])
+  @@index([projectId])
+  @@index([contactId])
+  @@index([parentId])
+  @@index([creatorId])
+  @@map("tasks")
+}
+
+model TaskAssignee {
+  id     String @id @default(cuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@index([taskId, userId])
+  @@map("task_assignees")
+}
+
+model TaskCurator {
+  id     String @id @default(cuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@index([taskId, userId])
+  @@map("task_curators")
+}
+
+model TaskHistory {
+  id        String   @id @default(cuid())
+  taskId    String   @map("task_id")
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  field     String
+  oldValue  String?  @map("old_value")
+  newValue  String?  @map("new_value")
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([taskId, createdAt])
+  @@map("task_history")
+}
+
+model Deal {
+  id          String   @id @default(cuid())
+  title       String
+  value       Int      @default(0)
+  currency    String   @default("RUB")
+  stage       String   @default("lead")
+  probability Int      @default(10)
+  expectedClose DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id])
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  tasks       Task[]
+
+  @@map("deals")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  vkMessageId  Int?    @unique @map("vk_message_id")
+  maxMessageId String? @unique @map("max_message_id")
+  isInternal   Boolean @default(false) @map("is_internal")
+
+  @@map("comments")
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  action    String
+  entity    String
+  entityId  String
+  details   String?
+  createdAt DateTime @default(now())
+
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id])
+
+  @@map("activities")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("push_subscriptions")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  deletedAt DateTime? @map("deleted_at")
+
+  authorId  String
+  author    User     @relation("AuthoredMessages", fields: [authorId], references: [id])
+
+  replyToId String?  @map("reply_to_id")
+  replyTo   ChatMessage? @relation("ReplyTo", fields: [replyToId], references: [id])
+  replies   ChatMessage[] @relation("ReplyTo")
+
+  recipients ChatMessageRecipient[]
+  reactions ChatReaction[]
+
+  @@index([replyToId])
+  @@index([deletedAt])
+  @@map("chat_messages")
+}
+
+model ChatMessageRecipient {
+  createdAt DateTime @default(now()) @map("created_at")
+  id        String   @id @default(cuid())
+  messageId String   @map("message_id")
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+  @@map("chat_message_recipients")
+}
+
+model ChatReaction {
+  id        String   @id @default(cuid())
+  emoji     String   @default("👍")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  messageId String   @map("message_id")
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
+  @@map("chat_reactions")
+}
+
+model FileAttachment {
+  id           String   @id @default(cuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  path         String
+  entityType   String
+  entityId     String
+  authorId     String
+  author       User     @relation(fields: [authorId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@map("file_attachments")
+}
+
+model EmailSettings {
+  id                  String   @id @default(cuid())
+  imapHost            String
+  imapPort            Int      @default(993)
+  imapUser            String
+  imapPass            String
+  checkIntervalMs     Int      @default(60000)
+  processedFolder     String?
+  defaultCreatorId    String?
+  isActive            Boolean  @default(true)
+  secure              Boolean  @default(true)
+  rejectUnauthorized  Boolean  @default(false)
+  requireTLS          Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("email_settings")
+}
+
+model TelephonySettings {
+  id                String   @id @default(cuid())
+  isActive          Boolean  @default(false) @map("is_active")
+  apiKey            String   @map("api_key")
+  apiSecret         String   @map("api_secret")
+  virtualNumber     String?  @map("virtual_number")
+  webhookSecret     String?  @map("webhook_secret")
+  autoCreateContact Boolean  @default(true)  @map("auto_create_contact")
+  autoCreateTask    Boolean  @default(false) @map("auto_create_task")
+  autoCreateTaskOnIncoming Boolean @default(false) @map("auto_create_task_on_incoming")
+  autoCreateTaskOnOutgoing Boolean @default(false) @map("auto_create_task_on_outgoing")
+  autoAttachRecord  Boolean  @default(false) @map("auto_attach_record")
+  notifyAdminsOnSms Boolean  @default(false) @map("notify_admins_on_sms")
+  defaultIovEmployeeId Int?  @map("default_iov_employee_id")
+  defaultIovEmployeeName String? @map("default_iov_employee_name")
+  defaultUserId     String?  @map("default_user_id")
+  defaultUser       User?    @relation(fields: [defaultUserId], references: [id])
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("telephony_settings")
+}
+
+model Call {
+  id              String   @id @default(cuid())
+  pbxCallId       String   @unique @map("pbx_call_id")
+  callIdWithRec   String?  @map("call_id_with_rec")
+  direction       String
+  callerId        String   @map("caller_id")
+  calledDid       String   @map("called_did")
+  internal        String?
+  employeeName    String?  @map("employee_name")
+  duration        Int      @default(0)
+  disposition     String   @default("unknown")
+  statusCode      String?  @map("status_code")
+  isRecorded      Boolean  @default(false) @map("is_recorded")
+  recordUrl       String?  @map("record_url")
+  recordLocalPath String?  @map("record_local_path")
+  recordDownloadedAt DateTime? @map("record_downloaded_at")
+  callStart       DateTime @map("call_start")
+  callEnd         DateTime? @map("call_end")
+  contactId       String?  @map("contact_id")
+  contact         Contact? @relation(fields: [contactId], references: [id])
+  taskId          String?  @map("task_id")
+  task            Task?    @relation(fields: [taskId], references: [id])
+  notes           String?
+  tags            String[] @default([])
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([callerId])
+  @@index([callStart])
+  @@index([contactId])
+  @@index([direction, disposition])
+  @@map("calls")
+}
+
+model SmsMessage {
+  id          String   @id @default(cuid())
+  from        String
+  to          String
+  text        String
+  contactId   String?  @map("contact_id")
+  contact     Contact? @relation(fields: [contactId], references: [id])
+  receivedAt  DateTime @default(now()) @map("received_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([from])
+  @@index([receivedAt])
+  @@index([contactId])
+  @@map("sms_messages")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // task, comment, call, deal, mention, system
+  title     String
+  body      String
+  entityType String? @map("entity_type")
+  entityId  String? @map("entity_id")
+  url       String?
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, readAt])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model Status {
+  id          String   @id @default(cuid())
+  entityType  String   @map("entity_type") // task, project, deal
+  name        String   @map("name")        // system name: open, in_progress, etc.
+  label       String   @map("label")       // display name
+  color       String   @default("#f0f0f0") @map("color")
+  textColor   String   @default("#666")    @map("text_color")
+  sortOrder   Int      @default(0)         @map("sort_order")
+  isDefault   Boolean  @default(false)     @map("is_default")
+  isActive    Boolean  @default(true)      @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")    
+
+  @@unique([entityType, name])
+  @@index([entityType, sortOrder])
+  @@map("statuses")
+}
+
+model MaxSettings {
+  id                String   @id @default(cuid())
+  isActive          Boolean  @default(false) @map("is_active")
+  apiToken          String   @map("api_token")
+  chatId            String?  @map("chat_id")
+  botUsername       String?  @map("bot_username")
+  webhookUrl        String?  @map("webhook_url")
+  autoNotify        Boolean  @default(true) @map("auto_notify")
+  notifyOn          String[] @default(["task", "comment"]) @map("notify_on")
+
+  // Новые поля по аналогии с VK
+  defaultCreatorId  String?  @map("default_creator_id")
+  defaultCreator    User?    @relation(fields: [defaultCreatorId], references: [id])
+  assigneeIds       String[] @default([]) @map("assignee_ids")
+  autoCreateContact Boolean  @default(true) @map("auto_create_contact")
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("max_settings")
+}
+
+model MaxUserChat {
+  id        String   @id @default(cuid())
+  chatId    String   @unique @map("chat_id")
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id])
+  username  String?  @map("username")
+  firstName String?  @map("first_name")
+  lastName  String?  @map("last_name")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("max_user_chats")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  color     String   @default("#f0f0f0")
+  tags      String[] @default([])
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("notes")
+}
+
+model NewsCategory {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  color         String   @default("#10b981")
+  sortOrder     Int      @default(0)
+  subcategories NewsSubcategory[]
+  news          News[]
+  @@map("news_categories")
+}
+
+model NewsSubcategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  categoryId  String
+  category    NewsCategory @relation(fields: [categoryId], references: [id])
+  news        News[]
+  @@unique([slug, categoryId])
+  @@map("news_subcategories")
+}
+
+model NewsTag {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  color       String   @default("#10b981")
+  news        News[]
+  @@map("news_tags")
+}
+
+model News {
+  id            String   @id @default(cuid())
+  title         String
+  slug          String   @unique
+  summary       String?
+  content       String
+  coverImage    String?  @map("cover_image")
+  isPublished   Boolean  @default(false) @map("is_published")
+  publishedAt   DateTime? @map("published_at")
+  views         Int      @default(0)
+  labels        String[] @default([])
+  authorId      String
+  author        User     @relation(fields: [authorId], references: [id])
+  categoryId    String?
+  category      NewsCategory? @relation(fields: [categoryId], references: [id])
+  subcategoryId String?
+  subcategory   NewsSubcategory? @relation(fields: [subcategoryId], references: [id])
+  tags          NewsTag[]
+  history       NewsHistory[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([isPublished, publishedAt])
+  @@index([categoryId])
+  @@index([authorId])
+  @@map("news")
+}
+
+model NewsHistory {
+  id            String   @id @default(cuid())
+  newsId        String   @map("news_id")
+  news          News     @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  title         String
+  summary       String?
+  content       String
+  labels        String[] @default([])
+  categoryId    String?
+  subcategoryId String?
+  tagIds        String[] @default([])
+  coverImage    String?  @map("cover_image")
+  isPublished   Boolean  @default(false) @map("is_published")
+  editorId      String
+  editorName    String
+  createdAt     DateTime @default(now())
+  @@index([newsId, createdAt])
+  @@map("news_history")
+}
+
+
+
+model PskovlineBalance {
+  id        String   @id @default(cuid())
+  balance   Float?
+  period    String?
+  status    String   @default("ok")
+  error     String?
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("pskovline_balances")
+}
+
+
+
+model PskovlineSettings {
+  id        String   @id @default(cuid())
+  label     String   @default("Псковлайн")
+  login     String   @default("91868")
+  password  String   @default("e5yvku2a")
+  label2    String   @default("Псковлайн телефон")
+  login2    String   @default("upl69777")
+  password2 String   @default("i9rmh2s9")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("pskovline_settings")
+}
+
+model CameraSettings {
+  id        String @id @default(cuid())
+  label     String @default("Видеокамера")
+  ip        String @default("192.168.8.10")
+  port      Int    @default(554)
+  channel   String @default("102")
+  username  String @default("admin")
+  password  String @default("W22665588e")
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int    @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("camera_settings")
+}
+
+model VkGroupSettings {
+  id                String   @id @default(cuid())
+  groupId           Int      @map("group_id")
+  accessToken       String   @map("access_token")
+  defaultCreatorId  String?  @map("default_creator_id")
+  defaultCreator    User?    @relation(fields: [defaultCreatorId], references: [id])
+  assigneeIds       String[] @default([]) @map("assignee_ids")
+  autoCreateContact Boolean  @default(true) @map("auto_create_contact")
+  isActive          Boolean  @default(true) @map("is_active")
+  lastTs            Int?     @map("last_ts")
+  callbackSecret    String?  @map("callback_secret")
+  confirmationString String? @map("confirmation_string")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("vk_group_settings")
+}
+
+model TaskTransaction {
+  id          String   @id @default(cuid())
+  taskId      String   @map("task_id")
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  type        String   // income | expense
+  amount      Float
+  description String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([taskId, date])
+  @@map("task_transactions")
+}

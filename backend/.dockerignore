@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+.env
+.git
+dist
+*.log
+.DS_Store
+coverage
+.vscode
+.idea
+*.swp
+*.swo
+uploads/
+*.tsbuildinfo

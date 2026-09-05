@@ -1,0 +1,13 @@
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -26,6 +26,10 @@ services:
+       VAPID_SUBJECT: mailto:admin@welans.cc
+       PORT: 4000
+       NODE_ENV: production
++      VK_CLIENT_ID: "54736647"
++      VK_CLIENT_SECRET: "l7d4RoIFcqdzmgLzt3nf"
++      VK_REDIRECT_URI: "https://welans.cc/api/vk/callback"
++      FRONTEND_URL: "https://welans.cc"
+     depends_on:
+       db:
+         condition: service_healthy
