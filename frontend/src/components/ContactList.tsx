@@ -62,10 +62,24 @@ export function ContactList() {
 
   const [isMobile, setIsMobile] = useState(false);
   const [contactTypes, setContactTypes] = useState<ContactType[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [selectedTag, setSelectedTag] = useState<string>('');
 
   useEffect(() => {
     loadContactTypes();
+    loadAllTags();
   }, []);
+
+  const loadAllTags = async () => {
+    try {
+      const data = await api.contacts.list('limit=9999');
+      const tags = new Set<string>();
+      data.forEach((c: Contact) => c.tags?.forEach((t: string) => tags.add(t)));
+      setAllTags(Array.from(tags).sort());
+    } catch (err) {
+      console.error('Failed to load tags:', err);
+    }
+  };
 
   const loadContactTypes = async () => {
     try {
@@ -120,8 +134,10 @@ export function ContactList() {
   }, [search]);
 
   const loadContacts = async (reset = false) => {
-    const params = kindFilter !== 'all' ? `kind=${kindFilter}` : '';
-    api.contacts.list(params).then(setContacts);
+    const params = new URLSearchParams();
+    if (kindFilter !== 'all') params.set('kind', kindFilter);
+    if (selectedTag) params.set('tag', selectedTag);
+    api.contacts.list(params.toString()).then(setContacts);
   };
 
   const loadOrganizations = () => {
@@ -130,7 +146,7 @@ export function ContactList() {
 
   useEffect(() => {
     loadContacts(true);
-  }, [kindFilter]);
+  }, [kindFilter, selectedTag]);
 
   useEffect(() => {
     if (location.state?.editingId && contacts.length > 0) {
@@ -544,6 +560,10 @@ export function ContactList() {
             <option value="contact">Контакты</option>
             <option value="organization">Организации</option>
           </select>
+          <select value={selectedTag} onChange={e => setSelectedTag(e.target.value)} style={{ padding: '6px 12px', borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }}>
+            <option value="">Все теги</option>
+            {allTags.map(tag => <option key={tag} value={tag}>{tag}</option>)}
+          </select>
           <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ padding: '6px 12px', borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }}>
             <option value="createdAtDesc">По дате ↓</option>
             <option value="createdAtAsc">По дате ↑</option>
@@ -552,9 +572,6 @@ export function ContactList() {
             <option value="type">По типу</option>
           </select>
           {!isMobile && <ViewToggle />}
-          {canImport && (
-            <button onClick={() => setShowImportModal(true)} style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>📥 Импорт</button>
-          )}
           <button onClick={openCreate} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>+ Создать</button>
         </div>
       </div>

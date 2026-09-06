@@ -92,6 +92,7 @@ model ContactType {
   textColor String   @default("#666") @map("text_color")
   sortOrder Int      @default(0)     @map("sort_order")
   isActive  Boolean  @default(true)  @map("is_active")
+  isVisible Boolean  @default(true)  @map("is_visible")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("contact_types")
