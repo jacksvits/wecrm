@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { authMiddleware } from '../middleware/auth.js';
 import fs from 'fs';
 import path from 'path';
-import * as archiver from 'archiver';
+import archiver from 'archiver';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -30,8 +30,9 @@ router.get('/tabs', authMiddleware, async (_req, res) => {
       return { ...d, url: found?.url || '', path: found?.path || d.path, id: found?.id || null };
     });
     res.json(merged);
-  } catch (e) {
-    res.status(500).json({ error: 'Ошибка загрузки настроек' });
+  } catch (e: any) {
+    console.error('[Files/Tabs] Error loading tabs:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка загрузки настроек', detail: e?.message });
   }
 });
 
@@ -49,8 +50,9 @@ router.post('/tabs/:tabKey', authMiddleware, async (req, res) => {
       create: { tabKey, url: url || '', path: tabPath || '' },
     });
     res.json(setting);
-  } catch (e) {
-    res.status(500).json({ error: 'Ошибка сохранения' });
+  } catch (e: any) {
+    console.error('[Files/Tabs] Error saving tab:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка сохранения', detail: e?.message });
   }
 });
 
@@ -59,16 +61,16 @@ router.get('/browse', authMiddleware, (req, res) => {
   const tabKey = (req.query.tab as string) || '';
   const subPath = (req.query.path as string) || '';
   const baseDir = TAB_DIRS[tabKey];
-  
+
   if (!baseDir) {
     return res.status(400).json({ error: 'Неверная вкладка' });
   }
-  
+
   const targetDir = path.join(baseDir, path.normalize(subPath).replace(/^(..(\/|$))+/g, ''));
   if (!targetDir.startsWith(baseDir)) {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
-  
+
   try {
     if (!fs.existsSync(targetDir)) {
       return res.status(404).json({ error: 'Папка не найдена' });
@@ -87,7 +89,8 @@ router.get('/browse', authMiddleware, (req, res) => {
       return a.name.localeCompare(b.name, 'ru');
     });
     res.json({ items, currentPath: subPath });
-  } catch (e) {
+  } catch (e: any) {
+    console.error('[Files/Browse] Error reading folder:', e?.message || e);
     res.status(500).json({ error: 'Ошибка чтения папки' });
   }
 });
@@ -97,22 +100,22 @@ router.get('/download', authMiddleware, (req, res) => {
   const tabKey = (req.query.tab as string) || '';
   const filePath = (req.query.path as string) || '';
   const baseDir = TAB_DIRS[tabKey];
-  
+
   if (!baseDir) {
     return res.status(400).json({ error: 'Неверная вкладка' });
   }
-  
+
   const targetFile = path.join(baseDir, path.normalize(filePath).replace(/^(..(\/|$))+/g, ''));
   if (!targetFile.startsWith(baseDir)) {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
-  
+
   try {
     if (!fs.existsSync(targetFile) || fs.statSync(targetFile).isDirectory()) {
       return res.status(404).json({ error: 'Файл не найден' });
     }
     const filename = path.basename(targetFile);
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8${encodeURIComponent(filename)}`);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.setHeader('Content-Type', 'application/octet-stream');
     const stream = fs.createReadStream(targetFile);
     stream.on('error', (err) => {
@@ -127,7 +130,7 @@ router.get('/download', authMiddleware, (req, res) => {
       stream.destroy();
     });
     stream.pipe(res);
-  } catch (e) {
+  } catch (e: any) {
     console.error('File download error:', e);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Ошибка скачивания' });
@@ -140,24 +143,24 @@ router.get('/download-folder', authMiddleware, (req, res) => {
   const tabKey = (req.query.tab as string) || '';
   const folderPath = (req.query.path as string) || '';
   const baseDir = TAB_DIRS[tabKey];
-  
+
   if (!baseDir) {
     return res.status(400).json({ error: 'Неверная вкладка' });
   }
-  
+
   const targetDir = path.join(baseDir, path.normalize(folderPath).replace(/^(..(\/|$))+/g, ''));
   if (!targetDir.startsWith(baseDir)) {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
-  
+
   try {
     if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) {
       return res.status(404).json({ error: 'Папка не найдена' });
     }
     const folderName = path.basename(targetDir);
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8${encodeURIComponent(folderName)}.zip`);
-    const archive = new (archiver as any).ZipArchive({ zlib: { level: 6 } });
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(folderName)}.zip`);
+    const archive = archiver('zip', { zlib: { level: 6 } });
     archive.on('error', (err: any) => {
       console.error('Archiver error:', err);
       if (!res.headersSent) {
@@ -175,7 +178,7 @@ router.get('/download-folder', authMiddleware, (req, res) => {
     archive.pipe(res);
     archive.directory(targetDir, folderName);
     archive.finalize();
-  } catch (e) {
+  } catch (e: any) {
     console.error('Folder download error:', e);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Ошибка архивации' });
@@ -212,7 +215,8 @@ router.get('/games', authMiddleware, (req, res) => {
       return a.name.localeCompare(b.name, 'ru');
     });
     res.json({ items, currentPath: subPath });
-  } catch (e) {
+  } catch (e: any) {
+    console.error('[Files/Games] Error reading folder:', e?.message || e);
     res.status(500).json({ error: 'Ошибка чтения папки' });
   }
 });
@@ -230,7 +234,7 @@ router.get('/games/download', authMiddleware, (req, res) => {
       return res.status(404).json({ error: 'Файл не найден' });
     }
     const filename = path.basename(targetFile);
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8${encodeURIComponent(filename)}`);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.setHeader('Content-Type', 'application/octet-stream');
     const stream = fs.createReadStream(targetFile);
     stream.on('error', (err) => {
@@ -245,7 +249,7 @@ router.get('/games/download', authMiddleware, (req, res) => {
       stream.destroy();
     });
     stream.pipe(res);
-  } catch (e) {
+  } catch (e: any) {
     console.error('File download error:', e);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Ошибка скачивания' });
@@ -267,8 +271,8 @@ router.get('/games/download-folder', authMiddleware, (req, res) => {
     }
     const folderName = path.basename(targetDir);
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8${encodeURIComponent(folderName)}.zip`);
-    const archive = new (archiver as any).ZipArchive({ zlib: { level: 6 } });
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(folderName)}.zip`);
+    const archive = archiver('zip', { zlib: { level: 6 } });
     archive.on('error', (err: any) => {
       console.error('Archiver error:', err);
       if (!res.headersSent) {
@@ -286,7 +290,7 @@ router.get('/games/download-folder', authMiddleware, (req, res) => {
     archive.pipe(res);
     archive.directory(targetDir, folderName);
     archive.finalize();
-  } catch (e) {
+  } catch (e: any) {
     console.error('Folder download error:', e);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Ошибка архивации' });
@@ -295,3 +299,4 @@ router.get('/games/download-folder', authMiddleware, (req, res) => {
 });
 
 export default router;
+
