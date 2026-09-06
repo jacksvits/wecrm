@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -29,7 +29,9 @@ const NOTE_COLORS = [
 export function NoteEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const isEdit = !!id;
+  const isViewMode = isEdit && !location.pathname.endsWith('/edit');
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -92,6 +94,92 @@ export function NoteEditor() {
     return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Загрузка...</div>;
   }
 
+  // Режим просмотра (read-only)
+  if (isViewMode) {
+    const textColor = ['#fef3c7', '#d1fae5', '#dbeafe', '#fce7f3', '#e9d5ff', '#ffedd5', '#f3f4f6', '#fee2e2'].includes(color) ? '#1f2937' : '#fff';
+    return (
+      <div style={{ maxWidth: 800 }}>
+        {/* Шапка */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <button
+            onClick={() => navigate('/notes')}
+            style={{ background: 'none', border: 'none', color: '#007AFF', cursor: 'pointer', fontSize: 14 }}
+          >
+            ← Назад к заметкам
+          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={() => navigate(`/notes/${id}/edit`)}
+              style={{
+                padding: '8px 18px',
+                borderRadius: 10,
+                background: '#007AFF',
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              Редактировать
+            </button>
+          </div>
+        </div>
+
+        {/* Карточка просмотра */}
+        <div style={{
+          borderRadius: 16,
+          background: color || '#f0f0f0',
+          border: '1px solid var(--border-color)',
+          padding: '24px 28px',
+          minHeight: 300,
+        }}>
+          <h1 style={{
+            margin: '0 0 12px',
+            fontSize: 22,
+            fontWeight: 700,
+            lineHeight: 1.3,
+            color: textColor,
+            wordBreak: 'break-word',
+          }}>
+            {title}
+          </h1>
+
+          {/* Теги */}
+          {tags && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {tags.split(',').map(t => t.trim()).filter(Boolean).map(tag => (
+                <span key={tag} style={{
+                  fontSize: 12,
+                  color: textColor,
+                  opacity: 0.85,
+                  background: 'rgba(0,0,0,0.08)',
+                  padding: '3px 10px',
+                  borderRadius: 12,
+                  fontWeight: 500,
+                }}>
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Содержимое */}
+          <div
+            style={{
+              fontSize: 15,
+              lineHeight: 1.7,
+              color: textColor,
+              wordBreak: 'break-word',
+            }}
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Режим редактирования
   return (
     <div style={{ maxWidth: 800 }}>
       {/* Шапка */}

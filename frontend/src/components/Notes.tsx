@@ -234,7 +234,7 @@ export function Notes() {
             return (
               <div
                 key={note.id}
-                onClick={() => navigate(`/notes/${note.id}/edit`)}
+                onClick={() => navigate(`/notes/${note.id}`)}
                 style={{
                   borderRadius: 16,
                   background: note.color || '#f0f0f0',
