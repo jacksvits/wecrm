@@ -159,4 +159,20 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/notes/new
+ * Получить шаблон новой заметки
+ */
+router.get("/new", async (_req, res) => {
+  res.json({
+    id: "new",
+    title: "",
+    content: "",
+    color: "#f0f0f0",
+    tags: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+});
+
 export default router;
