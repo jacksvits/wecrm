@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authMiddleware } from '../middleware/auth.js';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -42,6 +44,33 @@ router.post('/tabs/:tabKey', authMiddleware, async (req, res) => {
     res.json(setting);
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сохранения' });
+  }
+});
+
+// Получить список файлов из папки игр (NFS)
+router.get('/games', authMiddleware, (_req, res) => {
+  const gameDir = '/app/games';
+  try {
+    if (!fs.existsSync(gameDir)) {
+      return res.status(404).json({ error: 'Папка не найдена' });
+    }
+    const items = fs.readdirSync(gameDir, { withFileTypes: true }).map(dirent => {
+      const stat = fs.statSync(path.join(gameDir, dirent.name));
+      return {
+        name: dirent.name,
+        isDirectory: dirent.isDirectory(),
+        size: stat.size,
+        updatedAt: stat.mtime,
+      };
+    }).sort((a, b) => {
+      // Папки первыми, затем по имени
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
+      return a.name.localeCompare(b.name, 'ru');
+    });
+    res.json(items);
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка чтения папки' });
   }
 });
 

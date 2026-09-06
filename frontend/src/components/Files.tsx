@@ -14,6 +14,8 @@ export function Files() {
   const [loading, setLoading] = useState(true);
   const [editingTab, setEditingTab] = useState<string | null>(null);
   const [editUrl, setEditUrl] = useState('');
+  const [gameFiles, setGameFiles] = useState<any[]>([]);
+  const [gameLoading, setGameLoading] = useState(false);
 
   const load = async () => {
     try {
@@ -31,6 +33,18 @@ export function Files() {
     load();
   }, []);
 
+  // Загрузка списка игр при переключении на вкладку
+  useEffect(() => {
+    if (activeTab === 'games') {
+      setGameLoading(true);
+      fetch('/api/files/games', { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } })
+        .then(r => r.json())
+        .then(setGameFiles)
+        .catch(console.error)
+        .finally(() => setGameLoading(false));
+    }
+  }, [activeTab]);
+
   const openSettings = (key: string) => {
     setEditingTab(key);
     setEditUrl(settings[key] || '');
@@ -47,7 +61,53 @@ export function Files() {
     }
   };
 
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   const currentUrl = settings[activeTab] || '';
+
+  const renderGamesTab = () => {
+    if (gameLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Загрузка...</div>;
+    if (gameFiles.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Папка пуста</div>;
+
+    return (
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+          {gameFiles.map((item: any) => (
+            <div key={item.name} style={{
+              padding: 16,
+              borderRadius: 12,
+              border: '1px solid var(--border-color)',
+              background: 'var(--bg-color)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              cursor: item.isDirectory ? 'pointer' : 'default',
+            }}>
+              <div style={{ fontSize: 32 }}>
+                {item.isDirectory ? '📁' : '📄'}
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.name}
+                </div>
+                {!item.isDirectory && (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                    {formatSize(item.size)}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -102,6 +162,8 @@ export function Files() {
 
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Загрузка...</div>
+      ) : activeTab === 'games' ? (
+        renderGamesTab()
       ) : currentUrl ? (
         <iframe
           src={currentUrl}
