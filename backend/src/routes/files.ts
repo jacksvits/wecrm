@@ -6,6 +6,7 @@ import path from 'path';
 
 const router = Router();
 const prisma = new PrismaClient();
+const GAME_DIR = '/app/games';
 
 // Получить все настройки вкладок
 router.get('/tabs', authMiddleware, async (_req, res) => {
@@ -47,15 +48,22 @@ router.post('/tabs/:tabKey', authMiddleware, async (req, res) => {
   }
 });
 
-// Получить список файлов из папки игр (NFS)
-router.get('/games', authMiddleware, (_req, res) => {
-  const gameDir = '/app/games';
+// Получить список файлов из папки игр (с поддержкой подпапок)
+router.get('/games', authMiddleware, (req, res) => {
+  const subPath = (req.query.path as string) || '';
+  const targetDir = path.join(GAME_DIR, path.normalize(subPath).replace(/^(\.\.(\/|\$))+/g, ''));
+
+  // Security: ensure we stay within GAME_DIR
+  if (!targetDir.startsWith(GAME_DIR)) {
+    return res.status(403).json({ error: 'Доступ запрещен' });
+  }
+
   try {
-    if (!fs.existsSync(gameDir)) {
+    if (!fs.existsSync(targetDir)) {
       return res.status(404).json({ error: 'Папка не найдена' });
     }
-    const items = fs.readdirSync(gameDir, { withFileTypes: true }).map(dirent => {
-      const stat = fs.statSync(path.join(gameDir, dirent.name));
+    const items = fs.readdirSync(targetDir, { withFileTypes: true }).map(dirent => {
+      const stat = fs.statSync(path.join(targetDir, dirent.name));
       return {
         name: dirent.name,
         isDirectory: dirent.isDirectory(),
@@ -63,14 +71,37 @@ router.get('/games', authMiddleware, (_req, res) => {
         updatedAt: stat.mtime,
       };
     }).sort((a, b) => {
-      // Папки первыми, затем по имени
       if (a.isDirectory && !b.isDirectory) return -1;
       if (!a.isDirectory && b.isDirectory) return 1;
       return a.name.localeCompare(b.name, 'ru');
     });
-    res.json(items);
+    res.json({ items, currentPath: subPath });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка чтения папки' });
+  }
+});
+
+// Скачать файл
+router.get('/games/download', authMiddleware, (req, res) => {
+  const filePath = (req.query.path as string) || '';
+  const targetFile = path.join(GAME_DIR, path.normalize(filePath).replace(/^(\.\.(\/|\$))+/g, ''));
+
+  // Security: ensure we stay within GAME_DIR
+  if (!targetFile.startsWith(GAME_DIR)) {
+    return res.status(403).json({ error: 'Доступ запрещен' });
+  }
+
+  try {
+    if (!fs.existsSync(targetFile) || fs.statSync(targetFile).isDirectory()) {
+      return res.status(404).json({ error: 'Файл не найден' });
+    }
+    const filename = path.basename(targetFile);
+    res.setHeader('Content-Disposition', "attachment; filename*=UTF-8''" + encodeURIComponent(filename));
+    res.setHeader('Content-Type', 'application/octet-stream');
+    const stream = fs.createReadStream(targetFile);
+    stream.pipe(res);
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка скачивания' });
   }
 });
 
