@@ -41,10 +41,22 @@ export async function sendPushToRoleUsers(
       role: { name: { in: roleNames } },
       pushEnabled: true,
     },
-    select: { id: true },
-  }) ;
-  const targets = users.map(u => u.id).filter(id => id !== excludeUserId) ;
-  await Promise.all(targets.map(uid => sendGroupedPushToUser(uid, payload, type))) ;
+    include: { role: true },
+  });
+  const targets = users
+    .filter(u => {
+      if (!u.role) return false;
+      if (type === 'task' && u.role.notifyOnNewTask === false) return false;
+      if (type === 'deal' && u.role.notifyOnNewDeal === false) return false;
+      if (type === 'comment' && u.role.notifyOnNewComment === false) return false;
+      if (type === 'chat' && u.role.notifyOnNewChat === false) return false;
+      if (type === 'call' && u.role.notifyOnNewCall === false) return false;
+      if (type === 'news' && u.role.notifyOnNewNews === false) return false;
+      return true;
+    })
+    .map(u => u.id)
+    .filter(id => id !== excludeUserId);
+  await Promise.all(targets.map(uid => sendPushToUser(uid, payload, type).catch(() => {})));
 }
 
 export { webpush } ; 

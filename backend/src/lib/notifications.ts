@@ -113,7 +113,8 @@ export async function notifyTaskCreator(
 export async function notifyRoleUsers(
   roleNames: string[],
   payload: { title: string; body: string; url?: string },
-  excludeUserId?: string
+  excludeUserId?: string,
+  sendPush: boolean = true
 ) {
   const users = await prisma.user.findMany({
     where: {
@@ -139,6 +140,7 @@ export async function notifyRoleUsers(
         entityType: 'task',
         entityId: payload.url?.split('/').pop() || '',
         url: payload.url,
+        sendPush,
       })
     )
   );
