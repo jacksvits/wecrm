@@ -7,12 +7,16 @@ import './index.css';
 
 // Защита от ошибок performance-метрик сторонних расширений (gosuslugi и др.)
 // Фикс: TypeError: Cannot read properties of undefined (reading 'startTime')
+// Фикс: SVG path attribute d errors от расширений
 window.addEventListener('error', (e) => {
   const msg = e.message || '';
   const filename = e.filename || '';
   if (
     msg.includes('startTime') ||
     msg.includes('Cannot read properties of undefined') ||
+    msg.includes('Expected moveto path command') ||
+    msg.includes('attribute d') ||
+    msg.includes('path command') ||
     filename.includes('VM') ||
     filename.includes('bootstrap') ||
     filename.includes('gosuslugi')
@@ -25,7 +29,12 @@ window.addEventListener('error', (e) => {
 // Защита от unhandledrejection с аналогичными ошибками
 window.addEventListener('unhandledrejection', (e) => {
   const msg = String(e.reason || '');
-  if (msg.includes('startTime') || msg.includes('gosuslugi')) {
+  if (
+    msg.includes('startTime') ||
+    msg.includes('gosuslugi') ||
+    msg.includes('Expected moveto path command') ||
+    msg.includes('attribute d')
+  ) {
     e.preventDefault();
     console.warn('[App] Suppressed extension rejection:', msg);
   }
