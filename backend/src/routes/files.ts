@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { authMiddleware } from '../middleware/auth.js';
 import fs from 'fs';
 import path from 'path';
-import archiver from 'archiver';
+import * as archiver from 'archiver';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -160,7 +160,7 @@ router.get('/download-folder', authMiddleware, (req, res) => {
     const folderName = path.basename(targetDir);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(folderName)}.zip`);
-    const archive = archiver('zip', { zlib: { level: 6 } });
+    const archive = (archiver as any)('zip', { zlib: { level: 6 } });
     archive.on('error', (err: any) => {
       console.error('Archiver error:', err);
       if (!res.headersSent) {
@@ -272,7 +272,7 @@ router.get('/games/download-folder', authMiddleware, (req, res) => {
     const folderName = path.basename(targetDir);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(folderName)}.zip`);
-    const archive = archiver('zip', { zlib: { level: 6 } });
+    const archive = (archiver as any)('zip', { zlib: { level: 6 } });
     archive.on('error', (err: any) => {
       console.error('Archiver error:', err);
       if (!res.headersSent) {
