@@ -38,6 +38,7 @@ services:
       TOCHKA_REDIRECT_URI: "https://welans.cc/api/tochka/auth-url"
       TOCHKA_ACCESS_TOKEN: ""
       FRONTEND_URL: "https://welans.cc"
+      GEMINI_API_KEY: "${GEMINI_API_KEY}"
     depends_on:
       db:
         condition: service_healthy
