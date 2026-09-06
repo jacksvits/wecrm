@@ -106,4 +106,7 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
   },
   get: (path: string): Promise<any> => fetchApi(path),
 
+  assistant: {
+    chat: (messages: { role: string; content: string }[]) => fetchApi('/api/assistant/chat', { method: 'POST', body: JSON.stringify({ messages }) }),
+  },
 };
