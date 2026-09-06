@@ -773,6 +773,7 @@ model TaskTransaction {
 }
 
 model FileTabSetting {
+  path      String   @default("")
   id        String   @id @default(cuid())
   tabKey    String   @unique @map("tab_key")
   url       String   @default("")

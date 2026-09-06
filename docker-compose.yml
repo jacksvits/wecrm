@@ -43,6 +43,10 @@ services:
         condition: service_healthy
     volumes:
       - /mnt/nfs/wecrm-uploads:/app/uploads
+      - /mnt/nfs/SOFT:/app/files/programs:ro
+      - /mnt/nfs/DRIVER:/app/files/drivers:ro
+      - /mnt/nfs/BOOK:/app/files/documents:ro
+      - /mnt/nfs/GAME:/app/files/games:ro
       - /mnt/nfs/GAME:/app/games:ro
       - ./backend/data:/app/data
     restart: unless-stopped
@@ -77,6 +81,10 @@ services:
         condition: service_healthy
     volumes:
       - /mnt/nfs/wecrm-uploads:/app/uploads
+      - /mnt/nfs/SOFT:/app/files/programs:ro
+      - /mnt/nfs/DRIVER:/app/files/drivers:ro
+      - /mnt/nfs/BOOK:/app/files/documents:ro
+      - /mnt/nfs/GAME:/app/files/games:ro
       - /mnt/nfs/GAME:/app/games:ro
       - ./backend/prisma:/app/prisma:ro
     restart: unless-stopped

@@ -96,10 +96,13 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     delete: (id: string) => fetchApi(`/api/notes/${id}`, { method: 'DELETE' }),
   },
   files: {
-    tabs: () => fetchApi('/api/files/tabs'),
-    updateTab: (tabKey: string, url: string) => fetchApi(`/api/files/tabs/${tabKey}`, { method: 'POST', body: JSON.stringify({ url }) }),
-    downloadGameFile: (path: string) => downloadBlob(`/api/files/games/download?path=${encodeURIComponent(path)}`, path.split('/').pop() || 'file'),
-    downloadGameFolder: (path: string) => downloadBlob(`/api/files/games/download-folder?path=${encodeURIComponent(path)}`, `${path.split('/').pop() || 'folder'}.zip`),
+    tabs: () => fetchApi("/api/files/tabs"),
+    updateTab: (tabKey: string, url: string, path: string) => fetchApi(`/api/files/tabs/${tabKey}`, { method: "POST", body: JSON.stringify({ url, path }) }),
+    browse: (tab: string, filePath: string) => fetchApi(`/api/files/browse?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(filePath)}`),
+    downloadFile: (tab: string, filePath: string) => downloadBlob(`/api/files/download?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(filePath)}`, filePath.split("/").pop() || "file"),
+    downloadFolder: (tab: string, folderPath: string) => downloadBlob(`/api/files/download-folder?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(folderPath)}`, `${folderPath.split("/").pop() || "folder"}.zip`),
+    downloadGameFile: (path: string) => downloadBlob(`/api/files/games/download?path=${encodeURIComponent(path)}`, path.split("/").pop() || "file"),
+    downloadGameFolder: (path: string) => downloadBlob(`/api/files/games/download-folder?path=${encodeURIComponent(path)}`, `${path.split("/").pop() || "folder"}.zip`),
   },
   get: (path: string): Promise<any> => fetchApi(path),
 
