@@ -104,8 +104,6 @@ services:
       - ollama_data:/root/.ollama
     ports:
       - "11434:11434"
-    networks:
-      - wecrm-network
     deploy:
       resources:
         limits:
@@ -170,7 +168,3 @@ volumes:
   pgdata:
   ollama_data:
 
-
-networks:
-  wecrm-network:
-    driver: bridge
