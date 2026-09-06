@@ -5,6 +5,11 @@ const router = Router();
 
 // Provider configs
 const PROVIDERS = {
+  pollinations: {
+    // Free API, no key needed, works from any IP
+    url: 'https://text.pollinations.ai/openai',
+    model: 'openai',
+  },
   deepseek: {
     key: process.env.DEEPSEEK_API_KEY,
     url: 'https://api.deepseek.com/chat/completions',
@@ -34,18 +39,22 @@ interface ChatMessage {
 
 async function callOpenAICompatible(
   url: string,
-  apiKey: string,
+  apiKey: string | undefined,
   model: string,
   messages: ChatMessage[],
   extraHeaders: Record<string, string> = {}
 ) {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...extraHeaders,
+  };
+  if (apiKey) {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  }
+
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      ...extraHeaders,
-    },
+    headers,
     body: JSON.stringify({
       model,
       messages,
@@ -102,7 +111,19 @@ async function chatWithAI(messages: any[]) {
     content: m.content,
   }));
 
-  // Try DeepSeek first (works from Russia)
+  // 1. Pollinations AI — free, no key, works from any IP
+  try {
+    return await callOpenAICompatible(
+      PROVIDERS.pollinations.url,
+      undefined,
+      PROVIDERS.pollinations.model,
+      openaiMessages
+    );
+  } catch (e: any) {
+    console.error('[Assistant] Pollinations AI failed:', e.message);
+  }
+
+  // 2. DeepSeek (if key and balance available)
   if (PROVIDERS.deepseek.key) {
     try {
       return await callOpenAICompatible(
@@ -116,7 +137,7 @@ async function chatWithAI(messages: any[]) {
     }
   }
 
-  // Try Together AI (works from Russia)
+  // 3. Together AI
   if (PROVIDERS.together.key) {
     try {
       return await callOpenAICompatible(
@@ -130,7 +151,7 @@ async function chatWithAI(messages: any[]) {
     }
   }
 
-  // Try OpenRouter (may be geo-blocked)
+  // 4. OpenRouter
   if (PROVIDERS.openrouter.key) {
     try {
       return await callOpenAICompatible(
@@ -148,7 +169,7 @@ async function chatWithAI(messages: any[]) {
     }
   }
 
-  // Fallback to direct Gemini (may be geo-blocked)
+  // 5. Fallback to direct Gemini
   if (PROVIDERS.gemini.key) {
     try {
       return await callGemini(PROVIDERS.gemini.key, PROVIDERS.gemini.model, messages);
@@ -158,7 +179,8 @@ async function chatWithAI(messages: any[]) {
   }
 
   throw new Error(
-    'Ни один AI-провайдер не настроен или недоступен. ' +
+    'Ни один AI-провайдер не доступен. ' +
+    'Pollinations AI (бесплатный) временно недоступен. ' +
     'Добавьте DEEPSEEK_API_KEY, TOGETHER_API_KEY, OPENROUTER_API_KEY или GEMINI_API_KEY в .env'
   );
 }
