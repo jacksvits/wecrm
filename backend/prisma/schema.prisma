@@ -771,3 +771,13 @@ model TaskTransaction {
   @@index([taskId, date])
   @@map("task_transactions")
 }
+
+model FileTabSetting {
+  id        String   @id @default(cuid())
+  tabKey    String   @unique @map("tab_key")
+  url       String   @default("")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("file_tab_settings")
+}

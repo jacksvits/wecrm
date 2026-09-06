@@ -95,6 +95,10 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     update: (id: string, data: Partial<Note>) => fetchApi(`/api/notes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => fetchApi(`/api/notes/${id}`, { method: 'DELETE' }),
   },
+  files: {
+    tabs: () => fetchApi('/api/files/tabs'),
+    updateTab: (tabKey: string, url: string) => fetchApi(`/api/files/tabs/${tabKey}`, { method: 'POST', body: JSON.stringify({ url }) }),
+  },
   get: (path: string): Promise<any> => fetchApi(path),
 
 };
