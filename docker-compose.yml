@@ -39,6 +39,8 @@ services:
       TOCHKA_ACCESS_TOKEN: ""
       FRONTEND_URL: "https://welans.cc"
       GEMINI_API_KEY: "${GEMINI_API_KEY}"
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
+      OPENROUTER_MODEL: "${OPENROUTER_MODEL:-google/gemini-2.0-flash-exp:free}"
     depends_on:
       db:
         condition: service_healthy
