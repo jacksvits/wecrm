@@ -73,8 +73,9 @@ export function ContactList() {
   const loadAllTags = async () => {
     try {
       const data = await api.contacts.list('limit=9999');
+      const contactsArray = Array.isArray(data) ? data : ((data as any).contacts || []);
       const tags = new Set<string>();
-      data.forEach((c: Contact) => c.tags?.forEach((t: string) => tags.add(t)));
+      contactsArray.forEach((c: Contact) => c.tags?.forEach((t: string) => tags.add(t)));
       setAllTags(Array.from(tags).sort());
     } catch (err) {
       console.error('Failed to load tags:', err);
