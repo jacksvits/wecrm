@@ -5,7 +5,22 @@ services:
       POSTGRES_USER: crm
       POSTGRES_PASSWORD: crm_secret_2026
       POSTGRES_DB: wecrm
+      ollama:
+    image: ollama/ollama:latest
+    container_name: wecrm-ollama
+    restart: unless-stopped
     volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - wecrm-network
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+
+volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
@@ -43,6 +58,8 @@ services:
       OPENROUTER_MODEL: "${OPENROUTER_MODEL:-google/gemini-2.0-flash-exp:free}"
       DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY}"
       DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-chat}"
+      OLLAMA_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "${OLLAMA_MODEL:-llama3.2:3b}"
     depends_on:
       db:
         condition: service_healthy
@@ -150,4 +167,6 @@ services:
     restart: unless-stopped
 
 volumes:
+  ollama_data:
+    driver: local
   pgdata:
