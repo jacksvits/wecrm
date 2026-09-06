@@ -5,22 +5,7 @@ services:
       POSTGRES_USER: crm
       POSTGRES_PASSWORD: crm_secret_2026
       POSTGRES_DB: wecrm
-      ollama:
-    image: ollama/ollama:latest
-    container_name: wecrm-ollama
-    restart: unless-stopped
     volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    networks:
-      - wecrm-network
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-
-volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
@@ -111,6 +96,21 @@ volumes:
       - ./backend/prisma:/app/prisma:ro
     restart: unless-stopped
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: wecrm-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - wecrm-network
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+
   ngrok:
     image: ngrok/ngrok:latest
     command:
@@ -140,22 +140,22 @@ volumes:
         LAST_URL='' &&
         while true; do
           sleep 30 &&
-          NGROK_URL=\$$(wget -qO- http://ngrok:4040/api/tunnels 2>/dev/null | grep -oP 'https://[a-z0-9-]+\\.ngrok-free\\.app' | head -1) &&
-          if [ -z \"\$NGROK_URL\" ]; then
+          NGROK_URL=\$\$(wget -qO- http://ngrok:4040/api/tunnels 2>/dev/null | grep -oP 'https://[a-z0-9-]+\.ngrok-free\.app' | head -1) &&
+          if [ -z "\$NGROK_URL" ]; then
             echo '[Webhook Monitor] ngrok URL not available yet, retrying...' &&
             continue;
           fi &&
-          if [ \"\$NGROK_URL\" != \"\$LAST_URL\" ]; then
-            echo \"[Webhook Monitor] URL changed: \$LAST_URL -> \$NGROK_URL\" &&
-            if [ -n \"\$TELEGRAM_BOT_TOKEN\" ]; then
-              RESULT=\$$(wget -qO- \"https://api.telegram.org/bot\$TELEGRAM_BOT_TOKEN/setWebhook?url=\$NGROK_URL/api/telegram/webhook\" 2>/dev/null) &&
-              echo \"[Webhook Monitor] Webhook updated: \$RESULT\" &&
+          if [ "\$NGROK_URL" != "\$LAST_URL" ]; then
+            echo "[Webhook Monitor] URL changed: \$LAST_URL -> \$NGROK_URL" &&
+            if [ -n "\$TELEGRAM_BOT_TOKEN" ]; then
+              RESULT=\$\$(wget -qO- "https://api.telegram.org/bot\$TELEGRAM_BOT_TOKEN/setWebhook?url=\$NGROK_URL/api/telegram/webhook" 2>/dev/null) &&
+              echo "[Webhook Monitor] Webhook updated: \$RESULT" &&
               LAST_URL=\$\$NGROK_URL;
             else
               echo '[Webhook Monitor] ERROR: TELEGRAM_BOT_TOKEN not set';
             fi;
           else
-            echo \"[Webhook Monitor] URL unchanged: \$NGROK_URL\";
+            echo "[Webhook Monitor] URL unchanged: \$NGROK_URL";
           fi;
         done
       "
@@ -167,6 +167,10 @@ volumes:
     restart: unless-stopped
 
 volumes:
-  ollama_data:
-    driver: local
   pgdata:
+  ollama_data:
+
+
+networks:
+  wecrm-network:
+    driver: bridge
