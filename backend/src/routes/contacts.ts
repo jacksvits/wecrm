@@ -119,16 +119,19 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const data = createSchema.parse(req.body);
+    const { organizationId, projectIds, ...restData } = data;
     const payload: any = {
-      ...data,
+      ...restData,
       email: data.emails[0] || data.email || null,
       phone: normalizePhone(data.phones[0] || data.phone || ''),
       phones: data.phones.map(p => normalizePhone(p)).filter(Boolean),
-      organizationId: data.organizationId || null,
     };
+    // Use relation connect instead of scalar organizationId to avoid Prisma runtime issues
+    if (organizationId && organizationId !== '') {
+      payload.organization = { connect: { id: organizationId } };
+    }
     if (data.kind === 'organization') {
       payload.position = null;
-      payload.organizationId = null;
     } else {
       payload.inn = null;
       payload.ogrn = null;
@@ -137,8 +140,8 @@ router.post('/', async (req, res) => {
     const contact = await prisma.contact.create({
       data: {
         ...payload,
-        projects: data.projectIds?.length ? {
-          create: data.projectIds.map(pid => ({ project: { connect: { id: pid } } })),
+        projects: projectIds?.length ? {
+          create: projectIds.map(pid => ({ project: { connect: { id: pid } } })),
         } : undefined,
       },
       include: {
@@ -165,20 +168,23 @@ router.patch('/:id', async (req: AuthRequest, res) => {
       data.phone = normalizePhone(data.phones?.[0] || data.phone || '');
       data.phones = (data.phones || []).map((p: string) => normalizePhone(p)).filter(Boolean);
     }
-    // Fix: empty string organizationId causes FK violation
-    if (data.organizationId === '' || data.organizationId === undefined) {
-      data.organizationId = null;
-    }
-    if (data.kind === 'organization') {
-      data.position = null;
-      data.organizationId = null;
-    } else if (data.kind === 'contact') {
-      data.inn = null;
-      data.ogrn = null;
-      data.legalAddress = null;
-    }
-    const { projectIds, ...restData } = data;
+    const { projectIds, organizationId, ...restData } = data;
     const updateData: any = { ...restData };
+
+    // Fix: use relation connect/disconnect instead of scalar organizationId
+    if (organizationId === '' || organizationId === undefined) {
+      updateData.organization = { disconnect: true };
+    } else if (organizationId) {
+      updateData.organization = { connect: { id: organizationId } };
+    }
+
+    if (data.kind === 'organization') {
+      updateData.position = null;
+    } else if (data.kind === 'contact') {
+      updateData.inn = null;
+      updateData.ogrn = null;
+      updateData.legalAddress = null;
+    }
 
     if (projectIds !== undefined) {
       await prisma.contactProject.deleteMany({ where: { contactId: req.params.id } });

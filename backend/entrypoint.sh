@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+echo "[Entrypoint] Clearing Prisma Client cache..."
+rm -rf node_modules/.prisma/client
+
 echo "[Entrypoint] Generating Prisma Client..."
 npx prisma generate
 
