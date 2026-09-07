@@ -81,6 +81,9 @@ services:
     environment:
       DATABASE_URL: postgresql://crm:crm_secret_2026@db:5432/wecrm?schema=public
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      VAPID_PUBLIC_KEY: BBDb3f-KC_ZFFEP6fu2eQ6mNPBVUtn-O1IZme1ZX7Ug8W9JXHFiwzlXeyDEt4n2I7f2NWIII4QLyAJZ7ESZdzSs
+      VAPID_PRIVATE_KEY: duhNuxTRJLTYidASQ8jDpR1OQb7U3zUATxACkV855sA
+      VAPID_SUBJECT: mailto:admin@welans.cc
       NODE_ENV: production
       NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt
     depends_on:
