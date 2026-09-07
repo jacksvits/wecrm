@@ -1,6 +1,7 @@
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { prisma } from '../lib/prisma.js';
+import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -160,6 +161,20 @@ export class EmailWorker {
           },
         });
 
+        // Отправляем уведомления о новой задаче из письма
+        try {
+          const notifyPayload = {
+            title: 'Новая задача из email',
+            body: `Задача "${cleanTitle}" создана из письма от ${senderName}`,
+            url: '/tasks/' + task.id,
+          };
+          await notifyTaskCreator(task.id, notifyPayload);
+          await notifyRoleUsers(['admin'], notifyPayload, creatorId);
+          console.log(`[EmailWorker] Notifications sent for new task ${task.id}`);
+        } catch (notifyErr) {
+          console.error(`[EmailWorker] Failed to send notifications for task ${task.id}:`, notifyErr);
+        }
+
         // Обработка вложений из письма: сохраняем на диск и создаём комментарий
         const attachments = parsed.attachments || [];
         const hasRealAttachments = attachments.filter(
@@ -211,6 +226,32 @@ export class EmailWorker {
           });
 
           console.log(`[EmailWorker] Created comment with ${attachmentIds.length} attachment(s) for task ${task.id}`);
+
+          // Отправляем уведомления о комментарии с вложениями
+          try {
+            const taskForNotify = await prisma.task.findUnique({
+              where: { id: task.id },
+              include: {
+                assignees: { include: { user: true } },
+                curators: { include: { user: true } },
+                creator: true,
+              },
+            });
+            if (taskForNotify) {
+              const notifyPayload = {
+                title: 'Новое вложение из email',
+                body: `К задаче "${taskForNotify.title}" добавлено вложение из письма`,
+                url: '/tasks/' + taskForNotify.id,
+              };
+              const excludeUserId = creatorId;
+              await notifyTaskAssignees(taskForNotify.id, notifyPayload, excludeUserId);
+              await notifyTaskCurators(taskForNotify.id, notifyPayload, excludeUserId);
+              await notifyTaskCreator(taskForNotify.id, notifyPayload);
+              await notifyRoleUsers(['admin'], notifyPayload, excludeUserId);
+            }
+          } catch (notifyErr) {
+            console.error(`[EmailWorker] Failed to send comment notifications for task ${task.id}:`, notifyErr);
+          }
         }
 
         await prisma.activity.create({
