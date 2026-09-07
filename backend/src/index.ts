@@ -37,6 +37,7 @@ import contactTypeRoutes from './routes/contact-types.js';
 import filesRoutes from './routes/files.js';
 import notesRouter from './routes/notes.js';
 import assistantRoutes from './routes/assistant.js';
+import aiRoutes from './routes/ai.js';
 dotenv.config();
 
 const app = express();
@@ -104,6 +105,7 @@ app.use('/api/camera', cameraRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/notes', notesRouter);
 app.use('/api/assistant', assistantRoutes);
+app.use('/api/ai', aiRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', connections: getActiveConnections(), time: new Date().toISOString() }));
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
+import { AIModal } from './AIModal';
 import { Deal, Contact, Status } from '../types';
 
 export function DealBoard() {
@@ -10,6 +11,7 @@ export function DealBoard() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
+  const [showAIModal, setShowAIModal] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [contactSearch, setContactSearch] = useState('');
@@ -45,6 +47,17 @@ export function DealBoard() {
     if (data.entity === 'deal') loadDeals();
   });
 
+  const handleAIGenerateDeal = (data: any) => {
+    setEditingId(null);
+    setForm({
+      title: data.title || '',
+      value: data.value || 0,
+      stage: data.status || defaultStage,
+      probability: 10,
+      contactId: '',
+    });
+    setShowModal(true);
+  };
   const openCreate = () => {
     setEditingId(null);
     setForm({ title: '', value: 0, stage: defaultStage, probability: 10, contactId: '' });
@@ -122,7 +135,7 @@ export function DealBoard() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>Воронка продаж</h2>
-        <button onClick={openCreate} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>+ Создать сделку</button>
+        <button onClick={openCreate} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>+ Создать сделку</button><button onClick={() => setShowAIModal(true)} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>🤖 AI</button>
       </div>
       <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch', minHeight: 400, alignItems: 'flex-start' }}>
         {statuses.map(stage => {
@@ -156,6 +169,7 @@ export function DealBoard() {
           );
         })}
       </div>
+      {showAIModal && <AIModal type="deal" onGenerate={handleAIGenerateDeal} onClose={() => setShowAIModal(false)} />}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(16px, env(safe-area-inset-top, 0)) max(16px, env(safe-area-inset-right, 0)) max(16px, env(safe-area-inset-bottom, 0)) max(16px, env(safe-area-inset-left, 0))' }}>
           <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 480, maxHeight: '90vh', overflow: 'auto' }}>

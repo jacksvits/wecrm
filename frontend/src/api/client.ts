@@ -111,4 +111,8 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     chat: (messages: { role: string; content: string }[], model?: string) => fetchApi('/api/assistant/chat', { method: 'POST', body: JSON.stringify({ messages, model }) }),
     image: (prompt: string, width?: number, height?: number) => fetchApi('/api/assistant/image', { method: 'POST', body: JSON.stringify({ prompt, width, height }) }),
   },
+  ai: {
+    generateTask: (text: string) => fetchApi('/api/ai/generate-task', { method: 'POST', body: JSON.stringify({ text }) }),
+    generateDeal: (text: string) => fetchApi('/api/ai/generate-deal', { method: 'POST', body: JSON.stringify({ text }) }),
+  },
 };

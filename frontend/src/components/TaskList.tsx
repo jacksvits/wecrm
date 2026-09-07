@@ -6,6 +6,7 @@ import { useRealtime } from "../hooks/useRealtime";
 import { Task, User, Project, Status } from "../types";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
+import { AIModal } from "./AIModal";
 const priorityLabels: Record<string, string> = {
   low: "Низкий",
   medium: "Средний",
@@ -48,6 +49,7 @@ export function TaskList() {
     const saved = localStorage.getItem("taskViewMode") as ViewMode;
     return ["grid", "list", "kanban"].includes(saved) ? saved : "grid";
   });
+  const [showAIModal, setShowAIModal] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [preselectedParentId, setPreselectedParentId] = useState<string | null>(
@@ -149,6 +151,23 @@ export function TaskList() {
     setViewMode(mode);
     localStorage.setItem("taskViewMode", mode);
   };
+  const handleAIGenerateTask = (data: any) => {
+    setEditingId(null);
+    setPreselectedParentId(null);
+    setForm({
+      title: data.title || "",
+      description: data.description || "",
+      status: data.status || defaultStatus,
+      priority: data.priority || "medium",
+      dueDate: data.dueDate || "",
+      assigneeIds: [],
+      curatorIds: [],
+      projectId: "",
+      parentId: "",
+    });
+    setShowModal(true);
+  };
+
   const openCreate = (parentId?: string) => {
     setEditingId(null);
     setPreselectedParentId(parentId || null);
@@ -1174,6 +1193,21 @@ export function TaskList() {
           >
             + Создать задачу
           </button>{" "}
+          <button
+            onClick={() => setShowAIModal(true)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 12,
+              border: "none",
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            🤖 AI
+          </button>{" "}
         </div>{" "}
       </div>{" "}
       <div
@@ -1291,6 +1325,7 @@ export function TaskList() {
       {viewMode === "grid" && renderGrid()}{" "}
       {viewMode === "list" && renderList()}{" "}
       {viewMode === "kanban" && renderKanban()}{" "}
+      {showAIModal && <AIModal type="task" onGenerate={handleAIGenerateTask} onClose={() => setShowAIModal(false)} />}
       {showModal && (
         <div
           style={{
