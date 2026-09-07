@@ -160,6 +160,7 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
 
     console.log('[MAX Processor] Comment added to task', latestTask.id, 'with', attachmentIds.length, 'attachments');
     broadcast(CHANNELS.TASKS, { action: 'new_comment', entity: 'task', id: latestTask.id });
+    broadcast(CHANNELS.COMMENTS, { action: 'new_comment', entity: 'task', id: latestTask.id });
 
     // Отправляем уведомления исполнителям, кураторам, создателю и админам
     try {

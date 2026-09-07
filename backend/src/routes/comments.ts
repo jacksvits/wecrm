@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { sendPushToUser } from '../lib/push.js';
+import { broadcast, CHANNELS } from '../lib/events.js';
 
 const router = Router();
 const MAX_API_BASE = 'https://platform-api2.max.ru';
@@ -193,6 +193,9 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
       }
     }
     // ======================================================
+
+    // Real-time broadcast for new comment
+    broadcast(CHANNELS.COMMENTS, { action: 'new_comment', entity: 'task', id: taskId, comment });
 
     res.json(comment);
   } catch (err: any) {

@@ -245,7 +245,7 @@ export function TaskDetail() {
       setLoading(false);
     }
   };
-  useRealtime(['tasks','comments'], (data) => { if (data.entity === 'task' && data.id === id) loadTask(); });
+  useRealtime(['tasks','comments'], (data) => { if ((data.entity === 'task' || data.entity === 'comment') && data.id === id) loadTask(); });
   const loadHistory = async () => {
     setHistoryLoading(true);
     try {

@@ -220,6 +220,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
 
     console.log(`[VK Processor] Comment added to task ${latestTask.id} for peer ${fromId} (msg ${msg.id}) with ${attachmentIds.length} attachments`);
     broadcast(CHANNELS.TASKS, { action: 'new_comment', entity: 'task', id: latestTask.id });
+    broadcast(CHANNELS.COMMENTS, { action: 'new_comment', entity: 'task', id: latestTask.id });
 
     // Отправляем уведомления исполнителям, кураторам, создателю и админам
     try {
