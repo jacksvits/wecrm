@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { api } from '../api/client';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+
 
 interface Message {
   role: 'user' | 'assistant';
@@ -16,17 +15,6 @@ interface OllamaModel {
   parameter_size: string;
   family: string;
 }
-
-const quillModules = {
-  toolbar: [
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ list: 'ordered' }, { list: 'bullet' }],
-    ['link'],
-    ['clean'],
-  ],
-};
-
-const quillFormats = ['bold', 'italic', 'underline', 'strike', 'list', 'bullet', 'link'];
 
 export function Assistant() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -243,23 +231,26 @@ export function Assistant() {
 
       {/* Ввод */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-        <div style={{ flex: 1 }}>
-          <ReactQuill
-            theme="snow"
-            value={input}
-            onChange={setInput}
-            placeholder="Введите сообщение..."
-            modules={quillModules}
-            formats={quillFormats}
-            style={{
-              borderRadius: 14,
-              border: '1px solid var(--border-color)',
-              background: 'var(--bg-color)',
-              minHeight: 60,
-            }}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
+        <textarea
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Введите сообщение..."
+          rows={3}
+          style={{
+            flex: 1,
+            padding: '12px 16px',
+            borderRadius: 14,
+            border: '1px solid var(--border-color)',
+            background: 'var(--bg-color)',
+            color: 'var(--text-color)',
+            fontSize: 14,
+            lineHeight: 1.5,
+            resize: 'vertical',
+            outline: 'none',
+            fontFamily: 'inherit',
+          }}
+        />
         <button
           onClick={handleSend}
           disabled={loading || !input.trim()}
