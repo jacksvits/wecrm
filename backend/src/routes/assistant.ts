@@ -4,50 +4,76 @@ import { authMiddleware } from '../middleware/auth.js';
 const router = Router();
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://ollama:11434';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:3b';
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:3b';
 
-async function callOllama(messages: any[]) {
-  const response = await fetch(`${OLLAMA_URL}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      messages: messages.map((m: any) => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.content,
-      })),
-      stream: false,
-      options: {
-        temperature: 0.7,
-        num_predict: 4096,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Ollama HTTP ${response.status}: ${errText}`);
-  }
-
-  const data = await response.json() as any;
-  return {
-    text: data.message?.content || '',
-    finishReason: data.done ? 'stop' : '',
-    model: OLLAMA_MODEL,
-  };
+interface ChatMessage {
+  role: string;
+  content: string;
 }
 
+// GET /api/assistant/models — список установленных моделей
+router.get('/models', authMiddleware, async (_req, res) => {
+  try {
+    const response = await fetch(`${OLLAMA_URL}/api/tags`);
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Ollama HTTP ${response.status}: ${errText}`);
+    }
+    const data = await response.json() as any;
+    const models = (data.models || []).map((m: any) => ({
+      name: m.name,
+      size: m.size,
+      modified_at: m.modified_at,
+      parameter_size: m.details?.parameter_size || '',
+      family: m.details?.family || '',
+    }));
+    res.json({ models, default: DEFAULT_MODEL });
+  } catch (e: any) {
+    console.error('[Assistant] Error fetching models:', e);
+    res.status(502).json({ error: e.message || 'Ошибка получения списка моделей' });
+  }
+});
+
+// POST /api/assistant/chat — чат с выбранной моделью
 router.post('/chat', authMiddleware, async (req, res) => {
   try {
-    const { messages } = req.body;
+    const { messages, model } = req.body;
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array required' });
     }
 
-    const result = await callOllama(messages);
-    res.json(result);
+    const selectedModel = model || DEFAULT_MODEL;
+
+    const response = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: selectedModel,
+        messages: messages.map((m: any) => ({
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content,
+        })),
+        stream: false,
+        options: {
+          temperature: 0.7,
+          num_predict: 4096,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Ollama HTTP ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json() as any;
+    res.json({
+      text: data.message?.content || '',
+      finishReason: data.done ? 'stop' : '',
+      model: selectedModel,
+    });
   } catch (e: any) {
-    console.error('[Assistant] Ollama error:', e);
+    console.error('[Assistant] Error:', e);
     res.status(502).json({ error: e.message || 'Ошибка при обращении к AI' });
   }
 });
