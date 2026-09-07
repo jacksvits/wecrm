@@ -71,7 +71,9 @@ export function TaskDetail() {
     dueDate: "",
     assigneeIds: [] as string[],
     curatorIds: [] as string[],
+    contactId: "",
   });
+  const [contacts, setContacts] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "details" | "comments" | "subtasks" | "history" | "finances" | "files"
@@ -110,6 +112,7 @@ export function TaskDetail() {
       loadTask();
       api.users.list().then(setUsers);
       api.statuses.list("task").then(setStatuses);
+      api.contacts.list().then(setContacts).catch(() => {});
     }
   }, [id]);
   useEffect(() => {
@@ -234,6 +237,7 @@ export function TaskDetail() {
         dueDate: data.dueDate ? data.dueDate.slice(0, 16) : "",
         assigneeIds: data.assignees?.map((a) => a.user.id) || [],
         curatorIds: data.curators?.map((c) => c.id) || [],
+        contactId: data.contact?.id || "",
       });
     } catch (err: any) {
       if (err.message?.includes('403') || err.message?.includes('Доступ запрещен')) {
@@ -312,6 +316,7 @@ export function TaskDetail() {
         curatorIds: editForm.curatorIds.length
           ? editForm.curatorIds
           : undefined,
+        contactId: editForm.contactId || undefined,
       });
       setIsEditing(false);
       loadTask();
@@ -685,6 +690,41 @@ export function TaskDetail() {
                   background: "var(--bg-input)",
                   color: "var(--text-primary)",
                 }}
+            {isAdmin && (
+              <div style={{ position: "relative" }}>
+                <input
+                  type="text"
+                  list="contact-options"
+                  placeholder="Поиск контакта..."
+                  value={contacts.find(c => c.id === editForm.contactId)?.name || ""}
+                  onChange={(e) => {
+                    const contact = contacts.find(c => 
+                      c.name.toLowerCase().startsWith(e.target.value.toLowerCase())
+                    );
+                    setEditForm({ ...editForm, contactId: contact?.id || "" });
+                  }}
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid var(--border-color)",
+                    fontSize: 14,
+                    width: "100%",
+                    background: "var(--bg-input)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+                <datalist id="contact-options">
+                  {contacts.map(c => (
+                    <option key={c.id} value={c.name} />
+                  ))}
+                </datalist>
+                {editForm.contactId && (
+                  <div style={{ marginTop: 4, fontSize: 12, color: "#1565c0" }}>
+                    Выбран: {contacts.find(c => c.id === editForm.contactId)?.name}
+                  </div>
+                )}
+              </div>
+            )}{" "}
               />{" "}
             </div>{" "}
             <select
