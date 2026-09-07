@@ -109,5 +109,6 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
   assistant: {
     models: () => fetchApi('/api/assistant/models'),
     chat: (messages: { role: string; content: string }[], model?: string) => fetchApi('/api/assistant/chat', { method: 'POST', body: JSON.stringify({ messages, model }) }),
+    image: (prompt: string, width?: number, height?: number) => fetchApi('/api/assistant/image', { method: 'POST', body: JSON.stringify({ prompt, width, height }) }),
   },
 };

@@ -78,4 +78,21 @@ router.post('/chat', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /api/assistant/image — генерация картинки через Pollinations AI
+router.post('/image', authMiddleware, async (req, res) => {
+  try {
+    const { prompt, width = 1024, height = 1024 } = req.body;
+    if (!prompt || typeof prompt !== 'string') {
+      return res.status(400).json({ error: 'prompt required' });
+    }
+    const encodedPrompt = encodeURIComponent(prompt.trim());
+    const seed = Date.now();
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&seed=${seed}`;
+    res.json({ imageUrl, prompt: prompt.trim() });
+  } catch (e: any) {
+    console.error('[Assistant] Image error:', e);
+    res.status(502).json({ error: e.message || 'Ошибка генерации изображения' });
+  }
+});
+
 export default router;

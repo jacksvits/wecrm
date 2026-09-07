@@ -6,6 +6,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  type?: 'text' | 'image';
 }
 
 interface OllamaModel {
@@ -20,6 +21,7 @@ export function Assistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
   const [error, setError] = useState('');
   const [models, setModels] = useState<OllamaModel[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
@@ -67,6 +69,26 @@ export function Assistant() {
       setError(e.message || 'Ошибка при обращении к ИИ');
     }
     setLoading(false);
+  };
+
+  const handleGenerateImage = async () => {
+    const text = input.trim();
+    if (!text || imageLoading) return;
+
+    const userMsg: Message = { role: 'user', content: text, timestamp: new Date(), type: 'text' };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setImageLoading(true);
+    setError('');
+
+    try {
+      const res = await api.assistant.image(text, 1024, 1024);
+      const assistantMsg: Message = { role: 'assistant', content: res.imageUrl, timestamp: new Date(), type: 'image' };
+      setMessages(prev => [...prev, assistantMsg]);
+    } catch (e: any) {
+      setError(e.message || 'Ошибка генерации изображения');
+    }
+    setImageLoading(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -179,7 +201,19 @@ export function Assistant() {
               lineHeight: 1.5,
               wordBreak: 'break-word',
             }}>
-              {msg.role === 'assistant' ? (
+              {msg.type === 'image' ? (
+                <img
+                  src={msg.content}
+                  alt="Generated"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: 400,
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => window.open(msg.content, '_blank')}
+                />
+              ) : msg.role === 'assistant' ? (
                 <div dangerouslySetInnerHTML={{ __html: msg.content }} />
               ) : (
                 msg.content
@@ -251,6 +285,26 @@ export function Assistant() {
             fontFamily: 'inherit',
           }}
         />
+        <button
+          onClick={handleGenerateImage}
+          disabled={imageLoading || !input.trim()}
+          title="Сгенерировать картинку"
+          style={{
+            padding: '12px 16px',
+            borderRadius: 14,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: '#fff',
+            border: 'none',
+            cursor: imageLoading || !input.trim() ? 'not-allowed' : 'pointer',
+            fontSize: 14,
+            fontWeight: 600,
+            opacity: imageLoading || !input.trim() ? 0.5 : 1,
+            height: 44,
+            alignSelf: 'center',
+          }}
+        >
+          {imageLoading ? '...' : '🎨'}
+        </button>
         <button
           onClick={handleSend}
           disabled={loading || !input.trim()}
