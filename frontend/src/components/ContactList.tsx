@@ -154,7 +154,7 @@ export function ContactList() {
       const contact = contacts.find(c => c.id === location.state.editingId);
       if (contact) {
         openEdit(contact);
-        window.history.replaceState({}, document.title);
+        navigate(location.pathname, { replace: true });
       }
     }
   }, [contacts, location.state]);
