@@ -26,11 +26,21 @@ export function Assistant() {
   const [models, setModels] = useState<OllamaModel[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
   const [modelsLoading, setModelsLoading] = useState(true);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Загружаем список моделей при монтировании
+  // Загружаем список моделей и историю диалога при монтировании
   useEffect(() => {
     loadModels();
+    api.assistant.getHistory().then((data: any) => {
+      if (data.messages?.length) {
+        setMessages(data.messages.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp || Date.now()),
+        })));
+      }
+      setHistoryLoaded(true);
+    }).catch(() => setHistoryLoaded(true));
   }, []);
 
   const loadModels = async () => {
@@ -104,6 +114,18 @@ export function Assistant() {
     if (bytes > 1e6) return (bytes / 1e6).toFixed(0) + ' MB';
     return bytes + ' B';
   };
+
+  // Auto-save dialog history (last 50 messages)
+  useEffect(() => {
+    if (!historyLoaded) return;
+    const plainMessages = messages.map(m => ({
+      role: m.role,
+      content: m.content,
+      type: m.type,
+      timestamp: m.timestamp.toISOString(),
+    }));
+    api.assistant.saveHistory(plainMessages).catch(() => {});
+  }, [messages, historyLoaded]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', maxWidth: 900, margin: '0 auto' }}>

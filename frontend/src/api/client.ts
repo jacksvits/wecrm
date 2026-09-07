@@ -110,6 +110,8 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     models: () => fetchApi('/api/assistant/models'),
     chat: (messages: { role: string; content: string }[], model?: string) => fetchApi('/api/assistant/chat', { method: 'POST', body: JSON.stringify({ messages, model }) }),
     image: (prompt: string, width?: number, height?: number) => fetchApi('/api/assistant/image', { method: 'POST', body: JSON.stringify({ prompt, width, height }) }),
+    getHistory: () => fetchApi('/api/assistant/history'),
+    saveHistory: (messages: any[]) => fetchApi('/api/assistant/history', { method: 'POST', body: JSON.stringify({ messages }) }),
   },
   ai: {
     generateTask: (text: string) => fetchApi('/api/ai/generate-task', { method: 'POST', body: JSON.stringify({ text }) }),
