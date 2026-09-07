@@ -1,4 +1,6 @@
 import { prisma } from '../lib/prisma.js';
+import { broadcast, CHANNELS } from '../lib/events.js';
+import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
@@ -157,6 +159,37 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
     }
 
     console.log('[MAX Processor] Comment added to task', latestTask.id, 'with', attachmentIds.length, 'attachments');
+    broadcast(CHANNELS.TASKS, { action: 'new_comment', entity: 'task', id: latestTask.id });
+
+    // Отправляем уведомления исполнителям, кураторам, создателю и админам
+    try {
+      const taskForNotify = await prisma.task.findUnique({
+        where: { id: latestTask.id },
+        include: {
+          assignees: { include: { user: true } },
+          curators: { include: { user: true } },
+          creator: true,
+        },
+      });
+
+      if (taskForNotify) {
+        const authorName = msg.sender_name || 'Клиент';
+        const notifyPayload = {
+          title: 'Новое сообщение из MAX',
+          body: `${authorName} написал в обсуждение задачи "${taskForNotify.title}"`,
+          url: '/tasks/' + taskForNotify.id,
+        };
+        const excludeUserId = settings.defaultCreatorId || latestTask.creatorId;
+
+        await notifyTaskAssignees(taskForNotify.id, notifyPayload, excludeUserId);
+        await notifyTaskCurators(taskForNotify.id, notifyPayload, excludeUserId);
+        await notifyTaskCreator(taskForNotify.id, notifyPayload);
+        await notifyRoleUsers(['admin'], notifyPayload, excludeUserId);
+        console.log('[MAX Processor] Notifications sent for task', latestTask.id);
+      }
+    } catch (notifyErr) {
+      console.error('[MAX Processor] Failed to send notifications for task', latestTask.id, ':', notifyErr);
+    }
   } else {
     const creatorId = settings.defaultCreatorId;
     if (!creatorId) {
@@ -221,6 +254,36 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
       });
 
       console.log('[MAX Processor] Activity recorded for task', task.id);
+      broadcast(CHANNELS.TASKS, { action: 'create', entity: 'task', id: task.id });
+
+      // Отправляем уведомления исполнителям, кураторам, создателю и админам о новой задаче
+      try {
+        const taskForNotify = await prisma.task.findUnique({
+          where: { id: task.id },
+          include: {
+            assignees: { include: { user: true } },
+            curators: { include: { user: true } },
+            creator: true,
+          },
+        });
+
+        if (taskForNotify) {
+          const authorName = msg.sender_name || 'Клиент';
+          const notifyPayload = {
+            title: 'Новая задача из MAX',
+            body: `${authorName} создал задачу "${taskForNotify.title}"`,
+            url: '/tasks/' + taskForNotify.id,
+          };
+
+          await notifyTaskAssignees(taskForNotify.id, notifyPayload, creatorId);
+          await notifyTaskCurators(taskForNotify.id, notifyPayload, creatorId);
+          await notifyTaskCreator(taskForNotify.id, notifyPayload);
+          await notifyRoleUsers(['admin'], notifyPayload, creatorId);
+          console.log('[MAX Processor] Notifications sent for new task', task.id);
+        }
+      } catch (notifyErr) {
+        console.error('[MAX Processor] Failed to send notifications for new task', task.id, ':', notifyErr);
+      }
     } catch (createErr) {
       console.error('[MAX Processor] FAILED to create task:', createErr);
     }
