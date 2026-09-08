@@ -1055,16 +1055,39 @@ export function TaskList() {
                             </div>{" "}
                             <div
                               style={{
-                                fontSize: 13,
-                                fontWeight: 500,
+                                display: "flex",
+                                gap: 6,
+                                alignItems: "baseline",
                                 marginBottom: 6,
                                 paddingRight: 40,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
                               }}
                             >
-                              {task.title}
+                              {task.ticketNumber != null && (
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    color: "var(--text-muted)",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  #{task.ticketNumber}
+                                </span>
+                              )}
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: isMobile ? "normal" : "nowrap",
+                                  display: "-webkit-box",
+                                  WebkitBoxOrient: "vertical",
+                                  WebkitLineClamp: isMobile ? 2 : 1,
+                                }}
+                              >
+                                {task.title}
+                              </span>
                             </div>{" "}
                             <div
                               style={{
