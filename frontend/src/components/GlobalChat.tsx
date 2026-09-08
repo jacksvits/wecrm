@@ -80,9 +80,11 @@ export function GlobalChat() {
 
   // SSE + fallback polling для получения новых сообщений в реальном времени
   useEffect(() => {
-    api.chat.list().then(msgs => {
+    api.chat.listPage().then(({ messages: msgs, hasMore: more }) => {
       setMessages(msgs);
+      setHasMore(more);
       initialLoadRef.current = false;
+      stickToBottomRef.current = true;
     }).catch(() => {});
 
     // Подключаем SSE для канала chat
