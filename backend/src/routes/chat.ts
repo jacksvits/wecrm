@@ -15,43 +15,69 @@ const createSchema = z.object({
   attachmentIds: z.array(z.string()).optional(),
 });
 
-// Получить последние 50 сообщений (с пагинацией по курсору через afterId)
+// Размер страницы: сколько сообщений отдаём при первой загрузке и при прокрутке вверх
+const PAGE_SIZE = 10;
+
+// Получить сообщения (пагинация по курсору):
+// - без параметров — последние PAGE_SIZE сообщений (первая загрузка чата)
+// - beforeId — PAGE_SIZE сообщений старше указанного (подгрузка при прокрутке вверх)
+// - afterId — новые сообщения после указанного (polling)
 // Показываем: общие сообщения (без получателей) + личные для текущего пользователя
 router.get('/', async (req: AuthRequest, res) => {
-  const { afterId } = req.query;
+  const { afterId, beforeId } = req.query;
   const userId = req.user!.id;
   if (req.user?.canAccessChat === false) {
     return res.status(403).json({ error: 'Доступ к чату запрещён' });
   }
 
-  const messages = await prisma.chatMessage.findMany({
-    where: afterId
-      ? {
-          id: { gt: afterId as string },
-          deletedAt: null,
-          OR: [
-            { recipients: { none: {} } },
-            { recipients: { some: { userId } } },
-            { authorId: userId, recipients: { some: {} } },
-          ],
-        }
-      : {
-          deletedAt: null,
-          OR: [
-            { recipients: { none: {} } },
-            { recipients: { some: { userId } } },
-            { authorId: userId, recipients: { some: {} } },
-          ],
-        },
-    include: {
-      author: { select: { id: true, name: true, avatar: true } },
-      replyTo: { include: { author: { select: { id: true, name: true } } } },
-      recipients: { include: { user: { select: { id: true, name: true } } } },
-      reactions: { include: { user: { select: { id: true, name: true } } } },
-    },
-    orderBy: { createdAt: 'asc' },
-    take: 50,
-  });
+  const baseWhere = {
+    deletedAt: null,
+    OR: [
+      { recipients: { none: {} } },
+      { recipients: { some: { userId } } },
+      { authorId: userId, recipients: { some: {} } },
+    ],
+  };
+
+  const include = {
+    author: { select: { id: true, name: true, avatar: true } },
+    replyTo: { include: { author: { select: { id: true, name: true } } } },
+    recipients: { include: { user: { select: { id: true, name: true } } } },
+    reactions: { include: { user: { select: { id: true, name: true } } } },
+  };
+
+  let messages;
+  let hasMore = false;
+
+  if (afterId) {
+    // Новые сообщения после afterId — для polling, порядок хронологический
+    messages = await prisma.chatMessage.findMany({
+      where: { ...baseWhere, id: { gt: afterId as string } },
+      include,
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+    });
+  } else if (beforeId) {
+    // Более старые сообщения: берём на 1 больше страницы, чтобы определить hasMore
+    const batch = await prisma.chatMessage.findMany({
+      where: { ...baseWhere, id: { lt: beforeId as string } },
+      include,
+      orderBy: { createdAt: 'desc' },
+      take: PAGE_SIZE + 1,
+    });
+    hasMore = batch.length > PAGE_SIZE;
+    messages = batch.slice(0, PAGE_SIZE).reverse();
+  } else {
+    // Первая загрузка: последние PAGE_SIZE сообщений в хронологическом порядке
+    const batch = await prisma.chatMessage.findMany({
+      where: baseWhere,
+      include,
+      orderBy: { createdAt: 'desc' },
+      take: PAGE_SIZE + 1,
+    });
+    hasMore = batch.length > PAGE_SIZE;
+    messages = batch.slice(0, PAGE_SIZE).reverse();
+  }
 
   const messageIds = messages.map(m => m.id);
   const attachments = await prisma.fileAttachment.findMany({
@@ -65,6 +91,8 @@ router.get('/', async (req: AuthRequest, res) => {
     attachments: attachments.filter(a => a.entityId === m.id),
   }));
 
+  // Флаг наличия более старых сообщений — фронтенд читает его из заголовка
+  res.setHeader('X-Chat-Has-More', hasMore ? 'true' : 'false');
   res.json(withAttachments);
 });
 

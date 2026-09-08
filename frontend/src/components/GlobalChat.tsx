@@ -33,9 +33,14 @@ export function GlobalChat() {
   const [users, setUsers] = useState<User[]>([]);
   const [showReactionsFor, setShowReactionsFor] = useState<string | null>(null);
   const [hoveredMsg, setHoveredMsg] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const latestIdRef = useRef<string | undefined>(undefined);
   const initialLoadRef = useRef(true);
+  const stickToBottomRef = useRef(true);
+  const loadingMoreRef = useRef(false);
+  const prevScrollHeightRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -138,9 +143,19 @@ export function GlobalChat() {
     };
   }, [user?.id]);
 
+  // Скролл: при первой загрузке и новых сообщениях держим низ чата,
+  // при подгрузке старых — сохраняем позицию прокрутки
   useEffect(() => {
     const el = containerRef.current;
-    if (el) { el.scrollTop = el.scrollHeight; }
+    if (!el) return;
+    if (loadingMoreRef.current) {
+      loadingMoreRef.current = false;
+      el.scrollTop = el.scrollHeight - prevScrollHeightRef.current;
+      return;
+    }
+    if (stickToBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [messages]);
 
   const send = async () => {
@@ -244,10 +259,44 @@ export function GlobalChat() {
     return Object.values(groups);
   };
 
+  // Подгрузка более старых сообщений при прокрутке к верху чата
+  const loadOlder = async () => {
+    const oldestId = messages[0]?.id;
+    if (!oldestId || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    prevScrollHeightRef.current = containerRef.current?.scrollHeight ?? 0;
+    try {
+      const { messages: older, hasMore: more } = await api.chat.listPage(oldestId);
+      setMessages(prev => {
+        const existingIds = new Set(prev.map(m => m.id));
+        return [...older.filter(m => !existingIds.has(m.id)), ...prev];
+      });
+      setHasMore(more);
+    } catch {
+      // ошибка подгрузки — пользователь может попробовать ещё раз при прокрутке
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  };
+
+  // Отслеживание прокрутки: фиксируем «прилипание» к низу и подгружаем историю у верха
+  const handleScroll = () => {
+    const el = containerRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const canScroll = el.scrollHeight > el.clientHeight + 1;
+    if (canScroll && el.scrollTop < 60 && hasMore && !loadingMoreRef.current) {
+      loadOlder();
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div
         ref={containerRef}
+        onScroll={handleScroll}
         style={{
           flex: 1,
           overflowY: 'auto',
@@ -260,6 +309,17 @@ export function GlobalChat() {
         }}
         className="no-scrollbar"
       >
+        {loadingMore && (
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, padding: '2px 0 6px' }}>
+            Загрузка сообщений...
+          </div>
+        )}
+        {!loadingMore && messages.length > 0 && !hasMore && (
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 11, padding: '2px 0 6px', opacity: 0.7 }}>
+            Начало переписки
+          </div>
+        )}
+
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 14, marginTop: 120 }}>
             Нет сообщений. Напишите первое!
