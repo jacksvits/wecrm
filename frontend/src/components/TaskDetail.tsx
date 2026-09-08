@@ -690,6 +690,8 @@ export function TaskDetail() {
                   background: "var(--bg-input)",
                   color: "var(--text-primary)",
                 }}
+              />{" "}
+            </div>{" "}
             {isAdmin && (
               <div style={{ position: "relative" }}>
                 <input
@@ -725,8 +727,6 @@ export function TaskDetail() {
                 )}
               </div>
             )}{" "}
-              />{" "}
-            </div>{" "}
             <select
               multiple
               value={editForm.assigneeIds}

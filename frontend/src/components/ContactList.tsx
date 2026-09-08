@@ -39,7 +39,11 @@ export function ContactList() {
   const [sortBy, setSortBy] = useState('createdAtDesc');
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<'all' | 'contact' | 'organization'>('all');
-  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>(() => {
+    const saved = localStorage.getItem('contactsViewMode');
+    if (saved === 'cards' || saved === 'list') return saved;
+    return window.innerWidth <= 768 ? 'cards' : 'list';
+  });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
@@ -345,8 +349,8 @@ export function ContactList() {
 
   const ViewToggle = () => (
     <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 10, background: 'var(--bg-body)', border: '1px solid var(--border-color)' }}>
-      <button onClick={() => setViewMode('cards')} style={{ padding: '6px 10px', borderRadius: 8, border: 'none', background: viewMode === 'cards' ? '#fff' : 'transparent', color: viewMode === 'cards' ? '#1a1a1a' : '#999', fontSize: 13, cursor: 'pointer', fontWeight: 500, boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>⊞ Карточки</button>
-      <button onClick={() => setViewMode('list')} style={{ padding: '6px 10px', borderRadius: 8, border: 'none', background: viewMode === 'list' ? '#fff' : 'transparent', color: viewMode === 'list' ? '#1a1a1a' : '#999', fontSize: 13, cursor: 'pointer', fontWeight: 500, boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>☰ Список</button>
+      <button onClick={() => { setViewMode('cards'); localStorage.setItem('contactsViewMode', 'cards'); }} style={{ padding: '6px 10px', borderRadius: 8, border: 'none', background: viewMode === 'cards' ? '#fff' : 'transparent', color: viewMode === 'cards' ? '#1a1a1a' : '#999', fontSize: 13, cursor: 'pointer', fontWeight: 500, boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>⊞ Карточки</button>
+      <button onClick={() => { setViewMode('list'); localStorage.setItem('contactsViewMode', 'list'); }} style={{ padding: '6px 10px', borderRadius: 8, border: 'none', background: viewMode === 'list' ? '#fff' : 'transparent', color: viewMode === 'list' ? '#1a1a1a' : '#999', fontSize: 13, cursor: 'pointer', fontWeight: 500, boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>☰ Список</button>
     </div>
   );
 
