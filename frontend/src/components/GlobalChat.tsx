@@ -219,8 +219,11 @@ export function GlobalChat() {
     }
   };
 
-  const formatTime = (date: string) =>
-    new Date(date).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+  // Формат даты и времени сообщения в стиле проекта: «09.09.2026 23:24»
+  const formatTime = (date: string) => {
+    const d = new Date(date);
+    return `${d.toLocaleDateString('ru')} ${d.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`;
+  };
 
   const handleFileUpload = async (attachment: FileAttachment) => {
     setPendingAttachments((prev) => [...prev, attachment]);
