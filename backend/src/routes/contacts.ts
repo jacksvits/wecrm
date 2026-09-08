@@ -3,6 +3,7 @@ import { z } from 'zod';
 import * as XLSX from 'xlsx';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { findDuplicateContacts, mergeContacts } from '../lib/contact-dedup.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -155,6 +156,120 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Проверка дубликатов перед ручным созданием контакта (по имени, телефону или email)
+const duplicateCheckSchema = z.object({
+  name: z.string().optional().or(z.literal('')),
+  email: z.string().optional().or(z.literal('')).or(z.literal(null)),
+  phone: z.string().optional().or(z.literal(null)),
+  emails: z.array(z.string()).optional().default([]),
+  phones: z.array(z.string()).optional().default([]),
+});
+
+router.post('/check-duplicates', async (req, res) => {
+  try {
+    const data = duplicateCheckSchema.parse(req.body);
+    const duplicates = await findDuplicateContacts({
+      name: data.name || undefined,
+      email: data.email || undefined,
+      phone: data.phone || undefined,
+      emails: data.emails,
+      phones: data.phones,
+    });
+    const counts = duplicates.length > 0
+      ? await prisma.contact.findMany({
+          where: { id: { in: duplicates.map((d: any) => d.id) } },
+          select: { id: true, _count: { select: { deals: true, tasks: true } } },
+        })
+      : [];
+    const countMap = new Map(counts.map((c: any) => [c.id, c._count]));
+    res.json({
+      duplicates: duplicates.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        phone: c.phone,
+        company: c.company,
+        kind: c.kind,
+        tasks: countMap.get(c.id)?.tasks ?? 0,
+        deals: countMap.get(c.id)?.deals ?? 0,
+      })),
+    });
+  } catch (err: any) {
+    console.error('[Contacts CheckDuplicates] Error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Дополнение существующего контакта данными из формы создания (выбор «Объединить» при дубликате)
+router.post('/merge-new', async (req: AuthRequest, res) => {
+  try {
+    if (!isManagerOrAdmin(req)) {
+      return res.status(403).json({ error: 'Недостаточно прав для объединения контактов' });
+    }
+    const { targetId, data } = z.object({
+      targetId: z.string().min(1),
+      data: createSchema,
+    }).parse(req.body);
+
+    const target = await prisma.contact.findUnique({ where: { id: targetId } });
+    if (!target) return res.status(404).json({ error: 'Контакт не найден' });
+
+    const { organizationId, projectIds, ...restData } = data;
+    const extraData: any = {
+      ...restData,
+      email: data.emails[0] || data.email || null,
+      phone: normalizePhone(data.phones[0] || data.phone || ''),
+      phones: data.phones.map(p => normalizePhone(p)).filter(Boolean),
+      emails: data.emails,
+    };
+    if (data.kind === 'organization') {
+      extraData.position = null;
+    } else {
+      extraData.inn = null;
+      extraData.ogrn = null;
+      extraData.legalAddress = null;
+    }
+    if (organizationId && organizationId !== '') {
+      extraData.organizationId = organizationId;
+    }
+
+    await mergeContacts(targetId, [], extraData);
+
+    if (projectIds?.length) {
+      await prisma.contactProject.createMany({
+        data: projectIds.map(pid => ({ contactId: targetId, projectId: pid })),
+        skipDuplicates: true,
+      });
+    }
+    if (organizationId && organizationId !== '') {
+      await prisma.contact.update({ where: { id: targetId }, data: { organization: { connect: { id: organizationId } } } });
+    }
+
+    await prisma.activity.create({
+      data: {
+        action: 'merged',
+        entity: 'contact',
+        entityId: targetId,
+        userId: req.user!.id,
+        details: `В контакт «${target.name}» добавлены данные из формы создания (найден дубликат)`,
+      },
+    });
+
+    const contact = await prisma.contact.findUnique({
+      where: { id: targetId },
+      include: {
+        _count: { select: { deals: true, tasks: true, employees: true } },
+        organization: { select: { id: true, name: true } },
+        projects: { include: { project: { select: { id: true, name: true, status: true } } } },
+      },
+    });
+    res.json(contact);
+  } catch (err: any) {
+    console.error('[Contacts MergeNew] Error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.patch('/:id', async (req: AuthRequest, res) => {
   try {
     if (!isManagerOrAdmin(req)) {
@@ -244,41 +359,10 @@ router.post('/merge', async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Некоторые исходные контакты не найдены' });
     }
 
-    const allPhones = [...new Set([
-      ...target.phones.map(p => normalizePhone(p)),
-      ...(target.phone ? [normalizePhone(target.phone)] : []),
-      ...sources.flatMap(s => [...s.phones.map(p => normalizePhone(p)), ...(s.phone ? [normalizePhone(s.phone)] : [])]),
-    ])].filter(Boolean);
+    const merged = await mergeContacts(targetId, sourceIds);
 
-    const allEmails = [...new Set([
-      ...target.emails,
-      ...(target.email ? [target.email] : []),
-      ...sources.flatMap(s => [...s.emails, ...(s.email ? [s.email] : [])]),
-    ])].filter(Boolean);
-
-    const allTags = [...new Set([...target.tags, ...sources.flatMap(s => s.tags)])];
-    const mergedNotes = [target.notes, ...sources.map(s => s.notes)].filter(Boolean).join('\n\n---\n\n');
-
-    await prisma.contact.update({
-      where: { id: targetId },
-      data: {
-        phones: allPhones,
-        emails: allEmails,
-        tags: allTags,
-        notes: mergedNotes || null,
-        phone: allPhones[0] || null,
-        email: allEmails[0] || null,
-      },
-    });
-
-    for (const source of sources) {
-      await prisma.deal.updateMany({ where: { contactId: source.id }, data: { contactId: targetId } });
-      await prisma.task.updateMany({ where: { contactId: source.id }, data: { contactId: targetId } });
-      await prisma.call.updateMany({ where: { contactId: source.id }, data: { contactId: targetId } });
-      await prisma.contact.updateMany({ where: { organizationId: source.id }, data: { organizationId: targetId } });
-    }
-
-    await prisma.contact.deleteMany({ where: { id: { in: sourceIds } } });
+    const allPhones = merged.phones;
+    const allEmails = merged.emails;
 
     await prisma.activity.create({
       data: {

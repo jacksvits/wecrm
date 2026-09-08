@@ -52,6 +52,11 @@ export function ContactList() {
   const PAGE_SIZE = 50;
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [mergeTargetId, setMergeTargetId] = useState<string>('');
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateContacts, setDuplicateContacts] = useState<any[]>([]);
+  const [duplicateTargetId, setDuplicateTargetId] = useState<string>('');
+  const [pendingCreateData, setPendingCreateData] = useState<any>(null);
+  const [duplicateSaving, setDuplicateSaving] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFormat, setImportFormat] = useState<'vcf' | 'csv' | 'xlsx'>('vcf');
   const [importData, setImportData] = useState('');
@@ -221,10 +226,50 @@ export function ContactList() {
     if (editingId) {
       await api.contacts.update(editingId, data);
     } else {
+      const check = await api.contacts.checkDuplicates(data);
+      if (check.duplicates?.length) {
+        setPendingCreateData(data);
+        setDuplicateContacts(check.duplicates);
+        setDuplicateTargetId(check.duplicates[0].id);
+        setShowDuplicateModal(true);
+        return;
+      }
       await api.contacts.create(data);
     }
     setShowModal(false);
     loadContacts();
+  };
+
+  const confirmMergeDuplicate = async () => {
+    if (!pendingCreateData || !duplicateTargetId) return;
+    setDuplicateSaving(true);
+    try {
+      await api.contacts.mergeNew(duplicateTargetId, pendingCreateData);
+      setShowDuplicateModal(false);
+      setShowModal(false);
+      setPendingCreateData(null);
+      loadContacts();
+    } catch (err: any) {
+      alert('Ошибка: ' + (err.message || 'Не удалось объединить контакты'));
+    } finally {
+      setDuplicateSaving(false);
+    }
+  };
+
+  const createDespiteDuplicates = async () => {
+    if (!pendingCreateData) return;
+    setDuplicateSaving(true);
+    try {
+      await api.contacts.create(pendingCreateData);
+      setShowDuplicateModal(false);
+      setShowModal(false);
+      setPendingCreateData(null);
+      loadContacts();
+    } catch (err: any) {
+      alert('Ошибка: ' + (err.message || 'Не удалось создать контакт'));
+    } finally {
+      setDuplicateSaving(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -765,6 +810,45 @@ export function ContactList() {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setShowMergeModal(false)} style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer' }}>Отмена</button>
               <button onClick={confirmMerge} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', cursor: 'pointer' }}>Объединить</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDuplicateModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1003, padding: 'max(16px, env(safe-area-inset-top, 0)) max(16px, env(safe-area-inset-right, 0)) max(16px, env(safe-area-inset-bottom, 0)) max(16px, env(safe-area-inset-left, 0))' }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 18 }}>Контакт уже существует</h3>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16 }}>
+              Найдены совпадения по имени, телефону или email. Выберите основной контакт для объединения или создайте новый.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20, maxHeight: 300, overflow: 'auto' }}>
+              {duplicateContacts.map(contact => (
+                <label key={contact.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10,
+                  border: duplicateTargetId === contact.id ? '2px solid #007AFF' : '1px solid #e5e5e5',
+                  cursor: 'pointer', background: duplicateTargetId === contact.id ? '#f0f7ff' : '#fff',
+                }}>
+                  <input
+                    type="radio"
+                    name="duplicateTarget"
+                    checked={duplicateTargetId === contact.id}
+                    onChange={() => setDuplicateTargetId(contact.id)}
+                    style={{ width: 18, height: 18 }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500 }}>{contact.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      {contact.phone || '—'} · {contact.email || '—'} · задач: {contact.tasks}, сделок: {contact.deals}
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowDuplicateModal(false)} disabled={duplicateSaving} style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer' }}>Отмена</button>
+              <button onClick={createDespiteDuplicates} disabled={duplicateSaving} style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer' }}>Создать новый</button>
+              <button onClick={confirmMergeDuplicate} disabled={duplicateSaving} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', cursor: 'pointer' }}>{duplicateSaving ? 'Сохранение...' : 'Объединить'}</button>
             </div>
           </div>
         </div>

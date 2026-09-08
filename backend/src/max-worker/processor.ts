@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
+import { resolveContactAuto } from '../lib/contact-dedup.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
 import fs from 'fs';
 import path from 'path';
@@ -76,8 +77,9 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
     console.log('[MAX Processor] Updated contact', contactId, 'avatar, description, lastActivityTime');
   } else if (settings.autoCreateContact) {
     const name = msg.sender_name || 'MAX ' + chatId;
-    const newContact = await prisma.contact.create({
-      data: {
+    const resolved = await resolveContactAuto(
+      { name },
+      {
         name,
         maxChatId: chatId,
         maxUserId: userId,
@@ -87,9 +89,9 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
         type: 'client',
         notes: 'Автоматически создан из сообщения MAX',
       },
-    });
-    contactId = newContact.id;
-    console.log('[MAX Processor] Created contact', newContact.id, 'for MAX chat', chatId);
+    );
+    contactId = resolved.contactId;
+    console.log('[MAX Processor]', resolved.created ? 'Created contact' : 'Resolved existing contact', contactId, 'for MAX chat', chatId);
   } else {
     console.log('[MAX Processor] No contact found for MAX chat', chatId, 'and autoCreateContact is disabled');
   }

@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
 import { sendPushToRoleUsers } from '../lib/push.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
+import { resolveContactAuto } from '../lib/contact-dedup.js';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -131,22 +132,18 @@ export class EmailWorker {
 
         let contactId: string | undefined;
         if (senderEmail) {
-          const existingContact = await prisma.contact.findFirst({
-            where: { email: senderEmail },
-          });
-          if (existingContact) {
-            contactId = existingContact.id;
-          } else {
-            const newContact = await prisma.contact.create({
-              data: {
-                name: senderName,
-                email: senderEmail,
-                type: 'client',
-                notes: `Автоматически создан из письма: ${cleanTitle}`,
-              },
-            });
-            contactId = newContact.id;
-            console.log(`[EmailWorker] Created new contact ${newContact.id} for ${senderEmail}`);
+          const resolved = await resolveContactAuto(
+            { email: senderEmail, name: senderName },
+            {
+              name: senderName,
+              email: senderEmail,
+              type: 'client',
+              notes: `Автоматически создан из письма: ${cleanTitle}`,
+            },
+          );
+          contactId = resolved.contactId;
+          if (resolved.created) {
+            console.log(`[EmailWorker] Created new contact ${contactId} for ${senderEmail}`);
           }
         }
 
