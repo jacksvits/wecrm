@@ -166,11 +166,10 @@ export function NoteEditor() {
 
           {/* Содержимое */}
           <div
+            className="rich-text"
             style={{
               fontSize: 15,
-              lineHeight: 1.7,
               color: textColor,
-              wordBreak: 'break-word',
             }}
             dangerouslySetInnerHTML={{ __html: content }}
           />

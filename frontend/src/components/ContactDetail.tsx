@@ -175,7 +175,7 @@ export function ContactDetail() {
           {contact.notes && (
             <div style={{ marginTop: 8, padding: 16, background: 'var(--bg-body)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
               <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>Примечания</div>
-              <div style={{ fontSize: 14, lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: contact.notes }} />
+              <div className="rich-text" dangerouslySetInnerHTML={{ __html: contact.notes }} />
             </div>
           )}
           {contact.description && (

@@ -970,12 +970,8 @@ export function TaskDetail() {
                   </div>{" "}
                 </div>{" "}
                 <div
-                  style={{
-                    fontSize: 14,
-                    color: "var(--text-secondary)",
-                    lineHeight: 1.6,
-                    marginBottom: 16,
-                  }}
+                  className="rich-text"
+                  style={{ marginBottom: 16 }}
                   dangerouslySetInnerHTML={{
                     __html:
                       task.description ||
@@ -2291,6 +2287,7 @@ export function TaskDetail() {
                         </div>
                         {tx.description && (
                           <div
+                            className="rich-text"
                             style={{
                               fontSize: 12,
                               color: "var(--text-secondary)",
