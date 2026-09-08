@@ -36,6 +36,8 @@ import taskFinanceRoutes from './routes/task-finances.js';
 import contactTypeRoutes from './routes/contact-types.js';
 import filesRoutes from './routes/files.js';
 import notesRouter from './routes/notes.js';
+import reminderRoutes from './routes/reminders.js';
+import { startReminderScheduler } from './lib/reminder-scheduler.js';
 import assistantRoutes from './routes/assistant.js';
 import aiRoutes from './routes/ai.js';
 dotenv.config();
@@ -104,6 +106,7 @@ app.use('/api/pskovline', pskovlineRoutes);
 app.use('/api/camera', cameraRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/notes', notesRouter);
+app.use('/api/reminders', reminderRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/ai', aiRoutes);
 
@@ -111,6 +114,7 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok', connections: getA
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  startReminderScheduler();
   console.log(`Uploads route mounted at /api/uploads`);
   console.log(`Camera proxy mounted at /api/camera/stream`);
 });

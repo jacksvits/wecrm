@@ -83,6 +83,7 @@ model User {
   notes           Note[]
   telegramSettings TelegramSettings[]
   @@map("users")
+  reminders     Reminder[]
 }
 
 model ContactType {
@@ -545,6 +546,7 @@ model Status {
   @@unique([entityType, name])
   @@index([entityType, sortOrder])
   @@map("statuses")
+  reminders   Reminder[]
 }
 
 model MaxSettings {
@@ -597,6 +599,29 @@ model Note {
   @@index([userId])
   @@index([createdAt])
   @@map("notes")
+}
+
+
+model Reminder {
+  id              String    @id @default(cuid())
+  title           String
+  content         String    @default("")
+  userId          String    @map("user_id")
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  statusId        String?   @map("status_id")
+  status          Status?   @relation(fields: [statusId], references: [id])
+  remindAt        DateTime  @map("remind_at")
+  notifyBeforeMin Int       @default(0) @map("notify_before_min")
+  repeat          String    @default("none") @map("repeat")
+  repeatEndAt     DateTime? @map("repeat_end_at")
+  lastNotifiedAt  DateTime? @map("last_notified_at")
+  completedAt     DateTime? @map("completed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([remindAt])
+  @@map("reminders")
 }
 
 model NewsCategory {
