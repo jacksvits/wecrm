@@ -2,6 +2,8 @@ import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { prisma } from '../lib/prisma.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
+import { sendPushToRoleUsers } from '../lib/push.js';
+import { broadcast, CHANNELS } from '../lib/events.js';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -161,15 +163,19 @@ export class EmailWorker {
           },
         });
 
-        // Отправляем уведомления о новой задаче из письма
+        // Отправляем уведомления о новой задаче из письма (аналогично ручному созданию)
         try {
-          const notifyPayload = {
-            title: 'Новая задача из email',
-            body: `Задача "${cleanTitle}" создана из письма от ${senderName}`,
+          const rolePayload = {
+            title: 'Новая задача без исполнителя',
+            body: `Создана задача из письма: ${cleanTitle}`,
             url: '/tasks/' + task.id,
           };
-          await notifyTaskCreator(task.id, notifyPayload);
-          await notifyRoleUsers(['admin'], notifyPayload, creatorId);
+          // Push уведомления админам и менеджерам
+          sendPushToRoleUsers(['admin', 'manager'], rolePayload, 'task', creatorId).catch(() => {});
+          // IN-APP уведомления админам и менеджерам (push отправлен отдельно выше)
+          await notifyRoleUsers(['admin', 'manager'], rolePayload, creatorId, false);
+          // Обновление списка задач в реальном времени
+          broadcast(CHANNELS.TASKS, { action: 'create', entity: 'task', id: task.id });
           console.log(`[EmailWorker] Notifications sent for new task ${task.id}`);
         } catch (notifyErr) {
           console.error(`[EmailWorker] Failed to send notifications for task ${task.id}:`, notifyErr);
