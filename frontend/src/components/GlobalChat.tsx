@@ -162,6 +162,7 @@ export function GlobalChat() {
     if ((!text.trim() && !pendingAttachments.length) || loading) return;
     setLoading(true);
     try {
+      stickToBottomRef.current = true;
       const content = text.trim() || (pendingAttachments.length ? `📎 ${pendingAttachments.length} файл(ов)` : '');
       const attachmentIds = pendingAttachments.length ? pendingAttachments.map(a => a.id) : undefined;
       const msg = await api.chat.send(
