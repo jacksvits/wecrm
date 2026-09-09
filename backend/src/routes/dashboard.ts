@@ -1,15 +1,16 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authMiddleware);
 
-router.get('/stats', async (req, res) => {
+router.get('/stats', async (req: AuthRequest, res) => {
   const oneMinuteAgo = new Date(Date.now() - 1 * 60 * 1000);
   const [activeTasks, overdueTasks, dealsInProgress, totalDealValue, completedProjects, users, onlineUsersCount, onlineUsersList, totalTasks, totalContacts, totalDeals, totalProjects] = await Promise.all([
     prisma.task.count({ where: { status: { in: ['open', 'in_progress', 'load'] } } }),
-    prisma.task.count({ where: { status: { notIn: ['cancelled', 'win'] }, dueDate: { lt: new Date() } } }),
+    // Просрочено: активные задачи текущего пользователя с вышедшим сроком исполнения
+    prisma.task.count({ where: { status: { in: ['open', 'in_progress', 'load'] }, dueDate: { lt: new Date() }, assignees: { some: { userId: req.user!.id } } } }),
     prisma.deal.count({ where: { stage: { notIn: ['won', 'lost'] } } }),
     prisma.deal.aggregate({ where: { stage: { notIn: ['won', 'lost'] } }, _sum: { value: true } }),
     prisma.project.count({ where: { status: 'completed' } }),
