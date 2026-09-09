@@ -15,9 +15,7 @@ export function YandexMap({ address }: { address: string }) { const containerRef
       } catch (e) { console.warn('[YandexMap] JS API Яндекс недоступен, включаю резервный режим:', e) }
       // 2) Резервный режим: геокодинг через сервер (ключ Яндекс) + Leaflet с тайлами OpenStreetMap — без внешних JS-скриптов
       const g = await api.yandex.geocodeAddress(address) ; if (cancelled) return ;
-      let coords: [number, number] | null = null ;
-      if (g?.found && g.coords) coords = [g.coords[0], g.coords[1]] ;
-      if (!coords) { try { const nr = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=ru&q=${encodeURIComponent(address)}`) ; if (nr.ok) { const nd: any = await nr.json() ; const f = nd && nd[0] ; const nlat = Number(f?.lat) ; const nlon = Number(f?.lon) ; if (nlat && nlon) coords = [nlat, nlon] } } catch (e) { console.warn('[YandexMap] Nominatim из браузера недоступен:', e) } }
+      const coords: [number, number] | null = (g?.found && g.coords) ? [g.coords[0], g.coords[1]] : null ;
       if (!coords) { setStatus('notfound') ; return }
       await new Promise(r => setTimeout(r, 50)) ;
       if (!containerRef.current) { if (!cancelled) setStatus('error') ; return }
