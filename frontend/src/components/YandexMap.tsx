@@ -15,10 +15,13 @@ export function YandexMap({ address }: { address: string }) { const containerRef
       } catch (e) { console.warn('[YandexMap] JS API Яндекс недоступен, включаю резервный режим:', e) }
       // 2) Резервный режим: геокодинг через сервер (ключ Яндекс) + Leaflet с тайлами OpenStreetMap — без внешних JS-скриптов
       const g = await api.yandex.geocodeAddress(address) ; if (cancelled) return ;
-      if (!g?.found || !g.coords) { setStatus('notfound') ; return }
+      let coords: [number, number] | null = null ;
+      if (g?.found && g.coords) coords = [g.coords[0], g.coords[1]] ;
+      if (!coords) { try { const nr = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=ru&q=${encodeURIComponent(address)}`) ; if (nr.ok) { const nd: any = await nr.json() ; const f = nd && nd[0] ; const nlat = Number(f?.lat) ; const nlon = Number(f?.lon) ; if (nlat && nlon) coords = [nlat, nlon] } } catch (e) { console.warn('[YandexMap] Nominatim из браузера недоступен:', e) } }
+      if (!coords) { setStatus('notfound') ; return }
       await new Promise(r => setTimeout(r, 50)) ;
       if (!containerRef.current) { if (!cancelled) setStatus('error') ; return }
-      const map = L.map(containerRef.current, { center: [g.coords[0], g.coords[1]], zoom: 16 }) ; L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map) ; L.marker([g.coords[0], g.coords[1]]).addTo(map) ; leafletRef.current = map ; setMode('leaflet') ; setStatus('ready') ;
+      const map = L.map(containerRef.current, { center: coords, zoom: 16 }) ; L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map) ; L.marker(coords).addTo(map) ; leafletRef.current = map ; setMode('leaflet') ; setStatus('ready') ;
     } catch (e: any) { console.error('Yandex map error:', e) ; if (!cancelled) { setErrorMsg((e && e.message) || String(e)) ; setStatus('error') } } })() ;
     return () => { cancelled = true ; destroyMaps() } ;
   }, [address, attempt]) ;
