@@ -20,10 +20,10 @@ router.get('/tabs', authMiddleware, async (_req, res) => {
   try {
     const tabs = await prisma.fileTabSetting.findMany();
     const defaults = [
-      { tabKey: 'programs', label: 'Программы', url: '', path: '/volume3/SOFT' },
-      { tabKey: 'drivers', label: 'Драйвера', url: '', path: '/volume3/DRIVER' },
-      { tabKey: 'documents', label: 'Документы', url: '', path: '/volume2/BOOK' },
-      { tabKey: 'games', label: 'Игры', url: '', path: '/volume3/GAME' },
+      { tabKey: 'programs', label: 'Программы', url: '', path: '/mnt/nfs/SOFT' },
+      { tabKey: 'drivers', label: 'Драйвера', url: '', path: '/mnt/nfs/DRIVER' },
+      { tabKey: 'documents', label: 'Документы', url: '', path: '/mnt/nfs/BOOK' },
+      { tabKey: 'games', label: 'Игры', url: '', path: '/mnt/nfs/GAME' },
     ];
     const merged = defaults.map(d => {
       const found = tabs.find(t => t.tabKey === d.tabKey);
