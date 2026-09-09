@@ -729,7 +729,6 @@ export function GlobalChat() {
           marginTop: 8,
           marginBottom: 6,
           flexShrink: 0,
-          padding: '0 4px',
         }}>
           {/* Кнопка "Всем" — слева от аватарок */}
           <button

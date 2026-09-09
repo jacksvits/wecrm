@@ -232,6 +232,7 @@ body {
    на мобильных — горизонтальный свайп в одну строку */
 .chat-recipients-panel {
   flex-wrap: wrap;
+  padding: 0 4px;
 }
 @media (max-width: 768px) {
   .chat-recipients-panel {
@@ -240,6 +241,8 @@ body {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    padding-left: 10px;
+    padding-right: 10px;
   }
   .chat-recipients-panel::-webkit-scrollbar { display: none; }
   .chat-recipients-panel > * {
