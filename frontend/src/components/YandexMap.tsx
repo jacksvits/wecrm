@@ -21,7 +21,7 @@ export function YandexMap({ address }: { address: string }) { const containerRef
       if (!coords) { setStatus('notfound') ; return }
       await new Promise(r => setTimeout(r, 50)) ;
       if (!containerRef.current) { if (!cancelled) setStatus('error') ; return }
-      const map = L.map(containerRef.current, { center: coords, zoom: 16 }) ; L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map) ; L.marker(coords).addTo(map) ; leafletRef.current = map ; setMode('leaflet') ; setStatus('ready') ;
+      const map = L.map(containerRef.current, { center: coords, zoom: 16 }) ; L.tileLayer('/api/yandex/tiles?l=map&z={z}&x={x}&y={y}&lang=ru_RU', { maxZoom: 19, attribution: '© Яндекс' }).addTo(map) ; L.marker(coords).addTo(map) ; leafletRef.current = map ; setMode('leaflet') ; setStatus('ready') ;
     } catch (e: any) { console.error('Yandex map error:', e) ; if (!cancelled) { setErrorMsg((e && e.message) || String(e)) ; setStatus('error') } } })() ;
     return () => { cancelled = true ; destroyMaps() } ;
   }, [address, attempt]) ;
