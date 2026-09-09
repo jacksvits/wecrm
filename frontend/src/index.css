@@ -228,6 +228,25 @@ body {
 }
 .rich-text th { background: var(--bg-secondary); font-weight: 600; }
 
+/* Панель выбора получателей общего чата: на десктопе переносится,
+   на мобильных — горизонтальный свайп в одну строку */
+.chat-recipients-panel {
+  flex-wrap: wrap;
+}
+@media (max-width: 768px) {
+  .chat-recipients-panel {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .chat-recipients-panel::-webkit-scrollbar { display: none; }
+  .chat-recipients-panel > * {
+    flex-shrink: 0;
+  }
+}
+
 /* Swipe tabs indicator for mobile */
 .tab-swipe-indicator { display: none; }
 @media (max-width: 768px) {

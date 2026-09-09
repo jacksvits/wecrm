@@ -721,14 +721,13 @@ export function GlobalChat() {
 
       {/* Панель выбора получателей — кнопка "Всем" + аватарки пользователей */}
       {users.length > 0 && (
-        <div style={{
+        <div className="chat-recipients-panel" style={{
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
           gap: 10,
           marginTop: 8,
           marginBottom: 6,
-          flexWrap: 'wrap',
           flexShrink: 0,
           padding: '0 4px',
         }}>
