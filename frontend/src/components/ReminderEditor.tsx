@@ -131,6 +131,7 @@ export function ReminderEditor() {
         repeat,
         repeatEndAt: repeat !== 'none' && repeatEndAt ? new Date(repeatEndAt + 'T23:59:59').toISOString() : null,
         statusId: statusId || null,
+        recipientIds,
       };
 
       if (isEdit && id) {

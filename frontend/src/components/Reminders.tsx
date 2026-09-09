@@ -172,6 +172,11 @@ export function Reminders() {
                       {r.status && (
                         <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 10, background: r.status.color, color: r.status.textColor }}>{r.status.label}</span>
                       )}
+                      {!isMine && r.user && (
+                        <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 10, background: '#fef3c7', color: '#92400e' }}>
+                          📨 Напоминание от {r.user.name}
+                        </span>
+                      )}
                     </div>
                     {preview && (
                       <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>{preview.slice(0, 160)}</div>
