@@ -84,7 +84,7 @@ export function Dashboard() {
       delta: 'в работе', 
       path: '/tasks?hideCompleted=true' 
     },
-    { label: 'Просрочено', value: String(stats.metrics?.overdueTasks ?? 0), delta: 'задач', path: '/tasks' },
+    { label: 'Просрочено', value: String(stats.metrics?.overdueTasks ?? 0), delta: 'задач', path: `/tasks?filter=overdue&assigneeId=${user?.id ?? ''}&hideCompleted=true` },
     { label: 'Онлайн', value: String(stats.metrics?.onlineUsers ?? 0), delta: 'сейчас', avatars: stats.onlineUsersList || [], path: '/users' },
   ];
 
