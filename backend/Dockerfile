@@ -2,7 +2,7 @@ FROM node:20-slim
 
 WORKDIR /app
 
-RUN apt-get update -qq && apt-get install -y -qq openssl wget ffmpeg ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -qq && apt-get install -y -qq openssl wget ffmpeg ca-certificates fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
 
 # Устанавливаем сертификаты Минцифры (требуются для API MAX)
 # Файлы .cer на gu-st.ru уже в PEM-формате (Base64), просто копируем как .crt

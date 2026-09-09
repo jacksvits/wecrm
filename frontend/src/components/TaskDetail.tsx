@@ -55,6 +55,7 @@ export function TaskDetail() {
   const [newComment, setNewComment] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<FileAttachment[]>([]);
   const [isInternalComment, setIsInternalComment] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showSubtaskForm, setShowSubtaskForm] = useState(false);
@@ -351,6 +352,16 @@ export function TaskDetail() {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleAddComment(e as any);
+    }
+  };
+  const handleExportPdf = async () => {
+    setExportingPdf(true);
+    try {
+      await api.tasks.exportPdf(id!);
+    } catch (err: any) {
+      alert(err?.message || "Не удалось сформировать PDF");
+    } finally {
+      setExportingPdf(false);
     }
   };
   const handleDeleteComment = async (commentId: string) => {
