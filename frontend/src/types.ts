@@ -48,10 +48,18 @@ export interface SmsMessage {
   receivedAt: string;
   createdAt: string;
 }
+export interface ReminderRecipient {
+  id: string;
+  userId: string;
+  user: { id: string; name: string };
+}
+
 export interface Reminder {
   id: string;
   title: string;
   content: string;
+  userId?: string;
+  user?: { id: string; name: string } | null;
   statusId?: string | null;
   status?: Status | null;
   remindAt: string;
@@ -59,6 +67,7 @@ export interface Reminder {
   repeat: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
   repeatEndAt?: string | null;
   completedAt?: string | null;
+  sharedWith?: ReminderRecipient[];
   createdAt: string;
   updatedAt: string;
 }

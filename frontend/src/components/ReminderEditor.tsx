@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
-import { Status } from '../types';
+import { useAuth } from '../hooks/useAuth';
+import { Status, User } from '../types';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -32,6 +33,7 @@ export function ReminderEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = !!id;
+  const { user: currentUser } = useAuth();
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -46,9 +48,16 @@ export function ReminderEditor() {
   const [repeatEndAt, setRepeatEndAt] = useState('');
   const [statusId, setStatusId] = useState('');
   const [statuses, setStatuses] = useState<Status[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [recipientIds, setRecipientIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState('');
+
+  // Список пользователей, с которыми можно поделиться напоминанием
+  useEffect(() => {
+    api.users.list().then(list => setUsers(list.filter(u => u.id !== currentUser?.id))).catch(() => {});
+  }, [currentUser?.id]);
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '10px 14px', borderRadius: 10,
@@ -91,6 +100,7 @@ export function ReminderEditor() {
           setRepeat(r.repeat || 'none');
           setRepeatEndAt(r.repeatEndAt ? toLocalDate(new Date(r.repeatEndAt)) : '');
           if (r.statusId) setStatusId(r.statusId);
+          setRecipientIds(r.sharedWith?.map(s => s.userId) || []);
         } catch (e: any) {
           setError('Не удалось загрузить напоминание');
         }
@@ -238,6 +248,43 @@ export function ReminderEditor() {
           ))}
         </select>
       </div>
+
+      {/* Поделиться с пользователями */}
+      {users.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>Поделиться с пользователями</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {users.map(u => (
+              <label
+                key={u.id}
+                style={{
+                  padding: '6px 14px', borderRadius: 12, cursor: 'pointer', fontSize: 13,
+                  background: recipientIds.includes(u.id) ? '#007AFF' : 'var(--bg-hover)',
+                  color: recipientIds.includes(u.id) ? '#fff' : 'var(--text-color)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={recipientIds.includes(u.id)}
+                  onChange={() =>
+                    setRecipientIds(prev =>
+                      prev.includes(u.id) ? prev.filter(x => x !== u.id) : [...prev, u.id]
+                    )
+                  }
+                  style={{ display: 'none' }}
+                />
+                {u.name}
+              </label>
+            ))}
+          </div>
+          {recipientIds.length > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+              Выбрано получателей: {recipientIds.length}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Текст (WYSIWYG) */}
       <div style={{ marginBottom: 24 }}>

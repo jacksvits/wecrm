@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import { useAuth } from '../hooks/useAuth';
 import { Reminder, Status } from '../types';
 
 const REPEAT_LABELS: Record<string, string> = {
@@ -22,6 +23,7 @@ const formatDate = (iso: string) =>
 
 export function Reminders() {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [search, setSearch] = useState('');
@@ -128,6 +130,7 @@ export function Reminders() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {reminders.map(r => {
             const overdue = !r.completedAt && new Date(r.remindAt) < new Date();
+            const isMine = !r.userId || r.userId === currentUser?.id;
             const preview = stripHtml(r.content || '');
             const notifyText = r.notifyBeforeMin > 0
               ? (r.notifyBeforeMin % 60 === 0 ? `за ${r.notifyBeforeMin / 60} ч` : `за ${r.notifyBeforeMin} мин`)
@@ -175,20 +178,22 @@ export function Reminders() {
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
-                    <button
-                      onClick={() => navigate(`/reminders/${r.id}/edit`)}
-                      style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-color)', cursor: 'pointer', fontSize: 13 }}
-                    >
-                      Изменить
-                    </button>
-                    <button
-                      onClick={() => handleDelete(r.id)}
-                      style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: '#dc2626', cursor: 'pointer', fontSize: 13 }}
-                    >
-                      Удалить
-                    </button>
-                  </div>
+                  {isMine && (
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => navigate(`/reminders/${r.id}/edit`)}
+                        style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-color)', cursor: 'pointer', fontSize: 13 }}
+                      >
+                        Изменить
+                      </button>
+                      <button
+                        onClick={() => handleDelete(r.id)}
+                        style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: '#dc2626', cursor: 'pointer', fontSize: 13 }}
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );

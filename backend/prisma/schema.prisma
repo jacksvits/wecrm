@@ -76,6 +76,7 @@ model User {
   maxUserChats      MaxUserChat[]
   taskHistory       TaskHistory[]
   vkGroupSettings   VkGroupSettings[]
+  reminderRecipients ReminderRecipient[]
   maxSettings       MaxSettings[]
   assistantDialogs  AssistantDialog[]
 
@@ -618,10 +619,24 @@ model Reminder {
   completedAt     DateTime? @map("completed_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
+  sharedWith      ReminderRecipient[]
 
   @@index([userId])
   @@index([remindAt])
   @@map("reminders")
+}
+
+// Получатели напоминания, которыми автор поделился
+model ReminderRecipient {
+  id         String   @id @default(cuid())
+  reminderId String   @map("reminder_id")
+  reminder   Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([reminderId, userId])
+  @@map("reminder_recipients")
 }
 
 model NewsCategory {
