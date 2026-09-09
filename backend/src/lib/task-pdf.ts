@@ -91,6 +91,8 @@ export async function buildTaskPdf(task: PdfTask, user: { name?: string }, res: 
       doc.y = 92;
     };
     drawPageHeader();
+    // Фирменная шапка WeLANS на каждой новой странице отчёта
+    doc.on('pageAdded', drawPageHeader);
 
     doc.font(F.bold).fontSize(16).fill(BRAND.black).text(task.title, { width: W });
     doc.moveDown(0.4);
@@ -159,9 +161,9 @@ export async function buildTaskPdf(task: PdfTask, user: { name?: string }, res: 
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
-      doc.save().moveTo(50, doc.page.height - 45).lineTo(50 + W, doc.page.height - 45).lineWidth(0.6).strokeColor(BRAND.line).stroke().restore();
-      doc.font(F.regular).fontSize(8).fill(BRAND.gray).text('WeLANS · welans.ru', 50, doc.page.height - 38, { lineBreak: false });
-      doc.text(`Страница ${i + 1} из ${range.count}`, 50, doc.page.height - 38, { width: W, align: 'right', lineBreak: false });
+      doc.save().moveTo(50, 752).lineTo(50 + W, 752).lineWidth(0.6).strokeColor(BRAND.line).stroke().restore();
+      doc.font(F.regular).fontSize(8).fill(BRAND.gray).text('WeLANS · welans.ru', 50, 758, { lineBreak: false });
+      doc.text(`Страница ${i + 1} из ${range.count}`, 50, 758, { width: W, align: 'right', lineBreak: false });
     }
     doc.end();
   });
