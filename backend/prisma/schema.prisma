@@ -227,6 +227,9 @@ model Task {
   budget       Float?   @default(0)
   price        Float?   @default(0)
 
+  // Yandex map address
+  address      String?
+
   // Ticket number (unique numeric identifier)
   ticketNumber Int      @unique @default(autoincrement()) @map("ticket_number")
 
@@ -836,4 +839,13 @@ model AssistantDialog {
 
   @@index([userId])
   @@map("assistant_dialogs")
+}
+
+model YandexSettings {
+  id        String   @id @default(cuid())
+  apiKey    String?  @map("api_key")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("yandex_settings")
 }

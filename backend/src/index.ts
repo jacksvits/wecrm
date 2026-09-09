@@ -28,6 +28,7 @@ import vkRoutes from './routes/vk.js';
 import vkGroupSettingsRoutes from './routes/vk-group-settings.js';
 import maxRoutes from './routes/max.js';
 import telegramRoutes from './routes/telegram.js';
+import yandexRoutes from './routes/yandex.js';
 import begetRoutes from './routes/beget.js';
 import tochkaRoutes from './routes/tochka.js';
 import pskovlineRoutes from './routes/pskovline.js';
@@ -108,6 +109,7 @@ app.use('/api/files', filesRoutes);
 app.use('/api/notes', notesRouter);
 app.use('/api/reminders', reminderRoutes);
 app.use('/api/assistant', assistantRoutes);
+app.use('/api/yandex', yandexRoutes);
 app.use('/api/ai', aiRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', connections: getActiveConnections(), time: new Date().toISOString() }));

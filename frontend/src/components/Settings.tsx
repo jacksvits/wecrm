@@ -9,10 +9,11 @@ import { UserList } from "./UserList";
 import { VkGroupSettings } from "./VkGroupSettings";
 import { ContactTypeManager } from "./ContactTypeManager";
 import { SmsJournal } from "./SmsJournal";
+import { YandexSettings } from "./YandexSettings";
 import { SystemSettings } from "./SystemSettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "integrations" | "system";
-type IntegrationSubTab = "email" | "telephony" | "max" | "telegram" | "vk" | "sms";
+type IntegrationSubTab = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex";
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<MainTab>("roles");
@@ -101,6 +102,7 @@ export function Settings() {
         {integrationSubTab === "telegram" && <TelegramSettings />}
         {integrationSubTab === "vk" && <VkGroupSettings />}
         {integrationSubTab === "sms" && <SmsJournal />}
+        {integrationSubTab === "yandex" && <YandexSettings />}
       </div>
     );
   };

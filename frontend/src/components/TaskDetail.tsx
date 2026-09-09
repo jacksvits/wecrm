@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../api/client";
+import { YandexMap } from "./YandexMap";
 import { useRealtime } from "../hooks/useRealtime";
 import {
   Task,
@@ -73,6 +74,7 @@ export function TaskDetail() {
     assigneeIds: [] as string[],
     curatorIds: [] as string[],
     contactId: "",
+    address: "",
   });
   const [contacts, setContacts] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
@@ -239,6 +241,7 @@ export function TaskDetail() {
         assigneeIds: data.assignees?.map((a) => a.user.id) || [],
         curatorIds: data.curators?.map((c) => c.id) || [],
         contactId: data.contact?.id || "",
+        address: data.address || "",
       });
     } catch (err: any) {
       if (err.message?.includes('403') || err.message?.includes('Доступ запрещен')) {
@@ -318,6 +321,7 @@ export function TaskDetail() {
           ? editForm.curatorIds
           : undefined,
         contactId: editForm.contactId || undefined,
+        address: editForm.address || undefined,
       });
       setIsEditing(false);
       loadTask();
@@ -703,6 +707,23 @@ export function TaskDetail() {
                 }}
               />{" "}
             </div>{" "}
+            <input
+              type="text"
+              placeholder="Адрес (для карты Яндекс)..."
+              value={editForm.address}
+              onChange={(e) =>
+                setEditForm({ ...editForm, address: e.target.value })
+              }
+              style={{
+                padding: 10,
+                borderRadius: 12,
+                border: "1px solid var(--border-color)",
+                fontSize: 14,
+                width: "100%",
+                background: "var(--bg-input)",
+                color: "var(--text-primary)",
+              }}
+            />{" "}
             {isAdmin && (
               <div style={{ position: "relative" }}>
                 <input
@@ -1009,6 +1030,12 @@ export function TaskDetail() {
                   </div>{" "}
                   <div>
                     <strong style={{ color: "var(--text-muted)" }}>
+                      Адрес:
+                    </strong>{" "}
+                    {task.address || "Не указан"}
+                  </div>{" "}
+                  <div>
+                    <strong style={{ color: "var(--text-muted)" }}>
                       Создано:
                     </strong>{" "}
                     {new Date(task.createdAt).toLocaleDateString("ru")}
@@ -1035,6 +1062,11 @@ export function TaskDetail() {
                     )}
                   </div>{" "}
                 </div>{" "}
+                {task.address && (
+                  <div style={{ marginTop: 12 }}>
+                    <YandexMap address={task.address} />
+                  </div>
+                )}{" "}
                 <div style={{ marginTop: 12 }}>
                   {" "}
                   <strong style={{ color: "var(--text-muted)", fontSize: 13 }}>
