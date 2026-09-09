@@ -492,6 +492,24 @@ export function TaskDetail() {
         </button>{" "}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {" "}
+          {task && !isEditing && (
+            <button
+              onClick={handleExportPdf}
+              disabled={exportingPdf}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 12,
+                border: "1px solid var(--border-color)",
+                background: "var(--bg-card)",
+                cursor: exportingPdf ? "default" : "pointer",
+                fontSize: 13,
+                color: "var(--text-primary)",
+                opacity: exportingPdf ? 0.6 : 1,
+              }}
+            >
+              {exportingPdf ? "⏳ Формируется…" : "📄 Поделиться PDF"}
+            </button>
+          )}{" "}
           {task && (isAdmin || task.creatorId === user?.id || (task.curators || []).some(c => c.id === user?.id)) && !isEditing && activeTab === "details" && (
             <button
               onClick={() => setIsEditing(true)}
