@@ -141,7 +141,8 @@ export function Reminders() {
                 style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 16, padding: '14px 16px', opacity: r.completedAt ? 0.65 : 1 }}
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                  {/* Галочка выполнения */}
+                  {/* Галочка выполнения — только у своих напоминаний */}
+                  {isMine && (
                   <button
                     onClick={() => handleComplete(r)}
                     title={r.completedAt ? 'Вернуть в активные' : 'Отметить выполненным'}
@@ -154,6 +155,7 @@ export function Reminders() {
                   >
                     {r.completedAt ? '✓' : ''}
                   </button>
+                  )}
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 15, wordBreak: 'break-word', textDecoration: r.completedAt ? 'line-through' : 'none' }}>
