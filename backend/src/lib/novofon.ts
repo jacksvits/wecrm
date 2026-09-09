@@ -56,7 +56,7 @@ async function jsonRpcRequest<T = any>(
     body: JSON.stringify(body),
   });
 
-  const data = await res.json();
+  const data: any = await res.json();
 
   if (data.error) {
     throw new Error(`Novofon API error: ${data.error.message || JSON.stringify(data.error)}`);
@@ -104,12 +104,43 @@ export async function getCallRecord(
   credentials: NovofonCredentials,
   callIdWithRec: string
 ): Promise<NovofonRecordInfo> {
-  return jsonRpcRequest(
-    DATA_API_URL,
-    'get.call_record',
-    { call_id_with_rec: callIdWithRec },
-    credentials
-  );
+  const res = await fetch(DATA_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: `req_${Date.now()}`,
+      method: 'get.call_record',
+      params: {
+        auth: { login: credentials.apiKey, password: credentials.apiSecret },
+        call_id_with_rec: callIdWithRec,
+      },
+    }),
+  });
+  const data: any = await res.json();
+  if (data.error) {
+    throw new Error(`Novofon API error: ${data.error.message || JSON.stringify(data.error)}`);
+  }
+  // get.call_record может вернуть result.data объектом, массивом либо отдать поля сразу в result
+  let record: any = data.result?.data ?? data.result;
+  if (Array.isArray(record)) record = record[0];
+  if (record && record.url) return record as NovofonRecordInfo;
+  // Фолбэк: прямая ссылка на media.novofon.ru/<session_id>/<rec_hash>
+  // (call_id_with_rec приходит в формате <session_id>.<rec_hash>)
+  const mediaPath = String(callIdWithRec).replace('.', '/');
+  if (mediaPath.includes('/')) {
+    console.warn('[Novofon] get.call_record: пустой ответ, используем media-фолбэк', JSON.stringify(data).slice(0, 300));
+    return {
+      url: `https://media.novofon.ru/${mediaPath}`,
+      data: {
+        file_name: `record_${String(callIdWithRec).replace('.', '_')}.mp3`,
+        file_size: 0,
+        duration: 0,
+        created: new Date().toISOString(),
+      },
+    };
+  }
+  throw new Error(`Novofon get.call_record: неожиданный ответ: ${JSON.stringify(data).slice(0, 300)}`);
 }
 
 // === New methods for full integration ===
