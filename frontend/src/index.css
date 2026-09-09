@@ -257,4 +257,6 @@ body {
   .tab-swipe-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border-color); transition: background 0.2s, transform 0.2s; }
   .tab-swipe-dot.active { background: var(--text-primary); transform: scale(1.3); }
   .tab-content-swipeable { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+  /* Текст описания задачи (rich-text) должен оставаться выделяемым и копируемым */
+  .tab-content-swipeable .rich-text, .tab-content-swipeable .rich-text * { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 }
