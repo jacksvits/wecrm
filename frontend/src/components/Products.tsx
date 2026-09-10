@@ -52,6 +52,31 @@ export function Products() {
   const [whModal, setWhModal] = useState<Warehouse | 'new' | null>(null);
   const [ptModal, setPtModal] = useState<PriceType | 'new' | null>(null);
   const [editingCell, setEditingCell] = useState<{ productId: string; priceTypeId: string; value: string } | null>(null);
+  const [vkBusy, setVkBusy] = useState<'import' | 'sync' | null>(null);
+
+  const importFromVk = async () => {
+    if (!confirm('Импортировать все товары маркета группы ВК в проект? Позиции с совпадающим названием будут привязаны, не продублированы.')) return;
+    setVkBusy('import');
+    try {
+      const r = await api.products.vkImport();
+      alert(`Импорт завершён: создано ${r.created}, привязано ${r.linked}, пропущено ${r.skipped}${r.errors.length ? '\nОшибки:\n' + r.errors.slice(0, 10).join('\n') : ''}`);
+      await load();
+    } catch (e: any) {
+      alert(e.message || 'Ошибка импорта из ВК');
+    } finally { setVkBusy(null); }
+  };
+
+  const syncToVk = async () => {
+    if (!confirm('Выгрузить все позиции с отметкой «ВК» в маркет группы ВКонтакте?')) return;
+    setVkBusy('sync');
+    try {
+      const r = await api.products.vkSync();
+      alert(`Синхронизация завершена: создано ${r.created}, обновлено ${r.updated}, ошибок ${r.failed}${r.errors.length ? '\n' + r.errors.slice(0, 10).join('\n') : ''}`);
+      await load();
+    } catch (e: any) {
+      alert(e.message || 'Ошибка синхронизации с ВК');
+    } finally { setVkBusy(null); }
+  };
 
   const load = async () => {
     try {
@@ -142,7 +167,17 @@ export function Products() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Товары</h2>
         {tab === 'nomenclature' && (
-          <button onClick={() => setProductModal('new')} style={btnPrimary}>+ Позиция</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={importFromVk} disabled={!!vkBusy} title="Загрузить все товары маркета группы ВК в проект"
+              style={{ ...btnGhost, borderColor: '#0077FF', color: '#0077FF' }}>
+              {vkBusy === 'import' ? 'Импорт...' : '↓ Импорт из ВК'}
+            </button>
+            <button onClick={syncToVk} disabled={!!vkBusy} title="Выгрузить позиции с отметкой «ВК» в маркет группы"
+              style={{ ...btnGhost, borderColor: '#0077FF', color: '#0077FF' }}>
+              {vkBusy === 'sync' ? 'Синхронизация...' : '↑ Синхронизация ВК'}
+            </button>
+            <button onClick={() => setProductModal('new')} style={btnPrimary}>+ Позиция</button>
+          </div>
         )}
         {tab === 'stock' && (
           <button onClick={() => setWhModal('new')} style={btnPrimary}>+ Склад</button>
@@ -520,6 +555,12 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
         <span style={{ padding: '2px 10px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: KIND_COLORS[p.kind] || '#f0f0f0' }}>
           {KIND_LABELS[p.kind] || p.kind}
         </span>
+        {p.syncToVk && (
+          <span title="Синхронизируется с ВКонтакте"
+            style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#0077FF', color: '#fff' }}>
+            ВК
+          </span>
+        )}
       </td>
       <td style={tdStyle}>{p.unit}</td>
       <td style={tdStyle}>{p.kind === 'service' ? '—' : fmtMoney(totalStock)}</td>
@@ -537,7 +578,7 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, onClose, onSaved }: { product: Product | 'new'; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; category: string; subcategory: string; unit: string; barcode: string; description: string }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; category: string; subcategory: string; unit: string; barcode: string; syncToVk: boolean; description: string }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : product.kind,
     sku: isNew ? '' : product.sku || '',
@@ -545,6 +586,7 @@ function ProductModal({ product, onClose, onSaved }: { product: Product | 'new';
     subcategory: isNew ? '' : product.subcategory || '',
     unit: isNew ? 'шт' : product.unit,
     barcode: isNew ? '' : product.barcode || '',
+    syncToVk: isNew ? false : product.syncToVk,
     description: isNew ? '' : product.description || '',
   });
   const [error, setError] = useState('');
@@ -620,6 +662,10 @@ function ProductModal({ product, onClose, onSaved }: { product: Product | 'new';
               <input value={form.barcode} onChange={e => setForm({ ...form, barcode: e.target.value })} style={inputStyle} />
             </div>
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.syncToVk} onChange={e => setForm({ ...form, syncToVk: e.target.checked })} style={{ width: 16, height: 16 }} />
+            Синхронизировать с ВКонтакте
+          </label>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Описание</label>
           <ReactQuill theme="snow" value={form.description} onChange={v => setForm({ ...form, description: v })}
             modules={quillModules} formats={quillFormats} />

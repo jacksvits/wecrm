@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { importMarketItems, syncProductsToVk, getVkSettings } from '../lib/vk-market.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -179,6 +180,50 @@ router.get('/meta/movements', async (req, res) => {
   }
 });
 
+
+/* ============ ВКонтакте: импорт и синхронизация ============ */
+
+/**
+ * GET /api/products/meta/vk-status
+ * Статус подключения ВК (есть ли группа с токеном)
+ */
+router.get('/meta/vk-status', async (_req, res) => {
+  try {
+    const settings = await getVkSettings();
+    res.json({ configured: !!settings, groupId: settings?.groupId || null });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/products/meta/vk-import
+ * Первый импорт: все товары маркета группы ВК → проект
+ */
+router.post('/meta/vk-import', async (_req, res) => {
+  try {
+    const summary = await importMarketItems();
+    res.json(summary);
+  } catch (err: any) {
+    console.error('[products:vk-import]', err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/products/meta/vk-sync
+ * Синхронизация: все позиции с отметкой «ВК» → маркет группы
+ */
+router.post('/meta/vk-sync', async (_req, res) => {
+  try {
+    const summary = await syncProductsToVk();
+    res.json(summary);
+  } catch (err: any) {
+    console.error('[products:vk-sync]', err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
 /* ============ Номенклатура ============ */
 
 /**
@@ -215,7 +260,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, kind } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, kind, syncToVk } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
     const productKind = kind === 'service' ? 'service' : 'product';
     const product = await prisma.product.create({
@@ -228,6 +273,7 @@ router.post('/', async (req, res) => {
         subcategory: subcategory?.trim() || null,
         unit: unit?.trim() || 'шт',
         barcode: barcode?.trim() || null,
+        syncToVk: !!syncToVk,
       },
       include: { stocks: true, prices: true, images: { orderBy: { sortOrder: 'asc' } } },
     });
@@ -282,7 +328,7 @@ router.get('/:id', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind, syncToVk } = req.body;
     const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Товар не найден' });
     const data: any = {};
@@ -295,6 +341,7 @@ router.patch('/:id', async (req, res) => {
     if (unit !== undefined) data.unit = unit?.trim() || 'шт';
     if (barcode !== undefined) data.barcode = barcode?.trim() || null;
     if (isActive !== undefined) data.isActive = !!isActive;
+    if (syncToVk !== undefined) data.syncToVk = !!syncToVk;
     const product = await prisma.product.update({
       where: { id: req.params.id },
       data,

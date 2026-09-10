@@ -131,6 +131,9 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     createMovement: (id: string, data: Partial<StockMovement>) => fetchApi(`/api/products/${id}/movements`, { method: 'POST', body: JSON.stringify(data) }),
     setPrice: (id: string, priceTypeId: string, price: number) => fetchApi(`/api/products/${id}/prices`, { method: 'PUT', body: JSON.stringify({ priceTypeId, price }) }),
     priceHistory: (id: string): Promise<PriceHistory[]> => fetchApi(`/api/products/${id}/history`),
+    vkStatus: (): Promise<{ configured: boolean; groupId: number | null }> => fetchApi('/api/products/meta/vk-status'),
+    vkImport: (): Promise<{ created: number; linked: number; skipped: number; errors: string[] }> => fetchApi('/api/products/meta/vk-import', { method: 'POST' }),
+    vkSync: (): Promise<{ created: number; updated: number; failed: number; errors: string[] }> => fetchApi('/api/products/meta/vk-sync', { method: 'POST' }),
     addImage: (id: string, attachmentId: string): Promise<ProductImage> => fetchApi(`/api/products/${id}/images`, { method: 'POST', body: JSON.stringify({ attachmentId }) }),
     deleteImage: (id: string, imageId: string) => fetchApi(`/api/products/${id}/images/${imageId}`, { method: 'DELETE' }),
     movements: (params?: { productId?: string; warehouseId?: string }): Promise<StockMovement[]> => {
