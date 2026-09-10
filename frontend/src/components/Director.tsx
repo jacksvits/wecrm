@@ -248,6 +248,9 @@ export function Director() {
   const [begetDomains, setBegetDomains] = useState<any[]>([]);
   const [tochkaConnected, setTochkaConnected] = useState(false);
   const [tochkaAccounts, setTochkaAccounts] = useState<any>(null);
+  // Переименование счетов Точки прямо в виджете
+  const [editingTochkaAccountId, setEditingTochkaAccountId] = useState<string | null>(null);
+  const [tochkaNameDraft, setTochkaNameDraft] = useState("");
   const [pskovlineData, setPskovlineData] = useState<any>(null);
   const [pskovlineData2, setPskovlineData2] = useState<any>(null);
   const [pskovlineSettings, setPskovlineSettings] = useState<any>(null);
@@ -378,6 +381,25 @@ export function Director() {
       setMonthTaskDetails((prev) => ({ ...prev, [key]: data?.tasks || [] }));
     } catch {}
     setMonthTasksLoading(null);
+  };
+
+  // Сохранение кастомного названия счёта Точки (пустое — сброс к названию банка)
+  const saveTochkaAccountName = async (accountId: string, name: string) => {
+    setEditingTochkaAccountId(null);
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('/api/tochka/account-names', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ accountId, name: trimmed }),
+      });
+      setTochkaAccounts((prev: any) => prev ? {
+        ...prev,
+        accounts: (prev.accounts || []).map((a: any) => a.id === accountId ? { ...a, name: trimmed } : a),
+      } : prev);
+    } catch {}
   };
 
   const handleDragStart = (event: any) => setActiveId(event.active.id);
@@ -738,9 +760,34 @@ export function Director() {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {tochkaAccounts.accounts.map((acc: any) => (
                   <div key={acc.id} style={{ padding: "10px 12px", borderRadius: 10, background: "var(--bg-input)" }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>
-                      {acc.name}
-                      {acc.short ? <span style={{ color: "var(--text-muted)", fontWeight: 400 }}> ····{acc.short}</span> : null}
+                    <div style={{ fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                      {editingTochkaAccountId === acc.id ? (
+                        <input
+                          autoFocus
+                          value={tochkaNameDraft}
+                          onChange={(e) => setTochkaNameDraft(e.target.value)}
+                          onBlur={() => saveTochkaAccountName(acc.id, tochkaNameDraft)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveTochkaAccountName(acc.id, tochkaNameDraft);
+                            if (e.key === "Escape") setEditingTochkaAccountId(null);
+                          }}
+                          style={{ flex: 1, minWidth: 0, fontSize: 13, padding: "2px 6px", borderRadius: 6, border: "1px solid var(--border-color)", background: "var(--bg-card)", color: "var(--text-primary)", outline: "none" }}
+                        />
+                      ) : (
+                        <>
+                          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{acc.name}</span>
+                          {acc.short ? <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>····{acc.short}</span> : null}
+                          <button
+                            onClick={() => { setEditingTochkaAccountId(acc.id); setTochkaNameDraft(acc.name || ""); }}
+                            title="Переименовать счёт"
+                            style={{ background: "none", border: "none", cursor: "pointer", padding: 2, opacity: 0.5, transition: "opacity 0.15s", color: "var(--text-muted)", fontSize: 13 }}
+                            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+                            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+                          >
+                            ✏️
+                          </button>
+                        </>
+                      )}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
                       {(acc.balance || 0).toLocaleString("ru")} {acc.currency}

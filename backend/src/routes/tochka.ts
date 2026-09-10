@@ -9,6 +9,7 @@ const router = Router();
 
 const TOCHKA_BASE = 'https://enter.tochka.com/uapi';
 const TOKEN_FILE = path.join('/app/data', 'tochka_tokens.json');
+const ACCOUNT_NAMES_FILE = path.join('/app/data', 'tochka_account_names.json');
 const TOCHKA_CLIENT_ID = process.env.TOCHKA_CLIENT_ID || '';
 const TOCHKA_CLIENT_SECRET = process.env.TOCHKA_CLIENT_SECRET || '';
 const TOCHKA_REDIRECT_URI = process.env.TOCHKA_REDIRECT_URI || 'https://welans.cc/api/tochka/callback';
@@ -51,6 +52,23 @@ function loadTokens(): TochkaTokens | null {
 function saveTokens(tokens: TochkaTokens) {
   fs.mkdirSync(path.dirname(TOKEN_FILE), { recursive: true });
   fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2));
+}
+
+// Кастомные названия счетов (accountId -> название), задаются пользователем в виджете
+function loadAccountNames(): Record<string, string> {
+  try {
+    if (fs.existsSync(ACCOUNT_NAMES_FILE)) {
+      return JSON.parse(fs.readFileSync(ACCOUNT_NAMES_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.error('[Tochka] Failed to load account names:', e);
+  }
+  return {};
+}
+
+function saveAccountNames(names: Record<string, string>) {
+  fs.mkdirSync(path.dirname(ACCOUNT_NAMES_FILE), { recursive: true });
+  fs.writeFileSync(ACCOUNT_NAMES_FILE, JSON.stringify(names, null, 2));
 }
 
 // Обновление пары токенов через refresh_token; true — удалось, false — нет refresh_token или банк отклонил
@@ -265,10 +283,11 @@ router.get('/accounts', authMiddleware, async (_req, res) => {
     const { response: dataRes } = await authHeadersWithRetry((h) => tochkaRequest('/open-banking/v1.0/accounts', { headers: h }));
     if (dataRes.status !== 200) return res.json({ accounts: [], totalBalance: 0, error: `API ${dataRes.status}`, connected: true });
 
+    const customNames = loadAccountNames();
     const accounts = (dataRes.body?.Data?.Account || []).map((a: any) => ({
-      // Название из API банка (accountDetails.name); при его отсутствии — nickname, затем заглушка
+      // Кастомное название из виджета; иначе — название из API банка (accountDetails.name), nickname, заглушка
       id: a.accountId,
-      name: a.accountDetails?.[0]?.name || a.nickname || 'Счёт в банке Точка',
+      name: customNames[a.accountId] || a.accountDetails?.[0]?.name || a.nickname || 'Счёт в банке Точка',
       number: a.accountId,
       // Последние 4 цифры номера для визуального различения счетов (полный номер не показываем)
       short: (a.accountId.split('/')[0] || '').slice(-4),
@@ -291,6 +310,23 @@ router.get('/accounts', authMiddleware, async (_req, res) => {
   } catch (err: any) {
     res.json({ accounts: [], totalBalance: 0, error: err.message, connected: false });
   }
+});
+
+// GET /api/tochka/account-names — кастомные названия счетов
+router.get('/account-names', authMiddleware, (_req, res) => {
+  res.json(loadAccountNames());
+});
+
+// POST /api/tochka/account-names — задать/сбросить название счёта { accountId, name }; пустое name — сброс к названию банка
+router.post('/account-names', authMiddleware, (req, res) => {
+  const { accountId, name } = req.body || {};
+  if (!accountId || typeof accountId !== 'string') return res.status(400).json({ error: 'accountId is required' });
+  const names = loadAccountNames();
+  const trimmed = String(name || '').trim();
+  if (trimmed) names[accountId] = trimmed;
+  else delete names[accountId];
+  saveAccountNames(names);
+  res.json({ status: 'ok', names });
 });
 
 // GET /api/tochka/customer
