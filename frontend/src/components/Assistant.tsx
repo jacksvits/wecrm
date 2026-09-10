@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { api } from '../api/client';
+import { linkifyTaskTagsHtml, useTaskHashtagClick } from '../lib/taskHashtags';
 
 
 interface Message {
@@ -18,6 +19,7 @@ interface OllamaModel {
 }
 
 export function Assistant() {
+  const onTagClick = useTaskHashtagClick();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -236,7 +238,7 @@ export function Assistant() {
                   onClick={() => window.open(msg.content, '_blank')}
                 />
               ) : msg.role === 'assistant' ? (
-                <div dangerouslySetInnerHTML={{ __html: msg.content }} />
+                <div onClick={onTagClick} dangerouslySetInnerHTML={{ __html: linkifyTaskTagsHtml(msg.content) }} />
               ) : (
                 msg.content
               )}

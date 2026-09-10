@@ -16,6 +16,7 @@ import {
 } from "../types";
 import { AttachmentList, FileUpload } from "./FileUpload";
 import { LinkifyText } from "./LinkifyText";
+import { linkifyTaskTagsHtml, useTaskHashtagClick } from "../lib/taskHashtags";
 import { Avatar } from "./Avatar";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
@@ -55,6 +56,7 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
 export function TaskDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const onTagClick = useTaskHashtagClick();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const [task, setTask] = useState<Task | null>(null);
@@ -1077,10 +1079,12 @@ export function TaskDetail() {
                 <div
                   className="rich-text"
                   style={{ marginBottom: 16 }}
+                  onClick={onTagClick}
                   dangerouslySetInnerHTML={{
-                    __html:
+                    __html: linkifyTaskTagsHtml(
                       task.description ||
-                      "<em style=&#34;color: var(--text-muted)&#34;>Нет описания</em>",
+                      "<em style=&#34;color: var(--text-muted)&#34;>Нет описания</em>"
+                    ),
                   }}
                 />{" "}
                 <div
@@ -2421,8 +2425,9 @@ export function TaskDetail() {
                               color: "var(--text-secondary)",
                               marginTop: 4,
                             }}
+                            onClick={onTagClick}
                             dangerouslySetInnerHTML={{
-                              __html: tx.description,
+                              __html: linkifyTaskTagsHtml(tx.description),
                             }}
                           />
                         )}

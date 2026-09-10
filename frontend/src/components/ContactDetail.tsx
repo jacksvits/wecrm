@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { Contact, Task, Deal } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { displayPhone } from '../lib/phone';
+import { linkifyTaskTagsHtml, useTaskHashtagClick } from '../lib/taskHashtags';
 
 interface ContactType {
   id: string;
@@ -28,6 +29,7 @@ const kindColors: Record<string, { bg: string; text: string }> = {
 export function ContactDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const onTagClick = useTaskHashtagClick();
   const { user } = useAuth();
   const [contact, setContact] = useState<Contact | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'deals' | 'projects'>('info');
@@ -175,7 +177,7 @@ export function ContactDetail() {
           {contact.notes && (
             <div style={{ marginTop: 8, padding: 16, background: 'var(--bg-body)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
               <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>Примечания</div>
-              <div className="rich-text" dangerouslySetInnerHTML={{ __html: contact.notes }} />
+              <div className="rich-text" onClick={onTagClick} dangerouslySetInnerHTML={{ __html: linkifyTaskTagsHtml(contact.notes) }} />
             </div>
           )}
           {contact.description && (

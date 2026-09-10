@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
+import { linkifyTaskTagsHtml, useTaskHashtagClick } from '../lib/taskHashtags';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -29,6 +30,7 @@ const NOTE_COLORS = [
 export function NoteEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const onTagClick = useTaskHashtagClick();
   const location = useLocation();
   const isEdit = !!id;
   const isViewMode = isEdit && !location.pathname.endsWith('/edit');
@@ -171,7 +173,8 @@ export function NoteEditor() {
               fontSize: 15,
               color: textColor,
             }}
-            dangerouslySetInnerHTML={{ __html: content }}
+            onClick={onTagClick}
+            dangerouslySetInnerHTML={{ __html: linkifyTaskTagsHtml(content) }}
           />
         </div>
       </div>

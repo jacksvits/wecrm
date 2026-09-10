@@ -149,6 +149,10 @@ body {
   border-color: var(--border-color);
 }
 
+/* Хештег задачи: «#309» → ссылка на /tasks/309 */
+.task-hashtag { color: var(--accent-color); font-weight: 600; text-decoration: none; cursor: pointer; }
+.task-hashtag:hover { text-decoration: underline; }
+
 /* Rich text typography (Quill HTML output: descriptions, notes, news) */
 .rich-text {
   font-size: 14px;

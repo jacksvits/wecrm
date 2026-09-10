@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { News, NewsHistory } from '../types';
+import { LinkifyText } from './LinkifyText';
 
 export function NewsDetail() {
   const { id } = useParams();
@@ -328,7 +329,7 @@ export function NewsDetail() {
         color: 'var(--text-color)',
         whiteSpace: 'pre-wrap',
       }}>
-        {news.content}
+        <LinkifyText text={news.content} />
       </div>
     </div>
   );
