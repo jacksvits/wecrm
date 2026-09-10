@@ -387,7 +387,7 @@ export function TaskList() {
                   {task.description?.slice(0, 60) || "—"}
                 </div>{" "}
               </div>{" "}
-              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+              <div style={{ display: "flex", gap: 4, flexShrink: 0, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
                 {" "}
                 <span
                   style={{
@@ -423,6 +423,40 @@ export function TaskList() {
                 >
                   {priorityLabels[task.priority]}
                 </span>{" "}
+                {canEditTask(task) && (
+                  <button
+                    onClick={() => openEdit(task)}
+                    title="Изменить"
+                    style={{
+                      width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+                      borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
+                      color: "var(--text-color)", cursor: "pointer",
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                    </svg>
+                  </button>
+                )}{" "}
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDelete(task.id)}
+                    title="Удалить"
+                    style={{
+                      width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+                      borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
+                      color: "#dc2626", cursor: "pointer",
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                      <line x1="10" y1="11" x2="10" y2="17" />
+                      <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                  </button>
+                )}{" "}
               </div>{" "}
             </div>{" "}
             <div
@@ -480,34 +514,6 @@ export function TaskList() {
               {" "}
               <div style={{ display: "flex", gap: 8 }}>
                 {" "}
-                {canEditTask(task) && (
-                  <button
-                    onClick={() => openEdit(task)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--text-muted)",
-                      cursor: "pointer",
-                      fontSize: 12,
-                    }}
-                  >
-                    ✏️
-                  </button>
-                )}{" "}
-                {isAdmin && (
-                  <button
-                    onClick={() => handleDelete(task.id)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--text-muted)",
-                      cursor: "pointer",
-                      fontSize: 12,
-                    }}
-                  >
-                    🗑
-                  </button>
-                )}{" "}
                 <button
                   onClick={() => openCreate(task.id)}
                   style={{
@@ -756,29 +762,35 @@ export function TaskList() {
               {canEditTask(task) && (
                 <button
                   onClick={() => openEdit(task)}
+                  title="Изменить"
                   style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
-                    fontSize: 12,
+                    width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+                    borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
+                    color: "var(--text-color)", cursor: "pointer",
                   }}
                 >
-                  ✏️
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  </svg>
                 </button>
               )}{" "}
               {isAdmin && (
                 <button
                   onClick={() => handleDelete(task.id)}
+                  title="Удалить"
                   style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
-                    fontSize: 12,
+                    width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+                    borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
+                    color: "#dc2626", cursor: "pointer",
                   }}
                 >
-                  🗑
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
                 </button>
               )}{" "}
             </div>{" "}
@@ -1024,15 +1036,16 @@ export function TaskList() {
                                     e.stopPropagation();
                                     openEdit(task);
                                   }}
+                                  title="Изменить"
                                   style={{
-                                    background: "none",
-                                    border: "none",
-                                    color: "var(--text-muted)",
-                                    cursor: "pointer",
-                                    fontSize: 12,
+                                    width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+                                    borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
+                                    color: "var(--text-color)", cursor: "pointer",
                                   }}
                                 >
-                                  ✏️
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                  </svg>
                                 </button>
                               )}{" "}
                               {isAdmin && (
@@ -1041,15 +1054,20 @@ export function TaskList() {
                                     e.stopPropagation();
                                     handleDelete(task.id);
                                   }}
+                                  title="Удалить"
                                   style={{
-                                    background: "none",
-                                    border: "none",
-                                    color: "var(--text-muted)",
-                                    cursor: "pointer",
-                                    fontSize: 12,
+                                    width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+                                    borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
+                                    color: "#dc2626", cursor: "pointer",
                                   }}
                                 >
-                                  🗑
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M3 6h18" />
+                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                                    <line x1="10" y1="11" x2="10" y2="17" />
+                                    <line x1="14" y1="11" x2="14" y2="17" />
+                                  </svg>
                                 </button>
                               )}{" "}
                             </div>{" "}
@@ -1059,7 +1077,7 @@ export function TaskList() {
                                 gap: 6,
                                 alignItems: "baseline",
                                 marginBottom: 6,
-                                paddingRight: 40,
+                                paddingRight: 72,
                               }}
                             >
                               {task.ticketNumber != null && (
