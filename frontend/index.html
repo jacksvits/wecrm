@@ -29,6 +29,76 @@
   </style>
 </head>
 <body>
+  <!-- === Видео-заставка при загрузке PWA (на весь экран, только мобильные) === -->
+  <style>
+    #wecrm-splash {
+      position: fixed; inset: 0; z-index: 99999;
+      background: #0a0a0f;
+      transition: opacity 0.5s ease;
+    }
+    #wecrm-splash.hide { opacity: 0; pointer-events: none; }
+    #wecrm-splash video {
+      width: 100%; height: 100%;
+      object-fit: cover; /* обрезка по ширине экрана */
+    }
+  </style>
+  <div id="wecrm-splash" hidden>
+    <video id="wecrm-splash-video" src="/splash.mp4"
+           autoplay muted playsinline preload="auto"></video>
+  </div>
+  <script>
+    (function () {
+      var el = document.getElementById('wecrm-splash');
+      var video = document.getElementById('wecrm-splash-video');
+      var isMobile = window.matchMedia('(max-width: 900px)').matches
+        || 'ontouchstart' in window;
+      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // Заставка показывается при КАЖДОМ запуске приложения
+      if (!isMobile || reduced || !video) {
+        if (el) el.remove();
+        window.__wecrmAppReady = true;
+        return;
+      }
+
+      var videoDone = false, appReady = false, hidden = false;
+      el.hidden = false;
+
+      function tryHide() {
+        if (hidden || !videoDone || !appReady) return;
+        hidden = true;
+        el.classList.add('hide');
+        setTimeout(function () { el.remove(); }, 600);
+      }
+      // React сигнализирует о готовности через __wecrmSplashCheck (см. AuthContext)
+      window.__wecrmSplashCheck = function () {
+        appReady = true;
+        tryHide();
+      };
+      // Видео проигрывается один раз — после 'ended' фейд к приложению
+      video.addEventListener('ended', function () {
+        videoDone = true;
+        tryHide();
+      });
+      // Фолбэки: ошибка видео или лимит времени — не блокируем вход
+      video.addEventListener('error', function () {
+        videoDone = true;
+        tryHide();
+      });
+      setTimeout(function () {
+        videoDone = true;
+        tryHide();
+      }, 15000);
+      // Абсолютный предел: заставка не держится дольше 20 секунд
+      setTimeout(function () {
+        if (!hidden) { hidden = true; el.classList.add('hide'); setTimeout(function () { el.remove(); }, 600); }
+      }, 20000);
+      var p = video.play();
+      if (p && p.catch) p.catch(function () {
+        videoDone = true; tryHide();
+      });
+    })();
+  </script>
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>

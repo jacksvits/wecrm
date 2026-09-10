@@ -44,6 +44,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Сигнал видео-заставке: приложение прошло инициализацию и готово к показу
+  useEffect(() => {
+    if (!loading) {
+      (window as any).__wecrmAppReady = true;
+      (window as any).__wecrmSplashCheck?.();
+    }
+  }, [loading]);
+
   const login = useCallback(async (login: string, password: string) => {
     const res = await api.auth.login(login, password);
     localStorage.setItem('token', res.token);

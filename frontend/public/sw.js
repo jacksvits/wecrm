@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wecrm-v3';
+const CACHE_NAME = 'wecrm-v4';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/favicon.ico',
@@ -6,6 +6,8 @@ const STATIC_ASSETS = [
   '/icon-192x192.png',
   '/icon-512x512.png',
   '/icq-message.mp3',
+  // Примечание: /splash.mp4 намеренно НЕ кешируется в SW — медиа-запросы с Range
+  // некорректно обрабатываются Cache API в iOS Safari. Видео кешируется nginx (1 неделя).
 ];
 
 self.addEventListener('install', (event) => {
@@ -47,6 +49,13 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => caches.match(event.request))
     );
+    return;
+  }
+
+  // Splash video — обходим SW: video-элемент использует Range-запросы,
+  // которые ломаются при отдаче полного ответа из Cache API (iOS Safari).
+  // Кешированием занимается nginx (Cache-Control: public, max-age=604800).
+  if (url.pathname === '/splash.mp4') {
     return;
   }
 
