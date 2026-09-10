@@ -58,7 +58,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "widget-beget-partner", size: "medium", label: "Бегет-Партнёр", tab: "Бухгалтерия" },
   { id: "widget-beget", size: "medium", label: "Beget детали", tab: "Бухгалтерия" },
   { id: "stat-task-profit", size: "small", label: "Прибыль по задачам", tab: "Бухгалтерия" },
-  { id: "widget-task-finances", size: "large", label: "Помесячный отчёт по задачам", tab: "Бухгалтерия" },
+  { id: "widget-task-finances", size: "medium", label: "Помесячный отчёт по задачам", tab: "Бухгалтерия" },
 ];
 
 const TABS: WidgetTab[] = ["Основное", "Камеры", "Бухгалтерия"];
