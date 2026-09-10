@@ -190,7 +190,7 @@ router.get('/meta/movements', async (req, res) => {
 router.get('/meta/vk-status', async (_req, res) => {
   try {
     const settings = await getVkSettings();
-    res.json({ configured: !!settings, groupId: settings?.groupId || null });
+    res.json({ configured: !!settings, groupId: settings?.groupId || null, hasMarketToken: !!settings?.marketToken });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

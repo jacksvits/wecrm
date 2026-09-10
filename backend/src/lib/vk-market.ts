@@ -10,6 +10,7 @@ const UPLOAD_ROOT = '/app/uploads';
 interface VkSettings {
   groupId: number;
   accessToken: string;
+  marketToken?: string | null;
 }
 
 /** Настройки первой подключённой группы ВК */
@@ -18,13 +19,17 @@ export async function getVkSettings(): Promise<VkSettings | null> {
     orderBy: { createdAt: 'asc' },
   });
   if (!settings?.accessToken || !settings.groupId) return null;
-  return { groupId: settings.groupId, accessToken: settings.accessToken };
+  return { groupId: settings.groupId, accessToken: settings.accessToken, marketToken: settings.marketToken };
 }
 
 /** Базовый вызов VK API */
 async function vkApi(method: string, params: Record<string, string | number> = {}, token?: string): Promise<any> {
   const settings = token ? null : await getVkSettings();
-  const accessToken = token || settings?.accessToken;
+  // методы маркета недоступны с токеном сообщества (VK Error 27) — нужен пользовательский токен с scope market
+  if (method.startsWith('market.') && !token && !settings?.marketToken) {
+    throw new Error('Для работы с маркетом нужен пользовательский токен с правом market (Настройки → ВКонтакте → «Токен маркета»)');
+  }
+  const accessToken = token || (method.startsWith('market.') ? settings?.marketToken : settings?.marketToken || settings?.accessToken);
   if (!accessToken) throw new Error('ВКонтакте не подключён (нет токена)');
   const url = new URL(`${VK_API}/${method}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));

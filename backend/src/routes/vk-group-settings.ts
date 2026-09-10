@@ -17,6 +17,7 @@ router.use(adminOnly);
 const settingsSchema = z.object({
   groupId: z.number().int().min(1),
   accessToken: z.string().min(1),
+  marketToken: z.string().optional().nullable(),
   defaultCreatorId: z.string().optional().nullable(),
   assigneeIds: z.array(z.string()).default([]),
   autoCreateContact: z.boolean().default(true),
@@ -44,8 +45,8 @@ router.post('/', async (req: AuthRequest, res) => {
     } else {
       s = await prisma.vkGroupSettings.create({ data: data as any });
     }
-    const { accessToken, ...rest } = s;
-    res.json({ ...rest, hasToken: !!accessToken });
+    const { accessToken, marketToken, ...rest } = s;
+    res.json({ ...rest, hasToken: !!accessToken, hasMarketToken: !!marketToken });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }

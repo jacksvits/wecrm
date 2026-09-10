@@ -790,6 +790,7 @@ model VkGroupSettings {
   id                String   @id @default(cuid())
   groupId           Int      @map("group_id")
   accessToken       String   @map("access_token")
+  marketToken       String?  @map("market_token") // пользовательский токен с scope market (импорт/синхронизация товаров)
   defaultCreatorId  String?  @map("default_creator_id")
   defaultCreator    User?    @relation(fields: [defaultCreatorId], references: [id])
   assigneeIds       String[] @default([]) @map("assignee_ids")
