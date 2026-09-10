@@ -402,6 +402,24 @@ export function Director() {
     } catch {}
   };
 
+  // Ручная сортировка счетов Точка Банк: сдвиг вверх/вниз с сохранением порядка на сервере
+  const moveTochkaAccount = async (index: number, direction: -1 | 1) => {
+    const accounts = tochkaAccounts?.accounts || [];
+    const target = index + direction;
+    if (target < 0 || target >= accounts.length) return;
+    const reordered = [...accounts];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    setTochkaAccounts((prev: any) => prev ? { ...prev, accounts: reordered } : prev);
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('/api/tochka/account-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ order: reordered.map((a: any) => a.id) }),
+      });
+    } catch {}
+  };
+
   const handleDragStart = (event: any) => setActiveId(event.active.id);
   const handleDragEnd = (event: any) => {
     const { active, over } = event;
@@ -758,7 +776,7 @@ export function Director() {
             <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 12 }}>Точка Банк</div>
             {tochkaAccounts?.accounts?.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {tochkaAccounts.accounts.map((acc: any) => (
+                {tochkaAccounts.accounts.map((acc: any, idx: number) => (
                   <div key={acc.id} style={{ padding: "10px 12px", borderRadius: 10, background: "var(--bg-input)" }}>
                     <div style={{ fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
                       {editingTochkaAccountId === acc.id ? (
@@ -785,6 +803,26 @@ export function Director() {
                             onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
                           >
                             ✏️
+                          </button>
+                          <button
+                            onClick={() => moveTochkaAccount(idx, -1)}
+                            disabled={idx === 0}
+                            title="Переместить выше"
+                            style={{ background: "none", border: "none", cursor: idx === 0 ? "default" : "pointer", padding: 2, opacity: idx === 0 ? 0.2 : 0.5, transition: "opacity 0.15s", color: "var(--text-muted)", fontSize: 11 }}
+                            onMouseEnter={(e) => { if (idx > 0) e.currentTarget.style.opacity = "1"; }}
+                            onMouseLeave={(e) => { if (idx > 0) e.currentTarget.style.opacity = "0.5"; }}
+                          >
+                            ▲
+                          </button>
+                          <button
+                            onClick={() => moveTochkaAccount(idx, 1)}
+                            disabled={idx === tochkaAccounts.accounts.length - 1}
+                            title="Переместить ниже"
+                            style={{ background: "none", border: "none", cursor: idx === tochkaAccounts.accounts.length - 1 ? "default" : "pointer", padding: 2, opacity: idx === tochkaAccounts.accounts.length - 1 ? 0.2 : 0.5, transition: "opacity 0.15s", color: "var(--text-muted)", fontSize: 11 }}
+                            onMouseEnter={(e) => { if (idx < tochkaAccounts.accounts.length - 1) e.currentTarget.style.opacity = "1"; }}
+                            onMouseLeave={(e) => { if (idx < tochkaAccounts.accounts.length - 1) e.currentTarget.style.opacity = "0.5"; }}
+                          >
+                            ▼
                           </button>
                         </>
                       )}

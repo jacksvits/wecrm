@@ -10,6 +10,7 @@ const router = Router();
 const TOCHKA_BASE = 'https://enter.tochka.com/uapi';
 const TOKEN_FILE = path.join('/app/data', 'tochka_tokens.json');
 const ACCOUNT_NAMES_FILE = path.join('/app/data', 'tochka_account_names.json');
+const ACCOUNT_ORDER_FILE = path.join('/app/data', 'tochka_account_order.json');
 const TOCHKA_CLIENT_ID = process.env.TOCHKA_CLIENT_ID || '';
 const TOCHKA_CLIENT_SECRET = process.env.TOCHKA_CLIENT_SECRET || '';
 const TOCHKA_REDIRECT_URI = process.env.TOCHKA_REDIRECT_URI || 'https://welans.cc/api/tochka/callback';
@@ -69,6 +70,24 @@ function loadAccountNames(): Record<string, string> {
 function saveAccountNames(names: Record<string, string>) {
   fs.mkdirSync(path.dirname(ACCOUNT_NAMES_FILE), { recursive: true });
   fs.writeFileSync(ACCOUNT_NAMES_FILE, JSON.stringify(names, null, 2));
+}
+
+// Ручной порядок счетов (массив accountId в порядке отображения), задаётся в виджете
+function loadAccountOrder(): string[] {
+  try {
+    if (fs.existsSync(ACCOUNT_ORDER_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(ACCOUNT_ORDER_FILE, 'utf-8'));
+      return Array.isArray(raw) ? raw.filter((id) => typeof id === 'string') : [];
+    }
+  } catch (e) {
+    console.error('[Tochka] Failed to load account order:', e);
+  }
+  return [];
+}
+
+function saveAccountOrder(order: string[]) {
+  fs.mkdirSync(path.dirname(ACCOUNT_ORDER_FILE), { recursive: true });
+  fs.writeFileSync(ACCOUNT_ORDER_FILE, JSON.stringify(order, null, 2));
 }
 
 // Обновление пары токенов через refresh_token; true — удалось, false — нет refresh_token или банк отклонил
@@ -294,6 +313,13 @@ router.get('/accounts', authMiddleware, async (_req, res) => {
       currency: a.currency || 'RUB'
     }));
 
+    // Ручной порядок из виджета; счета без записи в порядке — в конец (в порядке банка)
+    const savedOrder = loadAccountOrder();
+    if (savedOrder.length) {
+      const rank = new Map(savedOrder.map((id, i) => [id, i]));
+      accounts.sort((a: any, b: any) => (rank.get(a.id) ?? savedOrder.length) - (rank.get(b.id) ?? savedOrder.length));
+    }
+
     let totalBalance = 0;
     for (const acc of accounts) {
       try {
@@ -327,6 +353,19 @@ router.post('/account-names', authMiddleware, (req, res) => {
   else delete names[accountId];
   saveAccountNames(names);
   res.json({ status: 'ok', names });
+});
+
+// GET /api/tochka/account-order — ручной порядок счетов
+router.get('/account-order', authMiddleware, (_req, res) => {
+  res.json(loadAccountOrder());
+});
+
+// POST /api/tochka/account-order — сохранить порядок {order: [accountId, ...]}
+router.post('/account-order', authMiddleware, (req, res) => {
+  const { order } = req.body || {};
+  if (!Array.isArray(order)) return res.status(400).json({ error: 'order must be an array' });
+  saveAccountOrder(order.filter((id) => typeof id === 'string'));
+  res.json({ status: 'ok', order: loadAccountOrder() });
 });
 
 // GET /api/tochka/customer
