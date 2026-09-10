@@ -856,8 +856,10 @@ model Product {
   id          String   @id @default(cuid())
   sku         String?  @unique
   name        String
+  kind        String   @default("product") // product | service
   description String?
   category    String?
+  subcategory String?
   unit        String   @default("шт")
   barcode     String?
   isActive    Boolean  @default(true) @map("is_active")
@@ -868,6 +870,7 @@ model Product {
   prices       ProductPrice[]
   movements    StockMovement[]
   priceHistory PriceHistory[]
+  images       ProductImage[]
 
   @@index([name])
   @@index([category])
@@ -966,4 +969,17 @@ model PriceHistory {
 
   @@index([productId, createdAt])
   @@map("price_history")
+}
+
+model ProductImage {
+  id           String   @id @default(cuid())
+  productId    String   @map("product_id")
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attachmentId String   @map("attachment_id")
+  url          String
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@map("product_images")
 }

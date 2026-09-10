@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
 
@@ -197,7 +199,7 @@ router.get('/', async (req, res) => {
     }
     const products = await prisma.product.findMany({
       where,
-      include: { stocks: true, prices: true },
+      include: { stocks: true, prices: true, images: { orderBy: { sortOrder: 'asc' } } },
       orderBy: { name: 'asc' },
     });
     res.json(products);
@@ -213,18 +215,21 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, sku, description, category, unit, barcode } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, kind } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
+    const productKind = kind === 'service' ? 'service' : 'product';
     const product = await prisma.product.create({
       data: {
         name: name.trim(),
         sku: sku?.trim() || null,
+        kind: productKind,
         description: description || '',
         category: category?.trim() || null,
+        subcategory: subcategory?.trim() || null,
         unit: unit?.trim() || 'шт',
         barcode: barcode?.trim() || null,
       },
-      include: { stocks: true, prices: true },
+      include: { stocks: true, prices: true, images: { orderBy: { sortOrder: 'asc' } } },
     });
     res.status(201).json(product);
   } catch (err: any) {
@@ -261,7 +266,7 @@ router.get('/:id', async (req, res) => {
   try {
     const product = await prisma.product.findUnique({
       where: { id: req.params.id },
-      include: { stocks: true, prices: true },
+      include: { stocks: true, prices: true, images: { orderBy: { sortOrder: 'asc' } } },
     });
     if (!product) return res.status(404).json({ error: 'Товар не найден' });
     res.json(product);
@@ -277,7 +282,7 @@ router.get('/:id', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, sku, description, category, unit, barcode, isActive } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind } = req.body;
     const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Товар не найден' });
     const data: any = {};
@@ -285,13 +290,15 @@ router.patch('/:id', async (req, res) => {
     if (sku !== undefined) data.sku = sku?.trim() || null;
     if (description !== undefined) data.description = description;
     if (category !== undefined) data.category = category?.trim() || null;
+    if (subcategory !== undefined) data.subcategory = subcategory?.trim() || null;
+    if (kind !== undefined) data.kind = kind === 'service' ? 'service' : 'product';
     if (unit !== undefined) data.unit = unit?.trim() || 'шт';
     if (barcode !== undefined) data.barcode = barcode?.trim() || null;
     if (isActive !== undefined) data.isActive = !!isActive;
     const product = await prisma.product.update({
       where: { id: req.params.id },
       data,
-      include: { stocks: true, prices: true },
+      include: { stocks: true, prices: true, images: { orderBy: { sortOrder: 'asc' } } },
     });
     res.json(product);
   } catch (err: any) {
@@ -313,6 +320,67 @@ router.delete('/:id', async (req, res) => {
     res.json({ success: true });
   } catch (err: any) {
     console.error('[products:delete]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+/* ============ Изображения ============ */
+
+const UPLOAD_ROOT = '/app/uploads';
+
+/**
+ * POST /api/products/:id/images
+ * Привязать загруженный файл (FileAttachment с entityType='product') как изображение товара
+ */
+router.post('/:id/images', async (req, res) => {
+  try {
+    const { attachmentId } = req.body;
+    if (!attachmentId) return res.status(400).json({ error: 'attachmentId обязателен' });
+    const product = await prisma.product.findUnique({ where: { id: req.params.id } });
+    if (!product) return res.status(404).json({ error: 'Товар не найден' });
+    const attachment = await prisma.fileAttachment.findUnique({ where: { id: attachmentId } });
+    if (!attachment || attachment.entityType !== 'product' || attachment.entityId !== product.id) {
+      return res.status(400).json({ error: 'Вложение не найдено или не принадлежит товару' });
+    }
+    const count = await prisma.productImage.count({ where: { productId: product.id } });
+    const image = await prisma.productImage.create({
+      data: {
+        productId: product.id,
+        attachmentId: attachment.id,
+        url: attachment.path,
+        sortOrder: count,
+      },
+    });
+    res.status(201).json(image);
+  } catch (err: any) {
+    console.error('[products:image:add]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/products/:id/images/:imageId
+ * Удалить изображение товара (вместе с файлом и вложением)
+ */
+router.delete('/:id/images/:imageId', async (req, res) => {
+  try {
+    const image = await prisma.productImage.findUnique({ where: { id: req.params.imageId } });
+    if (!image || image.productId !== req.params.id) {
+      return res.status(404).json({ error: 'Изображение не найдено' });
+    }
+    const attachment = await prisma.fileAttachment.findUnique({ where: { id: image.attachmentId } });
+    if (attachment) {
+      const filePath = path.join(UPLOAD_ROOT, attachment.filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+      await prisma.fileAttachment.delete({ where: { id: attachment.id } });
+    }
+    await prisma.productImage.delete({ where: { id: image.id } });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[products:image:delete]', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { format } from 'date-fns';
@@ -21,6 +21,9 @@ const TABS = [
   { key: 'prices', label: 'Цены' },
 ];
 
+const KIND_LABELS: Record<string, string> = { product: 'Товар', service: 'Услуга' };
+const KIND_COLORS: Record<string, string> = { product: '#dbeafe', service: '#ede9fe' };
+
 const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
 const inputStyle: React.CSSProperties = { padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', width: '100%', boxSizing: 'border-box' };
 const btnPrimary: React.CSSProperties = { padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' };
@@ -28,6 +31,8 @@ const btnGhost: React.CSSProperties = { padding: '6px 12px', borderRadius: 8, bo
 const thStyle: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' };
 const tdStyle: React.CSSProperties = { padding: '10px 12px', fontSize: 14, borderBottom: '1px solid var(--border-color)' };
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 };
+
+interface CategoryGroup { category: string; subs: { subcategory: string; products: Product[] }[]; }
 
 export function Products() {
   const [tab, setTab] = useState('nomenclature');
@@ -38,6 +43,8 @@ export function Products() {
   const [q, setQ] = useState('');
   const [whFilter, setWhFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  // свёрнутые группы: ключ "cat:<категория>" и "sub:<категория>::<подкатегория>"
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const [productModal, setProductModal] = useState<Product | 'new' | null>(null);
   const [movementModal, setMovementModal] = useState<{ product: Product; type: 'income' | 'outcome' } | null>(null);
@@ -72,8 +79,35 @@ export function Products() {
     return products.filter(p =>
       p.name.toLowerCase().includes(s) ||
       (p.sku || '').toLowerCase().includes(s) ||
-      (p.category || '').toLowerCase().includes(s));
+      (p.category || '').toLowerCase().includes(s) ||
+      (p.subcategory || '').toLowerCase().includes(s));
   }, [products, q]);
+
+  const searching = q.trim().length > 0;
+
+  // группировка по категориям и подкатегориям
+  const groups: CategoryGroup[] = useMemo(() => {
+    const map = new Map<string, Map<string, Product[]>>();
+    for (const p of filtered) {
+      const cat = p.category?.trim() || 'Без категории';
+      const sub = p.subcategory?.trim() || '';
+      if (!map.has(cat)) map.set(cat, new Map());
+      const subs = map.get(cat)!;
+      if (!subs.has(sub)) subs.set(sub, []);
+      subs.get(sub)!.push(p);
+    }
+    return [...map.entries()]
+      .map(([category, subs]) => ({
+        category,
+        subs: [...subs.entries()]
+          .map(([subcategory, ps]) => ({ subcategory, products: ps }))
+          .sort((a, b) => a.subcategory.localeCompare(b.subcategory, 'ru')),
+      }))
+      .sort((a, b) => a.category.localeCompare(b.category, 'ru'));
+  }, [filtered]);
+
+  const toggleGroup = (key: string) => setCollapsed(c => ({ ...c, [key]: !c[key] }));
+  const isCollapsed = (key: string) => !searching && !!collapsed[key];
 
   const activePriceTypes = useMemo(() => priceTypes.filter(t => t.isActive), [priceTypes]);
 
@@ -98,6 +132,9 @@ export function Products() {
     movements.filter(m => whFilter === 'all' || m.warehouseId === whFilter).slice(0, 50),
     [movements, whFilter]);
 
+  // товары (не услуги) для складского учёта
+  const stockProducts = useMemo(() => products.filter(p => p.kind !== 'service'), [products]);
+
   if (loading) return <div style={{ padding: 24 }}>Загрузка...</div>;
 
   return (
@@ -105,7 +142,7 @@ export function Products() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Товары</h2>
         {tab === 'nomenclature' && (
-          <button onClick={() => setProductModal('new')} style={btnPrimary}>+ Товар</button>
+          <button onClick={() => setProductModal('new')} style={btnPrimary}>+ Позиция</button>
         )}
         {tab === 'stock' && (
           <button onClick={() => setWhModal('new')} style={btnPrimary}>+ Склад</button>
@@ -146,8 +183,8 @@ export function Products() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Товар</th>
-                  <th style={thStyle}>Категория</th>
+                  <th style={thStyle}>Позиция</th>
+                  <th style={thStyle}>Вид</th>
                   <th style={thStyle}>Ед.</th>
                   <th style={thStyle}>Остаток</th>
                   {activePriceTypes.map(t => <th key={t.id} style={thStyle}>{t.label}</th>)}
@@ -155,40 +192,55 @@ export function Products() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(p => (
-                  <tr
-                    key={p.id}
-                    style={{ opacity: p.isActive ? 1 : 0.5, cursor: 'pointer' }}
-                    onClick={() => setProductModal(p)}
-                  >
-                    <td style={tdStyle}>
-                      <div style={{ fontWeight: 500 }}>{p.name}</div>
-                      {p.sku && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.sku}</div>}
-                    </td>
-                    <td style={tdStyle}>{p.category || '—'}</td>
-                    <td style={tdStyle}>{p.unit}</td>
-                    <td style={tdStyle}>{fmtMoney(totalStock(p))}</td>
-                    {activePriceTypes.map(t => {
-                      const v = priceOf(p, t.id);
-                      return <td key={t.id} style={tdStyle}>{v !== undefined ? fmtMoney(v) : '—'}</td>;
-                    })}
-                    <td style={tdStyle} onClick={e => e.stopPropagation()}>
-                      <button
-                        style={{ ...btnGhost, color: '#dc2626' }}
-                        onClick={async () => {
-                          if (!confirm(`Удалить товар «${p.name}»?`)) return;
-                          try { await api.products.delete(p.id); await load(); } catch (e: any) { alert(e.message); }
-                        }}
-                      >
-                        Удалить
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
+                {groups.map(g => {
+                  const catKey = `cat:${g.category}`;
+                  const catCount = g.subs.reduce((n, s) => n + s.products.length, 0);
+                  const catCollapsed = isCollapsed(catKey);
+                  return [
+                    <tr key={catKey} style={{ background: 'var(--bg-hover)', cursor: 'pointer' }} onClick={() => toggleGroup(catKey)}>
+                      <td colSpan={5 + activePriceTypes.length} style={{ ...tdStyle, fontWeight: 600, fontSize: 14 }}>
+                        <span style={{ display: 'inline-block', width: 20, transition: 'transform 0.15s', transform: catCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
+                        {g.category}
+                        <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, marginLeft: 8 }}>{catCount}</span>
+                      </td>
+                    </tr>,
+                    ...(!catCollapsed ? g.subs.map(sub => {
+                      const subKey = `sub:${g.category}::${sub.subcategory}`;
+                      const subCollapsed = isCollapsed(subKey);
+                      const hasSub = sub.subcategory !== '';
+                      return [
+                        hasSub && (
+                          <tr key={subKey} style={{ cursor: 'pointer' }} onClick={() => toggleGroup(subKey)}>
+                            <td colSpan={5 + activePriceTypes.length} style={{ ...tdStyle, paddingLeft: 32, color: 'var(--text-muted)', fontSize: 13 }}>
+                              <span style={{ display: 'inline-block', width: 20, transition: 'transform 0.15s', transform: subCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
+                              {sub.subcategory}
+                              <span style={{ fontWeight: 400, fontSize: 12, marginLeft: 8 }}>{sub.products.length}</span>
+                            </td>
+                          </tr>
+                        ),
+                        ...(!subCollapsed ? sub.products.map(p => (
+                          <ProductRow
+                            key={p.id}
+                            p={p}
+                            indent={hasSub ? 48 : 28}
+                            priceTypes={activePriceTypes}
+                            totalStock={totalStock(p)}
+                            priceOf={priceOf}
+                            onOpen={() => setProductModal(p)}
+                            onDelete={async () => {
+                              if (!confirm(`Удалить «${p.name}»?`)) return;
+                              try { await api.products.delete(p.id); await load(); } catch (e: any) { alert(e.message); }
+                            }}
+                          />
+                        )) : []),
+                      ];
+                    }) : []),
+                  ];
+                })}
+                {groups.length === 0 && (
                   <tr>
                     <td colSpan={5 + activePriceTypes.length} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
-                      Товары не найдены
+                      Позиции не найдены
                     </td>
                   </tr>
                 )}
@@ -236,7 +288,7 @@ export function Products() {
                 </tr>
               </thead>
               <tbody>
-                {products.flatMap(p =>
+                {stockProducts.flatMap(p =>
                   (p.stocks || [])
                     .filter(s => whFilter === 'all' || s.warehouseId === whFilter)
                     .map(s => {
@@ -269,7 +321,7 @@ export function Products() {
                       );
                     })
                 )}
-                {products.every(p => !(p.stocks || []).some(s => whFilter === 'all' || s.warehouseId === whFilter)) && (
+                {stockProducts.every(p => !(p.stocks || []).some(s => whFilter === 'all' || s.warehouseId === whFilter)) && (
                   <tr>
                     <td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
                       Остатков нет — добавьте приход
@@ -356,7 +408,7 @@ export function Products() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Товар</th>
+                  <th style={thStyle}>Позиция</th>
                   {activePriceTypes.map(t => <th key={t.id} style={thStyle}>{t.label}</th>)}
                   <th style={thStyle}>История</th>
                 </tr>
@@ -402,7 +454,7 @@ export function Products() {
                 {filtered.length === 0 && (
                   <tr>
                     <td colSpan={2 + activePriceTypes.length} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
-                      Товары не найдены
+                      Позиции не найдены
                     </td>
                   </tr>
                 )}
@@ -436,19 +488,70 @@ export function Products() {
   );
 }
 
-/* ---------- Модалка товара (WYSIWYG-описание) ---------- */
+/* ---------- Строка позиции в номенклатуре ---------- */
+function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDelete }: {
+  p: Product; indent: number; priceTypes: PriceType[];
+  totalStock: number;
+  priceOf: (p: Product, ptId: string) => number | undefined;
+  onOpen: () => void; onDelete: () => void;
+}) {
+  const origin = window.location.origin;
+  const mainImage = (p.images || [])[0];
+  return (
+    <tr style={{ opacity: p.isActive ? 1 : 0.5, cursor: 'pointer' }} onClick={onOpen}>
+      <td style={{ ...tdStyle, paddingLeft: indent }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {mainImage ? (
+            <img
+              src={`${origin}${mainImage.url}`}
+              alt={p.name}
+              style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border-color)', flexShrink: 0 }}
+            />
+          ) : (
+            <div style={{ width: 40, height: 40, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', flexShrink: 0 }} />
+          )}
+          <div>
+            <div style={{ fontWeight: 500 }}>{p.name}</div>
+            {p.sku && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.sku}</div>}
+          </div>
+        </div>
+      </td>
+      <td style={tdStyle}>
+        <span style={{ padding: '2px 10px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: KIND_COLORS[p.kind] || '#f0f0f0' }}>
+          {KIND_LABELS[p.kind] || p.kind}
+        </span>
+      </td>
+      <td style={tdStyle}>{p.unit}</td>
+      <td style={tdStyle}>{p.kind === 'service' ? '—' : fmtMoney(totalStock)}</td>
+      {priceTypes.map(t => {
+        const v = priceOf(p, t.id);
+        return <td key={t.id} style={tdStyle}>{v !== undefined ? fmtMoney(v) : '—'}</td>;
+      })}
+      <td style={tdStyle} onClick={e => e.stopPropagation()}>
+        <button style={{ ...btnGhost, color: '#dc2626' }} onClick={onDelete}>Удалить</button>
+      </td>
+    </tr>
+  );
+}
+
+/* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, onClose, onSaved }: { product: Product | 'new'; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; category: string; subcategory: string; unit: string; barcode: string; description: string }>({
     name: isNew ? '' : product.name,
+    kind: isNew ? 'product' : product.kind,
     sku: isNew ? '' : product.sku || '',
     category: isNew ? '' : product.category || '',
+    subcategory: isNew ? '' : product.subcategory || '',
     unit: isNew ? 'шт' : product.unit,
     barcode: isNew ? '' : product.barcode || '',
     description: isNew ? '' : product.description || '',
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const origin = window.location.origin;
 
   const save = async () => {
     if (!form.name.trim()) { setError('Название обязательно'); return; }
@@ -462,23 +565,51 @@ function ProductModal({ product, onClose, onSaved }: { product: Product | 'new';
   };
 
   const remove = async () => {
-    if (isNew || !confirm('Удалить товар?')) return;
+    if (isNew || !confirm('Удалить позицию?')) return;
     try { await api.products.delete(product.id); onSaved(); }
     catch (e: any) { setError(e.message || 'Ошибка удаления'); }
   };
 
+  const uploadImages = async (files: FileList | null) => {
+    if (!files || isNew) return;
+    setUploading(true); setError('');
+    try {
+      for (const file of Array.from(files)) {
+        const att = await api.uploads.upload(file, 'product', product.id);
+        await api.products.addImage(product.id, att.id);
+      }
+      onSaved();
+    } catch (e: any) { setError(e.message || 'Ошибка загрузки изображений'); }
+    finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+  };
+
+  const removeImage = async (imageId: string) => {
+    if (isNew) return;
+    try { await api.products.deleteImage(product.id, imageId); onSaved(); }
+    catch (e: any) { setError(e.message || 'Ошибка удаления изображения'); }
+  };
+
+  const images = isNew ? [] : (product.images || []);
+
   return (
     <div style={overlayStyle}>
       <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 560, maxHeight: '90vh', overflow: 'auto' }}>
-        <h3 style={{ margin: '0 0 16px' }}>{isNew ? 'Новый товар' : 'Изменить товар'}</h3>
+        <h3 style={{ margin: '0 0 16px' }}>{isNew ? 'Новая позиция' : 'Изменить позицию'}</h3>
         {error && <div style={{ color: '#dc2626', marginBottom: 12, fontSize: 14 }}>{error}</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Название</label>
           <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inputStyle} />
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Вид</label>
+          <select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value as 'product' | 'service' })} style={inputStyle}>
+            <option value="product">Товар</option>
+            <option value="service">Услуга</option>
+          </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Артикул</label>
           <input value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })} style={inputStyle} />
           <label style={{ fontSize: 14, fontWeight: 500 }}>Категория</label>
           <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={inputStyle} />
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Подкатегория</label>
+          <input value={form.subcategory} onChange={e => setForm({ ...form, subcategory: e.target.value })} style={inputStyle} />
           <div style={{ display: 'flex', gap: 12 }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 14, fontWeight: 500 }}>Единица</label>
@@ -492,6 +623,47 @@ function ProductModal({ product, onClose, onSaved }: { product: Product | 'new';
           <label style={{ fontSize: 14, fontWeight: 500 }}>Описание</label>
           <ReactQuill theme="snow" value={form.description} onChange={v => setForm({ ...form, description: v })}
             modules={quillModules} formats={quillFormats} />
+
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Изображения</label>
+          {isNew ? (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Сохраните позицию, чтобы добавить изображения</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {images.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {images.map((img, idx) => (
+                    <div key={img.id} style={{ position: 'relative' }}>
+                      <img
+                        src={`${origin}${img.url}`}
+                        alt=""
+                        style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: idx === 0 ? '2px solid #007AFF' : '1px solid var(--border-color)' }}
+                      />
+                      {idx === 0 && <div style={{ position: 'absolute', bottom: 2, left: 2, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 6 }}>главная</div>}
+                      <button
+                        onClick={() => removeImage(img.id)}
+                        title="Удалить"
+                        style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#dc2626', color: '#fff', fontSize: 12, cursor: 'pointer', lineHeight: 1 }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={e => uploadImages(e.target.files)}
+              />
+              <button onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{ ...btnGhost, alignSelf: 'flex-start' }}>
+                {uploading ? 'Загрузка...' : '+ Добавить изображения'}
+              </button>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={save} disabled={saving} style={btnPrimary}>{saving ? 'Сохранение...' : 'Сохранить'}</button>
             {!isNew && <button onClick={remove} style={{ ...btnPrimary, background: '#dc2626' }}>Удалить</button>}
@@ -502,7 +674,6 @@ function ProductModal({ product, onClose, onSaved }: { product: Product | 'new';
     </div>
   );
 }
-
 /* ---------- Модалка прихода/расхода ---------- */
 function MovementModal({ product, type, warehouses, onClose, onSaved }: { product: Product; type: 'income' | 'outcome'; warehouses: Warehouse[]; onClose: () => void; onSaved: () => void }) {
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id || '');
