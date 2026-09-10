@@ -257,6 +257,10 @@ export function Director() {
   const [fullscreenCamera, setFullscreenCamera] = useState<{ id: string; label: string } | null>(null);
   const [cameraRefreshKey, setCameraRefreshKey] = useState(0);
   const [taskFinanceStats, setTaskFinanceStats] = useState<any>(null);
+  // Детализация месяца в виджете «Помесячный отчёт по задачам»
+  const [expandedTaskMonth, setExpandedTaskMonth] = useState<string | null>(null);
+  const [monthTaskDetails, setMonthTaskDetails] = useState<Record<string, any[]>>({});
+  const [monthTasksLoading, setMonthTasksLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Refresh camera streams every 10 seconds
@@ -354,6 +358,26 @@ export function Director() {
         .catch(() => {});
     } catch {}
     setLoading(false);
+  };
+
+  // Раскрытие месяца: подгрузка задач, из которых собрана статистика месяца
+  const toggleTaskMonth = async (key: string) => {
+    if (expandedTaskMonth === key) {
+      setExpandedTaskMonth(null);
+      return;
+    }
+    setExpandedTaskMonth(key);
+    if (monthTaskDetails[key]) return;
+    setMonthTasksLoading(key);
+    try {
+      const token = localStorage.getItem('token');
+      const r = await fetch(`/api/dashboard/task-finances/month-tasks?month=${encodeURIComponent(key)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = r.ok ? await r.json() : null;
+      setMonthTaskDetails((prev) => ({ ...prev, [key]: data?.tasks || [] }));
+    } catch {}
+    setMonthTasksLoading(null);
   };
 
   const handleDragStart = (event: any) => setActiveId(event.active.id);
@@ -985,16 +1009,56 @@ export function Director() {
               <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Нет данных</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {taskFinanceStats.monthly.map((m: any) => (
-                  <div key={m.month} style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto auto", gap: 12, padding: "10px 12px", borderRadius: 10, background: "var(--bg-input)", alignItems: "center" }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{m.month}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Бюджет: {(m.budget || 0).toLocaleString("ru")} ₽</div>
-                    <div style={{ fontSize: 12, color: "#166534" }}>Доходы: {(m.income || 0).toLocaleString("ru")} ₽</div>
-                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Расходы: {(m.expense || 0).toLocaleString("ru")} ₽</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: (m.profit || 0) >= 0 ? "#10b981" : "#dc2626" }}>Прибыль: {(m.profit || 0).toLocaleString("ru")} ₽</div>
-                  </div>
-                ))}
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-color)", display: "grid", gridTemplateColumns: "1fr auto auto auto auto", gap: 12, fontWeight: 600, fontSize: 13 }}>
+                {taskFinanceStats.monthly.map((m: any) => {
+                  const monthKey = m.key ?? m.month;
+                  const isOpen = expandedTaskMonth === monthKey;
+                  return (
+                    <div key={monthKey} style={{ borderRadius: 10, background: "var(--bg-input)", overflow: "hidden" }}>
+                      <div
+                        onClick={() => toggleTaskMonth(monthKey)}
+                        style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto auto auto", gap: 12, padding: "10px 12px", alignItems: "center", cursor: "pointer" }}
+                        title="Показать задачи месяца"
+                      >
+                        <span style={{ fontSize: 11, color: "var(--text-muted)", width: 12 }}>{isOpen ? "▾" : "▸"}</span>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{m.month}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Бюджет: {(m.budget || 0).toLocaleString("ru")} ₽</div>
+                        <div style={{ fontSize: 12, color: "#166534" }}>Доходы: {(m.income || 0).toLocaleString("ru")} ₽</div>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Расходы: {(m.expense || 0).toLocaleString("ru")} ₽</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: (m.profit || 0) >= 0 ? "#10b981" : "#dc2626" }}>Прибыль: {(m.profit || 0).toLocaleString("ru")} ₽</div>
+                      </div>
+                      {isOpen && (
+                        <div style={{ borderTop: "1px solid var(--border-color)", padding: "6px 12px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
+                          {monthTasksLoading === monthKey ? (
+                            <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "6px 0" }}>Загрузка...</div>
+                          ) : (monthTaskDetails[monthKey] || []).length === 0 ? (
+                            <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "6px 0" }}>Нет задач</div>
+                          ) : (
+                            monthTaskDetails[monthKey].map((task: any) => (
+                              <div
+                                key={task.id}
+                                onClick={() => navigate(`/tasks/${task.id}`)}
+                                style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto auto", gap: 12, padding: "7px 10px", borderRadius: 8, alignItems: "center", cursor: "pointer", background: "var(--bg-card)" }}
+                                title="Открыть задачу"
+                              >
+                                <div style={{ fontSize: 12, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {task.title}
+                                  {task.assignees?.length ? <span style={{ color: "var(--text-muted)" }}> · {task.assignees.join(", ")}</span> : null}
+                                  <span style={{ color: "var(--text-muted)", fontSize: 11 }}> · {new Date(task.createdAt).toLocaleDateString("ru")}</span>
+                                </div>
+                                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{(task.budget || 0).toLocaleString("ru")} ₽</div>
+                                <div style={{ fontSize: 12, color: "#166534" }}>{(task.income || 0).toLocaleString("ru")} ₽</div>
+                                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{(task.expense || 0).toLocaleString("ru")} ₽</div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: (task.profit || 0) >= 0 ? "#10b981" : "#dc2626" }}>{(task.profit || 0).toLocaleString("ru")} ₽</div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-color)", display: "grid", gridTemplateColumns: "auto 1fr auto auto auto auto", gap: 12, fontWeight: 600, fontSize: 13 }}>
+                  <div style={{ width: 12 }} />
                   <div>Итого</div>
                   <div style={{ color: "var(--text-muted)" }}>{(taskFinanceStats?.totalBudget || 0).toLocaleString("ru")} ₽</div>
                   <div style={{ color: "#166534" }}>{(taskFinanceStats?.totalIncome || 0).toLocaleString("ru")} ₽</div>

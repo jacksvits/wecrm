@@ -132,7 +132,7 @@ router.get('/task-finances', async (req, res) => {
     },
     include: { transactions: true, deal: { select: { value: true } } },
   });
-  const monthlyMap = new Map<string, { month: string; budget: number; income: number; expense: number; profit: number }>();
+  const monthlyMap = new Map<string, { key: string; month: string; budget: number; income: number; expense: number; profit: number }>();
   let totalBudget = 0;
   let totalIncome = 0;
   let totalExpense = 0;
@@ -147,20 +147,63 @@ router.get('/task-finances', async (req, res) => {
     totalIncome += income;
     totalExpense += expense;
     totalProfit += profit;
-    const month = new Date(task.createdAt).toLocaleString('ru', { year: 'numeric', month: 'long' });
-    const cur = monthlyMap.get(month) || { month, budget: 0, income: 0, expense: 0, profit: 0 };
+    const created = new Date(task.createdAt);
+    const key = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`;
+    const month = created.toLocaleString('ru', { year: 'numeric', month: 'long' });
+    const cur = monthlyMap.get(key) || { key, month, budget: 0, income: 0, expense: 0, profit: 0 };
     cur.budget += budget;
     cur.income += income;
     cur.expense += expense;
     cur.profit += profit;
-    monthlyMap.set(month, cur);
+    monthlyMap.set(key, cur);
   }
-  const monthly = Array.from(monthlyMap.values()).sort((a, b) => {
-    const da = new Date(a.month.split(' ').reverse().join('-'));
-    const db = new Date(b.month.split(' ').reverse().join('-'));
-    return db.getTime() - da.getTime();
-  });
+  // Новые месяцы первыми (месяц дополнен нулём до 2 цифр — строковая сортировка корректна)
+  const monthly = Array.from(monthlyMap.values()).sort((a, b) => b.key.localeCompare(a.key));
   res.json({ totalBudget, totalIncome, totalExpense, totalProfit, monthly });
+});
+
+// Задачи конкретного месяца — детализация виджета «Помесячный отчёт по задачам»
+router.get('/task-finances/month-tasks', async (req, res) => {
+  const match = String(req.query.month || '').match(/^(\d{4})-(\d{1,2})$/);
+  if (!match) return res.status(400).json({ error: 'Неверный формат месяца. Ожидается YYYY-M' });
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  if (month < 1 || month > 12) return res.status(400).json({ error: 'Неверный месяц' });
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 1);
+  // Тот же фильтр, что и в /task-finances: задача сделки или с транзакциями
+  const tasks = await prisma.task.findMany({
+    orderBy: { createdAt: 'desc' },
+    where: {
+      createdAt: { gte: start, lt: end },
+      OR: [
+        { dealId: { not: null } },
+        { transactions: { some: {} } },
+      ],
+    },
+    include: {
+      transactions: true,
+      deal: { select: { value: true } },
+      assignees: { include: { user: { select: { name: true } } } },
+    },
+  });
+  const items = tasks.map((task) => {
+    const budget = (task.deal?.value ?? task.budget) || 0;
+    const income = task.transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const expense = task.transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    return {
+      id: task.id,
+      title: task.title,
+      status: task.status,
+      createdAt: task.createdAt,
+      budget,
+      income,
+      expense,
+      profit: income - expense,
+      assignees: task.assignees.map((a) => a.user?.name).filter(Boolean),
+    };
+  });
+  res.json({ month: `${year}-${String(month).padStart(2, '0')}`, tasks: items });
 });
 
 export default router;
