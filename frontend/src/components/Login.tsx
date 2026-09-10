@@ -22,6 +22,10 @@ function generateCodeChallenge(verifier: string): string {
     .replace(/=+$/, '')
 }
 
+const vkIcon = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.118-5.335-3.202C4.624 10.857 4 8.57 4 8.098c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.863 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.814-.542 1.254-1.406 2.151-3.574 2.151-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.203 1.253.745.847 1.32 1.558 1.473 2.05.17.49-.085.744-.576.744z"/></svg>
+)
+
 export function Login() {
   const { login, register } = useAuth()
   const [isRegister, setIsRegister] = useState(false)
@@ -176,62 +180,122 @@ export function Login() {
     window.location.href = `https://id.vk.ru/authorize?${params.toString()}`
   }
 
-  const inputStyle: React.CSSProperties = {
-    padding: '10px 14px',
-    borderRadius: 12,
-    border: '1px solid #e0e0e0',
-    fontSize: 14,
-    outline: 'none',
-    width: '100%',
-  }
-
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-body)', padding: 16 }}>
-      <div style={{ width: '100%', maxWidth: 400, padding: 32, background: 'var(--bg-card)', borderRadius: 12, boxShadow: '0 2px 16px rgba(0,0,0,0.08)' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 8, textAlign: 'center' }}>WeCRM</h1>
-        <p style={{ fontSize: 14, color: 'var(--text-secondary)', textAlign: 'center', marginBottom: 24 }}>{isRegister ? 'Создать аккаунт' : 'Вход'}</p>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {isRegister && (
-            <>
-              <input type="text" placeholder="Имя" value={name} onChange={e => setName(e.target.value)} required style={inputStyle} />
-              <input type="text" placeholder="Логин (необязательно)" value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} />
-            </>
-          )}
-          <input
-            type="text"
-            placeholder={isRegister ? 'Email' : 'Email или логин'}
-            value={loginInput}
-            onChange={e => setLoginInput(e.target.value)}
-            required
-            style={inputStyle}
-          />
-          <input type="password" placeholder="Пароль" value={password} onChange={e => setPassword(e.target.value)} required style={inputStyle} />
-          {error && (
-            <div style={{ color: '#dc2626', fontSize: 13 }}>{error}</div>
-          )}
-          <button type="submit" style={{ padding: '12px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>{isRegister ? 'Зарегистрироваться' : 'Войти'}</button>
-        </form>
-        <div style={{ margin: '16px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ flex: 1, height: 1, background: '#e0e0e0' }} />
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>или</span>
-          <div style={{ flex: 1, height: 1, background: '#e0e0e0' }} />
-        </div>
-        {vkConfig ? (
-          <button onClick={handleVKLogin} disabled={vkLoading} style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: '#0077ff', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: vkLoading ? 0.6 : 1 }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.118-5.335-3.202C4.624 10.857 4 8.57 4 8.098c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.863 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.814-.542 1.254-1.406 2.151-3.574 2.151-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.203 1.253.745.847 1.32 1.558 1.473 2.05.17.49-.085.744-.576.744z"/></svg>
-            {vkLoading ? 'Перенаправление...' : 'Войти через VK'}
-          </button>
-        ) : (
-          <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>VK ID не настроен</div>
-        )}
-        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)', marginTop: 16 }}>
-          {isRegister ? (
-            <>Уже есть аккаунт? <button onClick={() => setIsRegister(false)} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontWeight: 500, cursor: 'pointer', fontSize: 13 }}>Войти</button></>
-          ) : (
-            <>Нет аккаунта? <button onClick={() => setIsRegister(true)} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontWeight: 500, cursor: 'pointer', fontSize: 13 }}>Регистрация</button></>
-          )}
+    <div className="login-split">
+      {/* Левая брендовая панель */}
+      <section className="login-brand">
+        <div className="login-orb login-orb-1" />
+        <div className="login-orb login-orb-2" />
+        <div className="login-orb login-orb-3" />
+        <div className="login-wave login-wave-1" />
+        <div className="login-wave login-wave-2" />
+
+        <img src="/welans-logo.png" alt="Welans" className="login-brand-logo" />
+        <h2 className="login-brand-title">
+          Управляйте бизнесом<br />
+          <span className="accent">в одном окне</span>
+        </h2>
+        <p className="login-brand-sub">
+          Клиенты, сделки, задачи и коммуникации — всё под рукой. CRM, которая работает на вас.
         </p>
-      </div>
+        <div className="login-brand-stats">
+          <div className="login-stat">
+            <b>12 000+</b>
+            <span>компаний с нами</span>
+          </div>
+          <div className="login-stat">
+            <b>99.9%</b>
+            <span>время работы</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Правая панель с формой */}
+      <section className="login-form-side">
+        <div className="login-form-wrap">
+          <h1>{isRegister ? 'Регистрация' : 'Вход в систему'}</h1>
+          <p className="login-subtitle">
+            {isRegister ? 'Создайте аккаунт за пару минут' : 'С возвращением! Введите свои данные'}
+          </p>
+
+          <form onSubmit={handleSubmit}>
+            {isRegister && (
+              <>
+                <div className="login-field">
+                  <label htmlFor="reg-name">Имя</label>
+                  <input
+                    id="reg-name"
+                    type="text"
+                    placeholder="Иван Иванов"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    required
+                    autoComplete="name"
+                  />
+                </div>
+                <div className="login-field">
+                  <label htmlFor="reg-username">Логин (необязательно)</label>
+                  <input
+                    id="reg-username"
+                    type="text"
+                    placeholder="ivan"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    autoComplete="username"
+                  />
+                </div>
+              </>
+            )}
+            <div className="login-field">
+              <label htmlFor="auth-login">{isRegister ? 'Email' : 'Email или логин'}</label>
+              <input
+                id="auth-login"
+                type="text"
+                placeholder={isRegister ? 'ivan@example.com' : 'ivan@example.com'}
+                value={loginInput}
+                onChange={e => setLoginInput(e.target.value)}
+                required
+                autoComplete="username"
+              />
+            </div>
+            <div className="login-field">
+              <label htmlFor="auth-password">Пароль</label>
+              <input
+                id="auth-password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete={isRegister ? 'new-password' : 'current-password'}
+              />
+            </div>
+            {error && <div className="login-error">{error}</div>}
+            <button type="submit" className="login-btn-primary" style={{ marginTop: 10 }}>
+              {isRegister ? 'Зарегистрироваться' : 'Войти'}
+            </button>
+          </form>
+
+          <div className="login-divider"><span>или</span></div>
+
+          {vkConfig ? (
+            <button onClick={handleVKLogin} disabled={vkLoading} className="login-btn-vk">
+              {vkIcon}
+              {vkLoading ? 'Перенаправление...' : 'Войти через VK'}
+            </button>
+          ) : (
+            <div className="login-vk-hint">VK ID не настроен</div>
+          )}
+
+          <p className="login-register">
+            {isRegister ? (
+              <>Уже есть аккаунт? <button type="button" onClick={() => { setIsRegister(false); setError('') }}>Войти</button></>
+            ) : (
+              <>Нет аккаунта? <button type="button" onClick={() => { setIsRegister(true); setError('') }}>Регистрация</button></>
+            )}
+          </p>
+        </div>
+      </section>
 
       {/* Модальное окно запроса разрешения на звуки */}
       {showSoundPrompt && (
@@ -269,7 +333,7 @@ export function Login() {
                   padding: '12px 16px',
                   borderRadius: 12,
                   border: 'none',
-                  background: 'linear-gradient(135deg, #007aff 0%, #5856d6 100%)',
+                  background: 'linear-gradient(135deg, #6cc62e 0%, #3f8f0f 100%)',
                   color: '#fff',
                   fontSize: 14,
                   fontWeight: 600,
