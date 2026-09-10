@@ -248,6 +248,11 @@ export function TaskDetail() {
     setLoading(true);
     try {
       const data = await api.tasks.get(id!);
+      // Если пришли по хештегу #ticketNumber — подменяем URL на канонический id задачи
+      if (data.id !== id) {
+        navigate(`/tasks/${data.id}`, { replace: true });
+        return;
+      }
       setTask(data);
       setComments(data.comments || []);
       setTaskAttachments(data.attachments || []);
