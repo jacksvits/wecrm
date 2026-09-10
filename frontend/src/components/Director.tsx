@@ -225,10 +225,10 @@ function getWidgetLabel(widget: WidgetDef, pskovlineSettings: any): string {
   return widget.label;
 }
 
-function msUntilNextDailyRefresh(hour: number): number {
+function msUntilNextDailyRefresh(hour: number, minute = 0): number {
   const now = new Date();
   const next = new Date(now);
-  next.setHours(hour, 0, 0, 0);
+  next.setHours(hour, minute, 0, 0);
   if (next.getTime() <= now.getTime()) {
     next.setDate(next.getDate() + 1);
   }
@@ -303,7 +303,7 @@ export function Director() {
     return () => clearInterval(interval);
   }, []);
 
-  // Автоматическое обновление данных Псковлайн каждый день в 10:00
+  // Автоматическое обновление данных Псковлайн после ежедневного парсера в 10:00
   useEffect(() => {
     let dailyTimeout: number | undefined;
     let dailyInterval: number | undefined;
@@ -311,7 +311,7 @@ export function Director() {
     dailyTimeout = window.setTimeout(() => {
       loadPskovlineData();
       dailyInterval = window.setInterval(loadPskovlineData, 24 * 60 * 60 * 1000);
-    }, msUntilNextDailyRefresh(10));
+    }, msUntilNextDailyRefresh(10, 5));
 
     return () => {
       if (dailyTimeout !== undefined) window.clearTimeout(dailyTimeout);
