@@ -738,9 +738,12 @@ export function Director() {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {tochkaAccounts.accounts.map((acc: any) => (
                   <div key={acc.id} style={{ padding: "10px 12px", borderRadius: 10, background: "var(--bg-input)" }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{acc.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>
+                      {acc.name}
+                      {acc.short ? <span style={{ color: "var(--text-muted)", fontWeight: 400 }}> ····{acc.short}</span> : null}
+                    </div>
                     <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                      {acc.number} · {(acc.balance || 0).toLocaleString("ru")} {acc.currency}
+                      {(acc.balance || 0).toLocaleString("ru")} {acc.currency}
                     </div>
                   </div>
                 ))}

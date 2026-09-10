@@ -266,7 +266,13 @@ router.get('/accounts', authMiddleware, async (_req, res) => {
     if (dataRes.status !== 200) return res.json({ accounts: [], totalBalance: 0, error: `API ${dataRes.status}`, connected: true });
 
     const accounts = (dataRes.body?.Data?.Account || []).map((a: any) => ({
-      id: a.accountId, name: a.nickname || a.accountId, number: a.accountId, currency: a.currency || 'RUB'
+      // Название из API банка (accountDetails.name); при его отсутствии — nickname, затем заглушка
+      id: a.accountId,
+      name: a.accountDetails?.[0]?.name || a.nickname || 'Счёт в банке Точка',
+      number: a.accountId,
+      // Последние 4 цифры номера для визуального различения счетов (полный номер не показываем)
+      short: (a.accountId.split('/')[0] || '').slice(-4),
+      currency: a.currency || 'RUB'
     }));
 
     let totalBalance = 0;
