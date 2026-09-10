@@ -1,9 +1,19 @@
 {
-  "updated_at": "2026-09-10T13:39:17.450509",
+  "updated_at": "2026-09-10T13:51:53.371618",
   "balance": 2514.54,
+  "partner_balance": 2514.54,
   "active_referrals": 14,
   "last_transaction": "09.09.2026",
   "last_transaction_amount": 5040.0,
   "status": "ok",
-  "error": null
+  "error": null,
+  "plan_name": "Noble",
+  "user_balance": 1,
+  "user_days_to_block": 1,
+  "user_quota": 41930,
+  "plan_quota": 45000,
+  "user_sites": 15,
+  "plan_site": 20,
+  "server_name": "callisto.beget.com",
+  "user_domains": 18
 }

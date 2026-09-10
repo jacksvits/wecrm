@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Парсер партнёрского кабинета Beget (cp.beget.com/partnership)
-Сохраняет баланс, рефералов, транзакции в JSON
+Парсер данных Beget для виджетов директора:
+- Партнёрский кабинет (cp.beget.com/partnership) — playwright: баланс, рефералы, транзакции
+- Личный кабинет — официальный API (api.beget.com): тариф, баланс, дни до блокировки,
+  диск, сайты, домены, сервер
+Сохраняет всё в JSON
 """
 
 import os
 import re
 import json
-import subprocess
+import urllib.request
+import urllib.parse
 from datetime import datetime
 
 if os.path.isdir("/app/data"):
@@ -17,10 +21,40 @@ else:
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     OUTPUT_JSON = os.path.join(SCRIPT_DIR, "..", "data", "beget.json")
 
+BEGET_API_URL = "https://api.beget.com/api/user/getAccountInfo"
+BEGET_LOGIN = "softboeg"
+BEGET_PASSWORD = "nyBNQofDm96"
+
+# Поля личного кабинета, забираемые из API
+API_FIELDS = (
+    "plan_name", "user_balance", "user_days_to_block",
+    "user_quota", "plan_quota", "user_sites", "plan_site",
+    "server_name", "user_domains",
+)
+
 
 def _to_float(s: str) -> float:
     """Преобразует '2 514,54' / '2\xa0514.54' в float (устойчиво к неразрывному пробелу)."""
     return float(s.replace('\xa0', ' ').replace(' ', '').replace(',', '.'))
+
+
+def fetch_account_api():
+    """Данные личного кабинета через официальный API Beget."""
+    params = urllib.parse.urlencode({
+        "login": BEGET_LOGIN,
+        "passwd": BEGET_PASSWORD,
+        "output_format": "json",
+    })
+    req = urllib.request.Request(
+        BEGET_API_URL,
+        data=params.encode("utf-8"),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    if payload.get("status") != "success":
+        return None
+    return payload.get("answer", {}).get("result")
 
 
 def parse_beget():
@@ -33,6 +67,7 @@ def parse_beget():
     result = {
         "updated_at": datetime.now().isoformat(),
         "balance": None,
+        "partner_balance": None,
         "active_referrals": None,
         "last_transaction": None,
         "last_transaction_amount": None,
@@ -53,8 +88,8 @@ def parse_beget():
             # Логин
             page.goto('https://cp.beget.com/login', timeout=60000)
             page.wait_for_timeout(5000)
-            page.fill('input[type="text"], input:not([type="password"])', 'softboeg')
-            page.fill('input[type="password"]', 'nyBNQofDm96')
+            page.fill('input[type="text"], input:not([type="password"])', BEGET_LOGIN)
+            page.fill('input[type="password"]', BEGET_PASSWORD)
             page.click('button[type="submit"], button')
             page.wait_for_timeout(10000)
 
@@ -70,6 +105,7 @@ def parse_beget():
             if m:
                 try:
                     result["balance"] = _to_float(m.group(1))
+                    result["partner_balance"] = result["balance"]
                 except ValueError:
                     pass
 
@@ -94,11 +130,6 @@ def parse_beget():
                 except ValueError:
                     pass
 
-            if result["balance"] is not None:
-                result["status"] = "ok"
-            else:
-                result["error"] = "Не удалось извлечь данные"
-
         except Exception as e:
             result["error"] = str(e)
         finally:
@@ -106,6 +137,22 @@ def parse_beget():
 
     # Останавливаем Xvfb
     os.system("pkill Xvfb 2>/dev/null")
+
+    # Данные личного кабинета через API (партнёрский баланс не перезаписываем)
+    try:
+        api_data = fetch_account_api()
+        if api_data:
+            for key in API_FIELDS:
+                if key in api_data:
+                    result[key] = api_data[key]
+    except Exception as e:
+        if result["error"] is None:
+            result["error"] = f"API: {e}"
+
+    if result["balance"] is not None:
+        result["status"] = "ok"
+    else:
+        result["error"] = result["error"] or "Не удалось извлечь данные"
 
     os.makedirs(os.path.dirname(OUTPUT_JSON), exist_ok=True)
     with open(OUTPUT_JSON, "w", encoding="utf-8") as f:

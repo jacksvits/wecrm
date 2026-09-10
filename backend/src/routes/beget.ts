@@ -18,20 +18,23 @@ router.get('/', async (_req, res) => {
 });
 
 // GET /api/beget/account — данные аккаунта для виджетов
+// user_* — данные личного кабинета из API Beget (api.beget.com),
+// partner_balance / active_referrals / last_transaction_* — партнёрский кабинет (парсер)
 router.get('/account', async (_req, res) => {
   try {
     if (fs.existsSync(DATA_FILE)) {
       const raw = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
-      // Адаптируем структуру под ожидания frontend (парсер beget возвращает balance, active_referrals и т.д.)
       const account = {
         login: raw.login || 'softboeg',
         plan_name: raw.plan_name || 'Партнёрский',
-        user_balance: raw.balance ?? raw.user_balance ?? 0,
+        user_balance: raw.user_balance ?? 0,
+        partner_balance: raw.partner_balance ?? raw.balance ?? 0,
         user_days_to_block: raw.user_days_to_block ?? 0,
         user_quota: raw.user_quota ?? 0,
         plan_quota: raw.plan_quota ?? 0,
         user_sites: raw.user_sites ?? 0,
         plan_site: raw.plan_site ?? 0,
+        user_domains: raw.user_domains ?? 0,
         server_name: raw.server_name || '—',
         active_referrals: raw.active_referrals ?? 0,
         last_transaction: raw.last_transaction || null,

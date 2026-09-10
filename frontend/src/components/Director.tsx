@@ -449,7 +449,7 @@ export function Director() {
       case "stat-beget":
         return (
           <>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "#2563eb", marginBottom: 4 }}>{begetDomains.length}</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: "#2563eb", marginBottom: 4 }}>{begetAccount?.user_domains || begetDomains.length}</div>
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Beget — {begetAccount?.login || "—"}</div>
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, opacity: 0.7 }}>{begetAccount?.plan_name || ""} · {begetAccount?.user_balance || 0} ₽</div>
           </>
@@ -675,7 +675,7 @@ export function Director() {
               <div><div style={{ fontSize: 11, color: "var(--text-muted)" }}>Сайтов</div><div style={{ fontSize: 14, fontWeight: 500 }}>{begetAccount.user_sites || 0} / {begetAccount.plan_site || 0}</div></div>
               <div><div style={{ fontSize: 11, color: "var(--text-muted)" }}>Сервер</div><div style={{ fontSize: 14, fontWeight: 500 }}>{begetAccount.server_name || "—"}</div></div>
             </div>
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-color)", fontSize: 13, color: "var(--text-muted)" }}>Доменов: {begetDomains.length}</div>
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-color)", fontSize: 13, color: "var(--text-muted)" }}>Доменов: {begetAccount?.user_domains || begetDomains.length}</div>
           </>
         ) : (
           <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Загрузка данных Beget...</div>
@@ -687,7 +687,7 @@ export function Director() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div>
                 <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Баланс</div>
-                <div style={{ fontSize: 14, fontWeight: 500 }}>{(begetAccount.user_balance || 0).toLocaleString("ru")} ₽</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{(begetAccount.partner_balance || 0).toLocaleString("ru")} ₽</div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Активные рефералы</div>
