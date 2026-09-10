@@ -210,6 +210,7 @@ model Task {
   activities    Activity[]
   history       TaskHistory[]
   calls         Call[]
+  smsMessages   SmsMessage[]
 
   // Email integration fields
   emailMessageId String? @unique
@@ -457,6 +458,7 @@ model TelephonySettings {
   autoCreateTask    Boolean  @default(false) @map("auto_create_task")
   autoCreateTaskOnIncoming Boolean @default(false) @map("auto_create_task_on_incoming")
   autoCreateTaskOnOutgoing Boolean @default(false) @map("auto_create_task_on_outgoing")
+  autoCreateTaskOnSms   Boolean @default(false) @map("auto_create_task_on_sms")
   autoAttachRecord  Boolean  @default(false) @map("auto_attach_record")
   notifyAdminsOnSms Boolean  @default(false) @map("notify_admins_on_sms")
   defaultIovEmployeeId Int?  @map("default_iov_employee_id")
@@ -510,12 +512,15 @@ model SmsMessage {
   text        String
   contactId   String?  @map("contact_id")
   contact     Contact? @relation(fields: [contactId], references: [id])
+  taskId      String?  @map("task_id")
+  task        Task?    @relation(fields: [taskId], references: [id])
   receivedAt  DateTime @default(now()) @map("received_at")
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@index([from])
   @@index([receivedAt])
   @@index([contactId])
+  @@index([taskId])
   @@map("sms_messages")
 }
 
