@@ -74,9 +74,11 @@ export function TaskDetail() {
     assigneeIds: [] as string[],
     curatorIds: [] as string[],
     contactId: "",
+    dealId: "",
     address: "",
   });
   const [contacts, setContacts] = useState<any[]>([]);
+  const [deals, setDeals] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "details" | "comments" | "subtasks" | "history" | "finances" | "files"
@@ -116,6 +118,7 @@ export function TaskDetail() {
       api.users.list().then(setUsers);
       api.statuses.list("task").then(setStatuses);
       api.contacts.list().then(setContacts).catch(() => {});
+      api.deals.list().then(setDeals).catch(() => {});
     }
   }, [id]);
   useEffect(() => {
@@ -241,6 +244,7 @@ export function TaskDetail() {
         assigneeIds: data.assignees?.map((a) => a.user.id) || [],
         curatorIds: data.curators?.map((c) => c.id) || [],
         contactId: data.contact?.id || "",
+        dealId: data.deal?.id || "",
         address: data.address || "",
       });
     } catch (err: any) {
@@ -321,10 +325,12 @@ export function TaskDetail() {
           ? editForm.curatorIds
           : undefined,
         contactId: editForm.contactId || undefined,
+        dealId: editForm.dealId || undefined,
         address: editForm.address || undefined,
       });
       setIsEditing(false);
       loadTask();
+      loadFinances();
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -773,6 +779,41 @@ export function TaskDetail() {
                 {editForm.contactId && (
                   <div style={{ marginTop: 4, fontSize: 12, color: "#1565c0" }}>
                     Выбран: {contacts.find(c => c.id === editForm.contactId)?.name}
+                  </div>
+                )}
+              </div>
+            )}{" "}
+            {isAdmin && (
+              <div style={{ position: "relative" }}>
+                <input
+                  type="text"
+                  list="deal-options"
+                  placeholder="Поиск сделки..."
+                  value={deals.find(d => d.id === editForm.dealId)?.title || ""}
+                  onChange={(e) => {
+                    const deal = deals.find(d =>
+                      d.title.toLowerCase().startsWith(e.target.value.toLowerCase())
+                    );
+                    setEditForm({ ...editForm, dealId: deal?.id || "" });
+                  }}
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid var(--border-color)",
+                    fontSize: 14,
+                    width: "100%",
+                    background: "var(--bg-input)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+                <datalist id="deal-options">
+                  {deals.map(d => (
+                    <option key={d.id} value={d.title} />
+                  ))}
+                </datalist>
+                {editForm.dealId && (
+                  <div style={{ marginTop: 4, fontSize: 12, color: "#1565c0" }}>
+                    Выбрана: {deals.find(d => d.id === editForm.dealId)?.title} ({(deals.find(d => d.id === editForm.dealId)?.value || 0).toLocaleString("ru")} ₽)
                   </div>
                 )}
               </div>
@@ -2020,10 +2061,16 @@ export function TaskDetail() {
                         marginBottom: 4,
                       }}
                     >
-                      Стоимость
+                      Доходы
                     </div>
-                    <div style={{ fontSize: 20, fontWeight: 700 }}>
-                      {(finances?.price || 0).toLocaleString("ru")} ₽
+                    <div
+                      style={{
+                        fontSize: 20,
+                        fontWeight: 700,
+                        color: "#10b981",
+                      }}
+                    >
+                      {(finances?.totalIncome || 0).toLocaleString("ru")} ₽
                     </div>
                   </div>
                   <div
@@ -2072,13 +2119,19 @@ export function TaskDetail() {
                       style={{
                         fontSize: 20,
                         fontWeight: 700,
-                        color: "#10b981",
+                        color: (finances?.profit || 0) >= 0 ? "#10b981" : "#dc2626",
                       }}
                     >
                       {(finances?.profit || 0).toLocaleString("ru")} ₽
                     </div>
                   </div>
                 </div>
+
+                {finances?.deal && (
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+                    Бюджет из сделки: {finances.deal.title} — {(finances.deal.value || 0).toLocaleString("ru")} ₽
+                  </div>
+                )}
 
                 <div
                   style={{

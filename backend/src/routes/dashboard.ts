@@ -124,22 +124,33 @@ router.get('/task-finances', async (req, res) => {
   const tasks = await prisma.task.findMany({
     take: 100,
     orderBy: { createdAt: 'desc' },
-    where: { price: { gt: 0 } },
-    include: { transactions: true },
+    where: {
+      OR: [
+        { dealId: { not: null } },
+        { transactions: { some: {} } },
+      ],
+    },
+    include: { transactions: true, deal: { select: { value: true } } },
   });
-  const monthlyMap = new Map<string, { month: string; budget: number; expense: number; profit: number }>();
+  const monthlyMap = new Map<string, { month: string; budget: number; income: number; expense: number; profit: number }>();
   let totalBudget = 0;
+  let totalIncome = 0;
   let totalExpense = 0;
   let totalProfit = 0;
   for (const task of tasks) {
+    // Бюджет задачи = сумма связанной сделки, при отсутствии сделки — поле budget задачи
+    const budget = (task.deal?.value ?? task.budget) || 0;
+    const income = task.transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const expense = task.transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    const profit = (task.price || 0) - expense;
-    totalBudget += task.budget || 0;
+    const profit = income - expense;
+    totalBudget += budget;
+    totalIncome += income;
     totalExpense += expense;
     totalProfit += profit;
     const month = new Date(task.createdAt).toLocaleString('ru', { year: 'numeric', month: 'long' });
-    const cur = monthlyMap.get(month) || { month, budget: 0, expense: 0, profit: 0 };
-    cur.budget += task.budget || 0;
+    const cur = monthlyMap.get(month) || { month, budget: 0, income: 0, expense: 0, profit: 0 };
+    cur.budget += budget;
+    cur.income += income;
     cur.expense += expense;
     cur.profit += profit;
     monthlyMap.set(month, cur);
@@ -149,7 +160,7 @@ router.get('/task-finances', async (req, res) => {
     const db = new Date(b.month.split(' ').reverse().join('-'));
     return db.getTime() - da.getTime();
   });
-  res.json({ totalBudget, totalExpense, totalProfit, monthly });
+  res.json({ totalBudget, totalIncome, totalExpense, totalProfit, monthly });
 });
 
 export default router;

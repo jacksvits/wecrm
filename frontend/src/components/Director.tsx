@@ -951,16 +951,18 @@ export function Director() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {taskFinanceStats.monthly.map((m: any) => (
-                  <div key={m.month} style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 12, padding: "10px 12px", borderRadius: 10, background: "var(--bg-input)", alignItems: "center" }}>
+                  <div key={m.month} style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto auto", gap: 12, padding: "10px 12px", borderRadius: 10, background: "var(--bg-input)", alignItems: "center" }}>
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{m.month}</div>
                     <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Бюджет: {(m.budget || 0).toLocaleString("ru")} ₽</div>
+                    <div style={{ fontSize: 12, color: "#166534" }}>Доходы: {(m.income || 0).toLocaleString("ru")} ₽</div>
                     <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Расходы: {(m.expense || 0).toLocaleString("ru")} ₽</div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: (m.profit || 0) >= 0 ? "#10b981" : "#dc2626" }}>Прибыль: {(m.profit || 0).toLocaleString("ru")} ₽</div>
                   </div>
                 ))}
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-color)", display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 12, fontWeight: 600, fontSize: 13 }}>
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-color)", display: "grid", gridTemplateColumns: "1fr auto auto auto auto", gap: 12, fontWeight: 600, fontSize: 13 }}>
                   <div>Итого</div>
                   <div style={{ color: "var(--text-muted)" }}>{(taskFinanceStats?.totalBudget || 0).toLocaleString("ru")} ₽</div>
+                  <div style={{ color: "#166534" }}>{(taskFinanceStats?.totalIncome || 0).toLocaleString("ru")} ₽</div>
                   <div style={{ color: "var(--text-muted)" }}>{(taskFinanceStats?.totalExpense || 0).toLocaleString("ru")} ₽</div>
                   <div style={{ color: (taskFinanceStats?.totalProfit || 0) >= 0 ? "#10b981" : "#dc2626" }}>{(taskFinanceStats?.totalProfit || 0).toLocaleString("ru")} ₽</div>
                 </div>

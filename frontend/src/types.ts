@@ -34,6 +34,7 @@ export interface TaskFinances {
   totalIncome: number;
   totalExpense: number;
   profit: number;
+  deal?: { id: string; title: string; value: number } | null;
   transactions: TaskTransaction[];
 }
 export interface VkGroupSettings { id: string; groupId: number; accessToken: string; defaultCreatorId?: string | null; assigneeIds: string[]; autoCreateContact: boolean; isActive: boolean; lastTs?: number | null; callbackSecret?: string | null; confirmationString?: string | null; createdAt: string; updatedAt: string; }
