@@ -32,7 +32,6 @@ export function GlobalChat() {
   const [isAllSelected, setIsAllSelected] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
   const [showReactionsFor, setShowReactionsFor] = useState<string | null>(null);
-  const [hoveredMsg, setHoveredMsg] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -350,8 +349,6 @@ export function GlobalChat() {
                 padding: '2px 10px',
                 position: 'relative',
               }}
-              onMouseEnter={() => setHoveredMsg(msg.id)}
-              onMouseLeave={() => setHoveredMsg(null)}
             >
               {recipientNames.length > 0 && (
                 <div style={{
@@ -544,7 +541,7 @@ export function GlobalChat() {
                     </div>
                   )}
 
-                  {hoveredMsg === msg.id && !isDeleted && (
+                  {!isDeleted && (
                     <div style={{
                       display: 'flex',
                       gap: 4,
