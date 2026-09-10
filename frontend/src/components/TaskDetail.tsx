@@ -534,7 +534,7 @@ export function TaskDetail() {
                 opacity: exportingPdf ? 0.6 : 1,
               }}
             >
-              {exportingPdf ? "⏳ Формируется…" : "📄 Поделиться PDF"}
+              {exportingPdf ? "⏳ Формируется…" : "📄 PDF"}
             </button>
           )}{" "}
           {task && (isAdmin || task.creatorId === user?.id || (task.curators || []).some(c => c.id === user?.id)) && !isEditing && activeTab === "details" && (
