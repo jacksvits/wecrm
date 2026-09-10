@@ -54,12 +54,17 @@
         || 'ontouchstart' in window;
       var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      // Заставка показывается при КАЖДОМ запуске приложения
-      if (!isMobile || reduced || !video) {
+      // Заставка показывается один раз за сессию (при повторных переходах/обновлениях — нет)
+      var shown = false;
+      try { shown = sessionStorage.getItem('wecrm-splash-shown') === '1'; } catch (e) {}
+
+      if (!isMobile || reduced || shown || !video) {
         if (el) el.remove();
         window.__wecrmAppReady = true;
         return;
       }
+
+      try { sessionStorage.setItem('wecrm-splash-shown', '1'); } catch (e) {}
 
       var videoDone = false, appReady = false, hidden = false;
       el.hidden = false;
