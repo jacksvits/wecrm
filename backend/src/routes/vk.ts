@@ -248,4 +248,78 @@ router.get('/status', (_req, res) => {
   });
 });
 
+
+// ============ OAuth для токена маркета (market) ============
+// Без авторизации: вызывается редиректом из ВК и кнопкой из CRM.
+// Защита — одноразовый state (10 минут жизни).
+const marketOAuthStates = new Map<string, number>();
+const MARKET_REDIRECT_URI = 'https://welans.cc/api/vk/market-callback';
+const MARKET_SCOPE = 'market,offline';
+
+/**
+ * GET /api/vk/market-auth
+ * Старт серверного OAuth: редирект на авторизацию ВК с response_type=code
+ */
+router.get('/market-auth', async (_req, res) => {
+  try {
+    const s = await prisma.vkGroupSettings.findFirst({ orderBy: { createdAt: 'asc' } });
+    if (!s?.marketAppId || !s?.marketAppSecret) {
+      return res.status(400).send('<h3>Не настроено приложение маркета</h3><p>Укажите App ID и Secure key в CRM: Настройки → ВКонтакте → «Приложение маркета».</p>');
+    }
+    const state = randomUUID();
+    marketOAuthStates.set(state, Date.now());
+    // чистим протухшие state (>10 мин)
+    for (const [k, t] of marketOAuthStates) {
+      if (Date.now() - t > 10 * 60 * 1000) marketOAuthStates.delete(k);
+    }
+    const url = new URL('https://oauth.vk.com/authorize');
+    url.searchParams.set('client_id', String(s.marketAppId));
+    url.searchParams.set('redirect_uri', MARKET_REDIRECT_URI);
+    url.searchParams.set('response_type', 'code');
+    url.searchParams.set('scope', MARKET_SCOPE);
+    url.searchParams.set('state', state);
+    res.redirect(url.toString());
+  } catch (err: any) {
+    res.status(500).send(`<h3>Ошибка</h3><p>${err.message}</p>`);
+  }
+});
+
+/**
+ * GET /api/vk/market-callback?code=&state=
+ * VK редиректит сюда после авторизации. Меняем code на токен и сохраняем.
+ */
+router.get('/market-callback', async (req, res) => {
+  try {
+    const { code, state, error, error_description } = req.query as Record<string, string>;
+    if (error) {
+      return res.status(400).send(`<h3>Авторизация отклонена</h3><p>${error_description || error}</p><p><a href="https://welans.cc/settings">← В настройки CRM</a></p>`);
+    }
+    if (!state || !marketOAuthStates.has(state)) {
+      return res.status(400).send('<h3>Недействительный или просроченный state</h3><p>Повторите попытку из CRM.</p>');
+    }
+    marketOAuthStates.delete(state);
+    const s = await prisma.vkGroupSettings.findFirst({ orderBy: { createdAt: 'asc' } });
+    if (!s?.marketAppId || !s?.marketAppSecret) {
+      return res.status(400).send('<h3>Приложение маркета не настроено</h3>');
+    }
+    const tokenUrl = new URL('https://oauth.vk.com/access_token');
+    tokenUrl.searchParams.set('client_id', String(s.marketAppId));
+    tokenUrl.searchParams.set('client_secret', s.marketAppSecret);
+    tokenUrl.searchParams.set('redirect_uri', MARKET_REDIRECT_URI);
+    tokenUrl.searchParams.set('code', code);
+    const tokenRes = await fetch(tokenUrl.toString());
+    const tokenData: any = await tokenRes.json();
+    if (tokenData.error || !tokenData.access_token) {
+      return res.status(400).send(`<h3>VK не выдал токен</h3><p>${tokenData.error_description || tokenData.error || 'unknown'}</p><p>Проверьте, что добавлен доверенный redirect URI <code>${MARKET_REDIRECT_URI}</code> в настройках приложения ВК.</p>`);
+    }
+    await prisma.vkGroupSettings.update({
+      where: { id: s.id },
+      data: { marketToken: tokenData.access_token },
+    });
+    res.send('<h3 style="color:#059669">Токен маркета сохранён ✓</h3><p>Теперь можно закрыть эту вкладку и запустить «Товары → Импорт из ВК».</p><p><a href="https://welans.cc/settings">← В настройки CRM</a></p>');
+  } catch (err: any) {
+    res.status(500).send(`<h3>Ошибка</h3><p>${err.message}</p>`);
+  }
+});
+
 export default router;
