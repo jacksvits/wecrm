@@ -72,11 +72,19 @@ router.get('/:id/files', async (req: AuthRequest, res) => {
     if (!hasAccess) return res.status(403).json({ error: 'Доступ запрещен' });
     const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true } });
     if (!task) return res.status(404).json({ error: 'Задача не найдена' });
-    const taskDir = path.join(TASKS_DIR, String(task.ticketNumber));
-    if (!fs.existsSync(taskDir)) return res.json([]);
+    // Санитизация относительного пути подпапки (защита от path traversal)
+    const rawPath = typeof req.query.path === 'string' ? req.query.path : '';
+    const safePath = rawPath.split('/').filter((p) => p && p !== '.' && p !== '..').join('/');
+    const taskDir = path.join(TASKS_DIR, String(task.ticketNumber), safePath);
+    if (!fs.existsSync(taskDir) || !fs.statSync(taskDir).isDirectory()) return res.json([]);
     const files = fs.readdirSync(taskDir).map(name => {
       const stat = fs.statSync(path.join(taskDir, name));
-      return { name, size: stat.size, createdAt: stat.ctime };
+      return { name, size: stat.size, createdAt: stat.ctime, isDirectory: stat.isDirectory() };
+    });
+    // Сортировка: папки первыми, затем по имени
+    files.sort((a, b) => {
+      if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+      return a.name.localeCompare(b.name, 'ru');
     });
     res.json(files);
   } catch (err: any) {

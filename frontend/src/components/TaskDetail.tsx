@@ -105,7 +105,8 @@ export function TaskDetail() {
   });
   const [financeLoading, setFinanceLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [taskFiles, setTaskFiles] = useState<{name: string; size: number; createdAt: string}[]>([]);
+  const [taskFiles, setTaskFiles] = useState<{name: string; size: number; createdAt: string; isDirectory?: boolean}[]>([]);
+  const [taskFilesPath, setTaskFilesPath] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
@@ -181,12 +182,16 @@ export function TaskDetail() {
   const loadTaskFiles = async () => {
     if (!id) return;
     try {
-      const files = await api.tasks.files.list(id);
+      const files = await api.tasks.files.list(id, taskFilesPath || undefined);
       setTaskFiles(files);
     } catch (err: any) {
       console.error("Failed to load task files:", err);
     }
   };
+  // Сброс текущей подпапки при смене задачи
+  useEffect(() => { setTaskFilesPath(""); }, [id]);
+  // Перезагрузка списка файлов при смене подпапки
+  useEffect(() => { loadTaskFiles(); }, [taskFilesPath]);
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setDragOver(true); };
   const handleDragLeave = () => setDragOver(false);
   const handleDrop = async (e: React.DragEvent) => {
@@ -211,14 +216,15 @@ export function TaskDetail() {
     loadTaskFiles();
     e.target.value = '';
   };
+  const relFilePath = (name: string) => (taskFilesPath ? taskFilesPath + "/" + name : name);
   const handleDeleteFile = async (filename: string) => {
     if (!confirm('Удалить файл?')) return;
-    await api.tasks.files.delete(id!, filename);
+    await api.tasks.files.delete(id!, relFilePath(filename));
     loadTaskFiles();
   };
   const handleDownloadFile = async (filename: string) => {
     try {
-      const response = await api.tasks.files.download(id!, filename);
+      const response = await api.tasks.files.download(id!, relFilePath(filename));
       if (!response.ok) {
         alert('Ошибка скачивания файла');
         return;
@@ -2501,17 +2507,43 @@ export function TaskDetail() {
                   <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Перетащите файлы сюда или нажмите для выбора</div>
                   <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} onChange={handleFileInput} />
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  {taskFilesPath && (
+                    <button
+                      onClick={() => setTaskFilesPath((prev) => prev.split("/").slice(0, -1).join("/"))}
+                      style={{
+                        padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)',
+                        background: 'var(--bg-hover)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 13,
+                      }}
+                    >
+                      ← Назад
+                    </button>
+                  )}
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                    {taskFilesPath ? 'Файлы / ' + taskFilesPath.replace(/\//g, ' / ') : 'Файлы'}
+                  </div>
+                </div>
                 {taskFiles.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 20 }}>Нет файлов</div>
+                  <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 20 }}>Папка пуста</div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
-                    {taskFiles.map(file => {
-                      const isImage = IMAGE_EXT.test(file.name);
-                      const fileUrl = `${window.location.origin}/uploads/tasks/${task?.ticketNumber}/${encodeURIComponent(file.name)}`;
+                    {[...taskFiles]
+                      .sort((a, b) => (Number(b.isDirectory) - Number(a.isDirectory)) || a.name.localeCompare(b.name, 'ru'))
+                      .map(file => {
+                      const isImage = !file.isDirectory && IMAGE_EXT.test(file.name);
+                      const fileUrl = `${window.location.origin}/uploads/tasks/${task?.ticketNumber}/${taskFilesPath ? taskFilesPath.split('/').map(encodeURIComponent).join('/') + '/' : ''}${encodeURIComponent(file.name)}`;
                       return (
                         <div
                           key={file.name}
-                          onClick={() => (isImage ? setModalImage(fileUrl) : handleDownloadFile(file.name))}
+                          onClick={() => {
+                            if (file.isDirectory) {
+                              setTaskFilesPath((prev) => (prev ? prev + "/" + file.name : file.name));
+                            } else if (isImage) {
+                              setModalImage(fileUrl);
+                            } else {
+                              handleDownloadFile(file.name);
+                            }
+                          }}
                           style={{
                             padding: 16, borderRadius: 12, border: '1px solid var(--border-color)',
                             background: 'var(--bg-color)', display: 'flex', alignItems: 'center', gap: 12,
@@ -2528,7 +2560,9 @@ export function TaskDetail() {
                             e.currentTarget.style.boxShadow = 'none';
                           }}
                         >
-                          {isImage ? (
+                          {file.isDirectory ? (
+                            <div style={{ fontSize: 32, flexShrink: 0 }}>📁</div>
+                          ) : isImage ? (
                             <img
                               src={fileUrl}
                               alt={file.name}
@@ -2540,8 +2574,11 @@ export function TaskDetail() {
                           )}
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
-                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{formatSize(file.size)}</div>
+                            {!file.isDirectory && (
+                              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{formatSize(file.size)}</div>
+                            )}
                           </div>
+                          {!file.isDirectory && (
                           <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                             <button
                               onClick={(e) => { e.stopPropagation(); handleDownloadFile(file.name); }}
@@ -2571,6 +2608,7 @@ export function TaskDetail() {
                               </svg>
                             </button>
                           </div>
+                          )}
                         </div>
                       );
                     })}
