@@ -83,6 +83,8 @@ model User {
   news            News[]
   notes           Note[]
   telegramSettings TelegramSettings[]
+  stockMovements  StockMovement[]
+  priceHistory    PriceHistory[]
   @@map("users")
   reminders     Reminder[]
 }
@@ -848,4 +850,120 @@ model YandexSettings {
   updatedAt DateTime @updatedAt
 
   @@map("yandex_settings")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  sku         String?  @unique
+  name        String
+  description String?
+  category    String?
+  unit        String   @default("шт")
+  barcode     String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  stocks       StockBalance[]
+  prices       ProductPrice[]
+  movements    StockMovement[]
+  priceHistory PriceHistory[]
+
+  @@index([name])
+  @@index([category])
+  @@map("products")
+}
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  name      String
+  location  String?
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  stocks    StockBalance[]
+  movements StockMovement[]
+
+  @@map("warehouses")
+}
+
+model StockBalance {
+  id          String    @id @default(cuid())
+  productId   String    @map("product_id")
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId String    @map("warehouse_id")
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  quantity    Float     @default(0)
+  reserved    Float     @default(0)
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([productId, warehouseId])
+  @@index([warehouseId])
+  @@map("stock_balances")
+}
+
+model StockMovement {
+  id          String    @id @default(cuid())
+  productId   String    @map("product_id")
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId String    @map("warehouse_id")
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  type        String    // income | outcome | adjust
+  quantity    Float
+  price       Float?
+  comment     String?
+  date        DateTime  @default(now())
+  userId      String?   @map("user_id")
+  user        User?     @relation(fields: [userId], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([productId, date])
+  @@index([warehouseId, date])
+  @@map("stock_movements")
+}
+
+model PriceType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  label     String
+  color     String   @default("#f0f0f0")
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  prices       ProductPrice[]
+  priceHistory PriceHistory[]
+
+  @@map("price_types")
+}
+
+model ProductPrice {
+  id          String    @id @default(cuid())
+  productId   String    @map("product_id")
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priceTypeId String    @map("price_type_id")
+  priceType   PriceType @relation(fields: [priceTypeId], references: [id], onDelete: Cascade)
+  price       Float     @default(0)
+  currency    String    @default("RUB")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([productId, priceTypeId])
+  @@map("product_prices")
+}
+
+model PriceHistory {
+  id          String    @id @default(cuid())
+  productId   String    @map("product_id")
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priceTypeId String    @map("price_type_id")
+  priceType   PriceType @relation(fields: [priceTypeId], references: [id], onDelete: Cascade)
+  oldPrice    Float     @map("old_price")
+  newPrice    Float     @map("new_price")
+  userId      String?   @map("user_id")
+  user        User?     @relation(fields: [userId], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([productId, createdAt])
+  @@map("price_history")
 }

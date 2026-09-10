@@ -72,3 +72,12 @@ export interface Reminder {
   createdAt: string;
   updatedAt: string;
 }
+
+// Products (Товары)
+export interface Warehouse { id: string; name: string; location?: string | null; isActive: boolean; sortOrder: number; createdAt: string; }
+export interface PriceType { id: string; name: string; label: string; color: string; sortOrder: number; isActive: boolean; createdAt: string; }
+export interface StockBalance { id: string; productId: string; warehouseId: string; quantity: number; reserved: number; updatedAt: string; }
+export interface ProductPrice { id: string; productId: string; priceTypeId: string; price: number; currency: string; updatedAt: string; }
+export interface StockMovement { id: string; productId: string; warehouseId: string; type: 'income' | 'outcome' | 'adjust'; quantity: number; price?: number | null; comment?: string | null; date: string; userId?: string | null; createdAt: string; product?: { name: string; sku?: string | null; unit: string }; warehouse?: { name: string }; user?: { name: string } | null; }
+export interface PriceHistory { id: string; productId: string; priceTypeId: string; oldPrice: number; newPrice: number; createdAt: string; priceType?: { label: string }; user?: { name: string } | null; }
+export interface Product { id: string; sku?: string | null; name: string; description?: string | null; category?: string | null; unit: string; barcode?: string | null; isActive: boolean; createdAt: string; updatedAt: string; stocks?: StockBalance[]; prices?: ProductPrice[]; }
