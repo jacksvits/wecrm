@@ -25,6 +25,14 @@ const priorityLabels: Record<string, string> = {
   high: "Высокий",
   urgent: "Срочный",
 };
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i;
+const formatSize = (bytes: number) => {
+  if (!bytes) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
 const fieldLabels: Record<string, string> = {
   title: "Название",
   description: "Описание",
@@ -2496,20 +2504,76 @@ export function TaskDetail() {
                 {taskFiles.length === 0 ? (
                   <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 20 }}>Нет файлов</div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {taskFiles.map(file => (
-                      <div key={file.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border-color)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                          <span>📎</span>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>({(file.size / 1024).toFixed(1)} KB)</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+                    {taskFiles.map(file => {
+                      const isImage = IMAGE_EXT.test(file.name);
+                      const fileUrl = `${window.location.origin}/uploads/tasks/${task?.ticketNumber}/${encodeURIComponent(file.name)}`;
+                      return (
+                        <div
+                          key={file.name}
+                          onClick={() => (isImage ? setModalImage(fileUrl) : handleDownloadFile(file.name))}
+                          style={{
+                            padding: 16, borderRadius: 12, border: '1px solid var(--border-color)',
+                            background: 'var(--bg-color)', display: 'flex', alignItems: 'center', gap: 12,
+                            cursor: 'pointer', transition: 'all 0.15s', position: 'relative',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'var(--bg-hover)';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'var(--bg-color)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          {isImage ? (
+                            <img
+                              src={fileUrl}
+                              alt={file.name}
+                              loading="lazy"
+                              style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+                            />
+                          ) : (
+                            <div style={{ fontSize: 32, flexShrink: 0 }}>📄</div>
+                          )}
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{formatSize(file.size)}</div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDownloadFile(file.name); }}
+                              title="Скачать"
+                              style={{
+                                padding: '6px 8px', borderRadius: 6, border: 'none', background: '#007AFF',
+                                color: '#fff', cursor: 'pointer', fontSize: 12,
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteFile(file.name); }}
+                              title="Удалить"
+                              style={{
+                                padding: '6px 8px', borderRadius: 6, border: 'none', background: '#dc2626',
+                                color: '#fff', cursor: 'pointer', fontSize: 12,
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                              </svg>
+                            </button>
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button onClick={() => handleDownloadFile(file.name)} style={{ fontSize: 12, color: '#1565c0', background: 'none', border: 'none', cursor: 'pointer' }}>Скачать</button>
-                          <button onClick={() => handleDeleteFile(file.name)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>Удалить</button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
