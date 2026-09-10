@@ -53,6 +53,45 @@ function saveTokens(tokens: TochkaTokens) {
   fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2));
 }
 
+// Обновление пары токенов через refresh_token; true — удалось, false — нет refresh_token или банк отклонил
+async function refreshTokens(): Promise<boolean> {
+  const tokens = loadTokens();
+  if (!tokens?.refresh_token) return false;
+  try {
+    const refreshBody = `grant_type=refresh_token&client_id=${encodeURIComponent(TOCHKA_CLIENT_ID)}&client_secret=${encodeURIComponent(TOCHKA_CLIENT_SECRET)}&refresh_token=${encodeURIComponent(tokens.refresh_token)}`;
+    const tokenRes = await tokenRequest(refreshBody);
+    if (tokenRes.status !== 200) {
+      console.error('[Tochka] Refresh failed:', tokenRes.status, JSON.stringify(tokenRes.body).slice(0, 200));
+      return false;
+    }
+    const jwtExp = decodeJwtExp(tokenRes.body.access_token);
+    const expiresAt = jwtExp ? jwtExp * 1000 : Date.now() + (tokenRes.body.expires_in || 86400) * 1000;
+    saveTokens({
+      access_token: tokenRes.body.access_token,
+      refresh_token: tokenRes.body.refresh_token || tokens.refresh_token,
+      expires_at: expiresAt,
+      token_type: tokenRes.body.token_type || 'bearer',
+    });
+    return true;
+  } catch (err) {
+    console.error('[Tochka] Refresh error:', err);
+    return false;
+  }
+}
+
+// Заголовки авторизации; при отклонении токена банком (401/403) — авто-refresh и повтор, один раз
+async function authHeadersWithRetry(getResponse: (headers: Record<string, string>) => Promise<{ status: number; body: any; text: string }>): Promise<{ response: { status: number; body: any; text: string }; refreshed: boolean }> {
+  let tokens = loadTokens();
+  if (!tokens?.access_token) return { response: { status: 0, body: null, text: 'no token' }, refreshed: false };
+  const headers = () => ({ Authorization: `Bearer ${loadTokens()?.access_token || ''}` });
+  let response = await getResponse(headers());
+  if ((response.status === 401 || response.status === 403) && await refreshTokens()) {
+    response = await getResponse(headers());
+    return { response, refreshed: true };
+  }
+  return { response, refreshed: false };
+}
+
 function tochkaRequest(urlPath: string, options: { headers?: Record<string, string>; method?: string; body?: string } = {}): Promise<{ status: number; body: any; text: string }> {
   return new Promise((resolve, reject) => {
     const url = urlPath.startsWith('http') ? urlPath : `${TOCHKA_BASE}${urlPath}`;
@@ -205,24 +244,9 @@ router.get('/callback', async (req, res) => {
 router.post('/refresh', authMiddleware, async (_req, res) => {
   const tokens = loadTokens();
   if (!tokens?.refresh_token) return res.status(400).json({ error: 'No refresh token' });
-
-  try {
-    const refreshBody = `grant_type=refresh_token&client_id=${encodeURIComponent(TOCHKA_CLIENT_ID)}&client_secret=${encodeURIComponent(TOCHKA_CLIENT_SECRET)}&refresh_token=${encodeURIComponent(tokens.refresh_token)}`;
-    const tokenRes = await tokenRequest(refreshBody);
-    if (tokenRes.status !== 200) return res.status(500).json({ error: 'Refresh failed', details: tokenRes.body });
-
-    const jwtExp = decodeJwtExp(tokenRes.body.access_token);
-    const expiresAt = jwtExp ? jwtExp * 1000 : Date.now() + (tokenRes.body.expires_in || 86400) * 1000;
-    saveTokens({
-      access_token: tokenRes.body.access_token,
-      refresh_token: tokenRes.body.refresh_token || tokens.refresh_token,
-      expires_at: expiresAt,
-      token_type: tokenRes.body.token_type || 'bearer',
-    });
-    res.json({ status: 'ok', expires_at: expiresAt });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const ok = await refreshTokens();
+  if (!ok) return res.status(500).json({ error: 'Refresh failed' });
+  res.json({ status: 'ok', expires_at: loadTokens()?.expires_at });
 });
 
 // GET /api/tochka/status
@@ -237,8 +261,8 @@ router.get('/accounts', authMiddleware, async (_req, res) => {
     const tokens = loadTokens();
     if (!tokens?.access_token) return res.json({ accounts: [], totalBalance: 0, connected: false });
 
-    const headers = { Authorization: `Bearer ${tokens.access_token}` };
-    const dataRes = await tochkaRequest('/open-banking/v1.0/accounts', { headers });
+    // При 401/403 — авто-refresh и один повтор запроса
+    const { response: dataRes } = await authHeadersWithRetry((h) => tochkaRequest('/open-banking/v1.0/accounts', { headers: h }));
     if (dataRes.status !== 200) return res.json({ accounts: [], totalBalance: 0, error: `API ${dataRes.status}`, connected: true });
 
     const accounts = (dataRes.body?.Data?.Account || []).map((a: any) => ({
@@ -248,7 +272,9 @@ router.get('/accounts', authMiddleware, async (_req, res) => {
     let totalBalance = 0;
     for (const acc of accounts) {
       try {
-        const balRes = await tochkaRequest(`/open-banking/v1.0/accounts/${acc.id}/balances`, { headers });
+        // Всегда свежий токен (мог обновиться на шаге выше)
+        const freshHeaders = { Authorization: `Bearer ${loadTokens()?.access_token || ''}` };
+        const balRes = await tochkaRequest(`/open-banking/v1.0/accounts/${acc.id}/balances`, { headers: freshHeaders });
         if (balRes.status === 200) {
           const amount = parseFloat(balRes.body?.Data?.Balance?.[0]?.Amount?.amount || 0);
           acc.balance = amount; totalBalance += amount;
@@ -267,7 +293,8 @@ router.get('/customer', authMiddleware, async (_req, res) => {
     const tokens = loadTokens();
     if (!tokens?.access_token) return res.json({ name: '', inn: '', kpp: '', connected: false });
     const headers = { Authorization: `Bearer ${tokens.access_token}` };
-    const dataRes = await tochkaRequest('/open-banking/v1.0/customers', { headers });
+    // При 401/403 — авто-refresh и один повтор запроса
+    const { response: dataRes } = await authHeadersWithRetry((h) => tochkaRequest('/open-banking/v1.0/customers', { headers: h }));
     if (dataRes.status !== 200) return res.json({ name: '', inn: '', kpp: '', error: `API ${dataRes.status}`, connected: true });
     const customer = dataRes.body?.Data?.Customer?.[0];
     res.json({ name: customer?.name || '', inn: customer?.inn || '', kpp: customer?.kpp || '', connected: true });
