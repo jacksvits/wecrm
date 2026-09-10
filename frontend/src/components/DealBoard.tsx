@@ -3,13 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
 import { AIModal } from './AIModal';
-import { Deal, Contact, Status } from '../types';
+import { Deal, Contact, Status, Project } from '../types';
 
 export function DealBoard() {
   const [searchParams] = useSearchParams();
   const contactFilter = searchParams.get('contactId') || '';
   const [deals, setDeals] = useState<Deal[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [showAIModal, setShowAIModal] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -18,11 +19,12 @@ export function DealBoard() {
   const [showContactDropdown, setShowContactDropdown] = useState(false);
   const contactDropdownRef = useRef<HTMLDivElement>(null);
   const defaultStage = statuses.find(s => s.isDefault)?.name || statuses[0]?.name || 'lead';
-  const [form, setForm] = useState({ title: '', value: 0, stage: defaultStage, probability: 10, contactId: '' });
+  const [form, setForm] = useState({ title: '', value: 0, stage: defaultStage, probability: 10, contactId: '', projectId: '' });
 
   useEffect(() => {
     loadDeals();
     api.contacts.list().then(setContacts);
+    api.projects.list().then(setProjects);
     api.statuses.list('deal').then(setStatuses);
   }, [contactFilter]);
 
@@ -55,19 +57,20 @@ export function DealBoard() {
       stage: data.status || defaultStage,
       probability: 10,
       contactId: '',
+      projectId: '',
     });
     setShowModal(true);
   };
   const openCreate = () => {
     setEditingId(null);
-    setForm({ title: '', value: 0, stage: defaultStage, probability: 10, contactId: '' });
+    setForm({ title: '', value: 0, stage: defaultStage, probability: 10, contactId: '', projectId: '' });
     setContactSearch('');
     setShowModal(true);
   };
 
   const openEdit = (deal: Deal) => {
     setEditingId(deal.id);
-    setForm({ title: deal.title, value: deal.value, stage: deal.stage, probability: deal.probability, contactId: deal.contactId || '' });
+    setForm({ title: deal.title, value: deal.value, stage: deal.stage, probability: deal.probability, contactId: deal.contactId || '', projectId: deal.projectId || '' });
     const contact = deal.contact || contacts.find(c => c.id === deal.contactId);
     setContactSearch(contact?.name || '');
     setShowModal(true);
@@ -76,9 +79,11 @@ export function DealBoard() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
-      await api.deals.update(editingId, form);
+      // при редактировании пустое значение снимает привязку (null), иначе Prisma проигнорирует поле
+      await api.deals.update(editingId, { ...form, contactId: form.contactId || null, projectId: form.projectId || null });
     } else {
-      await api.deals.create(form);
+      // при создании пустые строки заменяем на undefined, чтобы не ловить нарушение внешнего ключа
+      await api.deals.create({ ...form, contactId: form.contactId || undefined, projectId: form.projectId || undefined });
     }
     setShowModal(false);
     loadDeals();
@@ -160,7 +165,7 @@ export function DealBoard() {
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, paddingRight: 40, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.title}</div>
                       <div style={{ fontSize: 14, fontWeight: 500 }}>₽{deal.value.toLocaleString()}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{deal.contact?.name} · {deal.probability}%</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{deal.project?.name ? `📁 ${deal.project.name} · ` : ''}{deal.contact?.name} · {deal.probability}%</div>
                     </div>
                   ))}
                 </div>
@@ -242,6 +247,13 @@ export function DealBoard() {
                   </div>
                 )}
               </div>
+              {/* Выбор проекта — только доступные для выбора (не заблокированные) */}
+              <select value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14, background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
+                <option value="">— Проект —</option>
+                {projects.filter(p => p.isLocked !== true).map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
                 <button type='button' onClick={() => setShowModal(false)} style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer' }}>Отмена</button>
                 <button type='submit' style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', cursor: 'pointer' }}>{editingId ? 'Сохранить' : 'Создать'}</button>
