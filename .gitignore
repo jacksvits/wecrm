@@ -37,7 +37,7 @@ yarn-error.log*
 *.sqlite3
 
 # Runtime data
-backend/data/pskovline.json
+backend/data/
 
 # Testing
 coverage/
