@@ -225,6 +225,16 @@ function getWidgetLabel(widget: WidgetDef, pskovlineSettings: any): string {
   return widget.label;
 }
 
+function msUntilNextDailyRefresh(hour: number): number {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(hour, 0, 0, 0);
+  if (next.getTime() <= now.getTime()) {
+    next.setDate(next.getDate() + 1);
+  }
+  return next.getTime() - now.getTime();
+}
+
 export function Director() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -268,12 +278,45 @@ export function Director() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  const loadPskovlineData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const [data, settings] = await Promise.all([
+        fetch("/api/pskovline").then(r => r.ok ? r.json() : null),
+        fetch("/api/pskovline/settings", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }).then(r => r.ok ? r.json() : null),
+      ]);
+      if (data?.accounts) {
+        setPskovlineData(data.accounts[0] || null);
+        setPskovlineData2(data.accounts[1] || null);
+      }
+      if (settings) setPskovlineSettings(settings);
+    } catch {}
+  };
+
   useEffect(() => {
     loadData();
     const interval = setInterval(() => {
       api.users.online().then(setOnlineUsers).catch(() => {});
     }, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Автоматическое обновление данных Псковлайн каждый день в 10:00
+  useEffect(() => {
+    let dailyTimeout: number | undefined;
+    let dailyInterval: number | undefined;
+
+    dailyTimeout = window.setTimeout(() => {
+      loadPskovlineData();
+      dailyInterval = window.setInterval(loadPskovlineData, 24 * 60 * 60 * 1000);
+    }, msUntilNextDailyRefresh(10));
+
+    return () => {
+      if (dailyTimeout !== undefined) window.clearTimeout(dailyTimeout);
+      if (dailyInterval !== undefined) window.clearInterval(dailyInterval);
+    };
   }, []);
 
   const loadData = async () => {
@@ -302,16 +345,8 @@ export function Director() {
           api.tochka.accounts().then(setTochkaAccounts).catch(() => {});
         }
       }).catch(() => {});
-      fetch("/api/pskovline").then(r => r.ok ? r.json() : null).then((data) => {
-        if (data?.accounts) {
-          setPskovlineData(data.accounts[0] || null);
-          setPskovlineData2(data.accounts[1] || null);
-        }
-      }).catch(() => {});
+      loadPskovlineData();
       const token = localStorage.getItem('token');
-      fetch("/api/pskovline/settings", {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      }).then(r => r.ok ? r.json() : null).then(setPskovlineSettings).catch(() => {});
       api.camera.getSettings().then((list: any[]) => setCameraSettingsList(list)).catch(() => {});
       fetch("/api/dashboard/task-finances", { headers: token ? { Authorization: `Bearer ${token}` } : {} })
         .then(r => r.ok ? r.json() : null)
@@ -1290,12 +1325,7 @@ export function Director() {
                       setPskovlineSettings(saved);
                       setShowPskovlineSettings(false);
                       // Перезагружаем данные
-                      fetch("/api/pskovline").then(r => r.ok ? r.json() : null).then((data) => {
-        if (data?.accounts) {
-          setPskovlineData(data.accounts[0] || null);
-          setPskovlineData2(data.accounts[1] || null);
-        }
-      }).catch(() => {});
+                      loadPskovlineData();
                     }
                   } catch {}
                 }}
