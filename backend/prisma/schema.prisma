@@ -42,6 +42,8 @@ model User {
   hideCompletedTasks Boolean @default(true)
   darkTheme         Boolean @default(false)
   canBeCurator      Boolean @default(false) @map("can_be_curator")
+  defaultTaskAssignee Boolean @default(false) @map("default_task_assignee")
+  defaultTaskCurator  Boolean @default(false) @map("default_task_curator")
   lastActiveAt DateTime? @map("last_active_at")
   allowedPages String[] @default([]) @map("allowed_pages")
 

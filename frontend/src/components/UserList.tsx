@@ -20,6 +20,8 @@ export function UserList() {
     password: "",
     roleId: "" as string,
     canBeCurator: false,
+    defaultTaskAssignee: false,
+    defaultTaskCurator: false,
     novofonExtension: "" as string,
   });
   useEffect(() => {
@@ -37,7 +39,7 @@ export function UserList() {
   };
   const openCreate = () => {
     setEditingId(null);
-    setForm({ name: "", email: "", password: "", roleId: roles[0]?.id || "", canBeCurator: false, novofonExtension: "" });
+    setForm({ name: "", email: "", password: "", roleId: roles[0]?.id || "", canBeCurator: false, defaultTaskAssignee: false, defaultTaskCurator: false, novofonExtension: "" });
     setError("");
     setShowModal(true);
   };
@@ -49,6 +51,8 @@ export function UserList() {
       password: "",
       roleId: u.roleId || "",
       canBeCurator: u.canBeCurator ?? false,
+      defaultTaskAssignee: u.defaultTaskAssignee ?? false,
+      defaultTaskCurator: u.defaultTaskCurator ?? false,
       novofonExtension: u.novofonExtension || "",
     });
     setError("");
@@ -59,7 +63,7 @@ export function UserList() {
     setError("");
     try {
       if (editingId) {
-        const data: any = { name: form.name, roleId: form.roleId || null, canBeCurator: form.canBeCurator, novofonExtension: form.novofonExtension || null };
+        const data: any = { name: form.name, roleId: form.roleId || null, canBeCurator: form.canBeCurator, defaultTaskAssignee: form.defaultTaskAssignee, defaultTaskCurator: form.defaultTaskCurator, novofonExtension: form.novofonExtension || null };
         if (form.email !== users.find((u) => u.id === editingId)?.email)
           data.email = form.email;
         await api.users.update(editingId, data);
@@ -480,6 +484,42 @@ export function UserList() {
                   }
                 />
                 Может быть куратором
+              </label>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={form.defaultTaskAssignee}
+                  onChange={(e) =>
+                    setForm({ ...form, defaultTaskAssignee: e.target.checked })
+                  }
+                />
+                Указывать исполнителем при создании новой задачи
+              </label>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={form.defaultTaskCurator}
+                  onChange={(e) =>
+                    setForm({ ...form, defaultTaskCurator: e.target.checked })
+                  }
+                />
+                Указывать куратором при создании новой задачи
               </label>
               <label style={{ display: 'block', marginTop: 12, fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>
                 Короткий номер Novofon

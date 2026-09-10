@@ -16,6 +16,8 @@ const createSchema = z.object({
   username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/, 'Username must be alphanumeric with underscores').optional(),
   roleId: z.string().optional(),
   canBeCurator: z.boolean().optional(),
+  defaultTaskAssignee: z.boolean().optional(),
+  defaultTaskCurator: z.boolean().optional(),
 });
 
 const updateSchema = z.object({
@@ -25,6 +27,8 @@ const updateSchema = z.object({
   username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/, 'Username must be alphanumeric with underscores').optional().nullable(),
   emails: z.array(z.string().email()).optional(),
   canBeCurator: z.boolean().optional(),
+  defaultTaskAssignee: z.boolean().optional(),
+  defaultTaskCurator: z.boolean().optional(),
   novofonExtension: z.string().optional().nullable(),
 });
 
@@ -37,7 +41,7 @@ const adminOnly = (req: AuthRequest, res: any, next: any) => {
 
 router.get('/', async (req, res) => {
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, username: true, emails: true, avatar: true, roleId: true, role: true, createdAt: true, lastActiveAt: true, canBeCurator: true, novofonExtension: true },
+    select: { id: true, name: true, email: true, username: true, emails: true, avatar: true, roleId: true, role: true, createdAt: true, lastActiveAt: true, canBeCurator: true, defaultTaskAssignee: true, defaultTaskCurator: true, novofonExtension: true },
     orderBy: { name: 'asc' },
   });
   res.json(users);
@@ -56,8 +60,8 @@ router.post('/', adminOnly, async (req: AuthRequest, res) => {
 
     const hash = await bcrypt.hash(data.password, 10);
     const user = await prisma.user.create({
-      data: { email: data.email, username: data.username || null, password: hash, name: data.name, roleId: data.roleId || null, canBeCurator: data.canBeCurator ?? false },
-      select: { id: true, name: true, email: true, username: true, emails: true, avatar: true, roleId: true, role: true, createdAt: true, lastActiveAt: true, canBeCurator: true, novofonExtension: true },
+      data: { email: data.email, username: data.username || null, password: hash, name: data.name, roleId: data.roleId || null, canBeCurator: data.canBeCurator ?? false, defaultTaskAssignee: data.defaultTaskAssignee ?? false, defaultTaskCurator: data.defaultTaskCurator ?? false },
+      select: { id: true, name: true, email: true, username: true, emails: true, avatar: true, roleId: true, role: true, createdAt: true, lastActiveAt: true, canBeCurator: true, defaultTaskAssignee: true, defaultTaskCurator: true, novofonExtension: true },
     });
     res.status(201).json(user);
   } catch (err: any) {
@@ -71,7 +75,7 @@ router.patch('/:id', adminOnly, async (req: AuthRequest, res) => {
     const user = await prisma.user.update({
       where: { id: req.params.id },
       data,
-      select: { id: true, name: true, email: true, username: true, emails: true, avatar: true, roleId: true, role: true, createdAt: true, lastActiveAt: true, canBeCurator: true, novofonExtension: true },
+      select: { id: true, name: true, email: true, username: true, emails: true, avatar: true, roleId: true, role: true, createdAt: true, lastActiveAt: true, canBeCurator: true, defaultTaskAssignee: true, defaultTaskCurator: true, novofonExtension: true },
     });
     res.json(user);
   } catch (err: any) {

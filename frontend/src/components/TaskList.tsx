@@ -151,6 +151,14 @@ export function TaskList() {
     setViewMode(mode);
     localStorage.setItem("taskViewMode", mode);
   };
+  // Автоподстановка отмеченных пользователей при создании новой задачи
+  const defaultAssigneeIds = () =>
+    users.filter((u) => u.defaultTaskAssignee).map((u) => u.id);
+  const defaultCuratorIds = () =>
+    users
+      .filter((u) => u.defaultTaskCurator && u.canBeCurator)
+      .map((u) => u.id);
+
   const handleAIGenerateTask = (data: any) => {
     setEditingId(null);
     setPreselectedParentId(null);
@@ -160,8 +168,8 @@ export function TaskList() {
       status: data.status || defaultStatus,
       priority: data.priority || "medium",
       dueDate: data.dueDate || "",
-      assigneeIds: [],
-      curatorIds: [],
+      assigneeIds: defaultAssigneeIds(),
+      curatorIds: defaultCuratorIds(),
       projectId: "",
       parentId: "",
     });
@@ -177,8 +185,8 @@ export function TaskList() {
       status: defaultStatus,
       priority: "medium",
       dueDate: "",
-      assigneeIds: [],
-      curatorIds: [],
+      assigneeIds: defaultAssigneeIds(),
+      curatorIds: defaultCuratorIds(),
       projectId: "",
       parentId: parentId || "",
     });
