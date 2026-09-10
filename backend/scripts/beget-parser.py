@@ -18,6 +18,11 @@ else:
     OUTPUT_JSON = os.path.join(SCRIPT_DIR, "..", "data", "beget.json")
 
 
+def _to_float(s: str) -> float:
+    """Преобразует '2 514,54' / '2\xa0514.54' в float (устойчиво к неразрывному пробелу)."""
+    return float(s.replace('\xa0', ' ').replace(' ', '').replace(',', '.'))
+
+
 def parse_beget():
     # Запускаем Xvfb
     os.system("pkill Xvfb 2>/dev/null; sleep 1; nohup Xvfb :99 -screen 0 1280x720x24 -ac > /dev/null 2>&1 & sleep 2")
@@ -61,14 +66,20 @@ def parse_beget():
             text = page.inner_text('body')
 
             # Баланс
-            m = re.search(r'Баланс:\s*([0-9\s]+[.,][0-9]+)\s*₽', text)
+            m = re.search(r'Баланс:\s*([0-9\s\xa0]+[.,][0-9]+)\s*₽', text)
             if m:
-                result["balance"] = float(m.group(1).replace(' ', '').replace(',', '.'))
+                try:
+                    result["balance"] = _to_float(m.group(1))
+                except ValueError:
+                    pass
 
             # Активные рефералы
             m = re.search(r'Активные рефералы:\s*(\d+)', text)
             if m:
-                result["active_referrals"] = int(m.group(1))
+                try:
+                    result["active_referrals"] = int(m.group(1))
+                except ValueError:
+                    pass
 
             # Последняя транзакция
             m = re.search(r'Последняя транзакция:\s*(\d{2}\.\d{2}\.\d{4})', text)
@@ -78,7 +89,10 @@ def parse_beget():
             # Сумма транзакции
             m = re.search(r'Сумма транзакции:\s*([0-9\s\xa0]+[.,][0-9]+)\s*₽', text)
             if m:
-                result["last_transaction_amount"] = float(m.group(1).replace(' ', '').replace('\xa0', '').replace(',', '.'))
+                try:
+                    result["last_transaction_amount"] = _to_float(m.group(1))
+                except ValueError:
+                    pass
 
             if result["balance"] is not None:
                 result["status"] = "ok"
