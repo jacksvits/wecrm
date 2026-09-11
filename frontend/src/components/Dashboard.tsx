@@ -70,7 +70,7 @@ export function Dashboard() {
     return taskStatus?.isActive !== false;
   }).length;
 
-  const metrics = [
+  const metrics: Array<{ label: string; value: string; delta: string; path?: string; avatars?: Array<{ id: string; name: string; avatar?: string | null }> }> = [
     { 
       label: 'Мои задачи', 
       value: String(activeMyTasks.length), 
@@ -85,6 +85,13 @@ export function Dashboard() {
     },
     { label: 'Просрочено', value: String(stats.metrics?.overdueTasks ?? 0), delta: 'задач', path: `/tasks?filter=overdue&assigneeId=${user?.id ?? ''}&hideCompleted=true` },
     { label: 'Онлайн', value: String(stats.metrics?.onlineUsers ?? 0), delta: 'сейчас', avatars: stats.onlineUsersList || [], path: '/users' },
+    // Балансы счетов Точка Банк, привязанных к текущему пользователю (Настройки → Точка Банк)
+    ...(stats.tochkaBalances || []).map((b) => ({
+      label: b.name,
+      value: b.balance.toLocaleString('ru-RU', { maximumFractionDigits: 0 }) + ' ₽',
+      delta: 'баланс счёта',
+      path: undefined as string | undefined,
+    })),
   ];
 
   return (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { User } from '../types';
 
 const INTERVALS = [
   { value: 5, label: '5 минут' },
@@ -14,6 +15,8 @@ export default function TochkaSettings() {
   const [state, setState] = useState<any>(null);
   const [msg, setMsg] = useState('');
   const [connecting, setConnecting] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [accountUsers, setAccountUsers] = useState<Record<string, string>>({});
 
   const load = () => {
     api.tochkaPlugin.get().then(setState).catch((e: any) => setMsg('Ошибка загрузки: ' + e.message));
@@ -21,6 +24,12 @@ export default function TochkaSettings() {
 
   useEffect(() => {
     load();
+    api.users.list().then(setUsers).catch(() => {});
+    const token = localStorage.getItem('token');
+    fetch('/api/tochka/account-users', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((m) => setAccountUsers(m || {}))
+      .catch(() => {});
     if (window.location.search.includes('tochka=connected')) {
       window.history.replaceState({}, '', '/settings');
       setMsg('Банк подключён');
@@ -71,6 +80,26 @@ export default function TochkaSettings() {
         body: JSON.stringify({ order }),
       });
       load();
+    } catch (e: any) {
+      setMsg('Ошибка: ' + e.message);
+    }
+  };
+
+  // Привязка счёта к пользователю CRM (только админ; пустой userId — отвязать)
+  const linkAccount = async (accountId: string, userId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('/api/tochka/account-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ accountId, userId }),
+      });
+      setAccountUsers((prev) => {
+        const next = { ...prev };
+        if (userId) next[accountId] = userId;
+        else delete next[accountId];
+        return next;
+      });
     } catch (e: any) {
       setMsg('Ошибка: ' + e.message);
     }
@@ -193,6 +222,16 @@ export default function TochkaSettings() {
                   placeholder="Название счёта"
                 />
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>••{acc.short}</div>
+                <select
+                  value={accountUsers[acc.id] || ''}
+                  onChange={(e) => linkAccount(acc.id, e.target.value)}
+                  style={{ ...inputStyle, marginTop: 6, fontSize: 12, cursor: 'pointer' }}
+                >
+                  <option value=''>— не привязан к пользователю —</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
               </div>
               <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap' }}>
                 {(acc.balance ?? 0).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ₽

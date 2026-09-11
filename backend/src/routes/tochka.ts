@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
@@ -11,6 +11,7 @@ const TOCHKA_BASE = 'https://enter.tochka.com/uapi';
 const TOKEN_FILE = path.join('/app/data', 'tochka_tokens.json');
 const ACCOUNT_NAMES_FILE = path.join('/app/data', 'tochka_account_names.json');
 const ACCOUNT_ORDER_FILE = path.join('/app/data', 'tochka_account_order.json');
+const ACCOUNT_USERS_FILE = path.join('/app/data', 'tochka_account_users.json');
 const TOCHKA_CLIENT_ID = process.env.TOCHKA_CLIENT_ID || '';
 const TOCHKA_CLIENT_SECRET = process.env.TOCHKA_CLIENT_SECRET || '';
 const TOCHKA_REDIRECT_URI = process.env.TOCHKA_REDIRECT_URI || 'https://welans.cc/api/tochka/callback';
@@ -89,6 +90,25 @@ function saveAccountOrder(order: string[]) {
   fs.mkdirSync(path.dirname(ACCOUNT_ORDER_FILE), { recursive: true });
   fs.writeFileSync(ACCOUNT_ORDER_FILE, JSON.stringify(order, null, 2));
 }
+
+// Связь счётов с пользователями CRM (accountId -> userId), задаётся администратором в настройках плагина
+function loadAccountUsers(): Record<string, string> {
+  try {
+    if (fs.existsSync(ACCOUNT_USERS_FILE)) {
+      return JSON.parse(fs.readFileSync(ACCOUNT_USERS_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.error('[Tochka] Failed to load account users:', e);
+  }
+  return {};
+}
+
+function saveAccountUsers(mapping: Record<string, string>) {
+  fs.mkdirSync(path.dirname(ACCOUNT_USERS_FILE), { recursive: true });
+  fs.writeFileSync(ACCOUNT_USERS_FILE, JSON.stringify(mapping, null, 2));
+}
+
+export { loadAccountUsers };
 
 // Обновление пары токенов через refresh_token; true — удалось, false — нет refresh_token или банк отклонил
 async function refreshTokens(): Promise<boolean> {
@@ -397,6 +417,26 @@ router.post('/account-order', authMiddleware, (req, res) => {
   if (!Array.isArray(order)) return res.status(400).json({ error: 'order must be an array' });
   saveAccountOrder(order.filter((id) => typeof id === 'string'));
   res.json({ status: 'ok', order: loadAccountOrder() });
+});
+
+// GET /api/tochka/account-users — связь счётов с пользователями (accountId -> userId)
+router.get('/account-users', authMiddleware, (_req, res) => {
+  res.json(loadAccountUsers());
+});
+
+// POST /api/tochka/account-users — привязать счёт к пользователю { accountId, userId }; пустой userId — отвязать (только админ)
+router.post('/account-users', authMiddleware, (req: AuthRequest, res) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Только администратор' });
+  }
+  const { accountId, userId } = req.body || {};
+  if (!accountId || typeof accountId !== 'string') return res.status(400).json({ error: 'accountId is required' });
+  const mapping = loadAccountUsers();
+  const trimmed = String(userId || '').trim();
+  if (trimmed) mapping[accountId] = trimmed;
+  else delete mapping[accountId];
+  saveAccountUsers(mapping);
+  res.json({ status: 'ok', mapping });
 });
 
 // GET /api/tochka/customer

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { getTochkaState, loadAccountUsers } from './tochka.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -34,7 +35,25 @@ router.get('/stats', async (req: AuthRequest, res) => {
     _count: { id: true },
   });
 
+  // Балансы счетов Точка Банк, привязанных к текущему пользователю (accountId -> userId)
+  let tochkaBalances: Array<{ id: string; name: string; balance: number }> = [];
+  try {
+    const accountUsers = loadAccountUsers();
+    const myAccountIds = Object.keys(accountUsers).filter((accId) => accountUsers[accId] === req.user!.id);
+    if (myAccountIds.length > 0) {
+      const state = await getTochkaState();
+      const byId = new Map((state.accounts || []).map((a: any) => [a.id, a]));
+      tochkaBalances = myAccountIds
+        .map((accId) => byId.get(accId))
+        .filter(Boolean)
+        .map((a: any) => ({ id: a.id, name: a.name, balance: a.balance ?? 0 }));
+    }
+  } catch (e) {
+    console.error('[dashboard] tochka balances error:', (e as any).message);
+  }
+
   res.json({
+    tochkaBalances,
     metrics: {
       activeTasks,
       overdueTasks,
