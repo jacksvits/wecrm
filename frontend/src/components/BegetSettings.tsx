@@ -169,6 +169,9 @@ export default function BegetSettings() {
         }}
       >
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Данные аккаунта</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+          Данные обновляются ежедневно в 10:00 (по времени сервера)
+        </div>
         {account ? (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
