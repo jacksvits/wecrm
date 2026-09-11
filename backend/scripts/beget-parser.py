@@ -41,6 +41,28 @@ if _settings.get("is_active") is False:
 # Креды берутся из настроек плагина (синхронизируются бэкендом), иначе — дефолтные
 BEGET_LOGIN = _settings.get("login") or "softboeg"
 BEGET_PASSWORD = _settings.get("password") or "nyBNQofDm96"
+UPDATE_TIME = _settings.get("update_time") or "10:00"
+
+# Запуск не чаще раза в день, не раньше заданного времени (cron вызывает скрипт ежечасно)
+_now = datetime.now()
+try:
+    _hh, _mm = map(int, UPDATE_TIME.split(":"))
+except ValueError:
+    _hh, _mm = 10, 0
+_scheduled = _now.replace(hour=_hh, minute=_mm, second=0, microsecond=0)
+if _now < _scheduled:
+    print(f"[{_now:%Y-%m-%d %H:%M:%S}] Ранее времени обновления {UPDATE_TIME}, пропуск")
+    raise SystemExit(0)
+try:
+    with open(OUTPUT_JSON, encoding="utf-8") as _f:
+        _last = datetime.fromisoformat(json.load(_f).get("updated_at"))
+    if _last >= _scheduled:
+        print(f"[{_now:%Y-%m-%d %H:%M:%S}] Данные уже собраны после {UPDATE_TIME}, пропуск")
+        raise SystemExit(0)
+except SystemExit:
+    raise
+except Exception:
+    pass  # файла ещё нет — собираем
 
 # Поля личного кабинета, забираемые из API
 API_FIELDS = (

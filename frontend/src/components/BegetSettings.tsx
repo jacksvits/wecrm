@@ -3,7 +3,7 @@ import { api } from '../api/client';
 
 // === Плагин Beget (хостинг): настройки доступа + данные аккаунта ===
 export default function BegetSettings() {
-  const [settings, setSettings] = useState<{ login: string; hasPassword: boolean; isActive: boolean; isPartner: boolean } | null>(null);
+  const [settings, setSettings] = useState<{ login: string; hasPassword: boolean; isActive: boolean; isPartner: boolean; updateTime: string } | null>(null);
   const [account, setAccount] = useState<any>(null);
   const [form, setForm] = useState({ login: '', password: '' });
   const [saving, setSaving] = useState(false);
@@ -45,6 +45,24 @@ export default function BegetSettings() {
       setTimeout(() => setMsg(''), 3000);
     } catch (err: any) {
       setSettings({ ...settings, isPartner: !checked });
+      setMsg('Ошибка: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Время ежедневного обновления данных (автосохранение)
+  const saveUpdateTime = async (value: string) => {
+    if (!settings || !/^\d{2}:\d{2}$/.test(value) || value === settings.updateTime) return;
+    setSettings({ ...settings, updateTime: value });
+    setSaving(true);
+    try {
+      const res: any = await api.begetSettings.save({ isActive: settings.isActive, updateTime: value });
+      setSettings(res);
+      setMsg(`Ежедневное обновление: ${value}`);
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err: any) {
+      setSettings({ ...settings, updateTime: settings.updateTime });
       setMsg('Ошибка: ' + err.message);
     } finally {
       setSaving(false);
@@ -113,6 +131,29 @@ export default function BegetSettings() {
       </label>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20 }}>
         Показывать виджет «Бегет-Партнёр» на странице директора и собирать партнёрские данные
+      </div>
+
+      {/* Время ежедневного обновления данных */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 500 }}>Ежедневное обновление данных</label>
+        <input
+          type="time"
+          value={settings?.updateTime ?? '10:00'}
+          onChange={(e) => saveUpdateTime(e.target.value)}
+          disabled={!settings || saving}
+          style={{
+            padding: '8px 12px',
+            borderRadius: 8,
+            border: '1px solid var(--border-color)',
+            background: 'var(--bg-input)',
+            color: 'var(--text-primary)',
+            fontSize: 13,
+            outline: 'none',
+          }}
+        />
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+          Данные аккаунта собираются один раз в день в указанное время
+        </div>
       </div>
 
       {/* Учётные данные */}
