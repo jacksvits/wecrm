@@ -9,7 +9,7 @@ router.use(authMiddleware);
 // GET /api/integrations/status — статус активности интеграций («плагинов»)
 router.get('/status', async (_req, res) => {
   try {
-    const [email, telephony, max, telegram, vk, yandex, beget] = await Promise.all([
+    const [email, telephony, max, telegram, vk, yandex, beget, pskovline] = await Promise.all([
       prisma.emailSettings.findFirst({ select: { isActive: true } }),
       prisma.telephonySettings.findFirst({ select: { isActive: true } }),
       prisma.maxSettings.findFirst({ select: { isActive: true } }),
@@ -17,6 +17,7 @@ router.get('/status', async (_req, res) => {
       prisma.vkGroupSettings.findFirst({ select: { isActive: true } }),
       prisma.yandexSettings.findFirst({ select: { apiKey: true } }),
       prisma.begetSettings.findFirst({ select: { isActive: true } }),
+      prisma.pskovlinePluginSettings.findFirst({ select: { isActive: true } }),
     ]);
     res.json({
       email: email?.isActive ?? false,
@@ -28,6 +29,7 @@ router.get('/status', async (_req, res) => {
       sms: telephony?.isActive ?? false,
       yandex: !!yandex?.apiKey,
       beget: beget?.isActive ?? false,
+      pskovline: pskovline?.isActive ?? false,
     });
   } catch (err: any) {
     console.error('[integrations] status error:', err.message);

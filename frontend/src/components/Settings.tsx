@@ -11,10 +11,11 @@ import { ContactTypeManager } from "./ContactTypeManager";
 import { SmsJournal } from "./SmsJournal";
 import { YandexSettings } from "./YandexSettings";
 import BegetSettings from "./BegetSettings";
+import PskovlineSettings from "./PskovlineSettings";
 import { SystemSettings } from "./SystemSettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "integrations" | "system";
-type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "beget";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "beget" | "pskovline";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
 const PLUGINS: { key: PluginKey; label: string; group: string; description: string }[] = [
@@ -26,6 +27,7 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "vk", label: "ВК Группа", group: "Мессенджеры", description: "Комментарии и товары ВКонтакте" },
   { key: "yandex", label: "Яндекс", group: "Сервисы", description: "API-ключ Яндекс.Карт" },
   { key: "beget", label: "Beget", group: "Хостинг", description: "Хостинг-аккаунт: тариф, баланс, домены" },
+  { key: "pskovline", label: "Псковлайн", group: "Провайдер", description: "Баланс лицевых счетов провайдера" },
 ];
 
 function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
@@ -38,6 +40,7 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
     vk: "M18 4h3v3h-3a4 4 0 00-4 4v2h4l-1 4h-3v7h-4v-7H7v-4h4v-3a6 6 0 016-6z",
     yandex: "M9 20l6-16M15 20L9 4",
     beget: "M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01",
+    pskovline: "M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20",
   };
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -64,6 +67,8 @@ function renderPluginSettings(pluginKey: PluginKey) {
       return <YandexSettings />;
     case "beget":
       return <BegetSettings />;
+    case "pskovline":
+      return <PskovlineSettings />;
     default:
       return null;
   }
@@ -81,6 +86,7 @@ export function Settings() {
     sms: false,
     yandex: false,
     beget: false,
+    pskovline: false,
   });
 
   useEffect(() => {

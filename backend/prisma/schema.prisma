@@ -1016,3 +1016,22 @@ model BegetSettings {
 
   @@map("beget_settings")
 }
+
+model PskovlinePluginSettings {
+  id         Int      @id @default(1)
+  isActive   Boolean  @default(false) @map("is_active")
+  updateTime String   @default("08:00") @map("update_time")
+  updatedAt  DateTime @default(now()) @map("updated_at")
+
+  @@map("pskovline_plugin_settings")
+}
+
+model PskovlinePluginAccount {
+  id        Int    @id @default(autoincrement())
+  label     String @default("")
+  login     String @default("")
+  password  String @default("")
+  sortOrder Int    @default(0) @map("sort_order")
+
+  @@map("pskovline_plugin_accounts")
+}

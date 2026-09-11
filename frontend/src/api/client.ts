@@ -43,6 +43,10 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     account: () => fetchApi('/api/beget/account'),
     domains: () => fetchApi('/api/beget/domains'),
   },
+  pskovlinePlugin: {
+    get: () => fetchApi('/api/pskovline-plugin'),
+    save: (data: any) => fetchApi('/api/pskovline-plugin', { method: 'POST', body: JSON.stringify(data) }),
+  },
   begetSettings: {
     get: () => fetchApi('/api/beget-settings'),
     save: (data: { login?: string; password?: string; isActive: boolean; isPartner?: boolean; updateTime?: string }) =>

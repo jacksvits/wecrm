@@ -53,8 +53,6 @@ const ALL_WIDGETS: WidgetDef[] = [
   // === Вкладка: Бухгалтерия ===
   { id: "stat-tochka", size: "small", label: "Точка Банк", tab: "Бухгалтерия" },
   { id: "widget-tochka", size: "medium", label: "Точка Банк детали", tab: "Бухгалтерия" },
-  { id: "stat-pskovline", size: "small", label: "Интернет - Чехова 6", tab: "Бухгалтерия" },
-  { id: "stat-pskovline-2", size: "small", label: "Телефон - 211323", tab: "Бухгалтерия" },
   { id: "widget-beget-partner", size: "medium", label: "Бегет-Партнёр", tab: "Бухгалтерия" },
   { id: "widget-beget", size: "medium", label: "Beget детали", tab: "Бухгалтерия" },
   { id: "stat-task-profit", size: "small", label: "Прибыль по задачам", tab: "Бухгалтерия" },
@@ -215,16 +213,6 @@ function SortableWidget({
   );
 }
 
-function getWidgetLabel(widget: WidgetDef, pskovlineSettings: any): string {
-  if (widget.id === "stat-pskovline" && pskovlineSettings?.label) {
-    return pskovlineSettings.label;
-  }
-  if (widget.id === "stat-pskovline-2" && pskovlineSettings?.label2) {
-    return pskovlineSettings.label2;
-  }
-  return widget.label;
-}
-
 function msUntilNextDailyRefresh(hour: number, minute = 0): number {
   const now = new Date();
   const next = new Date(now);
@@ -252,10 +240,8 @@ export function Director() {
   // Переименование счетов Точки прямо в виджете
   const [editingTochkaAccountId, setEditingTochkaAccountId] = useState<string | null>(null);
   const [tochkaNameDraft, setTochkaNameDraft] = useState("");
-  const [pskovlineData, setPskovlineData] = useState<any>(null);
-  const [pskovlineData2, setPskovlineData2] = useState<any>(null);
-  const [pskovlineSettings, setPskovlineSettings] = useState<any>(null);
-  const [showPskovlineSettings, setShowPskovlineSettings] = useState(false);
+  const [pskovlinePlugin, setPskovlinePlugin] = useState<any>(null);
+  const [pskovlineAccountsData, setPskovlineAccountsData] = useState<any[]>([]);
   const [cameraSettingsList, setCameraSettingsList] = useState<any[]>([]);
   const [editingCameraIndex, setEditingCameraIndex] = useState<number | null>(null);
   const [fullscreenCamera, setFullscreenCamera] = useState<{ id: string; label: string } | null>(null);
@@ -288,18 +274,11 @@ export function Director() {
 
   const loadPskovlineData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const [data, settings] = await Promise.all([
-        fetch("/api/pskovline").then(r => r.ok ? r.json() : null),
-        fetch("/api/pskovline/settings", {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        }).then(r => r.ok ? r.json() : null),
-      ]);
-      if (data?.accounts) {
-        setPskovlineData(data.accounts[0] || null);
-        setPskovlineData2(data.accounts[1] || null);
-      }
-      if (settings) setPskovlineSettings(settings);
+      const data = await fetch("/api/pskovline").then(r => r.ok ? r.json() : null);
+      setPskovlineAccountsData(data?.accounts || []);
+    } catch { setPskovlineAccountsData([]); }
+    try {
+      api.pskovlinePlugin.get().then(setPskovlinePlugin).catch(() => {});
     } catch {}
   };
 
@@ -460,7 +439,19 @@ export function Director() {
     saveHidden(new Set());
   };
 
-  const tabWidgets = ALL_WIDGETS.filter((w) => w.tab === activeTab);
+  // Виджеты Псковлайн: по одному на каждый аккаунт плагина (вкладка «Бухгалтерия»)
+  const pskovlineActive = pskovlinePlugin?.isActive === true;
+  const pskovlineWidgets: WidgetDef[] = pskovlineActive && (pskovlinePlugin?.accounts?.length || 0) > 0
+    ? pskovlinePlugin.accounts.map((a: any, i: number) => ({
+        id: `stat-pskovline-${i}`,
+        size: "small",
+        label: a.label || `Псковлайн ${i + 1}`,
+        tab: "Бухгалтерия",
+      }))
+    : [];
+  const ALL_WIDGETS_EFF: WidgetDef[] = [...ALL_WIDGETS, ...pskovlineWidgets];
+
+  const tabWidgets = ALL_WIDGETS_EFF.filter((w) => w.tab === activeTab);
 
   // Виджеты Beget зависят от плагина: неактивен плагин — нет виджетов;
   // «Бегет-Партнёр» дополнительно требует галочку «Партнёр»
@@ -469,16 +460,35 @@ export function Director() {
   const widgetAllowed = (w: WidgetDef) => {
     if (w.id === "widget-beget") return begetActive;
     if (w.id === "widget-beget-partner") return begetActive && begetPartner;
+    if (w.id.startsWith("stat-pskovline")) {
+      const idx = Number(w.id.replace("stat-pskovline-", "")) || 0;
+      return pskovlineActive && idx < (pskovlinePlugin?.accounts?.length || 0);
+    }
     return true;
   };
 
   const visibleWidgets = widgetOrder
-    .map((id) => ALL_WIDGETS.find((w) => w.id === id))
+    .map((id) => ALL_WIDGETS_EFF.find((w) => w.id === id))
     .filter((w): w is WidgetDef => !!w && !hidden.has(w.id) && w.tab === activeTab && widgetAllowed(w));
 
-  const hiddenWidgets = ALL_WIDGETS.filter((w) => hidden.has(w.id) && w.tab === activeTab && widgetAllowed(w));
+  const hiddenWidgets = ALL_WIDGETS_EFF.filter((w) => hidden.has(w.id) && w.tab === activeTab && widgetAllowed(w));
 
   const renderWidgetContent = (widget: WidgetDef) => {
+    // Виджеты Псковлайн: по индексу из id, данные — из массива аккаунтов
+    if (widget.id.startsWith("stat-pskovline")) {
+      const idx = Number(widget.id.replace("stat-pskovline-", "")) || 0;
+      const data = pskovlineAccountsData[idx];
+      const label = pskovlinePlugin?.accounts?.[idx]?.label || `Псковлайн ${idx + 1}`;
+      return (
+        <>
+          <div style={{ fontSize: 28, fontWeight: 700, color: idx % 2 === 0 ? "#10b981" : "#2563eb", marginBottom: 4 }}>
+            {data?.balance !== null && data?.balance !== undefined ? `${Number(data.balance).toFixed(2)} ₽` : "—"}
+          </div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{label}</div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, opacity: 0.7 }}>{data?.period || "—"}</div>
+        </>
+      );
+    }
     switch (widget.id) {
       case "stat-active-tasks":
         return (
@@ -563,60 +573,6 @@ export function Director() {
             >
               Подключить
             </button>
-          </>
-        );
-      case "stat-pskovline":
-        return (
-          <>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "#10b981", marginBottom: 4 }}>
-              {pskovlineData?.balance !== null && pskovlineData?.balance !== undefined ? `${pskovlineData.balance.toFixed(2)} ₽` : "—"}
-            </div>
-            <div style={{ fontSize: 13, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
-              {pskovlineSettings?.label || "Псковлайн"}
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowPskovlineSettings(true); }}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  padding: 2, opacity: 0.5, transition: "opacity 0.15s",
-                  color: "var(--text-muted)", fontSize: 12,
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
-                onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
-                title="Настройки"
-              >
-                ⚙️
-              </button>
-            </div>
-            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, opacity: 0.7 }}>
-              {pskovlineData?.period || "—"}
-            </div>
-          </>
-        );
-      case "stat-pskovline-2":
-        return (
-          <>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "#2563eb", marginBottom: 4 }}>
-              {pskovlineData2?.balance !== null && pskovlineData2?.balance !== undefined ? `${pskovlineData2.balance.toFixed(2)} ₽` : "—"}
-            </div>
-            <div style={{ fontSize: 13, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
-              {pskovlineSettings?.label2 || "Псковлайн телефон"}
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowPskovlineSettings(true); }}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  padding: 2, opacity: 0.5, transition: "opacity 0.15s",
-                  color: "var(--text-muted)", fontSize: 12,
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
-                onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
-                title="Настройки"
-              >
-                ⚙️
-              </button>
-            </div>
-            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, opacity: 0.7 }}>
-              {pskovlineData2?.period || "—"}
-            </div>
           </>
         );
       case "widget-online":
@@ -1323,7 +1279,7 @@ export function Director() {
                     style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#007AFF" }}
                   />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{getWidgetLabel(widget, pskovlineSettings)}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{widget.label}</div>
                     <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
                       {widget.size === "small" ? "Маленькая" : widget.size === "medium" ? "Средняя" : "Большая"}
                     </div>
@@ -1368,141 +1324,7 @@ export function Director() {
         </div>
       ) : null}
 
-      {/* Модальное окно настроек Псковлайн */}
-      {showPskovlineSettings && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0,0,0,0.4)", zIndex: 100,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: "max(16px, env(safe-area-inset-top, 0)) max(16px, env(safe-area-inset-right, 0)) max(16px, env(safe-area-inset-bottom, 0)) max(16px, env(safe-area-inset-left, 0))",
-        }} onClick={() => setShowPskovlineSettings(false)}>
-          <div style={{
-            background: "var(--bg-card)", borderRadius: 16, padding: 24,
-            width: "100%", maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-            border: "1px solid var(--border-color)",
-          }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 600 }}>Настройки Псковлайн</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Название виджета</label>
-                <input
-                  type="text"
-                  value={pskovlineSettings?.label || ""}
-                  onChange={(e) => setPskovlineSettings((s: any) => ({ ...s, label: e.target.value }))}
-                  style={{
-                    width: "100%", padding: "10px 12px", borderRadius: 10,
-                    border: "1px solid var(--border-color)", background: "var(--bg-input)",
-                    color: "var(--text-primary)", fontSize: 14,
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Логин</label>
-                <input
-                  type="text"
-                  value={pskovlineSettings?.login || ""}
-                  onChange={(e) => setPskovlineSettings((s: any) => ({ ...s, login: e.target.value }))}
-                  style={{
-                    width: "100%", padding: "10px 12px", borderRadius: 10,
-                    border: "1px solid var(--border-color)", background: "var(--bg-input)",
-                    color: "var(--text-primary)", fontSize: 14,
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Пароль</label>
-                <input
-                  type="password"
-                  value={pskovlineSettings?.password || ""}
-                  onChange={(e) => setPskovlineSettings((s: any) => ({ ...s, password: e.target.value }))}
-                  style={{
-                    width: "100%", padding: "10px 12px", borderRadius: 10,
-                    border: "1px solid var(--border-color)", background: "var(--bg-input)",
-                    color: "var(--text-primary)", fontSize: 14,
-                  }}
-                />
-              </div>
-            </div>
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border-color)" }}>
-              <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600 }}>Второй аккаунт</h4>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Название</label>
-                  <input
-                    type="text"
-                    value={pskovlineSettings?.label2 || ""}
-                    onChange={(e) => setPskovlineSettings((s: any) => ({ ...s, label2: e.target.value }))}
-                    style={{
-                      width: "100%", padding: "10px 12px", borderRadius: 10,
-                      border: "1px solid var(--border-color)", background: "var(--bg-input)",
-                      color: "var(--text-primary)", fontSize: 14,
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Логин</label>
-                  <input
-                    type="text"
-                    value={pskovlineSettings?.login2 || ""}
-                    onChange={(e) => setPskovlineSettings((s: any) => ({ ...s, login2: e.target.value }))}
-                    style={{
-                      width: "100%", padding: "10px 12px", borderRadius: 10,
-                      border: "1px solid var(--border-color)", background: "var(--bg-input)",
-                      color: "var(--text-primary)", fontSize: 14,
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Пароль</label>
-                  <input
-                    type="password"
-                    value={pskovlineSettings?.password2 || ""}
-                    onChange={(e) => setPskovlineSettings((s: any) => ({ ...s, password2: e.target.value }))}
-                    style={{
-                      width: "100%", padding: "10px 12px", borderRadius: 10,
-                      border: "1px solid var(--border-color)", background: "var(--bg-input)",
-                      color: "var(--text-primary)", fontSize: 14,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setShowPskovlineSettings(false)}
-                style={{
-                  padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border-color)",
-                  background: "var(--bg-input)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer",
-                }}
-              >Отмена</button>
-              <button
-                onClick={async () => {
-                  try {
-                    const token = localStorage.getItem('token');
-                    const res = await fetch('/api/pskovline/settings', {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                      body: JSON.stringify(pskovlineSettings),
-                    });
-                    if (res.ok) {
-                      const saved = await res.json();
-                      setPskovlineSettings(saved);
-                      setShowPskovlineSettings(false);
-                      // Перезагружаем данные
-                      loadPskovlineData();
-                    }
-                  } catch {}
-                }}
-                style={{
-                  padding: "8px 16px", borderRadius: 10, border: "none",
-                  background: "#007AFF", color: "#fff", fontSize: 13, cursor: "pointer", fontWeight: 500,
-                }}
-              >Сохранить</button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      
       {/* Модальное окно настроек камеры */}
       {editingCameraIndex !== null && (
         <div style={{
