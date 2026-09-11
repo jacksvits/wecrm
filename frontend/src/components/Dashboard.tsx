@@ -4,7 +4,6 @@ import { useAuth } from '../hooks/useAuth';
 import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
 import { DashboardStats, Task, Status } from '../types';
-import { GlobalChat } from './GlobalChat';
 import { Avatar } from './Avatar';
 
 export function Dashboard() {
@@ -125,9 +124,6 @@ export function Dashboard() {
         ))}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <GlobalChat />
-      </div>
     </div>
   );
 }
