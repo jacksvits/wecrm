@@ -213,7 +213,7 @@ export class EmailWorker {
 
           const attachmentIds: string[] = [];
           for (const att of hasRealAttachments) {
-            const ext = path.extname(att.filename) || '';
+            const ext = path.extname(att.filename || '') || '';
             const filename = `${randomUUID()}${ext}`;
             const filePath = path.join(COMMENTS_DIR, filename);
             fs.writeFileSync(filePath, att.content);
@@ -222,7 +222,7 @@ export class EmailWorker {
             const fileAtt = await prisma.fileAttachment.create({
               data: {
                 filename,
-                originalName: att.filename,
+                originalName: att.filename || 'attachment',
                 mimeType: att.contentType || 'application/octet-stream',
                 size: att.content.length,
                 path: dbPath,
