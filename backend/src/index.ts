@@ -43,6 +43,7 @@ import { startReminderScheduler } from './lib/reminder-scheduler.js';
 import assistantRoutes from './routes/assistant.js';
 import aiRoutes from './routes/ai.js';
 import brandingRoutes from './routes/branding.js';
+import integrationsRoutes from './routes/integrations.js';
 dotenv.config();
 
 const app = express();
@@ -113,6 +114,7 @@ app.use('/api/products', productsRoutes);
 app.use('/api/reminders', reminderRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/branding', brandingRoutes);
+app.use('/api/integrations', integrationsRoutes);
 app.use('/api/yandex', yandexRoutes);
 app.use('/api/ai', aiRoutes);
 

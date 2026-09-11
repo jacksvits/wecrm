@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EmailSettings } from "./EmailSettings";
 import { RoleManager } from "./RoleManager";
 import { TelephonySettings } from "./TelephonySettings";
@@ -13,11 +13,42 @@ import { YandexSettings } from "./YandexSettings";
 import { SystemSettings } from "./SystemSettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "integrations" | "system";
-type IntegrationSubTab = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex";
+
+// Интеграции («плагины»): карточка с заголовком и статусом активности
+const PLUGINS: { key: PluginKey; label: string; description: string }[] = [
+  { key: "email", label: "Почта", description: "Приём писем через IMAP и создание задач" },
+  { key: "telephony", label: "Телефония", description: "Звонки и SMS через Novofon" },
+  { key: "max", label: "MAX", description: "Уведомления в мессенджер MAX" },
+  { key: "telegram", label: "Telegram", description: "Уведомления и задачи из Telegram" },
+  { key: "vk", label: "ВК Группа", description: "Комментарии и товары ВКонтакте" },
+  { key: "sms", label: "SMS журнал", description: "Журнал входящих и исходящих SMS" },
+  { key: "yandex", label: "Яндекс", description: "API-ключ Яндекс.Карт" },
+];
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<MainTab>("roles");
-  const [integrationSubTab, setIntegrationSubTab] = useState<IntegrationSubTab>("email");
+  const [selectedPlugin, setSelectedPlugin] = useState<PluginKey>("email");
+  const [pluginStatus, setPluginStatus] = useState<Record<PluginKey, boolean>>({
+    email: false,
+    telephony: false,
+    max: false,
+    telegram: false,
+    vk: false,
+    sms: false,
+    yandex: false,
+  });
+
+  useEffect(() => {
+    if (activeTab !== "integrations") return;
+    const token = localStorage.getItem("token");
+    fetch("/api/integrations/status", {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => s && setPluginStatus((prev) => ({ ...prev, ...s })))
+      .catch(() => {});
+  }, [activeTab]);
 
   const tabStyle = (isActive: boolean): React.CSSProperties => ({
     padding: "10px 20px",
@@ -26,18 +57,6 @@ export function Settings() {
     background: isActive ? "var(--text-primary)" : "transparent",
     color: isActive ? "var(--bg-card)" : "var(--text-secondary)",
     fontSize: 14,
-    fontWeight: 500,
-    cursor: "pointer",
-    transition: "all 0.2s",
-  });
-
-  const subTabStyle = (isActive: boolean): React.CSSProperties => ({
-    padding: "8px 16px",
-    borderRadius: 10,
-    border: "1px solid var(--border-color)",
-    background: isActive ? "var(--bg-input)" : "transparent",
-    color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-    fontSize: 13,
     fontWeight: 500,
     cursor: "pointer",
     transition: "all 0.2s",
@@ -65,44 +84,80 @@ export function Settings() {
   const renderIntegrations = () => {
     return (
       <div>
+        {/* Сетка карточек плагинов */}
         <div
           style={{
-            display: "flex",
-            gap: 8,
-            marginBottom: 20,
-            flexWrap: "wrap",
-            padding: "12px 16px",
-            borderRadius: 12,
-            background: "var(--bg-input)",
-            border: "1px solid var(--border-color)",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: 12,
+            marginBottom: 24,
           }}
         >
-          <button style={subTabStyle(integrationSubTab === "email")} onClick={() => setIntegrationSubTab("email")}>
-            Почта
-          </button>
-          <button style={subTabStyle(integrationSubTab === "telephony")} onClick={() => setIntegrationSubTab("telephony")}>
-            Телефония
-          </button>
-          <button style={subTabStyle(integrationSubTab === "max")} onClick={() => setIntegrationSubTab("max")}>
-            MAX
-          </button>
-          <button style={subTabStyle(integrationSubTab === "telegram")} onClick={() => setIntegrationSubTab("telegram")}>
-            Telegram
-          </button>
-          <button style={subTabStyle(integrationSubTab === "vk")} onClick={() => setIntegrationSubTab("vk")}>
-            ВК Группа
-          </button>
-          <button style={subTabStyle(integrationSubTab === "sms")} onClick={() => setIntegrationSubTab("sms")}>
-            SMS журнал
-          </button>
+          {PLUGINS.map((plugin) => {
+            const isActive = pluginStatus[plugin.key];
+            const isSelected = selectedPlugin === plugin.key;
+            return (
+              <button
+                key={plugin.key}
+                onClick={() => setSelectedPlugin(plugin.key)}
+                style={{
+                  textAlign: "left",
+                  padding: 16,
+                  borderRadius: 12,
+                  border: isSelected ? "2px solid var(--text-primary)" : "1px solid var(--border-color)",
+                  background: "var(--bg-card)",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
+                    {plugin.label}
+                  </span>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "3px 10px",
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      background: isActive ? "#dcfce7" : "#f3f4f6",
+                      color: isActive ? "#16a34a" : "#6b7280",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: "50%",
+                        background: isActive ? "#16a34a" : "#9ca3af",
+                        flexShrink: 0,
+                      }}
+                    />
+                    {isActive ? "Активен" : "Не активен"}
+                  </span>
+                </div>
+                <span style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.4 }}>
+                  {plugin.description}
+                </span>
+              </button>
+            );
+          })}
         </div>
-        {integrationSubTab === "email" && <EmailSettings />}
-        {integrationSubTab === "telephony" && <TelephonySettings />}
-        {integrationSubTab === "max" && <MaxSettings />}
-        {integrationSubTab === "telegram" && <TelegramSettings />}
-        {integrationSubTab === "vk" && <VkGroupSettings />}
-        {integrationSubTab === "sms" && <SmsJournal />}
-        {integrationSubTab === "yandex" && <YandexSettings />}
+
+        {/* Настройки выбранного плагина */}
+        {selectedPlugin === "email" && <EmailSettings />}
+        {selectedPlugin === "telephony" && <TelephonySettings />}
+        {selectedPlugin === "max" && <MaxSettings />}
+        {selectedPlugin === "telegram" && <TelegramSettings />}
+        {selectedPlugin === "vk" && <VkGroupSettings />}
+        {selectedPlugin === "sms" && <SmsJournal />}
+        {selectedPlugin === "yandex" && <YandexSettings />}
       </div>
     );
   };
