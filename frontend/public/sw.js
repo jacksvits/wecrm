@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wecrm-v4';
+const CACHE_NAME = 'wecrm-v5';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/favicon.ico',
@@ -36,6 +36,21 @@ self.addEventListener('fetch', (event) => {
 
   // API and uploads — always network
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/')) {
+    return;
+  }
+
+  // Все SPA-навигации (/, /chat, /tasks/123, ...) — always network first (NEVER cache):
+  // иначе SW отдаёт из cache-first устаревший index.html со старым бандлом,
+  // и новые роуты (/chat) «не открываются» до истечения кэша
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((res) => {
+          if (res && res.status === 200) return res;
+          throw new Error('Network failed for navigation');
+        })
+        .catch(() => caches.match(event.request))
+    );
     return;
   }
 
