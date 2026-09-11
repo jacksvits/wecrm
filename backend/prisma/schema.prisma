@@ -1035,3 +1035,11 @@ model PskovlinePluginAccount {
 
   @@map("pskovline_plugin_accounts")
 }
+
+model TochkaPluginSettings {
+  id                    Int      @id @default(1)
+  updateIntervalMinutes Int      @default(15) @map("update_interval_minutes")
+  updatedAt             DateTime @default(now()) @map("updated_at")
+
+  @@map("tochka_plugin_settings")
+}

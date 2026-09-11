@@ -292,8 +292,30 @@ router.get('/status', authMiddleware, (_req, res) => {
   res.json({ connected: !!tokens?.access_token, expires_at: tokens?.expires_at || null, expired: false });
 });
 
+// Кэш состояния интеграции (TTL = интервал обновления из плагина)
+let tochkaStateCache: { data: any; ts: number } | null = null;
+let tochkaStateTtlMs = 15 * 60 * 1000;
+
+export function setTochkaCacheTtl(minutes: number) {
+  tochkaStateTtlMs = Math.max(1, minutes) * 60 * 1000;
+}
+
+export function invalidateTochkaCache() {
+  tochkaStateCache = null;
+}
+
 // Состояние интеграции для виджетов и плагина
 export async function getTochkaState() {
+  if (tochkaStateCache && Date.now() - tochkaStateCache.ts < tochkaStateTtlMs) {
+    return tochkaStateCache.data;
+  }
+  const data = await fetchTochkaState();
+  (data as any).__cachedAt = new Date().toISOString();
+  tochkaStateCache = { data, ts: Date.now() };
+  return data;
+}
+
+async function fetchTochkaState() {
   try {
     const tokens = loadTokens();
     if (!tokens?.access_token) return { accounts: [], totalBalance: 0, connected: false, expires_at: null };

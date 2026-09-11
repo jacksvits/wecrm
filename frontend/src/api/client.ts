@@ -45,6 +45,7 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
   },
   tochkaPlugin: {
     get: () => fetchApi('/api/tochka-plugin'),
+    save: (data: { updateIntervalMinutes?: number }) => fetchApi('/api/tochka-plugin', { method: 'POST', body: JSON.stringify(data) }),
   },
   pskovlinePlugin: {
     get: () => fetchApi('/api/pskovline-plugin'),

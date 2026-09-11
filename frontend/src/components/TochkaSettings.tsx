@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 
+const INTERVALS = [
+  { value: 5, label: '5 минут' },
+  { value: 15, label: '15 минут' },
+  { value: 30, label: '30 минут' },
+  { value: 60, label: '1 час' },
+  { value: 360, label: '6 часов' },
+];
+
 // === Плагин «Точка Банк» (Финансы): OAuth-подключение, счета, названия, порядок ===
 export default function TochkaSettings() {
   const [state, setState] = useState<any>(null);
@@ -126,6 +134,28 @@ export default function TochkaSettings() {
           </button>
         )}
       </div>
+      {/* Интервал обновления данных */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 500 }}>Интервал обновления данных</label>
+        <select
+          value={state?.updateIntervalMinutes ?? 15}
+          onChange={(e) => {
+            const interval = Number(e.target.value);
+            api.tochkaPlugin.save({ updateIntervalMinutes: interval })
+              .then(() => { setState((prev: any) => ({ ...prev, updateIntervalMinutes: interval })); setMsg(`Интервал обновления: ${INTERVALS.find(i => i.value === interval)?.label}`); setTimeout(() => setMsg(''), 3000); })
+              .catch((err: any) => setMsg('Ошибка: ' + err.message));
+          }}
+          disabled={!state}
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
+        >
+          {INTERVALS.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
+        </select>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+          Данные банка кэшируются на сервере и обновляются не чаще выбранного интервала
+          {state?.cachedAt ? ` · обновлено ${new Date(state.cachedAt).toLocaleTimeString('ru')}` : ''}
+        </div>
+      </div>
+
       {msg && <div style={{ fontSize: 13, color: msg.startsWith('Ошибка') ? '#dc2626' : '#16a34a', marginBottom: 12 }}>{msg}</div>}
       {state?.error && <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>Ошибка API банка: {state.error}</div>}
 
