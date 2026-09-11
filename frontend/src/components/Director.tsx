@@ -467,9 +467,15 @@ export function Director() {
     return true;
   };
 
-  const visibleWidgets = widgetOrder
-    .map((id) => ALL_WIDGETS_EFF.find((w) => w.id === id))
-    .filter((w): w is WidgetDef => !!w && !hidden.has(w.id) && w.tab === activeTab && widgetAllowed(w));
+  const visibleWidgets = [
+    ...widgetOrder
+      .map((id) => ALL_WIDGETS_EFF.find((w) => w.id === id))
+      .filter((w): w is WidgetDef => !!w && !hidden.has(w.id) && w.tab === activeTab && widgetAllowed(w)),
+    // Виджеты, которых нет в сохранённом порядке (например, новые виджеты плагинов)
+    ...ALL_WIDGETS_EFF.filter(
+      (w) => !widgetOrder.includes(w.id) && !hidden.has(w.id) && w.tab === activeTab && widgetAllowed(w)
+    ),
+  ];
 
   const hiddenWidgets = ALL_WIDGETS_EFF.filter((w) => hidden.has(w.id) && w.tab === activeTab && widgetAllowed(w));
 
