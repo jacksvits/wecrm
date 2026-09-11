@@ -10,6 +10,7 @@ export interface AuthRequest extends Request {
     role: string;
     allowedPages?: string[];
     canAccessChat?: boolean;
+    impersonatorId?: string;
   };
 }
 
@@ -45,6 +46,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       role: user.role?.name || 'user',
       allowedPages: user.role?.allowedPages || [],
       canAccessChat: user.role?.canAccessChat ?? true,
+      impersonatorId: decoded.imp,
     };
     next();
   } catch {

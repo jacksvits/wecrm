@@ -8,6 +8,8 @@ interface AuthContextType {
   login: (login: string, password: string) => Promise<User>;
   register: (email: string, password: string, name: string, username?: string) => Promise<User>;
   logout: () => void;
+  switchUser: (userId: string) => Promise<User>;
+  switchBack: () => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -72,8 +74,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = '/';
   }, []);
 
+  // Мультиаккаунтность: переход администратора под другой аккаунт
+  const switchUser = useCallback(async (userId: string) => {
+    const res = await api.auth.impersonate(userId);
+    localStorage.setItem('token', res.token);
+    setUser(res.user);
+    window.location.href = '/';
+    return res.user;
+  }, []);
+
+  // Мультиаккаунтность: возврат в свой аккаунт
+  const switchBack = useCallback(async () => {
+    const res = await api.auth.stopImpersonation();
+    localStorage.setItem('token', res.token);
+    setUser(res.user);
+    window.location.href = '/';
+    return res.user;
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, switchUser, switchBack }}>
       {children}
     </AuthContext.Provider>
   );

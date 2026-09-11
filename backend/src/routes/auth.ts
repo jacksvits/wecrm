@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
@@ -126,6 +127,12 @@ router.get('/me', async (req, res) => {
     });
     if (!user) return res.status(401).json({ error: 'User not found' });
 
+    let impersonatorName: string | null = null;
+    if (decoded.imp) {
+      const imp = await prisma.user.findUnique({ where: { id: decoded.imp }, select: { name: true } });
+      impersonatorName = imp?.name || null;
+    }
+
     res.json({
       id: user.id,
       email: user.email,
@@ -137,9 +144,95 @@ router.get('/me', async (req, res) => {
       emails: user.emails,
       allowedPages: user.role?.allowedPages || [],
       lastActiveAt: user.lastActiveAt,
+      impersonatorId: decoded.imp || null,
+      impersonatorName,
     });
   } catch {
     res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+
+import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+
+const adminOnly = (req: AuthRequest, res: any, next: any) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Требуются права администратора' });
+  }
+  next();
+};
+
+const issueToken = (user: any, imp?: string) => {
+  const roleName = user.role?.name || 'user';
+  const allowedPages = user.role?.allowedPages || [];
+  const token = jwt.sign(
+    { id: user.id, email: user.email, role: roleName, allowedPages, ...(imp ? { imp } : {}) },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  return { token, roleName, allowedPages };
+};
+
+const publicUser = (user: any, roleName: string, allowedPages: string[]) => ({
+  id: user.id,
+  email: user.email,
+  username: user.username,
+  name: user.name,
+  role: roleName,
+  roleId: user.roleId,
+  avatar: user.avatar,
+  allowedPages,
+});
+
+// Мультиаккаунтность: администратор быстро переходит под аккаунт другого пользователя
+router.post('/impersonate', authMiddleware, adminOnly, async (req: AuthRequest, res) => {
+  try {
+    const { userId } = z.object({ userId: z.string().min(1) }).parse(req.body);
+    if (userId === req.user!.id) return res.status(400).json({ error: 'Вы уже в своём аккаунте' });
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: { select: { name: true, allowedPages: true } } },
+    });
+    if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+    const { token, roleName, allowedPages } = issueToken(target, req.user!.id);
+    await prisma.activity.create({
+      data: {
+        action: 'impersonate',
+        entity: 'user',
+        entityId: target.id,
+        details: `Администратор ${req.user!.name} перешёл под пользователя ${target.name}`,
+        userId: req.user!.id,
+      },
+    });
+    res.json({ user: publicUser(target, roleName, allowedPages), token });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Мультиаккаунтность: возврат администратора в свой аккаунт
+router.post('/stop-impersonation', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const impersonatorId = req.user?.impersonatorId;
+    if (!impersonatorId) return res.status(400).json({ error: 'Нет активного переключения аккаунта' });
+    const admin = await prisma.user.findUnique({
+      where: { id: impersonatorId },
+      include: { role: { select: { name: true, allowedPages: true } } },
+    });
+    if (!admin) return res.status(401).json({ error: 'User not found' });
+    const { token, roleName, allowedPages } = issueToken(admin);
+    await prisma.activity.create({
+      data: {
+        action: 'impersonate-end',
+        entity: 'user',
+        entityId: admin.id,
+        details: `Администратор ${admin.name} вернулся в свой аккаунт`,
+        userId: admin.id,
+      },
+    });
+    res.json({ user: publicUser(admin, roleName, allowedPages), token });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
   }
 });
 
