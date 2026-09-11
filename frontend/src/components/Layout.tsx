@@ -6,7 +6,7 @@ import { useEffect, useState, useRef } from 'react' ; import { PushSubscriber } 
       {userMenuOpen && (
         <>
           <div onClick={() => setUserMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 998 }} />
-          <div style={{ position: 'absolute', bottom: 48, left: '50%', transform: 'translateX(-50%)', zIndex: 999, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: 6, minWidth: 160 }}>
+          <div style={{ position: 'fixed', bottom: 76, left: 8, zIndex: 999, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: 6, minWidth: 160 }}>
             <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-color)', marginBottom: 4 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{user?.name}</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{user?.role ? String(user.role) : ''}</div>
