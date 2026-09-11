@@ -2,7 +2,8 @@ import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { prisma } from '../lib/prisma.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
-import { sendPushToRoleUsers } from '../lib/push.js';
+import { sendPushToRoleUsers, sendPushToTaskAssignees, sendPushToTaskCurators } from '../lib/push.js';
+import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { resolveContactAuto } from '../lib/contact-dedup.js';
 import { randomUUID } from 'crypto';
@@ -147,6 +148,9 @@ export class EmailWorker {
           }
         }
 
+        // Исполнители/кураторы по умолчанию из настроек пользователей (как при ручном создании задачи)
+        const defaultAssignees = await getDefaultTaskAssigneeIds();
+        const defaultCurators = await getDefaultTaskCuratorIds();
         const task = await prisma.task.create({
           data: {
             title: cleanTitle,
@@ -157,6 +161,12 @@ export class EmailWorker {
             contactId,
             emailMessageId: messageId,
             sourceEmail: senderEmail,
+            assignees: defaultAssignees.length
+              ? { create: defaultAssignees.map((uid) => ({ userId: uid })) }
+              : undefined,
+            curators: defaultCurators.length
+              ? { create: defaultCurators.map((uid) => ({ userId: uid })) }
+              : undefined,
           },
         });
 
@@ -167,6 +177,16 @@ export class EmailWorker {
             body: `Создана задача из письма: ${cleanTitle}`,
             url: '/tasks/' + task.id,
           };
+          // Push и in-app уведомления исполнителям и кураторам по умолчанию
+          const assigneePayload = {
+            title: 'Новая задача из письма',
+            body: `Создана задача из письма: ${cleanTitle}`,
+            url: '/tasks/' + task.id,
+          };
+          sendPushToTaskAssignees(task.id, assigneePayload, creatorId).catch(() => {});
+          sendPushToTaskCurators(task.id, assigneePayload, creatorId).catch(() => {});
+          await notifyTaskAssignees(task.id, assigneePayload, creatorId);
+          await notifyTaskCurators(task.id, assigneePayload, creatorId);
           // Push уведомления админам и менеджерам
           sendPushToRoleUsers(['admin', 'manager'], rolePayload, 'task', creatorId).catch(() => {});
           // IN-APP уведомления админам и менеджерам (push отправлен отдельно выше)

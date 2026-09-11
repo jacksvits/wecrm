@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { resolveContactAuto } from '../lib/contact-dedup.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
+import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
@@ -202,6 +203,10 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
 
     console.log('[MAX Processor] Creating new task for MAX chat', chatId);
     try {
+      // Исполнители/кураторы по умолчанию из настроек пользователей (как при ручном создании задачи)
+      const defaultAssignees = await getDefaultTaskAssigneeIds();
+      const defaultCurators = await getDefaultTaskCuratorIds();
+      const mergedAssigneeIds = Array.from(new Set([...(settings.assigneeIds || []), ...defaultAssignees]));
       const task = await prisma.task.create({
         data: {
           title: text.slice(0, 100) || 'Сообщение из MAX',
@@ -213,8 +218,11 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
           maxChatId: chatId,
           maxUserId: userId,
           maxMessageId: msg.id,
-          assignees: settings.assigneeIds?.length
-            ? { create: settings.assigneeIds.map((uid: string) => ({ userId: uid })) }
+          assignees: mergedAssigneeIds.length
+            ? { create: mergedAssigneeIds.map((uid: string) => ({ userId: uid })) }
+            : undefined,
+          curators: defaultCurators.length
+            ? { create: defaultCurators.map((uid: string) => ({ userId: uid })) }
             : undefined,
         },
       });
