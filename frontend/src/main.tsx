@@ -4,6 +4,10 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import App from './App';
 import './index.css';
+import { loadBranding } from './lib/branding';
+
+// Загружаем кастомный брендинг (иконка PWA/favicon, логотип) до первого рендера
+loadBranding();
 
 // Защита от ошибок performance-метрик сторонних расширений (gosuslugi и др.)
 // Фикс: TypeError: Cannot read properties of undefined (reading 'startTime')

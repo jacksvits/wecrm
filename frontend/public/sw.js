@@ -121,8 +121,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'WeCRM', {
       body: data.body || '',
-      icon: '/icon-192x192.png',
-      badge: '/icon-192x192.png',
+      icon: data.icon || '/icon-192x192.png',
+      badge: data.icon || '/icon-192x192.png',
       tag: data.url || 'default',
       data: { url: data.url || '/' },
       requireInteraction: true,

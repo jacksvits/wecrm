@@ -995,3 +995,12 @@ model ProductImage {
   @@index([productId])
   @@map("product_images")
 }
+
+model Branding {
+  id        Int      @id @default(1)
+  iconPath  String?  @map("icon_path")
+  logoPath  String?  @map("logo_path")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("branding")
+}

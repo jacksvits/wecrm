@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { sha256 } from "js-sha256"
 import { useAuth } from '../hooks/useAuth'
+import { useBrandLogo } from '../lib/branding';
 
 const API_URL = ''
 
@@ -34,7 +35,9 @@ export function Login() {
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [error, setError] = useState('')
-  const [vkConfig, setVkConfig] = useState<{ appId: number; redirectUri: string } | null>(null)
+  const [vkConfig, setVkConfig] = useState<{ appId: number;
+    redirectUri: string } | null>(null)
+  const brandLogo = useBrandLogo(true)
   const [vkLoading, setVkLoading] = useState(false)
   const [showSoundPrompt, setShowSoundPrompt] = useState(false)
   const [pendingRedirect, setPendingRedirect] = useState(false)
@@ -190,7 +193,7 @@ export function Login() {
         <div className="login-wave login-wave-1" />
         <div className="login-wave login-wave-2" />
 
-        <img src="/welans-logo.png" alt="Welans" className="login-brand-logo" />
+        <img src={brandLogo} alt="Welans" className="login-brand-logo" />
         <h2 className="login-brand-title">
           Управляйте бизнесом<br />
           <span className="accent">в одном окне</span>
