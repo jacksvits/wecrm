@@ -1539,7 +1539,22 @@ export function TaskDetail() {
                               </div>
                             )}
                             <div style={{ marginBottom: 4 }}>
-                              <LinkifyText text={c.content} />
+                              {/<[a-z][\s\S]*>/i.test(c.content) ? (
+                                <div
+                                  className="rich-text"
+                                  style={{
+                                    fontSize: "inherit",
+                                    lineHeight: "inherit",
+                                    color: "inherit",
+                                  }}
+                                  onClick={onTagClick}
+                                  dangerouslySetInnerHTML={{
+                                    __html: linkifyTaskTagsHtml(c.content),
+                                  }}
+                                />
+                              ) : (
+                                <LinkifyText text={c.content} />
+                              )}
                             </div>{" "}
                             <div
                               style={{
