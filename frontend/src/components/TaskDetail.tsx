@@ -278,7 +278,20 @@ export function TaskDetail() {
       setLoading(false);
     }
   };
-  useRealtime(['tasks','comments'], (data) => { if ((data.entity === 'task' || data.entity === 'comment') && data.id === id) loadTask(); });
+  // Real-time обновление обсуждения: новые/удалённые комментарии применяем сразу
+  // из события без полной перезагрузки задачи (иначе на каждое сообщение — спиннер всей страницы)
+  useRealtime(['tasks','comments'], (data) => {
+    if ((data.entity !== 'task' && data.entity !== 'comment') || data.id !== id) return;
+    if (data.action === 'new_comment' && data.comment) {
+      setComments(prev => prev.some(c => c.id === data.comment.id) ? prev : [...prev, data.comment]);
+      return;
+    }
+    if (data.action === 'delete_comment' && data.commentId) {
+      setComments(prev => prev.filter(c => c.id !== data.commentId));
+      return;
+    }
+    loadTask();
+  });
   const loadHistory = async () => {
     setHistoryLoading(true);
     try {

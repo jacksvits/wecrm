@@ -32,6 +32,8 @@ export function broadcast(channel: string, payload: Record<string, any>) {
     if (client.channels.has(channel) || client.channels.has('*')) {
       try {
         client.res.write(`data: ${data}\n\n`);
+        // Сброс буфера compression, чтобы событие ушло клиенту немедленно
+        (client.res as any).flush?.();
         sent++;
       } catch (err) {
         console.error(`[SSE] Failed to send to client ${client.id}:`, err);
@@ -52,6 +54,8 @@ export function broadcastToUsers(channel: string, userIds: string[], payload: Re
     if ((client.channels.has(channel) || client.channels.has('*')) && userIds.includes(client.userId)) {
       try {
         client.res.write(`data: ${data}\n\n`);
+        // Сброс буфера compression, чтобы событие ушло клиенту немедленно
+        (client.res as any).flush?.();
         sent++;
       } catch (err) {
         console.error(`[SSE] Failed to send to client ${client.id}:`, err);

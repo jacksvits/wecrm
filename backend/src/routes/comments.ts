@@ -221,7 +221,7 @@ router.get('/:taskId/comments', authMiddleware, async (req, res) => {
 
 router.delete('/:taskId/comments/:commentId', authMiddleware, async (req, res) => {
   try {
-    const { commentId } = req.params;
+    const { taskId, commentId } = req.params;
     const comment = await prisma.comment.findUnique({
       where: { id: commentId },
     });
@@ -237,6 +237,9 @@ router.delete('/:taskId/comments/:commentId', authMiddleware, async (req, res) =
     await prisma.comment.delete({
       where: { id: commentId },
     });
+
+    // Real-time broadcast об удалении комментария
+    broadcast(CHANNELS.COMMENTS, { action: 'delete_comment', entity: 'task', id: taskId, commentId });
 
     res.json({ success: true });
   } catch (err: any) {

@@ -74,11 +74,19 @@ app.get('/api/events', authMiddleware, (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
+  // Отключаем сжатие для SSE-стрима, иначе middleware compression буферизует
+  // весь поток и события не доходят до клиента до разрыва соединения
+  res.setHeader('Content-Encoding', 'identity');
   res.flushHeaders();
-  res.write('data: ' + JSON.stringify({ type: 'connected', userId: user?.id, channels, timestamp: new Date().toISOString() }) + '\n\n');
+  const sendEvent = (payload: Record<string, any>) => {
+    res.write('data: ' + JSON.stringify(payload) + '\n\n');
+    // Принудительный сброс буфера compression после каждой записи
+    (res as any).flush?.();
+  };
+  sendEvent({ type: 'connected', userId: user?.id, channels, timestamp: new Date().toISOString() });
   const clientId = subscribeClient(res, channels, user?.id || 'anonymous');
   const pingInterval = setInterval(() => {
-    try { res.write(':ping\n\n'); } catch { clearInterval(pingInterval); }
+    try { res.write(':ping\n\n'); (res as any).flush?.(); } catch { clearInterval(pingInterval); }
   }, 30000);
   req.on('close', () => { clearInterval(pingInterval); });
 });
