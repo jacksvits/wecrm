@@ -349,7 +349,11 @@ async function fetchTochkaState() {
         const freshHeaders = { Authorization: `Bearer ${loadTokens()?.access_token || ''}` };
         const balRes = await tochkaRequest(`/open-banking/v1.0/accounts/${acc.id}/balances`, { headers: freshHeaders });
         if (balRes.status === 200) {
-          const amount = parseFloat(balRes.body?.Data?.Balance?.[0]?.Amount?.amount || 0);
+          // Берём «Доступный остаток» (ClosingAvailable), а не «Собственные средства» (OpeningAvailable);
+          // если тип отсутствует — первый доступный баланс
+          const balances = balRes.body?.Data?.Balance || [];
+          const entry = balances.find((b: any) => b.type === 'ClosingAvailable') || balances[0];
+          const amount = parseFloat(entry?.Amount?.amount || 0);
           acc.balance = amount; totalBalance += amount;
         } else acc.balance = 0;
       } catch { acc.balance = 0; }
