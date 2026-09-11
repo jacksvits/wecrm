@@ -95,7 +95,7 @@ export class VkGroupWorker {
     });
     const url = `https://api.vk.com/method/${method}?${qs.toString()}`;
     const res = await fetch(url);
-    const json = await res.json();
+    const json: any = await res.json();
     if (json.error) {
       throw new Error(`VK API error: ${json.error.error_msg} (code ${json.error.error_code})`);
     }

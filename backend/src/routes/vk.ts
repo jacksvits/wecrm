@@ -117,7 +117,7 @@ router.post('/id-auth', async (req, res) => {
       }),
     });
     clearTimeout(tokenTimeout);
-    const tokenData = await tokenRes.json();
+    const tokenData: any = await tokenRes.json();
     if (tokenData.error) {
       console.error('[VK ID Auth] Token exchange error:', tokenData);
       return res.status(400).json({ error: `VK ID error: ${tokenData.error_description || tokenData.error}` });
@@ -140,7 +140,7 @@ router.post('/id-auth', async (req, res) => {
       body: new URLSearchParams({ client_id: VK_CLIENT_ID }),
     });
     clearTimeout(userTimeout);
-    const userData = await userRes.json();
+    const userData: any = await userRes.json();
     console.log('[VK ID Auth] userData:', JSON.stringify(userData));
 
     if (userData.error) {
@@ -166,7 +166,7 @@ router.post('/id-auth', async (req, res) => {
       console.log('[VK ID Auth] localAvatarPath:', localAvatarPath);
     }
 
-    let user = await prisma.user.findFirst({ where: { email: vkEmail } });
+    let user = await prisma.user.findFirst({ where: { email: vkEmail }, include: { role: { select: { name: true } } } });
 
     if (!user) {
       const bcryptMod = await import('bcryptjs');

@@ -1,6 +1,7 @@
-import { ImapFlow } from 'imapflow';
+import { ImapFlow, ImapFlowOptions, FetchMessageObject } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { prisma } from '../lib/prisma.js';
+import { normalizeEmailDescription } from '../lib/email-description.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
 import { sendPushToRoleUsers, sendPushToTaskAssignees, sendPushToTaskCurators } from '../lib/push.js';
 import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js';
@@ -69,7 +70,7 @@ export class EmailWorker {
       },
       auth: { user: this.config.imapUser, pass: this.config.imapPass },
       logger: false,
-    });
+    } as ImapFlowOptions);
   }
 
   private async processInbox() {
@@ -79,9 +80,9 @@ export class EmailWorker {
 
     try {
       const searchCriteria = { unseen: true };
-      const uids = await client.search(searchCriteria, { uid: true });
+      const uids = (await client.search(searchCriteria as Parameters<ImapFlow['search']>[0], { uid: true })) as number[] | false;
 
-      if (uids.length === 0) {
+      if (!uids || uids.length === 0) {
         console.log('[EmailWorker] No new emails');
         return;
       }
@@ -89,7 +90,7 @@ export class EmailWorker {
       console.log(`[EmailWorker] Found ${uids.length} new email(s)`);
 
       for (const uid of uids) {
-        const message = await client.fetchOne(uid, { source: true }, { uid: true });
+        const message = (await client.fetchOne(uid, { source: true }, { uid: true })) as FetchMessageObject;
         if (!message.source) {
           console.log(`[EmailWorker] Message ${uid} has no source, skipping`);
           continue;

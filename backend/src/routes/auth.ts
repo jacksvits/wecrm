@@ -152,9 +152,6 @@ router.get('/me', async (req, res) => {
   }
 });
 
-
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-
 const adminOnly = (req: AuthRequest, res: any, next: any) => {
   if (req.user?.role !== 'admin') {
     return res.status(403).json({ error: 'Требуются права администратора' });

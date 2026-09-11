@@ -204,7 +204,7 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
           console.log('[VK Comment Send] Sending reply to peer', task.vkPeerId, 'text:', vkMessageText.substring(0, 100));
 
           const vkResponse = await fetch(vkUrl, { method: 'POST' });
-          const vkData = await vkResponse.json();
+          const vkData: any = await vkResponse.json();
 
           if (vkData.error) {
             console.error('[VK Comment Send] VK API error:', vkData.error.error_msg, '(code', vkData.error.error_code, ')');
@@ -250,7 +250,7 @@ router.get('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =>
   }
 });
 
-router.delete('/:taskId/comments/:commentId', authMiddleware, async (req, res) => {
+router.delete('/:taskId/comments/:commentId', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { taskId, commentId } = req.params;
     const comment = await prisma.comment.findUnique({
