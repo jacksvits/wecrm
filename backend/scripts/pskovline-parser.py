@@ -1,28 +1,35 @@
 #!/usr/bin/env python3
-"""Парсер балансов Псковлайн: списание за месяц, текущий баланс, дата.
-Читает настройки плагина (/app/data/pskovline_settings.json), пишет /app/data/pskovline.json.
-Cron на хосте вызывает скрипт ежечасно; запуск не чаще раза в день, не раньше update_time.
+# -*- coding: utf-8 -*-
 """
+Парсер личного кабинета Псковлайн (stat.pskovline.ru)
+Сохраняет баланс и период услуги для всех аккаунтов плагина в JSON.
+
+Настройки читает из /app/data/pskovline_settings.json (синхронизируется бэкендом):
+  { "is_active": bool, "update_time": "ЧЧ:ММ", "accounts": [{label, login, password}, ...] }
+Cron на хосте вызывает скрипт каждые 5 минут; запуск не чаще раза в день, не раньше update_time.
+"""
+
+import requests
+import re
 import json
 import os
-import re
 import subprocess
 import sys
 from datetime import datetime
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "..", "data")
+URL = "https://stat.pskovline.ru"
+
+if os.path.isdir("/app/data"):
+    DATA_DIR = "/app/data"
+else:
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    DATA_DIR = os.path.join(SCRIPT_DIR, "..", "data")
 OUTPUT_JSON = os.path.join(DATA_DIR, "pskovline.json")
 SETTINGS_JSON = os.path.join(DATA_DIR, "pskovline_settings.json")
 
-DEFAULT_ACCOUNTS = [
-    {"label": "Псковлайн", "login": "91868", "password": "e5yvku2a"},
-    {"label": "Псковлайн телефон", "login": "upl69777", "password": "i9rmh2s9"},
-]
-
 
 def get_settings():
-    """Настройки плагина: is_active, update_time, accounts. Fallback — legacy из БД."""
+    """Настройки плагина: is_active, update_time, accounts. Fallback — legacy-таблица из БД."""
     try:
         with open(SETTINGS_JSON, encoding="utf-8") as f:
             s = json.load(f)
@@ -32,85 +39,112 @@ def get_settings():
             return s
     except Exception:
         pass
-    # Fallback: legacy-таблица pskovline_settings (docker exec psql)
+    # Fallback: legacy-таблица pskovline_settings
     try:
         result = subprocess.run(
-            [
-                "docker", "exec", "wecrm-db-1", "psql", "-U", "crm", "wecrm", "-t", "-A",
-                "-c",
-                "SELECT label, login, password, label2, login2, password2 FROM pskovline_settings LIMIT 1",
-            ],
-            capture_output=True, text=True, timeout=30,
+            ['docker', 'exec', '-i', 'wecrm-db-1', 'psql', '-U', 'crm', '-d', 'wecrm', '-t', '-A', '-c',
+             'SELECT label, login, password, label2, login2, password2 FROM pskovline_settings LIMIT 1;'],
+            capture_output=True, text=True, timeout=10
         )
         line = result.stdout.strip()
-        if "|" in line:
-            parts = line.split("|")
+        if '|' in line:
+            parts = line.split('|')
             accounts = []
             if len(parts) > 2 and parts[1] and parts[2]:
-                accounts.append({"label": parts[0] or "Псковлайн", "login": parts[1], "password": parts[2]})
+                accounts.append({'label': parts[0], 'login': parts[1], 'password': parts[2]})
             if len(parts) > 5 and parts[4] and parts[5]:
-                accounts.append({"label": parts[3] or "Псковлайн 2", "login": parts[4], "password": parts[5]})
+                accounts.append({'label': parts[3], 'login': parts[4], 'password': parts[5]})
             if accounts:
-                return {"is_active": True, "update_time": "08:00", "accounts": accounts}
+                return {'is_active': True, 'update_time': '08:00', 'accounts': accounts}
     except Exception as e:
-        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Ошибка чтения legacy-настроек: {e}")
-    return {"is_active": True, "update_time": "08:00", "accounts": DEFAULT_ACCOUNTS}
+        print(f"DB read error: {e}", file=sys.stderr)
+    return {
+        'is_active': True,
+        'update_time': '08:00',
+        'accounts': [
+            {'label': 'Псковлайн', 'login': '91868', 'password': 'e5yvku2a'},
+            {'label': 'Псковлайн телефон', 'login': 'upl69777', 'password': 'i9rmh2s9'},
+        ],
+    }
+
+
+def parse_account(account):
+    """Парсим один аккаунт — новая сессия для каждого"""
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    })
+
+    session.get(URL, timeout=30)
+    auth = session.post(URL, data={"login": account['login'], "password": account['password']}, timeout=30)
+    text = auth.text
+
+    result = {
+        "label": account['label'],
+        "login": account['login'],
+        "updated_at": datetime.now().isoformat(),
+        "balance": None,
+        "period": None,
+        "status": "error",
+        "error": None,
+    }
+
+    balance_match = re.search(
+        r'<td[^>]*>\s*Баланс\s*</td>\s*<td[^>]*>\s*<strong[^>]*>([0-9]+(?:[.,][0-9]+)?)</strong>',
+        text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if balance_match:
+        result["balance"] = float(balance_match.group(1).replace(",", "."))
+    else:
+        alt_balance = re.search(
+            r'<td[^>]*>\s*Баланс\s*</td>\s*<td[^>]*>\s*([0-9]+(?:[.,][0-9]+)?)',
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if alt_balance:
+            result["balance"] = float(alt_balance.group(1).replace(",", "."))
+
+    period_match = re.search(
+        r'Период услуги:\s*(\d{4}\.\d{2}\.\d{2}\s+\d{2}:\d{2}:\d{2}\s*[-–—]\s*\d{4}\.\d{2}\.\d{2}\s+\d{2}:\d{2}:\d{2})',
+        text,
+    )
+    if period_match:
+        result["period"] = period_match.group(1).strip()
+    else:
+        alt_match = re.search(
+            r'Период услуги:\s*(\d{2}:\d{2}:\d{2}\s+\d{2}\.\d{2}\.\d{4}\s*[-–—]\s*\d{2}:\d{2}:\d{2}\s+\d{2}\.\d{2}\.\d{4})',
+            text,
+        )
+        if alt_match:
+            result["period"] = alt_match.group(1).strip()
+
+    if result["balance"] is not None or result["period"] is not None:
+        result["status"] = "ok"
+    else:
+        result["error"] = "Не удалось извлечь данные со страницы"
+
+    return result
 
 
 def parse_pskovline(accounts):
-    data = {"accounts": [], "updated_at": datetime.now().isoformat()}
-    for acc in accounts:
-        login = acc.get("login", "")
-        password = acc.get("password", "")
-        account = {
-            "label": acc.get("label", ""),
-            "login": login,
-            "spending": None,
-            "balance": None,
-            "period": "",
-            "status": "error",
-            "error": "",
-        }
-        if not login or not password:
-            account["error"] = "Не задан логин или пароль"
-            data["accounts"].append(account)
-            continue
-        try:
-            from selenium import webdriver
-            from selenium.webdriver.common.by import By
-            from selenium.webdriver.support import expected_conditions as EC
-            from selenium.webdriver.support.ui import WebDriverWait
+    results = []
+    for account in accounts:
+        if account.get('login') and account.get('password'):
+            results.append(parse_account(account))
 
-            options = webdriver.ChromeOptions()
-            options.add_argument("--headless=new")
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-dev-shm-usage")
-            driver = webdriver.Chrome(options=options)
-            try:
-                driver.get("https://lk.pskovline.ru/")
-                wait = WebDriverWait(driver, 15)
-                wait.until(EC.presence_of_element_located((By.NAME, "login"))).send_keys(login)
-                driver.find_element(By.NAME, "password").send_keys(password)
-                driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
-                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".balance-value, [class*='balance']")))
-                body = driver.find_element(By.TAG_NAME, "body").text
+    output = {
+        "accounts": results,
+        "updated_at": datetime.now().isoformat(),
+    }
 
-                m = re.search(r"(-?[\d\s.,]+)\s*руб", body)
-                if m:
-                    account["spending"] = float(m.group(1).replace(" ", "").replace(",", "."))
-                m = re.search(r"Текущий баланс[:\s]*(-?[\d\s.,]+)", body)
-                if m:
-                    account["balance"] = float(m.group(1).replace(" ", "").replace(",", "."))
-                m = re.search(r"(\d{2}\.\d{2}\.\d{4})\s*[-—]\s*(\d{2}\.\d{2}\.\d{4})", body)
-                if m:
-                    account["period"] = f"{m.group(1)} — {m.group(2)}"
-                account["status"] = "ok"
-            finally:
-                driver.quit()
-        except Exception as e:
-            account["error"] = str(e)[:200]
-        data["accounts"].append(account)
-    return data
+    os.makedirs(os.path.dirname(OUTPUT_JSON), exist_ok=True)
+    with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
+        json.dump(output, f, ensure_ascii=False, indent=2)
+
+    print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Сохранено {len(results)} аккаунтов")
+    return output
 
 
 if __name__ == "__main__":
@@ -120,7 +154,7 @@ if __name__ == "__main__":
         print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Интеграция Псковлайн деактивирована, пропуск")
         sys.exit(0)
 
-    # Запуск не чаще раза в день, не раньше заданного времени (cron вызывает ежечасно)
+    # Запуск не чаще раза в день, не раньше заданного времени (cron вызывает каждые 5 минут)
     now = datetime.now()
     try:
         hh, mm = map(int, settings.get("update_time", "08:00").split(":"))
@@ -141,8 +175,4 @@ if __name__ == "__main__":
     except Exception:
         pass  # файла ещё нет — собираем
 
-    data = parse_pskovline(settings.get("accounts") or DEFAULT_ACCOUNTS)
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Сохранено {len(data['accounts'])} аккаунтов")
+    parse_pskovline(settings.get("accounts") or [])
