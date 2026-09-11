@@ -32,7 +32,7 @@ function decodeJwtExp(token: string): number | null {
   } catch { return null; }
 }
 
-function loadTokens(): TochkaTokens | null {
+export function loadTokens(): TochkaTokens | null {
   try {
     if (fs.existsSync(TOKEN_FILE)) {
       const raw = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf-8'));
@@ -209,7 +209,7 @@ router.get('/auth-url', async (req, res) => {
       });
 
       // Редирект обратно в приложение с сообщением об успехе
-      return res.redirect('https://welans.cc/director?tochka=connected');
+      return res.redirect('https://welans.cc/settings?tochka=connected');
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
@@ -292,19 +292,19 @@ router.get('/status', authMiddleware, (_req, res) => {
   res.json({ connected: !!tokens?.access_token, expires_at: tokens?.expires_at || null, expired: false });
 });
 
-// GET /api/tochka/accounts
-router.get('/accounts', authMiddleware, async (_req, res) => {
+// Состояние интеграции для виджетов и плагина
+export async function getTochkaState() {
   try {
     const tokens = loadTokens();
-    if (!tokens?.access_token) return res.json({ accounts: [], totalBalance: 0, connected: false });
+    if (!tokens?.access_token) return { accounts: [], totalBalance: 0, connected: false, expires_at: null };
 
     // При 401/403 — авто-refresh и один повтор запроса
     const { response: dataRes } = await authHeadersWithRetry((h) => tochkaRequest('/open-banking/v1.0/accounts', { headers: h }));
-    if (dataRes.status !== 200) return res.json({ accounts: [], totalBalance: 0, error: `API ${dataRes.status}`, connected: true });
+    if (dataRes.status !== 200) return { accounts: [], totalBalance: 0, error: `API ${dataRes.status}`, connected: true, expires_at: tokens.expires_at };
 
     const customNames = loadAccountNames();
     const accounts = (dataRes.body?.Data?.Account || []).map((a: any) => ({
-      // Кастомное название из виджета; иначе — название из API банка (accountDetails.name), nickname, заглушка
+      // Кастомное название из настроек плагина; иначе — название из API банка (accountDetails.name), nickname, заглушка
       id: a.accountId,
       name: customNames[a.accountId] || a.accountDetails?.[0]?.name || a.nickname || 'Счёт в банке Точка',
       number: a.accountId,
@@ -313,7 +313,7 @@ router.get('/accounts', authMiddleware, async (_req, res) => {
       currency: a.currency || 'RUB'
     }));
 
-    // Ручной порядок из виджета; счета без записи в порядке — в конец (в порядке банка)
+    // Ручной порядок из настроек плагина; счета без записи в порядке — в конец (в порядке банка)
     const savedOrder = loadAccountOrder();
     if (savedOrder.length) {
       const rank = new Map(savedOrder.map((id, i) => [id, i]));
@@ -332,10 +332,15 @@ router.get('/accounts', authMiddleware, async (_req, res) => {
         } else acc.balance = 0;
       } catch { acc.balance = 0; }
     }
-    res.json({ accounts, totalBalance, currency: 'RUB', connected: true });
+    return { accounts, totalBalance, currency: 'RUB', connected: true, expires_at: tokens.expires_at };
   } catch (err: any) {
-    res.json({ accounts: [], totalBalance: 0, error: err.message, connected: false });
+    return { accounts: [], totalBalance: 0, error: err.message, connected: false, expires_at: null };
   }
+}
+
+// GET /api/tochka/accounts
+router.get('/accounts', authMiddleware, async (_req, res) => {
+  res.json(await getTochkaState());
 });
 
 // GET /api/tochka/account-names — кастомные названия счетов

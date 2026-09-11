@@ -238,8 +238,6 @@ export function Director() {
   const [tochkaConnected, setTochkaConnected] = useState(false);
   const [tochkaAccounts, setTochkaAccounts] = useState<any>(null);
   // Переименование счетов Точки прямо в виджете
-  const [editingTochkaAccountId, setEditingTochkaAccountId] = useState<string | null>(null);
-  const [tochkaNameDraft, setTochkaNameDraft] = useState("");
   const [pskovlinePlugin, setPskovlinePlugin] = useState<any>(null);
   const [pskovlineAccountsData, setPskovlineAccountsData] = useState<any[]>([]);
   const [cameraSettingsList, setCameraSettingsList] = useState<any[]>([]);
@@ -364,43 +362,6 @@ export function Director() {
     setMonthTasksLoading(null);
   };
 
-  // Сохранение кастомного названия счёта Точки (пустое — сброс к названию банка)
-  const saveTochkaAccountName = async (accountId: string, name: string) => {
-    setEditingTochkaAccountId(null);
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    try {
-      const token = localStorage.getItem('token');
-      await fetch('/api/tochka/account-names', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ accountId, name: trimmed }),
-      });
-      setTochkaAccounts((prev: any) => prev ? {
-        ...prev,
-        accounts: (prev.accounts || []).map((a: any) => a.id === accountId ? { ...a, name: trimmed } : a),
-      } : prev);
-    } catch {}
-  };
-
-  // Ручная сортировка счетов Точка Банк: сдвиг вверх/вниз с сохранением порядка на сервере
-  const moveTochkaAccount = async (index: number, direction: -1 | 1) => {
-    const accounts = tochkaAccounts?.accounts || [];
-    const target = index + direction;
-    if (target < 0 || target >= accounts.length) return;
-    const reordered = [...accounts];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    setTochkaAccounts((prev: any) => prev ? { ...prev, accounts: reordered } : prev);
-    try {
-      const token = localStorage.getItem('token');
-      await fetch('/api/tochka/account-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ order: reordered.map((a: any) => a.id) }),
-      });
-    } catch {}
-  };
-
   const handleDragStart = (event: any) => setActiveId(event.active.id);
   const handleDragEnd = (event: any) => {
     const { active, over } = event;
@@ -460,6 +421,7 @@ export function Director() {
   const widgetAllowed = (w: WidgetDef) => {
     if (w.id === "widget-beget") return begetActive;
     if (w.id === "widget-beget-partner") return begetActive && begetPartner;
+    if (w.id === "stat-tochka" || w.id === "widget-tochka") return tochkaConnected === true;
     if (w.id.startsWith("stat-pskovline")) {
       const idx = Number(w.id.replace("stat-pskovline-", "")) || 0;
       return pskovlineActive && idx < (pskovlinePlugin?.accounts?.length || 0);
@@ -558,28 +520,7 @@ export function Director() {
             </div>
           </>
         ) : (
-          <>
-            <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8 }}>Точка Банк</div>
-            <button
-              onClick={async (e) => {
-                e.stopPropagation();
-                try {
-                  const token = localStorage.getItem('token');
-                  const res = await fetch('/api/tochka/auth-url', {
-                    headers: token ? { Authorization: `Bearer ${token}` } : {}
-                  });
-                  const data = await res.json();
-                  if (data.authUrl) window.open(data.authUrl, '_blank');
-                } catch {}
-              }}
-              style={{
-                padding: "6px 12px", borderRadius: 8, border: "none",
-                background: "#e11d48", color: "#fff", fontSize: 12, cursor: "pointer", fontWeight: 500,
-              }}
-            >
-              Подключить
-            </button>
-          </>
+          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Точка Банк не подключена</div>
         );
       case "widget-online":
         return (
@@ -753,53 +694,8 @@ export function Director() {
                 {tochkaAccounts.accounts.map((acc: any, idx: number) => (
                   <div key={acc.id} style={{ padding: "10px 12px", borderRadius: 10, background: "var(--bg-input)" }}>
                     <div style={{ fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
-                      {editingTochkaAccountId === acc.id ? (
-                        <input
-                          autoFocus
-                          value={tochkaNameDraft}
-                          onChange={(e) => setTochkaNameDraft(e.target.value)}
-                          onBlur={() => saveTochkaAccountName(acc.id, tochkaNameDraft)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") saveTochkaAccountName(acc.id, tochkaNameDraft);
-                            if (e.key === "Escape") setEditingTochkaAccountId(null);
-                          }}
-                          style={{ flex: 1, minWidth: 0, fontSize: 13, padding: "2px 6px", borderRadius: 6, border: "1px solid var(--border-color)", background: "var(--bg-card)", color: "var(--text-primary)", outline: "none" }}
-                        />
-                      ) : (
-                        <>
-                          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{acc.name}</span>
+                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{acc.name}</span>
                           {acc.short ? <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>····{acc.short}</span> : null}
-                          <button
-                            onClick={() => { setEditingTochkaAccountId(acc.id); setTochkaNameDraft(acc.name || ""); }}
-                            title="Переименовать счёт"
-                            style={{ background: "none", border: "none", cursor: "pointer", padding: 2, opacity: 0.5, transition: "opacity 0.15s", color: "var(--text-muted)", fontSize: 13 }}
-                            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
-                            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => moveTochkaAccount(idx, -1)}
-                            disabled={idx === 0}
-                            title="Переместить выше"
-                            style={{ background: "none", border: "none", cursor: idx === 0 ? "default" : "pointer", padding: 2, opacity: idx === 0 ? 0.2 : 0.5, transition: "opacity 0.15s", color: "var(--text-muted)", fontSize: 11 }}
-                            onMouseEnter={(e) => { if (idx > 0) e.currentTarget.style.opacity = "1"; }}
-                            onMouseLeave={(e) => { if (idx > 0) e.currentTarget.style.opacity = "0.5"; }}
-                          >
-                            ▲
-                          </button>
-                          <button
-                            onClick={() => moveTochkaAccount(idx, 1)}
-                            disabled={idx === tochkaAccounts.accounts.length - 1}
-                            title="Переместить ниже"
-                            style={{ background: "none", border: "none", cursor: idx === tochkaAccounts.accounts.length - 1 ? "default" : "pointer", padding: 2, opacity: idx === tochkaAccounts.accounts.length - 1 ? 0.2 : 0.5, transition: "opacity 0.15s", color: "var(--text-muted)", fontSize: 11 }}
-                            onMouseEnter={(e) => { if (idx < tochkaAccounts.accounts.length - 1) e.currentTarget.style.opacity = "1"; }}
-                            onMouseLeave={(e) => { if (idx < tochkaAccounts.accounts.length - 1) e.currentTarget.style.opacity = "0.5"; }}
-                          >
-                            ▼
-                          </button>
-                        </>
-                      )}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
                       {(acc.balance || 0).toLocaleString("ru")} {acc.currency}
