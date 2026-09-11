@@ -43,6 +43,11 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     account: () => fetchApi('/api/beget/account'),
     domains: () => fetchApi('/api/beget/domains'),
   },
+  begetSettings: {
+    get: () => fetchApi('/api/beget-settings'),
+    save: (data: { login?: string; password?: string; isActive: boolean }) =>
+      fetchApi('/api/beget-settings', { method: 'POST', body: JSON.stringify(data) }),
+  },
   news: {
     list: (query?: string) => fetchApi(`/api/news${query ? '?' + query : ''}`),
     get: (id: string) => fetchApi(`/api/news/${id}`),

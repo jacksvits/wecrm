@@ -22,8 +22,25 @@ else:
     OUTPUT_JSON = os.path.join(SCRIPT_DIR, "..", "data", "beget.json")
 
 BEGET_API_URL = "https://api.beget.com/api/user/getAccountInfo"
-BEGET_LOGIN = "softboeg"
-BEGET_PASSWORD = "nyBNQofDm96"
+SETTINGS_JSON = os.path.join(os.path.dirname(OUTPUT_JSON), "beget_settings.json")
+
+
+def _load_settings():
+    try:
+        with open(SETTINGS_JSON, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+_settings = _load_settings()
+if _settings.get("is_active") is False:
+    print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Интеграция Beget деактивирована, пропуск")
+    raise SystemExit(0)
+
+# Креды берутся из настроек плагина (синхронизируются бэкендом), иначе — дефолтные
+BEGET_LOGIN = _settings.get("login") or "softboeg"
+BEGET_PASSWORD = _settings.get("password") or "nyBNQofDm96"
 
 # Поля личного кабинета, забираемые из API
 API_FIELDS = (

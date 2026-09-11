@@ -1004,3 +1004,13 @@ model Branding {
 
   @@map("branding")
 }
+
+model BegetSettings {
+  id        Int      @id @default(1)
+  login     String   @default("")
+  password  String   @default("")
+  isActive  Boolean  @default(false) @map("is_active")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("beget_settings")
+}

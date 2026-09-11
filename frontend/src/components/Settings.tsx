@@ -10,10 +10,11 @@ import { VkGroupSettings } from "./VkGroupSettings";
 import { ContactTypeManager } from "./ContactTypeManager";
 import { SmsJournal } from "./SmsJournal";
 import { YandexSettings } from "./YandexSettings";
+import BegetSettings from "./BegetSettings";
 import { SystemSettings } from "./SystemSettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "integrations" | "system";
-type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "beget";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
 const PLUGINS: { key: PluginKey; label: string; group: string; description: string }[] = [
@@ -24,6 +25,7 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "telegram", label: "Telegram", group: "Мессенджеры", description: "Уведомления и задачи из Telegram" },
   { key: "vk", label: "ВК Группа", group: "Мессенджеры", description: "Комментарии и товары ВКонтакте" },
   { key: "yandex", label: "Яндекс", group: "Сервисы", description: "API-ключ Яндекс.Карт" },
+  { key: "beget", label: "Beget", group: "Хостинг", description: "Хостинг-аккаунт: тариф, баланс, домены" },
 ];
 
 function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
@@ -35,6 +37,7 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
     telegram: "M12 19l9 2-9-18-9 18 9-2zm0 0v-8",
     vk: "M18 4h3v3h-3a4 4 0 00-4 4v2h4l-1 4h-3v7h-4v-7H7v-4h4v-3a6 6 0 016-6z",
     yandex: "M9 20l6-16M15 20L9 4",
+    beget: "M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01",
   };
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -59,6 +62,8 @@ function renderPluginSettings(pluginKey: PluginKey) {
       return <SmsJournal />;
     case "yandex":
       return <YandexSettings />;
+    case "beget":
+      return <BegetSettings />;
     default:
       return null;
   }
@@ -75,6 +80,7 @@ export function Settings() {
     vk: false,
     sms: false,
     yandex: false,
+    beget: false,
   });
 
   useEffect(() => {
