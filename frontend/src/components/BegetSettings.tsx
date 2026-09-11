@@ -3,7 +3,7 @@ import { api } from '../api/client';
 
 // === Плагин Beget (хостинг): настройки доступа + данные аккаунта ===
 export default function BegetSettings() {
-  const [settings, setSettings] = useState<{ login: string; hasPassword: boolean; isActive: boolean } | null>(null);
+  const [settings, setSettings] = useState<{ login: string; hasPassword: boolean; isActive: boolean; isPartner: boolean } | null>(null);
   const [account, setAccount] = useState<any>(null);
   const [form, setForm] = useState({ login: '', password: '' });
   const [saving, setSaving] = useState(false);
@@ -28,6 +28,23 @@ export default function BegetSettings() {
       setTimeout(() => setMsg(''), 3000);
     } catch (err: any) {
       setSettings({ ...settings, isActive: !checked });
+      setMsg('Ошибка: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const togglePartner = async (checked: boolean) => {
+    if (!settings) return;
+    setSettings({ ...settings, isPartner: checked });
+    setSaving(true);
+    try {
+      const res: any = await api.begetSettings.save({ isActive: settings.isActive, isPartner: checked });
+      setSettings(res);
+      setMsg(checked ? 'Партнёрский кабинет включён' : 'Партнёрский кабинет выключен');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err: any) {
+      setSettings({ ...settings, isPartner: !checked });
       setMsg('Ошибка: ' + err.message);
     } finally {
       setSaving(false);
@@ -80,6 +97,23 @@ export default function BegetSettings() {
         />
         <span style={{ fontSize: 14, fontWeight: 500 }}>Активировать интеграцию с Beget</span>
       </label>
+
+      {/* Партнёрский кабинет: виджет «Бегет-Партнёр» на странице директора */}
+      <label
+        style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, cursor: settings?.isActive ? 'pointer' : 'default', opacity: settings?.isActive ? 1 : 0.5 }}
+        title={settings?.isActive ? '' : 'Доступно при активной интеграции'}
+      >
+        <input
+          type="checkbox"
+          checked={settings?.isPartner ?? false}
+          onChange={(e) => togglePartner(e.target.checked)}
+          disabled={!settings || saving || !settings.isActive}
+        />
+        <span style={{ fontSize: 14, fontWeight: 500 }}>Партнёр</span>
+      </label>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20 }}>
+        Показывать виджет «Бегет-Партнёр» на странице директора и собирать партнёрские данные
+      </div>
 
       {/* Учётные данные */}
       <form onSubmit={handleSubmit}>

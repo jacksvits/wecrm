@@ -75,11 +75,15 @@ def fetch_account_api():
 
 
 def parse_beget():
-    # Запускаем Xvfb
-    os.system("pkill Xvfb 2>/dev/null; sleep 1; nohup Xvfb :99 -screen 0 1280x720x24 -ac > /dev/null 2>&1 & sleep 2")
-    os.environ['DISPLAY'] = ':99'
+    # Партнёрский кабинет парсится только при включённой галочке «Партнёр»
+    partner_enabled = _settings.get("is_partner") is not False
 
-    from playwright.sync_api import sync_playwright
+    if partner_enabled:
+        # Запускаем Xvfb
+        os.system("pkill Xvfb 2>/dev/null; sleep 1; nohup Xvfb :99 -screen 0 1280x720x24 -ac > /dev/null 2>&1 & sleep 2")
+        os.environ['DISPLAY'] = ':99'
+
+        from playwright.sync_api import sync_playwright
 
     result = {
         "updated_at": datetime.now().isoformat(),
@@ -92,7 +96,8 @@ def parse_beget():
         "error": None,
     }
 
-    with sync_playwright() as p:
+    if partner_enabled:
+      with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=False,
             executable_path='/usr/bin/chromium-browser',

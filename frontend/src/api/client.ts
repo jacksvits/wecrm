@@ -45,7 +45,7 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
   },
   begetSettings: {
     get: () => fetchApi('/api/beget-settings'),
-    save: (data: { login?: string; password?: string; isActive: boolean }) =>
+    save: (data: { login?: string; password?: string; isActive: boolean; isPartner?: boolean }) =>
       fetchApi('/api/beget-settings', { method: 'POST', body: JSON.stringify(data) }),
   },
   news: {

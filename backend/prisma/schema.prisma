@@ -1010,6 +1010,7 @@ model BegetSettings {
   login     String   @default("")
   password  String   @default("")
   isActive  Boolean  @default(false) @map("is_active")
+  isPartner  Boolean  @default(false) @map("is_partner")
   updatedAt DateTime @default(now()) @map("updated_at")
 
   @@map("beget_settings")

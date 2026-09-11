@@ -245,6 +245,7 @@ export function Director() {
   const [overdueTasks, setOverdueTasks] = useState<Task[]>([]);
   const [activeDeals, setActiveDeals] = useState<Deal[]>([]);
   const [begetAccount, setBegetAccount] = useState<any>(null);
+  const [begetPlugin, setBegetPlugin] = useState<any>(null);
   const [begetDomains, setBegetDomains] = useState<any[]>([]);
   const [tochkaConnected, setTochkaConnected] = useState(false);
   const [tochkaAccounts, setTochkaAccounts] = useState<any>(null);
@@ -345,6 +346,7 @@ export function Director() {
       setActiveDeals(d.slice(0, 5));
       setPushStatusUsers(psu || []);
       api.beget.account().then(setBegetAccount).catch(() => {});
+      api.begetSettings.get().then(setBegetPlugin).catch(() => {});
       api.beget.domains().then(setBegetDomains).catch(() => {});
       api.tochka.status().then((s: any) => {
         setTochkaConnected(s?.connected || false);
@@ -460,11 +462,21 @@ export function Director() {
 
   const tabWidgets = ALL_WIDGETS.filter((w) => w.tab === activeTab);
 
+  // Виджеты Beget зависят от плагина: неактивен плагин — нет виджетов;
+  // «Бегет-Партнёр» дополнительно требует галочку «Партнёр»
+  const begetActive = begetPlugin?.isActive === true;
+  const begetPartner = begetPlugin?.isPartner === true;
+  const widgetAllowed = (w: WidgetDef) => {
+    if (w.id === "widget-beget") return begetActive;
+    if (w.id === "widget-beget-partner") return begetActive && begetPartner;
+    return true;
+  };
+
   const visibleWidgets = widgetOrder
     .map((id) => ALL_WIDGETS.find((w) => w.id === id))
-    .filter((w): w is WidgetDef => !!w && !hidden.has(w.id) && w.tab === activeTab);
+    .filter((w): w is WidgetDef => !!w && !hidden.has(w.id) && w.tab === activeTab && widgetAllowed(w));
 
-  const hiddenWidgets = ALL_WIDGETS.filter((w) => hidden.has(w.id) && w.tab === activeTab);
+  const hiddenWidgets = ALL_WIDGETS.filter((w) => hidden.has(w.id) && w.tab === activeTab && widgetAllowed(w));
 
   const renderWidgetContent = (widget: WidgetDef) => {
     switch (widget.id) {
