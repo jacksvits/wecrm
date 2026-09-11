@@ -68,7 +68,29 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
     // Determine subfolder by entityType
     if (entityType === 'comment') {
       // For comments, entityId at upload time is the taskId
-      const task = await prisma.task.findUnique({ where: { id: entityId }, select: { ticketNumber: true } });
+      // Доступ к загрузке = доступ к задаче (админ, создатель, исполнители, кураторы)
+      const task = await prisma.task.findUnique({
+        where: { id: entityId },
+        select: {
+          ticketNumber: true,
+          creatorId: true,
+          assignees: { select: { userId: true } },
+          curators: { select: { userId: true } },
+        },
+      });
+      const userId = req.user!.id;
+      const hasAccess = req.user!.role === 'admin' ||
+        !!task && (
+          task.creatorId === userId ||
+          task.assignees.some(a => a.userId === userId) ||
+          task.curators.some(c => c.userId === userId)
+        );
+      if (!hasAccess) {
+        // Удаляем уже принятый multer-файл, чтобы не копить мусор в /app/uploads
+        const tmpPath = path.join(UPLOAD_DIR, req.file.filename);
+        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+        return res.status(403).json({ error: 'Доступ запрещен' });
+      }
       const ticketNum = task?.ticketNumber ?? entityId;
       const taskDir = path.join(TASKS_DIR, String(ticketNum));
       if (!fs.existsSync(taskDir)) {

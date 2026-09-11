@@ -13,6 +13,25 @@ const createSchema = z.object({
   isInternal: z.boolean().optional(),
 });
 
+// Проверка доступа к задаче: админ, создатель, исполнители и кураторы
+// (аналог canAccessTask из routes/tasks.ts — локальная копия, чтобы не тащить весь роутер)
+const canAccessTask = async (taskId: string, userId: string, role: string) => {
+  if (role === 'admin') return true;
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: {
+      creatorId: true,
+      assignees: { select: { userId: true } },
+      curators: { select: { userId: true } },
+    },
+  });
+  if (!task) return false;
+  if (task.creatorId === userId) return true;
+  if (task.assignees.some(a => a.userId === userId)) return true;
+  if (task.curators.some(c => c.userId === userId)) return true;
+  return false;
+};
+
 router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { taskId } = req.params;
@@ -29,6 +48,12 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
 
     if (!task) {
       return res.status(404).json({ error: 'Задача не найдена' });
+    }
+
+    // Доступ к обсуждению = доступ к задаче (админ, создатель, исполнители, кураторы)
+    const hasAccess = await canAccessTask(taskId, req.user!.id, req.user!.role);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Доступ запрещен' });
     }
 
     const comment = await prisma.comment.create({
@@ -203,9 +228,14 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
   }
 });
 
-router.get('/:taskId/comments', authMiddleware, async (req, res) => {
+router.get('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { taskId } = req.params;
+    // Доступ к обсуждению = доступ к задаче
+    const hasAccess = await canAccessTask(taskId, req.user!.id, req.user!.role);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Доступ запрещен' });
+    }
     const comments = await prisma.comment.findMany({
       where: { taskId },
       include: {
