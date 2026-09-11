@@ -154,7 +154,7 @@ export class EmailWorker {
         const task = await prisma.task.create({
           data: {
             title: cleanTitle,
-            description: parsed.text || parsed.html || '',
+            description: normalizeEmailDescription(parsed.text, typeof parsed.html === 'string' ? parsed.html : undefined),
             priority,
             status: 'open',
             creatorId,
