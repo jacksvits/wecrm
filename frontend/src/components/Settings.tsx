@@ -111,8 +111,11 @@ export function Settings() {
     <div>
       <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16 }}>Настройки</h2>
       <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+        <button style={tabStyle(activeTab === "system")} onClick={() => setActiveTab("system")}>
+          Системные
+        </button>
         <button style={tabStyle(activeTab === "roles")} onClick={() => setActiveTab("roles")}>
-          Роли
+          Права доступа
         </button>
         <button style={tabStyle(activeTab === "statuses")} onClick={() => setActiveTab("statuses")}>
           Статусы
@@ -125,9 +128,6 @@ export function Settings() {
         </button>
         <button style={tabStyle(activeTab === "integrations")} onClick={() => setActiveTab("integrations")}>
           Интеграции
-        </button>
-        <button style={tabStyle(activeTab === "system")} onClick={() => setActiveTab("system")}>
-          Системные
         </button>
       </div>
       {renderContent()}
