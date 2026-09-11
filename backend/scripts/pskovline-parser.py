@@ -91,7 +91,7 @@ def parse_account(account):
     }
 
     balance_match = re.search(
-        r'<td[^>]*>\s*Баланс\s*</td>\s*<td[^>]*>\s*<strong[^>]*>([0-9]+(?:[.,][0-9]+)?)</strong>',
+        r'<td[^>]*>\s*Баланс\s*</td>\s*<td[^>]*>\s*<strong[^>]*>(?:<[^>]+>)*\s*([0-9]+(?:[.,][0-9]+)?)',
         text,
         re.IGNORECASE | re.DOTALL,
     )
@@ -99,7 +99,7 @@ def parse_account(account):
         result["balance"] = float(balance_match.group(1).replace(",", "."))
     else:
         alt_balance = re.search(
-            r'<td[^>]*>\s*Баланс\s*</td>\s*<td[^>]*>\s*([0-9]+(?:[.,][0-9]+)?)',
+            r'<td[^>]*>\s*Баланс\s*</td>\s*<td[^>]*>(?:<[^>]+>)*\s*([0-9]+(?:[.,][0-9]+)?)',
             text,
             re.IGNORECASE | re.DOTALL,
         )
