@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
+import { sendPushToUser } from '../lib/push.js';
 
 const router = Router();
 const MAX_API_BASE = 'https://platform-api2.max.ru';
