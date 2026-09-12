@@ -41,9 +41,32 @@ async function api(method: string, params: Record<string, any> = {}, accessToken
 
 async function getUserInfo(userId: number, accessToken: string) {
   try {
-    const res = await api('users.get', { user_ids: userId }, accessToken);
+    // Запрашиваем также фото профиля, чтобы сохранить аватарку контакта
+    const res = await api('users.get', { user_ids: userId, fields: 'photo_200' }, accessToken);
     return res?.[0] || null;
   } catch {
+    return null;
+  }
+}
+
+// Скачивает аватарку пользователя ВК на локальный сервер (в uploads),
+// чтобы контакт не зависел от временных ссылок VK CDN
+async function downloadVkAvatar(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error('[VK Processor] Avatar download HTTP', res.status, url);
+      return null;
+    }
+    const buffer = await res.arrayBuffer();
+    const ext = path.extname(new URL(url).pathname) || '.jpg';
+    const filename = `${randomUUID()}${ext}`;
+    const filepath = path.join(UPLOAD_DIR, filename);
+    fs.writeFileSync(filepath, Buffer.from(buffer));
+    console.log('[VK Processor] Avatar saved to', filepath);
+    return `/uploads/${filename}`;
+  } catch (err) {
+    console.error('[VK Processor] Avatar download error:', err);
     return null;
   }
 }
@@ -138,23 +161,48 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
   }
 
   let contactId: string | undefined;
+  const vkProfileUrl = `https://vk.com/id${fromId}`;
   const contact = await prisma.contact.findUnique({ where: { vkUserId: fromId } });
   if (contact) {
     contactId = contact.id;
     console.log(`[VK Processor] Found contact ${contactId} for VK user ${fromId}`);
+
+    // Дозаполняем аватарку и ссылку на профиль ВК для ранее созданных контактов
+    if (!contact.avatarUrl || !contact.vkProfileUrl) {
+      const userInfo = await getUserInfo(fromId, settings.accessToken);
+      let avatarUrl = contact.avatarUrl;
+      if (!avatarUrl && userInfo?.photo_200) {
+        avatarUrl = await downloadVkAvatar(userInfo.photo_200);
+      }
+      const updated = await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          avatarUrl: avatarUrl || contact.avatarUrl,
+          vkProfileUrl: contact.vkProfileUrl || vkProfileUrl,
+        },
+      });
+      console.log(`[VK Processor] Updated contact ${contactId}: avatar=${updated.avatarUrl || 'none'}, profile=${updated.vkProfileUrl}`);
+    }
   } else if (settings.autoCreateContact) {
     const userInfo = await getUserInfo(fromId, settings.accessToken);
     const name = userInfo ? `${userInfo.first_name || ''} ${userInfo.last_name || ''}`.trim() : `VK ${fromId}`;
+    // Скачиваем аватарку из ВК и сохраняем локально
+    let avatarUrl: string | null = null;
+    if (userInfo?.photo_200) {
+      avatarUrl = await downloadVkAvatar(userInfo.photo_200);
+    }
     const newContact = await prisma.contact.create({
       data: {
         name,
         vkUserId: fromId,
+        vkProfileUrl,
+        avatarUrl,
         type: 'client',
         notes: 'Автоматически создан из сообщения ВК группы',
       },
     });
     contactId = newContact.id;
-    console.log(`[VK Processor] Created contact ${newContact.id} for VK user ${fromId}`);
+    console.log(`[VK Processor] Created contact ${newContact.id} for VK user ${fromId}, avatar=${avatarUrl || 'none'}`);
   } else {
     console.log(`[VK Processor] No contact found for VK user ${fromId} and autoCreateContact is disabled`);
   }

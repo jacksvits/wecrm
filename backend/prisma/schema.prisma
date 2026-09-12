@@ -124,6 +124,7 @@ model Contact {
   tags        String[] @default([])
   notes       String?
   vkUserId    Int?     @unique @map("vk_user_id")
+  vkProfileUrl     String?  @map("vk_profile_url")
   maxChatId        String?  @unique @map("max_chat_id")
   maxUserId        String?  @map("max_user_id")
   avatarUrl        String?  @map("avatar_url")

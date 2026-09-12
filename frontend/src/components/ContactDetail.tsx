@@ -150,6 +150,12 @@ export function ContactDetail() {
               {contact.emails?.filter(Boolean).map((e, i) => <span key={i} style={{ fontSize: 14 }}>{e}</span>) || <span style={{ fontSize: 14 }}>{contact.email || '—'}</span>}
             </div>
           </div>
+          {contact.vkProfileUrl && (
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Профиль ВК</span>
+              <a href={contact.vkProfileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 14, color: '#1565c0', fontWeight: 500, textDecoration: 'none' }}>{contact.vkProfileUrl}</a>
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Теги</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
