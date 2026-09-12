@@ -41,22 +41,28 @@ const createSchema = z.object({
 
 router.get('/', async (req, res) => {
   try {
-    const { type, search, kind, page, limit, tag, includeHidden } = req.query;
+    const { type, search, kind, page, limit, tag, includeHidden, onlyHidden } = req.query;
     const where: any = {};
     if (type) where.type = type;
     if (kind) where.kind = kind;
     if (tag) where.tags = { has: tag as string };
 
-    // Фильтрация: скрывать контакты типов с isVisible=false (спам, рассылка, чёрный список).
-    // С параметром includeHidden=1 возвращаем все записи, включая скрытые типы.
+    // Фильтрация по видимости типов (спам, рассылка, чёрный список):
+    // - по умолчанию скрытые типы исключаются;
+    // - includeHidden=1 — все записи, включая скрытые;
+    // - onlyHidden=1 — только записи скрытых типов.
     const showHidden = includeHidden === '1' || includeHidden === 'true';
-    if (!showHidden) {
+    const hiddenOnly = onlyHidden === '1' || onlyHidden === 'true';
+    if (hiddenOnly || !showHidden) {
       const hiddenTypes = await prisma.contactType.findMany({
         where: { isVisible: false },
         select: { name: true },
       });
-      if (hiddenTypes.length > 0) {
-        where.NOT = { type: { in: hiddenTypes.map(t => t.name) } };
+      const hiddenNames = hiddenTypes.map(t => t.name);
+      if (hiddenOnly) {
+        where.type = { in: hiddenNames };
+      } else if (hiddenNames.length > 0) {
+        where.NOT = { type: { in: hiddenNames } };
       }
     }
 

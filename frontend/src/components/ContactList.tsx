@@ -39,7 +39,7 @@ export function ContactList() {
   const [sortBy, setSortBy] = useState('createdAtDesc');
   const [search, setSearch] = useState('');
   // Список разделён на контакты и организации; вкладка «Скрытые» показывает
-  // все записи, включая скрытые типы (спам, рассылка, чёрный список)
+  // только скрытые типы (спам, рассылка, чёрный список)
   const [kindFilter, setKindFilter] = useState<'contact' | 'organization' | 'all'>(() => {
     const saved = localStorage.getItem('contactsKindFilter');
     return saved === 'organization' || saved === 'all' ? saved : 'contact';
@@ -151,8 +151,8 @@ export function ContactList() {
   const loadContacts = async (reset = false) => {
     const params = new URLSearchParams();
     if (kindFilter === 'all') {
-      // Вкладка «Скрытые»: все виды записей + скрытые типы (спам, рассылка, чёрный список)
-      params.set('includeHidden', '1');
+      // Вкладка «Скрытые»: только скрытые типы (спам, рассылка, чёрный список)
+      params.set('onlyHidden', '1');
     } else {
       params.set('kind', kindFilter);
     }
