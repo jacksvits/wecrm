@@ -126,6 +126,10 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     complete: (id: string) => fetchApi(`/api/reminders/${id}/complete`, { method: 'POST' }),
     reopen: (id: string) => fetchApi(`/api/reminders/${id}/reopen`, { method: 'POST' }),
   },
+  handlerSettings: {
+    get: (): Promise<{ greeting: string; completion: string; userId: string | null; user?: { id: string; name: string } | null }> => fetchApi("/api/handler-settings"),
+    save: (data: { greeting: string; completion: string; userId: string | null }) => fetchApi("/api/handler-settings", { method: "PUT", body: JSON.stringify(data) }),
+  },
   files: {
     tabs: () => fetchApi("/api/files/tabs"),
     updateTab: (tabKey: string, url: string, path: string) => fetchApi(`/api/files/tabs/${tabKey}`, { method: "POST", body: JSON.stringify({ url, path }) }),

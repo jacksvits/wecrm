@@ -87,6 +87,7 @@ model User {
   telegramSettings TelegramSettings[]
   telegramSettingsDefaultCreator TelegramSettings[] @relation("TelegramDefaultCreator")
   telegramUserChats TelegramUserChat[]
+  handlerSettings HandlerSettings[]
   stockMovements  StockMovement[]
   priceHistory    PriceHistory[]
   @@map("users")
@@ -1065,4 +1066,17 @@ model TelegramUserChat {
   user      User?    @relation(fields: [userId], references: [id])
 
   @@map("telegram_user_chat")
+}
+
+// Настройки «Обработчика»: авто-сообщения в обсуждение задачи
+model HandlerSettings {
+  id         String   @id @default(cuid())
+  greeting   String   @default("")
+  completion String   @default("")
+  userId     String?  @map("user_id")
+  user       User?    @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("handler_settings")
 }

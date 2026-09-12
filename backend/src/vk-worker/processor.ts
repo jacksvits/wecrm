@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { postHandlerGreeting } from '../lib/handler-messages.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
 import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js';
@@ -285,6 +286,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
         },
       });
       console.log(`[VK Processor] Created task ${task.id} for peer ${fromId} (msg ${msg.id})`);
+      postHandlerGreeting(task.id); // Обрабо «Приветствие» в обсуждение новой задачи
 
       const taskDir = path.join(TASKS_DIR, String(task.ticketNumber || task.id));
       if (!fs.existsSync(taskDir)) {

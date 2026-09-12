@@ -1,6 +1,21 @@
 import { useEffect, useState } from "react";
+import ReactQuill from "react-quill";
+import "react-quill/dist/quill.snow.css";
 import { api } from "../api/client";
 import { loadBranding } from "../lib/branding";
+import { User } from "../types";
+
+// WYSIWYG-редактор — та же конфигурация, что и в остальных текстовых полях проекта
+const quillModules = {
+  toolbar: [
+    ["bold", "italic", "underline", "strike"],
+    [{ list: "ordered" }, { list: "bullet" }],
+    ["link"],
+    ["clean"],
+  ],
+};
+
+const quillFormats = ["bold", "italic", "underline", "strike", "list", "bullet", "link"];
 
 const TAB_CONFIGS = [
   { key: "programs", label: "Программы", defaultPath: "/volume3/SOFT" },
@@ -9,7 +24,7 @@ const TAB_CONFIGS = [
   { key: "games", label: "Игры", defaultPath: "/volume3/GAME" },
 ];
 
-type SystemSubTab = "design" | "storage";
+type SystemSubTab = "design" | "storage" | "handler";
 
 export function SystemSettings() {
   // По умолчанию открываем под-вкладку «Дизайн»
@@ -23,6 +38,42 @@ export function SystemSettings() {
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
+
+  // === Обработчик: авто-сообщения в обсуждение задачи ===
+  const [handlerGreeting, setHandlerGreeting] = useState("");
+  const [handlerCompletion, setHandlerCompletion] = useState("");
+  const [handlerUserId, setHandlerUserId] = useState<string | null>(null);
+  const [handlerUsers, setHandlerUsers] = useState<User[]>([]);
+  const [handlerLoading, setHandlerLoading] = useState(true);
+  const [handlerSaving, setHandlerSaving] = useState(false);
+
+  useEffect(() => {
+    Promise.all([api.handlerSettings.get(), api.users.list()])
+      .then(([s, users]) => {
+        setHandlerGreeting(s.greeting || "");
+        setHandlerCompletion(s.completion || "");
+        setHandlerUserId(s.userId || null);
+        setHandlerUsers(users || []);
+        setHandlerLoading(false);
+      })
+      .catch(() => setHandlerLoading(false));
+  }, []);
+
+  const saveHandler = async () => {
+    setHandlerSaving(true);
+    try {
+      await api.handlerSettings.save({
+        greeting: handlerGreeting,
+        completion: handlerCompletion,
+        userId: handlerUserId,
+      });
+      alert("Сохранено");
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    } finally {
+      setHandlerSaving(false);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/branding")
@@ -303,6 +354,122 @@ export function SystemSettings() {
     </div>
   );
 
+  // === Под-вкладка «Обработчик»: авто-сообщения в обсуждение задач ===
+  const renderHandler = () => {
+    if (handlerLoading) return <div style={{ padding: 20, color: "var(--text-muted)" }}>Загрузка...</div>;
+
+    return (
+      <div>
+        <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 14 }}>
+          Автоматические сообщения в обсуждение задачи. Работает только при включённых плагинах «MAX», «Telegram» и «ВК Группа» (раздел «Интеграции»)
+        </p>
+
+        {/* Приветствие */}
+        <div
+          style={{
+            marginBottom: 20,
+            padding: 20,
+            borderRadius: 12,
+            border: "1px solid var(--border-color)",
+            background: "var(--bg-card)",
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Приветствие</div>
+          <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-muted)" }}>
+            Автоматически добавляется в обсуждение при создании новой задачи
+          </p>
+          <ReactQuill
+            theme="snow"
+            value={handlerGreeting}
+            onChange={setHandlerGreeting}
+            modules={quillModules}
+            formats={quillFormats}
+            placeholder="Текст приветствия..."
+          />
+        </div>
+
+        {/* Завершение задачи */}
+        <div
+          style={{
+            marginBottom: 20,
+            padding: 20,
+            borderRadius: 12,
+            border: "1px solid var(--border-color)",
+            background: "var(--bg-card)",
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Завершение задачи</div>
+          <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-muted)" }}>
+            Автоматически добавляется в обсуждение, когда статус задачи меняется на «Выполнена»
+          </p>
+          <ReactQuill
+            theme="snow"
+            value={handlerCompletion}
+            onChange={setHandlerCompletion}
+            modules={quillModules}
+            formats={quillFormats}
+            placeholder="Текст сообщения о завершении..."
+          />
+        </div>
+
+        {/* Пользователь, от имени которого публикуются сообщения */}
+        <div
+          style={{
+            marginBottom: 20,
+            padding: 20,
+            borderRadius: 12,
+            border: "1px solid var(--border-color)",
+            background: "var(--bg-card)",
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Публикация от имени</div>
+          <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-muted)" }}>
+            Автоматические сообщения будут добавлены в обсуждение от имени выбранного пользователя
+          </p>
+          <select
+            value={handlerUserId || ""}
+            onChange={(e) => setHandlerUserId(e.target.value || null)}
+            style={{
+              width: "100%",
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid var(--border-color)",
+              background: "var(--bg-color)",
+              color: "var(--text-color)",
+              fontSize: 14,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          >
+            <option value="">— Не выбран (сообщения отключены) —</option>
+            {handlerUsers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          onClick={saveHandler}
+          disabled={handlerSaving}
+          style={{
+            padding: "8px 16px",
+            borderRadius: 10,
+            background: "#007AFF",
+            color: "#fff",
+            border: "none",
+            cursor: "pointer",
+            fontSize: 14,
+            opacity: handlerSaving ? 0.7 : 1,
+          }}
+        >
+          {handlerSaving ? "Сохранение..." : "Сохранить"}
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div>
       <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>Системные настройки</h3>
@@ -314,9 +481,12 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "storage")} onClick={() => setSubTab("storage")}>
           Хранение
         </button>
+        <button style={subTabStyle(subTab === "handler")} onClick={() => setSubTab("handler")}>
+          Обработчик
+        </button>
       </div>
 
-      {subTab === "design" ? renderDesign() : renderStorage()}
+      {subTab === "design" ? renderDesign() : subTab === "storage" ? renderStorage() : renderHandler()}
     </div>
   );
 }

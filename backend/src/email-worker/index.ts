@@ -1,6 +1,7 @@
 import { ImapFlow, ImapFlowOptions, FetchMessageObject } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { prisma } from '../lib/prisma.js';
+import { postHandlerGreeting } from '../lib/handler-messages.js';
 import { normalizeEmailDescription } from '../lib/email-description.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
 import { sendPushToRoleUsers, sendPushToTaskAssignees, sendPushToTaskCurators } from '../lib/push.js';
@@ -170,6 +171,8 @@ export class EmailWorker {
               : undefined,
           },
         });
+
+        postHandlerGreeting(task.id); // Обработчик: «Приветствие» в обсуждение новой задачи
 
         // Отправляем уведомления о новой задаче из письма (аналогично ручному созданию)
         try {

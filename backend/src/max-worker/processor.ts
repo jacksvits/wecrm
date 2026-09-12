@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { postHandlerGreeting } from '../lib/handler-messages.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { resolveContactAuto } from '../lib/contact-dedup.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
@@ -228,6 +229,7 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
       });
 
       console.log('[MAX Processor] Created task', task.id);
+      postHandlerGreeting(task.id); // Обработчик: «Приветствие» в обсуждение новой задачи
 
       const taskDir = path.join(TASKS_DIR, String(task.ticketNumber || task.id));
       if (!fs.existsSync(taskDir)) {
