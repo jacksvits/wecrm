@@ -363,6 +363,9 @@ export function SystemSettings() {
         <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 14 }}>
           Автоматические сообщения в обсуждение задачи. Работает только при включённых плагинах «MAX», «Telegram» и «ВК Группа» (раздел «Интеграции»)
         </p>
+        <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 13 }}>
+          В тексте можно использовать переменные: <strong>[name]</strong> — имя контакта, который обратился; <strong>[task]</strong> — номер задачи
+        </p>
 
         {/* Приветствие */}
         <div

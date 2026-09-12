@@ -39,6 +39,16 @@ function isChannelAllowed(task: any, plugins: { max: boolean; telegram: boolean;
   return true;
 }
 
+// Подстановка переменных из данных задачи:
+// [name] — имя контакта, который обратился; [task] — номер задачи (ticketNumber)
+function applyTaskVariables(content: string, task: any): string {
+  const contactName = task?.contact?.name?.trim() || 'клиент';
+  const ticket = task?.ticketNumber != null ? String(task.ticketNumber) : '';
+  return content
+    .replace(/\[name\]/gi, contactName)
+    .replace(/\[task\]/gi, ticket);
+}
+
 // Публикация автоматического сообщения в обсуждение задачи от имени выбранного пользователя
 async function postAutoMessage(taskId: string, content: string): Promise<void> {
   const config = await getHandlerConfig();
@@ -48,7 +58,7 @@ async function postAutoMessage(taskId: string, content: string): Promise<void> {
   const text = stripHtml(content);
   if (!text) return;
 
-  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  const task = await prisma.task.findUnique({ where: { id: taskId }, include: { contact: { select: { name: true } } } });
   if (!task) return;
   if (!isChannelAllowed(task, plugins)) return;
 
@@ -57,7 +67,7 @@ async function postAutoMessage(taskId: string, content: string): Promise<void> {
 
   await prisma.comment.create({
     data: {
-      content,
+      content: applyTaskVariables(content, task),
       authorId: settings.userId,
       taskId,
     },
