@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { processMaxMessage } from '../max-worker/processor.js';
+import { resolveContactAuto, normalizePhoneNumber } from '../lib/contact-dedup.js';
 
 const router = Router();
 const MAX_API_BASE = 'https://platform-api2.max.ru';
@@ -225,6 +227,14 @@ router.post('/webhook', async (req, res) => {
       },
     });
 
+    // Вложение-контакт: пользователь поделился номером телефона.
+    // Обрабатываем отдельно, чтобы не создавать из него задачу-пустышку.
+    const contactAttachment = attachments.find((a: any) => a?.type === 'contact');
+    if (contactAttachment) {
+      await handleMaxContactAttachment(contactAttachment, String(chatId), senderName, maxSettings);
+      return res.json({ ok: true });
+    }
+
     await processMaxMessage({
       id: messageId,
       chat_id: String(chatId),
@@ -232,7 +242,8 @@ router.post('/webhook', async (req, res) => {
       text,
       sender_name: senderName,
       sender_username: senderUsername,
-      sender_avatar: maxMessage.sender?.avatar_url,
+      // full_avatar_url — фото в лучшем качестве, avatar_url — запасной вариант
+      sender_avatar: maxMessage.sender?.full_avatar_url || maxMessage.sender?.avatar_url,
       sender_description: maxMessage.sender?.description,
       attachments,
     }, maxSettings);
@@ -283,6 +294,78 @@ router.get('/my-chat', authMiddleware, async (req: AuthRequest, res) => {
 });
 
 // Helper function to send message to MAX
+// Обработка вложения-контакта из MAX: извлекает телефон из vCard,
+// проверяет hash (HMAC-SHA256 от токена бота), что номер принадлежит отправителю,
+// и сохраняет номер в контакт CRM
+async function handleMaxContactAttachment(attachment: any, chatId: string, senderName: string, settings: any) {
+  try {
+    const payload = attachment?.payload || {};
+    const vcfInfo: string = payload.vcf_info || payload.vcfInfo || '';
+    const maxInfo = payload.max_info || payload.maxInfo || payload.tam_info || payload.tamInfo || {};
+
+    // Телефон берём из max_info, либо парсим из vCard (строка TEL:...)
+    let phoneRaw: string = maxInfo.phone || '';
+    if (!phoneRaw && vcfInfo) {
+      const m = vcfInfo.match(/TEL[^:\r\n]*:([^\r\n]+)/i);
+      if (m) phoneRaw = m[1].trim();
+    }
+    const phone = normalizePhoneNumber(phoneRaw);
+    if (!phone) {
+      console.log('[MAX Webhook] Contact attachment without phone, chat', chatId);
+      return;
+    }
+
+    // Проверяем, что контакт принадлежит отправителю (если MAX передал hash)
+    const providedHash: string = payload.hash || '';
+    if (providedHash && vcfInfo) {
+      const variants = [vcfInfo, vcfInfo.replace(/\r?\n/g, '\r\n')];
+      const valid = variants.some(
+        (v) => crypto.createHmac('sha256', settings.apiToken).update(v).digest('hex') === providedHash
+      );
+      if (!valid) {
+        console.log('[MAX Webhook] Contact hash mismatch, chat', chatId, '— чужой контакт, номер не сохраняем');
+        await sendMaxMessage(chatId, 'Похоже, вы отправили чужой контакт. Пожалуйста, отправьте свой номер кнопкой «Отправить номер телефона».', settings.apiToken);
+        return;
+      }
+    }
+
+    const contact = await prisma.contact.findUnique({ where: { maxChatId: chatId } });
+    if (contact) {
+      const phones = Array.from(new Set([...(contact.phones || []), phone]));
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          phones,
+          phone: contact.phone || phone,
+          lastActivityTime: new Date(),
+        },
+      });
+      console.log('[MAX Webhook] Phone saved to contact', contact.id, ':', phone);
+    } else if (settings.autoCreateContact) {
+      const resolved = await resolveContactAuto(
+        { name: senderName, phone },
+        {
+          name: senderName,
+          maxChatId: chatId,
+          phones: [phone],
+          phone,
+          type: 'client',
+          notes: 'Автоматически создан из сообщения MAX',
+          lastActivityTime: new Date(),
+        },
+      );
+      console.log('[MAX Webhook] Contact', resolved.created ? 'created' : 'resolved', resolved.contactId, 'with phone', phone);
+    } else {
+      console.log('[MAX Webhook] No contact for chat', chatId, 'and autoCreateContact is disabled');
+      return;
+    }
+
+    await sendMaxMessage(chatId, 'Спасибо! Ваш номер телефона сохранён ✅', settings.apiToken);
+  } catch (err: any) {
+    console.error('[MAX Webhook] handleMaxContactAttachment error:', err.message);
+  }
+}
+
 async function sendMaxMessage(chatId: string, text: string, apiToken: string) {
   try {
     console.log('[MAX Send] Sending to chat_id:', chatId, 'text:', text.substring(0, 50));

@@ -11,9 +11,64 @@ import { randomUUID } from 'crypto';
 
 const UPLOAD_DIR = '/app/uploads';
 const TASKS_DIR = path.join(UPLOAD_DIR, 'tasks');
+const MAX_API_BASE = 'https://platform-api2.max.ru';
 
 if (!fs.existsSync(TASKS_DIR)) {
   fs.mkdirSync(TASKS_DIR, { recursive: true });
+}
+
+// Скачивает аватарку пользователя MAX на локальный сервер (в uploads),
+// чтобы контакт не зависел от внешних ссылок MAX CDN
+async function downloadMaxAvatar(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error('[MAX Processor] Avatar download HTTP', res.status, url);
+      return null;
+    }
+    const buffer = await res.arrayBuffer();
+    const ext = path.extname(new URL(url).pathname) || '.jpg';
+    const filename = `${randomUUID()}${ext}`;
+    const filepath = path.join(UPLOAD_DIR, filename);
+    fs.writeFileSync(filepath, Buffer.from(buffer));
+    console.log('[MAX Processor] Avatar saved to', filepath);
+    return `/uploads/${filename}`;
+  } catch (err) {
+    console.error('[MAX Processor] Avatar download error:', err);
+    return null;
+  }
+}
+
+// Отправляет кнопку request_contact, чтобы клиент одним нажатием поделился номером телефона
+async function sendMaxContactRequest(chatId: string, apiToken: string) {
+  try {
+    if (!apiToken) return;
+    const response = await fetch(`${MAX_API_BASE}/messages?chat_id=${chatId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': apiToken,
+      },
+      body: JSON.stringify({
+        text: 'Чтобы мы могли связаться с вами быстрее, отправьте, пожалуйста, свой номер телефона кнопкой ниже 👇',
+        attachments: [
+          {
+            type: 'inline_keyboard',
+            payload: {
+              buttons: [[{ type: 'request_contact', text: '📱 Отправить номер телефона' }]],
+            },
+          },
+        ],
+      }),
+    });
+    if (!response.ok) {
+      console.error('[MAX Processor] Contact request send failed:', response.status, await response.text());
+    } else {
+      console.log('[MAX Processor] Contact request sent to chat', chatId);
+    }
+  } catch (err) {
+    console.error('[MAX Processor] Contact request send error:', err);
+  }
 }
 
 export interface MaxMessage {
@@ -66,8 +121,12 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
     const updateData: any = {
       lastActivityTime: new Date(),
     };
-    if (msg.sender_avatar !== undefined && msg.sender_avatar !== null) {
-      updateData.avatarUrl = msg.sender_avatar;
+    // Аватарку храним локально: скачиваем с CDN MAX, если её нет или она ещё внешняя
+    if (msg.sender_avatar && (!contact.avatarUrl || contact.avatarUrl.startsWith('http'))) {
+      const localAvatar = await downloadMaxAvatar(msg.sender_avatar);
+      if (localAvatar) {
+        updateData.avatarUrl = localAvatar;
+      }
     }
     if (msg.sender_description !== undefined && msg.sender_description !== null) {
       updateData.description = msg.sender_description;
@@ -80,13 +139,18 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
     console.log('[MAX Processor] Updated contact', contactId, 'avatar, description, lastActivityTime');
   } else if (settings.autoCreateContact) {
     const name = msg.sender_name || 'MAX ' + chatId;
+    // Скачиваем аватарку из MAX и сохраняем локально
+    let avatarUrl: string | null = null;
+    if (msg.sender_avatar) {
+      avatarUrl = await downloadMaxAvatar(msg.sender_avatar);
+    }
     const resolved = await resolveContactAuto(
       { name },
       {
         name,
         maxChatId: chatId,
         maxUserId: userId,
-        avatarUrl: msg.sender_avatar || null,
+        avatarUrl,
         description: msg.sender_description || null,
         lastActivityTime: new Date(),
         type: 'client',
@@ -94,7 +158,12 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
       },
     );
     contactId = resolved.contactId;
-    console.log('[MAX Processor]', resolved.created ? 'Created contact' : 'Resolved existing contact', contactId, 'for MAX chat', chatId);
+    console.log('[MAX Processor]', resolved.created ? 'Created contact' : 'Resolved existing contact', contactId, 'for MAX chat', chatId, ', avatar=', avatarUrl || 'none');
+
+    // MAX не передаёт телефон в данных отправителя — просим номер кнопкой request_contact
+    if (resolved.created) {
+      await sendMaxContactRequest(chatId, settings.apiToken);
+    }
   } else {
     console.log('[MAX Processor] No contact found for MAX chat', chatId, 'and autoCreateContact is disabled');
   }
