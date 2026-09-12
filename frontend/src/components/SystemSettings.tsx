@@ -17,6 +17,11 @@ const quillModules = {
 
 const quillFormats = ["bold", "italic", "underline", "strike", "list", "bullet", "link"];
 
+// Шаблоны «по умолчанию» для обработчика — подставляются кнопкой «По умолчанию»
+const HANDLER_DEFAULT_GREETING = `<p>Здравствуйте, <strong>[name]</strong>.</p><p><br></p><p>Заявка № <strong>[task]</strong></p><p>Менеджера уже позвал. Ожидайте пожалуйста.</p><p>(Если это очень срочно - напишите: "срочно!")</p><p>----------------------------------------</p><p>Пока оператор подключается скажите пожалуйста:</p><ul><li>Подскажите Ваш номер телефона.</li><li>Вы обращаетесь от организации?</li></ul>`;
+
+const HANDLER_DEFAULT_COMPLETION = `<p>Задача № <strong>[task]</strong> перешла в статус "<strong>Выполнено</strong>". </p><p>Если есть ещё вопросы, то обращайтесь иначе будет создана новая заявка.</p><p>Через 10 мин перейдёт в статус "<strong>Завершено</strong>"</p><p>----------------------------------------</p><p>Будем рады если оставите отзыв: <a href="https://yandex.ru/maps/-/CLdgeDoA" rel="noopener noreferrer" target="_blank">Yandex</a> / <a href="https://2gis.ru/reviews/70000001089480719/addReview" rel="noopener noreferrer" target="_blank">2Gis</a></p><p>Заранее благодарим! </p><p> </p>`;
+
 const TAB_CONFIGS = [
   { key: "programs", label: "Программы", defaultPath: "/volume3/SOFT" },
   { key: "drivers", label: "Драйвера", defaultPath: "/volume3/DRIVER" },
@@ -453,22 +458,42 @@ export function SystemSettings() {
           </select>
         </div>
 
-        <button
-          onClick={saveHandler}
-          disabled={handlerSaving}
-          style={{
-            padding: "8px 16px",
-            borderRadius: 10,
-            background: "#007AFF",
-            color: "#fff",
-            border: "none",
-            cursor: "pointer",
-            fontSize: 14,
-            opacity: handlerSaving ? 0.7 : 1,
-          }}
-        >
-          {handlerSaving ? "Сохранение..." : "Сохранить"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={saveHandler}
+            disabled={handlerSaving}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              background: "#007AFF",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 14,
+              opacity: handlerSaving ? 0.7 : 1,
+            }}
+          >
+            {handlerSaving ? "Сохранение..." : "Сохранить"}
+          </button>
+          <button
+            onClick={() => {
+              setHandlerGreeting(HANDLER_DEFAULT_GREETING);
+              setHandlerCompletion(HANDLER_DEFAULT_COMPLETION);
+            }}
+            title="Подставить тексты-шаблоны в поля «Приветствие» и «Завершение задачи» (в базу запишется после «Сохранить»)"
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              background: "transparent",
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border-color)",
+              cursor: "pointer",
+              fontSize: 14,
+            }}
+          >
+            По умолчанию
+          </button>
+        </div>
       </div>
     );
   };
