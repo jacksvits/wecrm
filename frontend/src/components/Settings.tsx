@@ -80,7 +80,8 @@ function renderPluginSettings(pluginKey: PluginKey) {
 }
 
 export function Settings() {
-  const [activeTab, setActiveTab] = useState<MainTab>("roles");
+  // По умолчанию открываем «Системные» настройки
+  const [activeTab, setActiveTab] = useState<MainTab>("system");
   const [selectedPlugin, setSelectedPlugin] = useState<PluginKey | null>(null);
   const [pluginStatus, setPluginStatus] = useState<Record<PluginKey, boolean>>({
     email: false,

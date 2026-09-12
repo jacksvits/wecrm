@@ -9,7 +9,11 @@ const TAB_CONFIGS = [
   { key: "games", label: "Игры", defaultPath: "/volume3/GAME" },
 ];
 
+type SystemSubTab = "design" | "storage";
+
 export function SystemSettings() {
+  // По умолчанию открываем под-вкладку «Дизайн»
+  const [subTab, setSubTab] = useState<SystemSubTab>("design");
   const [settings, setSettings] = useState<Record<string, { url: string; path: string }>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -91,72 +95,90 @@ export function SystemSettings() {
     }
   };
 
-  if (loading) return <div style={{ padding: 20, color: "var(--text-muted)" }}>Загрузка...</div>;
+  // Стиль под-вкладок — в единой стилистике с основными вкладками настроек
+  const subTabStyle = (isActive: boolean): React.CSSProperties => ({
+    padding: "10px 20px",
+    borderRadius: 12,
+    border: "none",
+    background: isActive ? "var(--text-primary)" : "transparent",
+    color: isActive ? "var(--bg-card)" : "var(--text-secondary)",
+    fontSize: 14,
+    fontWeight: 500,
+    cursor: "pointer",
+    transition: "all 0.2s",
+  });
 
-  return (
-    <div>
-      <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>Системные настройки</h3>
-      <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 14 }}>
-        Настройка путей к NFS-папкам для вкладок на странице «Файлы»
-      </p>
+  // === Под-вкладка «Хранение»: пути к NFS-папкам для страницы «Файлы» ===
+  const renderStorage = () => {
+    if (loading) return <div style={{ padding: 20, color: "var(--text-muted)" }}>Загрузка...</div>;
 
-      {TAB_CONFIGS.map((cfg) => (
-        <div
-          key={cfg.key}
-          style={{
-            marginBottom: 20,
-            padding: 20,
-            borderRadius: 12,
-            border: "1px solid var(--border-color)",
-            background: "var(--bg-card)",
-          }}
-        >
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>{cfg.label}</div>
+    return (
+      <div>
+        <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 14 }}>
+          Настройка путей к NFS-папкам для вкладок на странице «Файлы»
+        </p>
 
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "var(--text-muted)" }}>
-              Путь к NFS папке
-            </label>
-            <input
-              type="text"
-              value={settings[cfg.key]?.path || cfg.defaultPath}
-              onChange={(e) => updateField(cfg.key, "path", e.target.value)}
-              placeholder="/volume3/SOFT"
-              style={{
-                width: "100%",
-                padding: "10px 14px",
-                borderRadius: 10,
-                border: "1px solid var(--border-color)",
-                background: "var(--bg-color)",
-                color: "var(--text-color)",
-                fontSize: 14,
-                outline: "none",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
-
-          <button
-            onClick={() => save(cfg.key)}
-            disabled={saving === cfg.key}
+        {TAB_CONFIGS.map((cfg) => (
+          <div
+            key={cfg.key}
             style={{
-              padding: "8px 16px",
-              borderRadius: 10,
-              background: "#007AFF",
-              color: "#fff",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 14,
-              opacity: saving === cfg.key ? 0.7 : 1,
+              marginBottom: 20,
+              padding: 20,
+              borderRadius: 12,
+              border: "1px solid var(--border-color)",
+              background: "var(--bg-card)",
             }}
           >
-            {saving === cfg.key ? "Сохранение..." : "Сохранить"}
-          </button>
-        </div>
-      ))}
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>{cfg.label}</div>
 
-      <h3 style={{ margin: "32px 0 20px", fontSize: 18, fontWeight: 600 }}>Брендинг</h3>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "var(--text-muted)" }}>
+                Путь к NFS папке
+              </label>
+              <input
+                type="text"
+                value={settings[cfg.key]?.path || cfg.defaultPath}
+                onChange={(e) => updateField(cfg.key, "path", e.target.value)}
+                placeholder="/volume3/SOFT"
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  border: "1px solid var(--border-color)",
+                  background: "var(--bg-color)",
+                  color: "var(--text-color)",
+                  fontSize: 14,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
 
+            <button
+              onClick={() => save(cfg.key)}
+              disabled={saving === cfg.key}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 10,
+                background: "#007AFF",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 14,
+                opacity: saving === cfg.key ? 0.7 : 1,
+              }}
+            >
+              {saving === cfg.key ? "Сохранение..." : "Сохранить"}
+            </button>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // === Под-вкладка «Дизайн»: брендинг (иконка приложения и логотип компании) ===
+  const renderDesign = () => (
+    <div>
       {/* Иконка приложения: PWA, favicon, уведомления */}
       <div
         style={{
@@ -278,6 +300,23 @@ export function SystemSettings() {
           </button>
         </div>
       </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>Системные настройки</h3>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+        <button style={subTabStyle(subTab === "design")} onClick={() => setSubTab("design")}>
+          Дизайн
+        </button>
+        <button style={subTabStyle(subTab === "storage")} onClick={() => setSubTab("storage")}>
+          Хранение
+        </button>
+      </div>
+
+      {subTab === "design" ? renderDesign() : renderStorage()}
     </div>
   );
 }
