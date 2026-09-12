@@ -52,7 +52,7 @@ function applyTaskVariables(content: string, task: any): string {
 
 // Отправка авто-ответа клиенту в канал-источник задачи (MAX / Telegram / ВК).
 // HTML из WYSIWYG-редактора конвертируется в чистый текст — мессенджеры его не понимают.
-async function sendToChannel(task: any, text: string): Promise<void> {
+export async function sendToChannel(task: any, text: string): Promise<void> {
   // MAX: user_id задачи
   if (task.maxUserId || task.maxChatId) {
     try {

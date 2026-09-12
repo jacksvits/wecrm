@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { processAutoReply } from '../lib/auto-reply.js';
 import { postHandlerGreeting } from '../lib/handler-messages.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
@@ -212,6 +213,9 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
         vkMessageId: msg.id,
       },
     });
+
+    // Автоответчик: проверка триггеров по тексту сообщения
+    processAutoReply(latestTask.id, commentText || '').catch(() => {});
 
     if (attachmentIds.length > 0) {
       await prisma.fileAttachment.updateMany({

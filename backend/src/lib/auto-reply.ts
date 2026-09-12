@@ -1,5 +1,7 @@
 import { prisma } from './prisma.js';
 import { broadcast, CHANNELS } from './events.js';
+import { sendToChannel } from './handler-messages.js';
+import { htmlToText } from './html-to-text.js';
 
 // === Автоответчик: автоматические ответы по триггерам в обсуждении задачи ===
 // Если триггер совпадает (подстрока, без учёта регистра) со словом в комментарии
@@ -47,6 +49,12 @@ export async function processAutoReply(taskId: string, commentContent: string): 
     broadcast(CHANNELS.TASKS, { action: 'comment', entity: 'task', id: taskId });
     broadcast(CHANNELS.COMMENTS, { action: 'create', entity: 'comment', taskId });
     console.log('[AutoReply] Триггер "%s" совпал в задаче %s', hit.word, taskId);
+
+    // Дублируем авто-ответ клиенту в канал-источник задачи (MAX / Telegram / ВК)
+    const task = await prisma.task.findUnique({ where: { id: taskId } });
+    if (task) {
+      await sendToChannel(task, htmlToText(hit.answer));
+    }
   } catch (err: any) {
     console.error('[AutoReply] Ошибка:', err?.message || err);
   }

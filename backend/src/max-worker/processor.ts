@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { processAutoReply } from '../lib/auto-reply.js';
 import { postHandlerGreeting } from '../lib/handler-messages.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { resolveContactAuto } from '../lib/contact-dedup.js';
@@ -154,6 +155,9 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
         maxMessageId: msg.id,
       },
     });
+
+    // Автоответчик: проверка триггеров по тексту сообщения
+    processAutoReply(latestTask.id, commentWithAuthor).catch(() => {});
 
     if (attachmentIds.length > 0) {
       await prisma.fileAttachment.updateMany({
