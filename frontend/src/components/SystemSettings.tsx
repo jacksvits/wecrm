@@ -3,7 +3,7 @@ import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import { api } from "../api/client";
 import { loadBranding } from "../lib/branding";
-import { User } from "../types";
+import { User, AutoReplyTrigger } from "../types";
 
 // WYSIWYG-редактор — та же конфигурация, что и в остальных текстовых полях проекта
 const quillModules = {
@@ -29,7 +29,7 @@ const TAB_CONFIGS = [
   { key: "games", label: "Игры", defaultPath: "/volume3/GAME" },
 ];
 
-type SystemSubTab = "design" | "storage" | "handler";
+type SystemSubTab = "design" | "storage" | "handler" | "autoreply";
 
 export function SystemSettings() {
   // По умолчанию открываем под-вкладку «Дизайн»
@@ -52,16 +52,34 @@ export function SystemSettings() {
   const [handlerLoading, setHandlerLoading] = useState(true);
   const [handlerSaving, setHandlerSaving] = useState(false);
 
+  // === Автоответчик: триггеры и ответы в обсуждениях задач ===
+  const [arUserId, setArUserId] = useState<string | null>(null);
+  const [arTriggers, setArTriggers] = useState<AutoReplyTrigger[]>([]);
+  const [arUsers, setArUsers] = useState<User[]>([]);
+  const [arNewWord, setArNewWord] = useState("");
+  const [arNewAnswer, setArNewAnswer] = useState("");
+  const [arLoading, setArLoading] = useState(true);
+  const [arSaving, setArSaving] = useState(false);
+  // Редактируемый триггер: id → { word, answer }
+  const [arEditing, setArEditing] = useState<Record<string, { word: string; answer: string }>>({});
+
   useEffect(() => {
-    Promise.all([api.handlerSettings.get(), api.users.list()])
-      .then(([s, users]) => {
+    Promise.all([api.handlerSettings.get(), api.autoReplySettings.get(), api.users.list()])
+      .then(([s, ar, users]) => {
         setHandlerGreeting(s.greeting || "");
         setHandlerCompletion(s.completion || "");
         setHandlerUserId(s.userId || null);
         setHandlerUsers(users || []);
+        setArUserId(ar.userId || null);
+        setArTriggers(ar.triggers || []);
+        setArUsers(users || []);
+        setArLoading(false);
         setHandlerLoading(false);
       })
-      .catch(() => setHandlerLoading(false));
+      .catch(() => {
+        setArLoading(false);
+        setHandlerLoading(false);
+      });
   }, []);
 
   const saveHandler = async () => {
@@ -77,6 +95,79 @@ export function SystemSettings() {
       alert("Ошибка: " + e.message);
     } finally {
       setHandlerSaving(false);
+    }
+  };
+
+  // === Автоответчик: обработчики ===
+  const saveArUser = async () => {
+    setArSaving(true);
+    try {
+      await api.autoReplySettings.saveUser(arUserId);
+      alert("Сохранено");
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    } finally {
+      setArSaving(false);
+    }
+  };
+
+  const addArTrigger = async () => {
+    if (!arNewWord.trim() || !arNewAnswer.trim()) {
+      alert("Заполните слово-триггер и ответ");
+      return;
+    }
+    setArSaving(true);
+    try {
+      const trigger = await api.autoReplySettings.addTrigger({ word: arNewWord.trim(), answer: arNewAnswer });
+      setArTriggers((prev) => [...prev, trigger]);
+      setArNewWord("");
+      setArNewAnswer("");
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    } finally {
+      setArSaving(false);
+    }
+  };
+
+  const toggleArTrigger = async (t: AutoReplyTrigger) => {
+    try {
+      const updated = await api.autoReplySettings.updateTrigger(t.id, { isActive: !t.isActive });
+      setArTriggers((prev) => prev.map((x) => (x.id === t.id ? { ...x, ...updated } : x)));
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    }
+  };
+
+  const saveArTrigger = async (t: AutoReplyTrigger) => {
+    const edit = arEditing[t.id];
+    if (!edit) return;
+    if (!edit.word.trim() || !edit.answer.trim()) {
+      alert("Заполните слово-триггер и ответ");
+      return;
+    }
+    setArSaving(true);
+    try {
+      const updated = await api.autoReplySettings.updateTrigger(t.id, { word: edit.word.trim(), answer: edit.answer });
+      setArTriggers((prev) => prev.map((x) => (x.id === t.id ? { ...x, ...updated } : x)));
+      setArEditing((prev) => {
+        const next = { ...prev };
+        delete next[t.id];
+        return next;
+      });
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    } finally {
+      setArSaving(false);
+    }
+  };
+
+  const deleteArTrigger = async (t: AutoReplyTrigger) => {
+    if (!confirm(`Удалить триггер "${t.word}"?`)) return;
+    try {
+      await api.autoReplySettings.deleteTrigger(t.id);
+      setArTriggers((prev) => prev.filter((x) => x.id !== t.id));
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
     }
   };
 
@@ -498,6 +589,215 @@ export function SystemSettings() {
     );
   };
 
+  // === Под-вкладка «Автоответчик»: триггеры и ответы в обсуждениях задач ===
+  const renderAutoReply = () => {
+    if (arLoading) return <div style={{ padding: 20, color: "var(--text-muted)" }}>Загрузка...</div>;
+
+    const cardStyle: React.CSSProperties = {
+      marginBottom: 20,
+      padding: 20,
+      borderRadius: 12,
+      border: "1px solid var(--border-color)",
+      background: "var(--bg-card)",
+    };
+    const inputStyle: React.CSSProperties = {
+      width: "100%",
+      padding: "10px 14px",
+      borderRadius: 10,
+      border: "1px solid var(--border-color)",
+      background: "var(--bg-color)",
+      color: "var(--text-color)",
+      fontSize: 14,
+      outline: "none",
+      boxSizing: "border-box",
+    };
+    const btnPrimary: React.CSSProperties = {
+      padding: "8px 16px",
+      borderRadius: 10,
+      background: "#007AFF",
+      color: "#fff",
+      border: "none",
+      cursor: "pointer",
+      fontSize: 14,
+      opacity: arSaving ? 0.7 : 1,
+    };
+    const btnGhost: React.CSSProperties = {
+      padding: "8px 16px",
+      borderRadius: 10,
+      background: "transparent",
+      color: "var(--text-secondary)",
+      border: "1px solid var(--border-color)",
+      cursor: "pointer",
+      fontSize: 14,
+    };
+
+    return (
+      <div>
+        <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 14 }}>
+          Автоматические ответы в обсуждениях задач. Если слово-триггер совпадает с текстом комментария (без учёта регистра), в обсуждение задачи добавляется указанный ответ от имени выбранного пользователя
+        </p>
+
+        {/* Пользователь, от имени которого публикуются ответы */}
+        <div style={cardStyle}>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Публикация от имени</div>
+          <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-muted)" }}>
+            Ответы по триггерам будут добавлены в обсуждение от имени выбранного пользователя
+          </p>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <select
+              value={arUserId || ""}
+              onChange={(e) => setArUserId(e.target.value || null)}
+              style={{ ...inputStyle, width: "auto", minWidth: 280, flex: 1 }}
+            >
+              <option value="">— Не выбран (автоответы отключены) —</option>
+              {arUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+            <button onClick={saveArUser} disabled={arSaving} style={btnPrimary}>
+              {arSaving ? "Сохранение..." : "Сохранить"}
+            </button>
+          </div>
+        </div>
+
+        {/* Добавление триггера */}
+        <div style={cardStyle}>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Добавить триггер</div>
+          <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-muted)" }}>
+            Слово-триггер — часть текста комментария, при совпадении с которой отправляется ответ
+          </p>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "var(--text-muted)" }}>
+              Слово-триггер
+            </label>
+            <input
+              type="text"
+              value={arNewWord}
+              onChange={(e) => setArNewWord(e.target.value)}
+              placeholder="например: срочно"
+              style={inputStyle}
+            />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "var(--text-muted)" }}>
+              Ответ
+            </label>
+            <ReactQuill
+              theme="snow"
+              value={arNewAnswer}
+              onChange={setArNewAnswer}
+              modules={quillModules}
+              formats={quillFormats}
+              placeholder="Текст ответа..."
+            />
+          </div>
+          <button onClick={addArTrigger} disabled={arSaving} style={btnPrimary}>
+            {arSaving ? "Сохранение..." : "Добавить"}
+          </button>
+        </div>
+
+        {/* Список триггеров */}
+        <div style={cardStyle}>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>
+            Триггеры ({arTriggers.length})
+          </div>
+          {arTriggers.length === 0 ? (
+            <p style={{ margin: 0, fontSize: 13, color: "var(--text-muted)" }}>
+              Триггеры не добавлены
+            </p>
+          ) : (
+            arTriggers.map((t) => {
+              const edit = arEditing[t.id];
+              const isEditing = !!edit;
+              return (
+                <div
+                  key={t.id}
+                  style={{
+                    marginBottom: 12,
+                    padding: 16,
+                    borderRadius: 10,
+                    border: "1px solid var(--border-color)",
+                    background: "var(--bg-color)",
+                    opacity: t.isActive ? 1 : 0.6,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={edit.word}
+                        onChange={(e) => setArEditing((prev) => ({ ...prev, [t.id]: { ...edit, word: e.target.value } }))}
+                        style={{ ...inputStyle, width: "auto", flex: 1, minWidth: 180 }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: 14, fontWeight: 600 }}>{t.word}</span>
+                    )}
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-muted)", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={t.isActive}
+                        onChange={() => toggleArTrigger(t)}
+                      />
+                      Активен
+                    </label>
+                    <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                      {isEditing ? (
+                        <>
+                          <button onClick={() => saveArTrigger(t)} disabled={arSaving} style={btnPrimary}>
+                            Сохранить
+                          </button>
+                          <button
+                            onClick={() =>
+                              setArEditing((prev) => {
+                                const next = { ...prev };
+                                delete next[t.id];
+                                return next;
+                              })
+                            }
+                            style={btnGhost}
+                          >
+                            Отмена
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setArEditing((prev) => ({ ...prev, [t.id]: { word: t.word, answer: t.answer } }))}
+                          style={btnGhost}
+                        >
+                          Изменить
+                        </button>
+                      )}
+                      <button onClick={() => deleteArTrigger(t)} style={{ ...btnGhost, color: "#FF3B30" }}>
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
+                  {isEditing ? (
+                    <ReactQuill
+                      theme="snow"
+                      value={edit.answer}
+                      onChange={(val) => setArEditing((prev) => ({ ...prev, [t.id]: { ...edit, answer: val } }))}
+                      modules={quillModules}
+                      formats={quillFormats}
+                      placeholder="Текст ответа..."
+                    />
+                  ) : (
+                    <div
+                      style={{ fontSize: 13, color: "var(--text-secondary)" }}
+                      dangerouslySetInnerHTML={{ __html: t.answer }}
+                    />
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div>
       <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>Системные настройки</h3>
@@ -512,9 +812,12 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "handler")} onClick={() => setSubTab("handler")}>
           Обработчик
         </button>
+        <button style={subTabStyle(subTab === "autoreply")} onClick={() => setSubTab("autoreply")}>
+          Автоответчик
+        </button>
       </div>
 
-      {subTab === "design" ? renderDesign() : subTab === "storage" ? renderStorage() : renderHandler()}
+      {subTab === "design" ? renderDesign() : subTab === "storage" ? renderStorage() : subTab === "handler" ? renderHandler() : renderAutoReply()}
     </div>
   );
 }

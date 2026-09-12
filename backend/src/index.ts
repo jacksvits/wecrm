@@ -48,6 +48,7 @@ import begetSettingsRoutes from './routes/beget-settings.js';
 import pskovlinePluginRoutes from './routes/pskovline-plugin.js';
 import tochkaPluginRoutes from './routes/tochka-plugin.js';
 import handlerSettingsRoutes from './routes/handler-settings.js';
+import autoReplySettingsRoutes from './routes/auto-reply-settings.js';
 dotenv.config();
 
 const app = express();
@@ -131,6 +132,7 @@ app.use('/api/beget-settings', begetSettingsRoutes);
 app.use('/api/pskovline-plugin', pskovlinePluginRoutes);
 app.use('/api/tochka-plugin', tochkaPluginRoutes);
 app.use('/api/handler-settings', handlerSettingsRoutes);
+app.use('/api/auto-reply-settings', autoReplySettingsRoutes);
 app.use('/api/yandex', yandexRoutes);
 app.use('/api/ai', aiRoutes);
 

@@ -88,6 +88,7 @@ model User {
   telegramSettingsDefaultCreator TelegramSettings[] @relation("TelegramDefaultCreator")
   telegramUserChats TelegramUserChat[]
   handlerSettings HandlerSettings[]
+  autoReplySettings AutoReplySettings[]
   stockMovements  StockMovement[]
   priceHistory    PriceHistory[]
   @@map("users")
@@ -1082,4 +1083,29 @@ model HandlerSettings {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@map("handler_settings")
+}
+
+// «Автоответчик»: триггеры и ответы в обсуждениях задач
+model AutoReplySettings {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  triggers  AutoReplyTrigger[]
+
+  @@map("auto_reply_settings")
+}
+
+model AutoReplyTrigger {
+  id         String            @id @default(cuid())
+  settingsId String            @map("settings_id")
+  settings   AutoReplySettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+  word       String
+  answer     String
+  isActive   Boolean           @default(true) @map("is_active")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  @@map("auto_reply_triggers")
 }

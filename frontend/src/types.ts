@@ -82,3 +82,14 @@ export interface StockMovement { id: string; productId: string; warehouseId: str
 export interface PriceHistory { id: string; productId: string; priceTypeId: string; oldPrice: number; newPrice: number; createdAt: string; priceType?: { label: string }; user?: { name: string } | null; }
 export interface ProductImage { id: string; productId: string; attachmentId: string; url: string; sortOrder: number; createdAt: string; }
 export interface Product { id: string; sku?: string | null; name: string; kind: 'product' | 'service'; description?: string | null; category?: string | null; subcategory?: string | null; unit: string; barcode?: string | null; syncToVk: boolean; vkItemId?: number | null; isActive: boolean; createdAt: string; updatedAt: string; stocks?: StockBalance[]; prices?: ProductPrice[]; images?: ProductImage[]; }
+
+// «Автоответчик»: триггеры и ответы в обсуждениях задач
+export interface AutoReplyTrigger {
+  id: string;
+  settingsId?: string;
+  word: string;
+  answer: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
