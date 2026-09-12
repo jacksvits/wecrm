@@ -38,10 +38,11 @@ export function ContactList() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState('createdAtDesc');
   const [search, setSearch] = useState('');
-  // Список разделён на контакты и организации; выбранная вкладка сохраняется
-  const [kindFilter, setKindFilter] = useState<'contact' | 'organization'>(() => {
+  // Список разделён на контакты и организации; вкладка «Скрытые» показывает
+  // все записи, включая скрытые типы (спам, рассылка, чёрный список)
+  const [kindFilter, setKindFilter] = useState<'contact' | 'organization' | 'all'>(() => {
     const saved = localStorage.getItem('contactsKindFilter');
-    return saved === 'organization' ? 'organization' : 'contact';
+    return saved === 'organization' || saved === 'all' ? saved : 'contact';
   });
   const [viewMode, setViewMode] = useState<'cards' | 'list'>(() => {
     const saved = localStorage.getItem('contactsViewMode');
@@ -149,7 +150,12 @@ export function ContactList() {
 
   const loadContacts = async (reset = false) => {
     const params = new URLSearchParams();
-    params.set('kind', kindFilter);
+    if (kindFilter === 'all') {
+      // Вкладка «Скрытые»: все виды записей + скрытые типы (спам, рассылка, чёрный список)
+      params.set('includeHidden', '1');
+    } else {
+      params.set('kind', kindFilter);
+    }
     if (selectedTag) params.set('tag', selectedTag);
     api.contacts.list(params.toString()).then(setContacts);
   };
@@ -182,7 +188,7 @@ export function ContactList() {
   const openCreate = () => {
     setEditingId(null);
     setForm({
-      name: '', emails: [''], phones: [''], company: '', type: 'client', kind: kindFilter,
+      name: '', emails: [''], phones: [''], company: '', type: 'client', kind: kindFilter === 'organization' ? 'organization' : 'contact',
       tags: '', notes: '', inn: '', ogrn: '', legalAddress: '', position: '', organizationId: '',
       projectIds: [],
     });
@@ -409,7 +415,7 @@ export function ContactList() {
       fontWeight: 500,
       boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
     });
-    const select = (kind: 'contact' | 'organization') => {
+    const select = (kind: 'contact' | 'organization' | 'all') => {
       setKindFilter(kind);
       localStorage.setItem('contactsKindFilter', kind);
     };
@@ -417,6 +423,7 @@ export function ContactList() {
       <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 10, background: 'var(--bg-body)', border: '1px solid var(--border-color)' }}>
         <button onClick={() => select('contact')} style={btnStyle(kindFilter === 'contact')}>👤 Контакты</button>
         <button onClick={() => select('organization')} style={btnStyle(kindFilter === 'organization')}>🏢 Организации</button>
+        <button onClick={() => select('all')} style={btnStyle(kindFilter === 'all')}>🙈 Скрытые</button>
       </div>
     );
   };
