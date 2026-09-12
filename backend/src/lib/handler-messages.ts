@@ -2,8 +2,9 @@ import { prisma } from './prisma.js';
 import { broadcast, CHANNELS } from './events.js';
 
 // === Обработчик: автоматические сообщения в обсуждение задачи ===
-// Условие срабатывания: включён хотя бы один из плагинов «MAX», «Telegram», «ВК Группа».
-// Если у задачи определён канал-источник (Telegram/MAX/VK) — требуется активность именно этого плагина.
+// Условие срабатывания: задача пришла из канала (Telegram/MAX/VK), у которого
+// в настройках плагина включена опция «Автоматические ответы» (autoReply).
+// Задачи без канала-источника (созданные вручную или из почты) авто-сообщения не получают.
 
 const stripHtml = (html: string) => html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
 
@@ -11,32 +12,31 @@ async function getHandlerConfig() {
   const settings = await prisma.handlerSettings.findFirst();
   if (!settings) return null;
   const [max, telegram, vk] = await Promise.all([
-    prisma.maxSettings.findFirst({ select: { isActive: true } }),
-    prisma.telegramSettings.findFirst({ select: { isActive: true } }),
-    prisma.vkGroupSettings.findFirst({ select: { isActive: true } }),
+    prisma.maxSettings.findFirst({ select: { isActive: true, autoReply: true } }),
+    prisma.telegramSettings.findFirst({ select: { isActive: true, autoReply: true } }),
+    prisma.vkGroupSettings.findFirst({ select: { isActive: true, autoReply: true } }),
   ]);
   return {
     settings,
     plugins: {
-      max: max?.isActive ?? false,
-      telegram: telegram?.isActive ?? false,
-      vk: vk?.isActive ?? false,
+      max: (max?.isActive ?? false) && (max?.autoReply ?? false),
+      telegram: (telegram?.isActive ?? false) && (telegram?.autoReply ?? false),
+      vk: (vk?.isActive ?? false) && (vk?.autoReply ?? false),
     },
   };
 }
 
-// Проверка условия плагинов для конкретной задачи
+// Проверка условия для конкретной задачи: канал-источник задачи должен быть
+// с включённой опцией «Автоматические ответы» в соответствующем плагине
 function isChannelAllowed(task: any, plugins: { max: boolean; telegram: boolean; vk: boolean }): boolean {
-  const anyActive = plugins.max || plugins.telegram || plugins.vk;
-  if (!anyActive) return false;
   const fromTelegram = !!(task?.telegramMessageId || task?.telegramChatId);
   const fromMax = !!(task?.maxMessageId || task?.maxChatId);
   const fromVk = !!(task?.vkMessageId || task?.vkPeerId || task?.vkGroupId);
   if (fromTelegram) return plugins.telegram;
   if (fromMax) return plugins.max;
   if (fromVk) return plugins.vk;
-  // Задача без канала-источника (создана вручную/по почте) — достаточно любого активного плагина
-  return true;
+  // Задача без канала-источника — авто-ответы не применяются
+  return false;
 }
 
 // Подстановка переменных из данных задачи:

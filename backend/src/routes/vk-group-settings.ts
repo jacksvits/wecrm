@@ -23,6 +23,7 @@ const settingsSchema = z.object({
   defaultCreatorId: z.string().optional().nullable(),
   assigneeIds: z.array(z.string()).default([]),
   autoCreateContact: z.boolean().default(true),
+  autoReply: z.boolean().default(false),
   isActive: z.boolean().default(true),
   callbackSecret: z.string().optional().nullable(),
   confirmationString: z.string().optional().nullable(),

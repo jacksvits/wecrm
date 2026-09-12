@@ -586,6 +586,7 @@ model MaxSettings {
   defaultCreator    User?    @relation(fields: [defaultCreatorId], references: [id])
   assigneeIds       String[] @default([]) @map("assignee_ids")
   autoCreateContact Boolean  @default(true) @map("auto_create_contact")
+  autoReply         Boolean  @default(false) @map("auto_reply")
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt @map("updated_at")
@@ -752,6 +753,7 @@ model TelegramSettings {
   defaultCreatorId  String?  @map("default_creator_id")
   assigneeIds       String[] @default([]) @map("assignee_ids")
   autoCreateContact Boolean  @default(true) @map("auto_create_contact")
+  autoReply         Boolean  @default(false) @map("auto_reply")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
   userId            String?  @map("user_id")
@@ -814,6 +816,7 @@ model VkGroupSettings {
   defaultCreator    User?    @relation(fields: [defaultCreatorId], references: [id])
   assigneeIds       String[] @default([]) @map("assignee_ids")
   autoCreateContact Boolean  @default(true) @map("auto_create_contact")
+  autoReply         Boolean  @default(false) @map("auto_reply")
   isActive          Boolean  @default(true) @map("is_active")
   lastTs            Int?     @map("last_ts")
   callbackSecret    String?  @map("callback_secret")

@@ -18,6 +18,7 @@ const settingsSchema = z.object({
   defaultCreatorId: z.string().optional().nullable(),
   assigneeIds: z.array(z.string()).default([]),
   autoCreateContact: z.boolean().default(true),
+  autoReply: z.boolean().default(false),
 });
 
 // GET /api/max/settings — получить настройки (требует авторизации)
