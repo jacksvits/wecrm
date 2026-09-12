@@ -38,7 +38,11 @@ export function ContactList() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState('createdAtDesc');
   const [search, setSearch] = useState('');
-  const [kindFilter, setKindFilter] = useState<'all' | 'contact' | 'organization'>('all');
+  // Список разделён на контакты и организации; выбранная вкладка сохраняется
+  const [kindFilter, setKindFilter] = useState<'contact' | 'organization'>(() => {
+    const saved = localStorage.getItem('contactsKindFilter');
+    return saved === 'organization' ? 'organization' : 'contact';
+  });
   const [viewMode, setViewMode] = useState<'cards' | 'list'>(() => {
     const saved = localStorage.getItem('contactsViewMode');
     if (saved === 'cards' || saved === 'list') return saved;
@@ -145,7 +149,7 @@ export function ContactList() {
 
   const loadContacts = async (reset = false) => {
     const params = new URLSearchParams();
-    if (kindFilter !== 'all') params.set('kind', kindFilter);
+    params.set('kind', kindFilter);
     if (selectedTag) params.set('tag', selectedTag);
     api.contacts.list(params.toString()).then(setContacts);
   };
@@ -178,7 +182,7 @@ export function ContactList() {
   const openCreate = () => {
     setEditingId(null);
     setForm({
-      name: '', emails: [''], phones: [''], company: '', type: 'client', kind: 'contact',
+      name: '', emails: [''], phones: [''], company: '', type: 'client', kind: kindFilter,
       tags: '', notes: '', inn: '', ogrn: '', legalAddress: '', position: '', organizationId: '',
       projectIds: [],
     });
@@ -391,6 +395,31 @@ export function ContactList() {
   const addPhone = () => setForm(prev => ({ ...prev, phones: [...prev.phones, ''] }));
   const removePhone = (idx: number) => setForm(prev => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }));
   const updatePhone = (idx: number, val: string) => setForm(prev => ({ ...prev, phones: prev.phones.map((p, i) => i === idx ? val : p) }));
+
+  // Переключатель «Контакты / Организации» в стиле переключателя вида (карточки/список)
+  const KindToggle = () => {
+    const btnStyle = (active: boolean) => ({
+      padding: '6px 10px',
+      borderRadius: 8,
+      border: 'none',
+      background: active ? '#fff' : 'transparent',
+      color: active ? '#1a1a1a' : '#999',
+      fontSize: 13,
+      cursor: 'pointer',
+      fontWeight: 500,
+      boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+    });
+    const select = (kind: 'contact' | 'organization') => {
+      setKindFilter(kind);
+      localStorage.setItem('contactsKindFilter', kind);
+    };
+    return (
+      <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 10, background: 'var(--bg-body)', border: '1px solid var(--border-color)' }}>
+        <button onClick={() => select('contact')} style={btnStyle(kindFilter === 'contact')}>👤 Контакты</button>
+        <button onClick={() => select('organization')} style={btnStyle(kindFilter === 'organization')}>🏢 Организации</button>
+      </div>
+    );
+  };
 
   const ViewToggle = () => (
     <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 10, background: 'var(--bg-body)', border: '1px solid var(--border-color)' }}>
@@ -605,11 +634,7 @@ export function ContactList() {
         <h2 style={{ margin: 0, fontSize: 18 }}>Контакты</h2>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} style={{ padding: '6px 12px', borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14, width: 180 }} />
-          <select value={kindFilter} onChange={e => setKindFilter(e.target.value as any)} style={{ padding: '6px 12px', borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }}>
-            <option value="all">Все</option>
-            <option value="contact">Контакты</option>
-            <option value="organization">Организации</option>
-          </select>
+          <KindToggle />
           <select value={selectedTag} onChange={e => setSelectedTag(e.target.value)} style={{ padding: '6px 12px', borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }}>
             <option value="">Все теги</option>
             {allTags.map(tag => <option key={tag} value={tag}>{tag}</option>)}
