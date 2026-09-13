@@ -20,12 +20,18 @@ export interface OneCSyncStats {
 // второй получает ошибку «уже выполняется».
 
 export async function runOneCSync(): Promise<OneCSyncStats> {
-  const lockRow: { ok: boolean }[] = await prisma.$queryRaw`SELECT pg_tryadvisory_lock(742017) AS ok`;
-  if (!lockRow[0]?.ok) throw new Error('Синхронизация уже выполняется другим процессом');
+  // Взаимное исключение через таблицу-муьекс (advisory-функции недоступны в этой сборке Postgres).
+  // Занятая блокировка считается протухшей через 30 минут (защита от зависшего процесса).
+  await prisma.$executeRaw`CREATE TABLE IF NOT EXISTS onec_sync_lock (id INTEGER PRIMARY KEY, started_at TIMESTAMPTZ NOT NULL)`;
+  const acquired = await prisma.$executeRaw`
+    INSERT INTO onec_sync_lock (id, started_at) VALUES (1, now())
+    ON CONFLICT (id) DO UPDATE SET started_at = now() WHERE onec_sync_lock.started_at < now() - interval '30 minutes'
+  `;
+  if (!acquired) throw new Error('Синхронизация уже выполняется другим процессом');
   try {
     return await runOneCSyncInner();
   } finally {
-    try { await prisma.$queryRaw`SELECT pg_advisory_unlock(742017)`; } catch { /* соединение закрыто — блокировка снимется автоматически */ }
+    try { await prisma.$executeRaw`DELETE FROM onec_sync_lock WHERE id = 1`; } catch { /* строка останется, снимется по таймауту 30 минут */ }
   }
 }
 
