@@ -21,12 +21,12 @@ export interface OneCSyncStats {
 const ONEC_SYNC_LOCK_KEY = 742017;
 
 export async function runOneCSync(): Promise<OneCSyncStats> {
-  const lockRow: { ok: boolean }[] = await prisma.$queryRaw`SELECT pg_tryadvisory_lock(${ONEC_SYNC_LOCK_KEY}) AS ok`;
+  const lockRow: { ok: boolean }[] = await prisma.$queryRaw`SELECT pg_tryadvisory_lock(${ONEC_SYNC_LOCK_KEY}::int) AS ok`;
   if (!lockRow[0]?.ok) throw new Error('Синхронизация уже выполняется другим процессом');
   try {
     return await runOneCSyncInner();
   } finally {
-    try { await prisma.$queryRaw`SELECT pg_advisory_unlock(${ONEC_SYNC_LOCK_KEY})`; } catch { /* соединение закрыто — блокировка снимется автоматически */ }
+    try { await prisma.$queryRaw`SELECT pg_advisory_unlock(${ONEC_SYNC_LOCK_KEY}::int)`; } catch { /* соединение закрыто — блокировка снимется автоматически */ }
   }
 }
 
