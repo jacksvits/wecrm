@@ -98,15 +98,20 @@ export function Products() {
   };
   useEffect(() => { load(); }, []);
 
+  // Фильтр по виду: все / товары / услуги
+  const [kindFilter, setKindFilter] = useState<'all' | 'product' | 'service'>('all');
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return products;
-    return products.filter(p =>
+    let list = products;
+    if (kindFilter !== 'all') list = list.filter(p => (p.kind || 'product') === kindFilter);
+    if (!s) return list;
+    return list.filter(p =>
       p.name.toLowerCase().includes(s) ||
       (p.sku || '').toLowerCase().includes(s) ||
       (p.category || '').toLowerCase().includes(s) ||
       (p.subcategory || '').toLowerCase().includes(s));
-  }, [products, q]);
+  }, [products, q, kindFilter]);
 
   const searching = q.trim().length > 0;
 
@@ -253,12 +258,33 @@ export function Products() {
       {/* ===== Номенклатура ===== */}
       {tab === 'nomenclature' && (
         <div>
-          <input
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            placeholder="Поиск: название, артикул, категория"
-            style={{ ...inputStyle, maxWidth: 360, marginBottom: 12 }}
-          />
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Поиск: название, артикул, категория"
+              style={{ ...inputStyle, maxWidth: 360 }}
+            />
+            {/* Фильтр: все / товары / услуги */}
+            <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden' }}>
+              {([['all', 'Все'], ['product', 'Товары'], ['service', 'Услуги']] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setKindFilter(val)}
+                  style={{
+                    padding: '8px 16px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    background: kindFilter === val ? 'var(--accent, #007AFF)' : 'transparent',
+                    color: kindFilter === val ? '#fff' : 'var(--text-primary)',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
