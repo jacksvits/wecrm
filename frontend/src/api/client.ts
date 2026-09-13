@@ -47,6 +47,12 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     get: () => fetchApi('/api/tochka-plugin'),
     save: (data: { updateIntervalMinutes?: number }) => fetchApi('/api/tochka-plugin', { method: 'POST', body: JSON.stringify(data) }),
   },
+  oneCPlugin: {
+    get: () => fetchApi('/api/onec-plugin'),
+    save: (data: any) => fetchApi('/api/onec-plugin', { method: 'POST', body: JSON.stringify(data) }),
+    test: (data?: any) => fetchApi('/api/onec-plugin/test', { method: 'POST', body: JSON.stringify(data ?? {}) }),
+    sync: () => fetchApi('/api/onec-plugin/sync', { method: 'POST' }),
+  },
   pskovlinePlugin: {
     get: () => fetchApi('/api/pskovline-plugin'),
     save: (data: any) => fetchApi('/api/pskovline-plugin', { method: 'POST', body: JSON.stringify(data) }),

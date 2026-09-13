@@ -127,6 +127,7 @@ model Contact {
   vkProfileUrl     String?  @map("vk_profile_url")
   maxChatId        String?  @unique @map("max_chat_id")
   maxUserId        String?  @map("max_user_id")
+  onecId           String?  @map("onec_id")
   avatarUrl        String?  @map("avatar_url")
   description      String?  @map("description")
   lastActivityTime DateTime? @map("last_activity_time")
@@ -149,6 +150,8 @@ model Contact {
   calls       Call[]
   smsMessages SmsMessage[]
   projects    ContactProject[]
+
+  @@index([onecId])
 
   @@map("contacts")
 }
@@ -889,6 +892,8 @@ model Product {
   barcode     String?
   syncToVk    Boolean  @default(false) @map("sync_to_vk")
   vkItemId    Int?     @unique @map("vk_item_id")
+  onecId      String?  @unique @map("onec_id")
+  onecSyncedAt DateTime? @map("onec_synced_at")
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -1111,4 +1116,18 @@ model AutoReplyTrigger {
   updatedAt  DateTime          @updatedAt @map("updated_at")
 
   @@map("auto_reply_triggers")
+}
+
+model OneCPluginSettings {
+  id                  Int       @id @default(1)
+  isActive            Boolean   @default(false) @map("is_active")
+  serviceUrl          String    @default("") @map("service_url")
+  login               String    @default("")
+  password            String    @default("")
+  syncIntervalMinutes Int       @default(15) @map("sync_interval_minutes")
+  lastSyncAt          DateTime? @map("last_sync_at")
+  lastSyncResult      Json?     @map("last_sync_result")
+  updatedAt           DateTime  @default(now()) @map("updated_at")
+
+  @@map("onec_plugin_settings")
 }

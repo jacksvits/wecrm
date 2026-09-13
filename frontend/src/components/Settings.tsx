@@ -13,10 +13,11 @@ import { YandexSettings } from "./YandexSettings";
 import BegetSettings from "./BegetSettings";
 import PskovlineSettings from "./PskovlineSettings";
 import TochkaSettings from "./TochkaSettings";
+import OneCSettings from "./OneCSettings";
 import { SystemSettings } from "./SystemSettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "integrations" | "system";
-type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "beget" | "pskovline" | "tochka";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "beget" | "pskovline" | "tochka" | "onec";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
 const PLUGINS: { key: PluginKey; label: string; group: string; description: string }[] = [
@@ -30,6 +31,7 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "beget", label: "Beget", group: "Хостинг", description: "Хостинг-аккаунт: тариф, баланс, домены" },
   { key: "pskovline", label: "Псковлайн", group: "Провайдер", description: "Баланс лицевых счетов провайдера" },
   { key: "tochka", label: "Точка Банк", group: "Финансы", description: "Счета и балансы банка (OAuth)" },
+  { key: "onec", label: "1С УТ 8.3", group: "Учётные системы", description: "Двусторонняя синхронизация номенклатуры и контрагентов" },
 ];
 
 function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
@@ -44,6 +46,7 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
     beget: "M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01",
     pskovline: "M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20",
     tochka: "M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3",
+    onec: "M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 006.5 22H20V2H6.5A2.5 2.5 0 004 4.5v15z",
   };
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -74,6 +77,8 @@ function renderPluginSettings(pluginKey: PluginKey) {
       return <PskovlineSettings />;
     case "tochka":
       return <TochkaSettings />;
+    case "onec":
+      return <OneCSettings />;
     default:
       return null;
   }
@@ -94,6 +99,7 @@ export function Settings() {
     beget: false,
     pskovline: false,
     tochka: false,
+    onec: false,
   });
 
   // Возврат из OAuth банка: сразу открываем интеграции

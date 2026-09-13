@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { api } from '../api/client';
 
 interface AIModalProps {
@@ -12,8 +14,11 @@ export function AIModal({ type, onGenerate, onClose }: AIModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Пустой WYSIWYG-контент: "<p><br></p>" и т.п. считаем пустым
+  const isTextEmpty = !text.replace(/<[^>]*>/g, '').trim();
+
   const handleGenerate = async () => {
-    if (!text.trim() || loading) return;
+    if (isTextEmpty || loading) return;
     setLoading(true);
     setError('');
 
@@ -71,25 +76,12 @@ export function AIModal({ type, onGenerate, onClose }: AIModalProps) {
           </div>
         )}
 
-        <textarea
+        <ReactQuill
+          theme="snow"
           value={text}
-          onChange={e => setText(e.target.value)}
+          onChange={v => setText(v)}
           placeholder={placeholder}
-          rows={6}
-          style={{
-            width: '100%',
-            padding: '12px 16px',
-            borderRadius: 12,
-            border: '1px solid var(--border-color)',
-            background: 'var(--bg-color)',
-            color: 'var(--text-color)',
-            fontSize: 14,
-            lineHeight: 1.5,
-            resize: 'vertical',
-            outline: 'none',
-            fontFamily: 'inherit',
-            marginBottom: 16,
-          }}
+          style={{ marginBottom: 16 }}
         />
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
@@ -110,7 +102,7 @@ export function AIModal({ type, onGenerate, onClose }: AIModalProps) {
           </button>
           <button
             onClick={handleGenerate}
-            disabled={loading || !text.trim()}
+            disabled={loading || isTextEmpty}
             style={{
               padding: '10px 24px',
               borderRadius: 10,
