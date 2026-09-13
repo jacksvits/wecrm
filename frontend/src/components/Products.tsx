@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { format } from 'date-fns';
@@ -32,7 +32,7 @@ const thStyle: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', 
 const tdStyle: React.CSSProperties = { padding: '10px 12px', fontSize: 14, borderBottom: '1px solid var(--border-color)' };
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 };
 
-interface CategoryGroup { category: string; subs: { subcategory: string; products: Product[] }[]; }
+interface CategoryNode { key: string; name: string; children: CategoryNode[]; products: Product[]; }
 
 export function Products() {
   const [tab, setTab] = useState('nomenclature');
@@ -44,7 +44,7 @@ export function Products() {
   const [whFilter, setWhFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   // свёрнутые группы: ключ "cat:<категория>" и "sub:<категория>::<подкатегория>"
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const [productModal, setProductModal] = useState<Product | 'new' | null>(null);
   const [movementModal, setMovementModal] = useState<{ product: Product; type: 'income' | 'outcome' } | null>(null);
@@ -110,34 +110,79 @@ export function Products() {
 
   const searching = q.trim().length > 0;
 
-  // группировка по категориям и подкатегориям
-  const groups: CategoryGroup[] = useMemo(() => {
-    const map = new Map<string, Map<string, Product[]>>();
+  // Дерево категорий из полных путей "A / B / C" (1С-группы + необязательная подкатегория)
+  const tree: CategoryNode[] = useMemo(() => {
+    const root: CategoryNode = { key: '', name: '', children: [], products: [] };
+    const findChild = (parent: CategoryNode, name: string) => parent.children.find(c => c.name === name);
     for (const p of filtered) {
-      const cat = p.category?.trim() || 'Без категории';
-      const sub = p.subcategory?.trim() || '';
-      if (!map.has(cat)) map.set(cat, new Map());
-      const subs = map.get(cat)!;
-      if (!subs.has(sub)) subs.set(sub, []);
-      subs.get(sub)!.push(p);
+      const segs = [
+        ...(p.category?.trim() ? p.category.split(' / ').map(s => s.trim()) : []),
+        ...(p.subcategory?.trim() ? p.subcategory.split(' / ').map(s => s.trim()) : []),
+      ].filter(Boolean);
+      if (!segs.length) segs.push('Без категории');
+      let node = root;
+      let path = '';
+      for (const seg of segs) {
+        path = path ? `${path} / ${seg}` : seg;
+        let child = findChild(node, seg);
+        if (!child) { child = { key: path, name: seg, children: [], products: [] }; node.children.push(child); }
+        node = child;
+      }
+      node.products.push(p);
     }
-    return [...map.entries()]
-      .map(([category, subs]) => ({
-        category,
-        subs: [...subs.entries()]
-          .map(([subcategory, ps]) => ({ subcategory, products: ps }))
-          .sort((a, b) => a.subcategory.localeCompare(b.subcategory, 'ru')),
-      }))
-      .sort((a, b) => a.category.localeCompare(b.category, 'ru'));
+    const sortRec = (n: CategoryNode) => { n.children.sort((a, b) => a.name.localeCompare(b.name, 'ru')); n.children.forEach(sortRec); };
+    root.children.forEach(sortRec);
+    return root.children;
   }, [filtered]);
 
-  const toggleGroup = (key: string) => setCollapsed(c => ({ ...c, [key]: !c[key] }));
-  const isCollapsed = (key: string) => !searching && !!collapsed[key];
+  const toggleGroup = (key: string) => setExpanded(c => ({ ...c, [key]: !c[key] }));
+  const isCollapsed = (key: string) => !searching && !expanded[key];
 
   const activePriceTypes = useMemo(() => priceTypes.filter(t => t.isActive), [priceTypes]);
 
   const totalStock = (p: Product) => (p.stocks || []).reduce((sum, s) => sum + s.quantity, 0);
   const priceOf = (p: Product, ptId: string) => (p.prices || []).find(x => x.priceTypeId === ptId)?.price;
+
+  // Рекурсивный рендер узла дерева категорий (свёрнут по умолчанию)
+  const countNode = (n: CategoryNode): number => n.products.length + n.children.reduce((s, c) => s + countNode(c), 0);
+  const renderNode = (node: CategoryNode, depth: number): ReactNode[] => {
+    const key = `cat:${node.key}`;
+    const collapsed = isCollapsed(key);
+    const rows: ReactNode[] = [
+      <tr key={key} style={{ background: depth === 0 ? 'var(--bg-hover)' : 'transparent', cursor: 'pointer' }} onClick={() => toggleGroup(key)}>
+        <td colSpan={5 + activePriceTypes.length} style={{
+          ...tdStyle,
+          fontWeight: depth === 0 ? 600 : 400,
+          fontSize: depth === 0 ? 14 : 13,
+          paddingLeft: 12 + depth * 24,
+          color: depth === 0 ? 'var(--text-primary)' : 'var(--text-muted)',
+        }}>
+          <span style={{ display: 'inline-block', width: 20, transition: 'transform 0.15s', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
+          {node.name}
+          <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, marginLeft: 8 }}>{countNode(node)}</span>
+        </td>
+      </tr>,
+    ];
+    if (!collapsed) {
+      for (const child of node.children) rows.push(...renderNode(child, depth + 1));
+      rows.push(...node.products.map(p => (
+        <ProductRow
+          key={p.id}
+          p={p}
+          indent={12 + (depth + 1) * 24 + 8}
+          priceTypes={activePriceTypes}
+          totalStock={totalStock(p)}
+          priceOf={priceOf}
+          onOpen={() => setProductModal(p)}
+          onDelete={async () => {
+            if (!confirm(`Удалить «${p.name}»?`)) return;
+            try { await api.products.delete(p.id); await load(); } catch (e: any) { alert(e.message); }
+          }}
+        />
+      )));
+    }
+    return rows;
+  };
 
   const saveCell = async () => {
     if (!editingCell) return;
@@ -227,52 +272,8 @@ export function Products() {
                 </tr>
               </thead>
               <tbody>
-                {groups.map(g => {
-                  const catKey = `cat:${g.category}`;
-                  const catCount = g.subs.reduce((n, s) => n + s.products.length, 0);
-                  const catCollapsed = isCollapsed(catKey);
-                  return [
-                    <tr key={catKey} style={{ background: 'var(--bg-hover)', cursor: 'pointer' }} onClick={() => toggleGroup(catKey)}>
-                      <td colSpan={5 + activePriceTypes.length} style={{ ...tdStyle, fontWeight: 600, fontSize: 14 }}>
-                        <span style={{ display: 'inline-block', width: 20, transition: 'transform 0.15s', transform: catCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
-                        {g.category}
-                        <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, marginLeft: 8 }}>{catCount}</span>
-                      </td>
-                    </tr>,
-                    ...(!catCollapsed ? g.subs.map(sub => {
-                      const subKey = `sub:${g.category}::${sub.subcategory}`;
-                      const subCollapsed = isCollapsed(subKey);
-                      const hasSub = sub.subcategory !== '';
-                      return [
-                        hasSub && (
-                          <tr key={subKey} style={{ cursor: 'pointer' }} onClick={() => toggleGroup(subKey)}>
-                            <td colSpan={5 + activePriceTypes.length} style={{ ...tdStyle, paddingLeft: 32, color: 'var(--text-muted)', fontSize: 13 }}>
-                              <span style={{ display: 'inline-block', width: 20, transition: 'transform 0.15s', transform: subCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
-                              {sub.subcategory}
-                              <span style={{ fontWeight: 400, fontSize: 12, marginLeft: 8 }}>{sub.products.length}</span>
-                            </td>
-                          </tr>
-                        ),
-                        ...(!subCollapsed ? sub.products.map(p => (
-                          <ProductRow
-                            key={p.id}
-                            p={p}
-                            indent={hasSub ? 48 : 28}
-                            priceTypes={activePriceTypes}
-                            totalStock={totalStock(p)}
-                            priceOf={priceOf}
-                            onOpen={() => setProductModal(p)}
-                            onDelete={async () => {
-                              if (!confirm(`Удалить «${p.name}»?`)) return;
-                              try { await api.products.delete(p.id); await load(); } catch (e: any) { alert(e.message); }
-                            }}
-                          />
-                        )) : []),
-                      ];
-                    }) : []),
-                  ];
-                })}
-                {groups.length === 0 && (
+                {tree.flatMap(node => renderNode(node, 0))}
+                {tree.length === 0 && (
                   <tr>
                     <td colSpan={5 + activePriceTypes.length} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
                       Позиции не найдены
