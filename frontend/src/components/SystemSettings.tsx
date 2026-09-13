@@ -38,11 +38,14 @@ export function SystemSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
-  // === Брендинг: иконка приложения и логотип компании ===
-  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null }>({ iconUrl: null, logoUrl: null });
+  // === Брендинг: иконка приложения, логотип компании, логотип тёмной темы, цвет акцента ===
+  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null });
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [darkLogoFile, setDarkLogoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [accentInput, setAccentInput] = useState("");
+  const [accentSaving, setAccentSaving] = useState(false);
 
   // === Обработчик: авто-сообщения в обсуждение задачи ===
   const [handlerGreeting, setHandlerGreeting] = useState("");
@@ -174,11 +177,15 @@ export function SystemSettings() {
   useEffect(() => {
     fetch("/api/branding")
       .then((r) => (r.ok ? r.json() : null))
-      .then((b) => b && setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl }))
+      .then((b) => {
+        if (!b) return;
+        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor });
+        setAccentInput(b.accentColor || "");
+      })
       .catch(() => {});
   }, []);
 
-  const uploadBranding = async (kind: "icon" | "logo", file: File) => {
+  const uploadBranding = async (kind: "icon" | "logo" | "dark-logo", file: File) => {
     setUploading(kind);
     try {
       const fd = new FormData();
@@ -191,15 +198,45 @@ export function SystemSettings() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ошибка загрузки");
-      setBranding((prev) => ({ ...prev, ...(kind === "icon" ? { iconUrl: data.iconUrl } : { logoUrl: data.logoUrl }) }));
-      await loadBranding(); // применить сразу: favicon, manifest PWA, логотип
+      setBranding((prev) => ({
+        ...prev,
+        ...(kind === "icon" ? { iconUrl: data.iconUrl } : kind === "logo" ? { logoUrl: data.logoUrl } : { darkLogoUrl: data.darkLogoUrl }),
+      }));
+      await loadBranding(); // применить сразу: favicon, manifest PWA, логотип, цвет акцента
       if (kind === "icon") setIconFile(null);
-      else setLogoFile(null);
+      else if (kind === "logo") setLogoFile(null);
+      else setDarkLogoFile(null);
       alert("Сохранено");
     } catch (e: any) {
       alert("Ошибка: " + e.message);
     } finally {
       setUploading(null);
+    }
+  };
+
+  // Сохранение цвета акцента: пустое значение — сброс к цвету по умолчанию
+  const saveAccentColor = async (color: string | null) => {
+    setAccentSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/branding/accent-color", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ color }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка сохранения");
+      setBranding((prev) => ({ ...prev, accentColor: data.accentColor }));
+      setAccentInput(data.accentColor || "");
+      await loadBranding(); // применить цвет сразу
+      alert("Сохранено");
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    } finally {
+      setAccentSaving(false);
     }
   };
 
@@ -445,6 +482,152 @@ export function SystemSettings() {
           >
             {uploading === "logo" ? "Загрузка..." : "Загрузить"}
           </button>
+        </div>
+      </div>
+
+      {/* Логотип для тёмной темы */}
+      <div
+        style={{
+          marginBottom: 20,
+          padding: 20,
+          borderRadius: 12,
+          border: "1px solid var(--border-color)",
+          background: "var(--bg-card)",
+        }}
+      >
+        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Логотип для тёмной темы</div>
+        <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-muted)" }}>
+          Используется вместо основного логотипа при включённой тёмной теме. Если не загружен — в тёмной теме показывается основной логотип
+        </p>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            marginBottom: 16,
+            padding: 12,
+            borderRadius: 10,
+            border: "1px solid var(--border-color)",
+            background: "#1e1e2e",
+          }}
+        >
+          <img
+            src={branding.darkLogoUrl || branding.logoUrl || "/welans-logo.png"}
+            alt="Логотип тёмной темы"
+            style={{ height: 48, maxWidth: 180, objectFit: "contain", borderRadius: 8 }}
+          />
+          <span style={{ fontSize: 13, color: "#a0a0b0" }}>
+            {branding.darkLogoUrl ? "Текущий логотип тёмной темы" : "Не задан — используется основной логотип"}
+          </span>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setDarkLogoFile(e.target.files?.[0] || null)}
+            style={{ fontSize: 13, color: "var(--text-muted)" }}
+          />
+          <button
+            onClick={() => darkLogoFile && uploadBranding("dark-logo", darkLogoFile)}
+            disabled={!darkLogoFile || uploading === "dark-logo"}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              background: "#007AFF",
+              color: "#fff",
+              border: "none",
+              cursor: darkLogoFile && uploading !== "dark-logo" ? "pointer" : "default",
+              fontSize: 14,
+              opacity: !darkLogoFile || uploading === "dark-logo" ? 0.7 : 1,
+            }}
+          >
+            {uploading === "dark-logo" ? "Загрузка..." : "Загрузить"}
+          </button>
+        </div>
+      </div>
+
+      {/* Цвет акцента проекта */}
+      <div
+        style={{
+          marginBottom: 20,
+          padding: 20,
+          borderRadius: 12,
+          border: "1px solid var(--border-color)",
+          background: "var(--bg-card)",
+        }}
+      >
+        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Цвет акцента</div>
+        <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-muted)" }}>
+          Основной акцентный цвет проекта: ссылки, активные элементы и выделения в интерфейсе. По умолчанию — синий (#007AFF в светлой теме, #5A9FD4 в тёмной)
+        </p>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <input
+            type="color"
+            value={/^#[0-9a-fA-F]{6}$/.test(accentInput) ? accentInput : "#007AFF"}
+            onChange={(e) => setAccentInput(e.target.value)}
+            style={{
+              width: 44,
+              height: 38,
+              padding: 2,
+              borderRadius: 10,
+              border: "1px solid var(--border-color)",
+              background: "var(--bg-color)",
+              cursor: "pointer",
+            }}
+          />
+          <input
+            type="text"
+            value={accentInput}
+            onChange={(e) => setAccentInput(e.target.value)}
+            placeholder="#007AFF"
+            style={{
+              width: 120,
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid var(--border-color)",
+              background: "var(--bg-color)",
+              color: "var(--text-color)",
+              fontSize: 14,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+          <button
+            onClick={() => saveAccentColor(accentInput.trim() || null)}
+            disabled={accentSaving}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              background: "#007AFF",
+              color: "#fff",
+              border: "none",
+              cursor: accentSaving ? "default" : "pointer",
+              fontSize: 14,
+              opacity: accentSaving ? 0.7 : 1,
+            }}
+          >
+            {accentSaving ? "Сохранение..." : "Сохранить"}
+          </button>
+          {branding.accentColor && (
+            <button
+              onClick={() => saveAccentColor(null)}
+              disabled={accentSaving}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 10,
+                background: "transparent",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border-color)",
+                cursor: accentSaving ? "default" : "pointer",
+                fontSize: 14,
+              }}
+            >
+              По умолчанию
+            </button>
+          )}
         </div>
       </div>
     </div>

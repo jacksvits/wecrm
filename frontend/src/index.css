@@ -83,7 +83,7 @@
   --text-secondary: #666666;
   --text-muted: #999999;
   --border-color: #e5e5e5;
-  --accent-color: #007AFF;
+  --accent-color: var(--custom-accent, #007AFF);
   --shadow: 0 8px 30px rgba(0,0,0,0.08);
   /* Safe-area aware spacing tokens */
   --sat: env(safe-area-inset-top, 0);
@@ -104,7 +104,7 @@
   --text-secondary: #a0a0b0;
   --text-muted: #888888;
   --border-color: #3f3f55;
-  --accent-color: #5a9fd4;
+  --accent-color: var(--custom-accent, #5a9fd4);
   --shadow: 0 8px 30px rgba(0,0,0,0.25);
 }
 

@@ -41,6 +41,8 @@ router.get('/', async (_req, res) => {
       iconUrl512: branding?.iconPath ? fileUrl('icon-512x512.png', branding.updatedAt) : null,
       appleTouchIconUrl: branding?.iconPath ? fileUrl('apple-touch-icon.png', branding.updatedAt) : null,
       logoUrl: branding?.logoPath ? fileUrl('logo.png', branding.updatedAt) : null,
+      darkLogoUrl: branding?.darkLogoPath ? fileUrl('logo-dark.png', branding.updatedAt) : null,
+      accentColor: branding?.accentColor || null,
       updatedAt: branding?.updatedAt || null,
     });
   } catch (err: any) {
@@ -117,6 +119,61 @@ router.post('/logo', authMiddleware, upload.single('file'), async (req: AuthRequ
     res.json({ logoUrl: fileUrl('logo.png', branding.updatedAt) });
   } catch (err: any) {
     console.error('[branding] logo upload error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/branding/dark-logo — загрузка логотипа для тёмной темы
+router.post('/dark-logo', authMiddleware, upload.single('file'), async (req: AuthRequest, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Только администратор' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл не загружен' });
+    }
+
+    // Логотип ограничиваем по ширине 1024px, формат сохраняем с прозрачностью
+    await sharp(req.file.buffer)
+      .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+      .png()
+      .toFile(path.join(BRANDING_DIR, 'logo-dark.png'));
+
+    const branding = await prisma.branding.upsert({
+      where: { id: 1 },
+      create: { id: 1, darkLogoPath: '/uploads/branding/logo-dark.png', updatedAt: new Date() },
+      update: { darkLogoPath: '/uploads/branding/logo-dark.png', updatedAt: new Date() },
+    });
+
+    console.log(`[branding] dark logo updated: ${req.file.size} bytes`);
+    res.json({ darkLogoUrl: fileUrl('logo-dark.png', branding.updatedAt) });
+  } catch (err: any) {
+    console.error('[branding] dark logo upload error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/branding/accent-color — кастомный цвет акцента проекта (null — сброс к дефолту)
+router.post('/accent-color', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Только администратор' });
+    }
+    const color = req.body?.color ?? null;
+    if (color !== null && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(String(color))) {
+      return res.status(400).json({ error: 'Цвет должен быть в формате HEX, например #007AFF' });
+    }
+
+    const branding = await prisma.branding.upsert({
+      where: { id: 1 },
+      create: { id: 1, accentColor: color, updatedAt: new Date() },
+      update: { accentColor: color, updatedAt: new Date() },
+    });
+
+    console.log(`[branding] accent color updated: ${color || 'default'}`);
+    res.json({ accentColor: branding.accentColor });
+  } catch (err: any) {
+    console.error('[branding] accent color error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

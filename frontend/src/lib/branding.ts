@@ -6,6 +6,8 @@ export interface Branding {
   iconUrl512: string | null;
   appleTouchIconUrl: string | null;
   logoUrl: string | null;
+  darkLogoUrl: string | null;
+  accentColor: string | null;
   updatedAt: string | null;
 }
 
@@ -14,6 +16,8 @@ let current: Branding = {
   iconUrl512: null,
   appleTouchIconUrl: null,
   logoUrl: null,
+  darkLogoUrl: null,
+  accentColor: null,
   updatedAt: null,
 };
 

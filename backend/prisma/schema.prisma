@@ -1012,10 +1012,12 @@ model ProductImage {
 }
 
 model Branding {
-  id        Int      @id @default(1)
-  iconPath  String?  @map("icon_path")
-  logoPath  String?  @map("logo_path")
-  updatedAt DateTime @default(now()) @map("updated_at")
+  id           Int      @id @default(1)
+  iconPath     String?  @map("icon_path")
+  logoPath     String?  @map("logo_path")
+  darkLogoPath String?  @map("dark_logo_path")
+  accentColor  String?  @map("accent_color")
+  updatedAt    DateTime @default(now()) @map("updated_at")
 
   @@map("branding")
 }
