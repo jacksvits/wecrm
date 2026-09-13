@@ -18,6 +18,7 @@ router.get('/', authMiddleware, async (_req, res) => {
       syncIntervalMinutes: s?.syncIntervalMinutes ?? 15,
       lastSyncAt: s?.lastSyncAt ?? null,
       lastSyncResult: s?.lastSyncResult ?? null,
+      entitySync: getEntitySync(s?.entitySync),
     });
   } catch (err: any) {
     console.error('[onec-plugin] GET error:', err.message);
