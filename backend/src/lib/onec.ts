@@ -223,11 +223,18 @@ export class OneCClient {
   }
 
   async createCounterparty(item: Partial<OneCCounterparty>): Promise<{ id: string }> {
-    const id = await this.createEntity(encodeURI('Catalog_Контрагенты'), {
+    // УТ 11: Контрагент без Партнёра не записывается (обработчик ПриЗаписи -> HTTP 500)
+    let partnerKey: string | undefined;
+    try {
+      partnerKey = await this.createEntity(encodeURI('Catalog_Партнеры'), { Description: item.name });
+    } catch { /* если партнёры недоступны — пробуем создать контрагента без них */ }
+    const body: Record<string, any> = {
       Description: item.name,
       ИНН: item.inn || '',
       ЮридическоеФизическоеЛицо: item.kind === 'contact' ? 'ФизическоеЛицо' : 'ЮридическоеЛицо',
-    });
+    };
+    if (partnerKey) body['Партнер_Key'] = partnerKey;
+    const id = await this.createEntity(encodeURI('Catalog_Контрагенты'), body);
     return { id };
   }
 
