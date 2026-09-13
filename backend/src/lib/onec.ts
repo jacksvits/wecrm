@@ -149,8 +149,24 @@ export class OneCClient {
 
   private async kindsMap(): Promise<Map<string, string>> {
     if (this.kindsCache) return this.kindsCache;
-    const rows = await this.readCollection(encodeURI('Catalog_ВидыНоменклатуры'), 'Ref_Key,ТипНоменклатуры,DeletionMark');
-    this.kindsCache = new Map(rows.map((r) => [r.Ref_Key, r['ТипНоменклатуры'] || '']));
+    const rows = await this.readCollection(encodeURI('Catalog_ВидыНоменклатуры'), 'Ref_Key,ТипНоменклатуры,Parent_Key,DeletionMark');
+    // Виды иерархические: если тип не заполнен у вида, берём у родительского (с защитой от циклов)
+    const raw = new Map<string, { type?: string; parent?: string }>();
+    for (const r of rows) {
+      raw.set(r.Ref_Key, { type: r['ТипНоменклатуры'] || undefined, parent: r.Parent_Key || undefined });
+    }
+    this.kindsCache = new Map<string, string>();
+    for (const key of raw.keys()) {
+      const guard = new Set<string>();
+      let cur: string | undefined = key;
+      while (cur && raw.has(cur) && !guard.has(cur)) {
+        guard.add(cur);
+        const t: { type?: string; parent?: string } = raw.get(cur)!;
+        if (t.type) { this.kindsCache.set(key, t.type); break; }
+        cur = t.parent;
+      }
+      if (!this.kindsCache.has(key)) this.kindsCache.set(key, '');
+    }
     return this.kindsCache;
   }
 
