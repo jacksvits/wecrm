@@ -648,10 +648,10 @@ function ProductModal({ product, onClose, onSaved }: { product: Product | 'new';
           </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Артикул</label>
           <input value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })} style={inputStyle} />
-          <label style={{ fontSize: 14, fontWeight: 500 }}>Категория</label>
-          <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={inputStyle} />
-          <label style={{ fontSize: 14, fontWeight: 500 }}>Подкатегория</label>
-          <input value={form.subcategory} onChange={e => setForm({ ...form, subcategory: e.target.value })} style={inputStyle} />
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Категория (группы 1С)</label>
+          <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={inputStyle} placeholder="Полный путь групп из 1С: Товары на продажу / Камеры" />
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Подкатегория (доп. уровень)</label>
+          <input value={form.subcategory} onChange={e => setForm({ ...form, subcategory: e.target.value })} style={inputStyle} placeholder="Необязательно — для ручной детализации" />
           <div style={{ display: 'flex', gap: 12 }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 14, fontWeight: 500 }}>Единица</label>
