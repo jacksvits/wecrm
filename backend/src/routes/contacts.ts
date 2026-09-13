@@ -391,6 +391,48 @@ router.post('/merge', async (req: AuthRequest, res) => {
   }
 });
 
+// Массовая смена типа карточек (контакт <-> организация) для выбранных карточек
+router.post('/bulk-kind', async (req: AuthRequest, res) => {
+  try {
+    if (!isManagerOrAdmin(req)) {
+      return res.status(403).json({ error: 'Недостаточно прав для редактирования контактов' });
+    }
+    const { ids, kind } = z.object({
+      ids: z.array(z.string().min(1)).min(1),
+      kind: z.enum(['contact', 'organization']),
+    }).parse(req.body);
+
+    // Логика смены типа зеркалит PATCH /:id: у организации очищаем контактные
+    // поля, у контакта — организационные. Организация не может принадлежать
+    // организации, поэтому при переводе в организацию отвязываем от родителя.
+    const data = kind === 'organization'
+      ? { kind, position: null, organizationId: null }
+      : { kind, inn: null, ogrn: null, legalAddress: null };
+
+    // Меняем тип только у карточек с противоположным типом — так updated
+    // отражает реальное число изменённых записей
+    const result = await prisma.contact.updateMany({
+      where: { id: { in: ids }, kind: kind === 'organization' ? 'contact' : 'organization' },
+      data,
+    });
+
+    await prisma.activity.create({
+      data: {
+        action: 'updated',
+        entity: 'contact',
+        entityId: ids[0],
+        userId: req.user!.id,
+        details: `Массовая смена типа на «${kind === 'organization' ? 'Организация' : 'Контакт'}» для ${result.count} карточек`,
+      },
+    });
+
+    res.json({ success: true, updated: result.count });
+  } catch (err: any) {
+    console.error('[Contacts BulkKind] Error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.post('/import', async (req: AuthRequest, res) => {
   try {
     if (!isAdmin(req)) return res.status(403).json({ error: 'Недостаточно прав' });

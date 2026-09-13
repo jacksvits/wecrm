@@ -57,6 +57,9 @@ export function ContactList() {
   const PAGE_SIZE = 50;
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [mergeTargetId, setMergeTargetId] = useState<string>('');
+  const [showKindModal, setShowKindModal] = useState(false);
+  const [bulkKind, setBulkKind] = useState<'contact' | 'organization'>('contact');
+  const [changingKind, setChangingKind] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateContacts, setDuplicateContacts] = useState<any[]>([]);
   const [duplicateTargetId, setDuplicateTargetId] = useState<string>('');
@@ -313,6 +316,24 @@ export function ContactList() {
     const ids = Array.from(selectedIds);
     setMergeTargetId(ids[0]);
     setShowMergeModal(true);
+  };
+
+  // Массовая смена типа выбранных карточек: контакт <-> организация
+  const handleBulkChangeKind = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setChangingKind(true);
+    try {
+      const res = await api.contacts.changeKind(ids, bulkKind);
+      alert(`Тип изменён для ${res.updated} карточек`);
+      setShowKindModal(false);
+      setSelectedIds(new Set());
+      loadContacts();
+    } catch (err: any) {
+      alert('Ошибка: ' + err.message);
+    } finally {
+      setChangingKind(false);
+    }
   };
 
   const handleImport = async () => {
@@ -662,6 +683,9 @@ export function ContactList() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', marginBottom: 12, borderRadius: 12, background: '#f0f7ff', border: '1px solid #cce5ff' }}>
           <span style={{ fontSize: 14, fontWeight: 500 }}>Выбрано: {selectedIds.size}</span>
           <button onClick={handleMerge} style={{ padding: '6px 14px', borderRadius: 10, border: 'none', background: '#007AFF', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>🔗 Объединить</button>
+          {canEdit && (
+            <button onClick={() => setShowKindModal(true)} style={{ padding: '6px 14px', borderRadius: 10, border: 'none', background: '#007AFF', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>🔄 Сменить тип</button>
+          )}
           <button onClick={() => setSelectedIds(new Set())} style={{ padding: '6px 14px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' }}>Снять выделение</button>
         </div>
       )}
@@ -842,6 +866,32 @@ export function ContactList() {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setShowMergeModal(false)} style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer' }}>Отмена</button>
               <button onClick={confirmMerge} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', cursor: 'pointer' }}>Объединить</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showKindModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001, padding: 'max(16px, env(safe-area-inset-top, 0)) max(16px, env(safe-area-inset-right, 0)) max(16px, env(safe-area-inset-bottom, 0)) max(16px, env(safe-area-inset-left, 0))' }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 18 }}>Сменить тип карточек</h3>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16 }}>
+              Выбрано {selectedIds.size} карточек. Выберите новый тип.
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <button onClick={() => setBulkKind('contact')} style={{ flex: 1, padding: '12px', borderRadius: 10, border: bulkKind === 'contact' ? '2px solid #007AFF' : '1px solid #e5e5e5', background: bulkKind === 'contact' ? '#f0f7ff' : '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>👤 Контакт</button>
+              <button onClick={() => setBulkKind('organization')} style={{ flex: 1, padding: '12px', borderRadius: 10, border: bulkKind === 'organization' ? '2px solid #007AFF' : '1px solid #e5e5e5', background: bulkKind === 'organization' ? '#f0f7ff' : '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>🏢 Организация</button>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20 }}>
+              {bulkKind === 'organization'
+                ? 'У карточек будет очищена должность и отвязана родительская организация.'
+                : 'У карточек будут очищены ИНН, ОГРН и юридический адрес.'}
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowKindModal(false)} disabled={changingKind} style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer' }}>Отмена</button>
+              <button onClick={handleBulkChangeKind} disabled={changingKind} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', cursor: changingKind ? 'not-allowed' : 'pointer', opacity: changingKind ? 0.7 : 1 }}>
+                {changingKind ? 'Сохранение...' : 'Применить'}
+              </button>
             </div>
           </div>
         </div>
