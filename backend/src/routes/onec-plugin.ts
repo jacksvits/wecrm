@@ -85,14 +85,39 @@ router.post('/test', authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-// POST /api/onec-plugin/sync — ручной запуск синхронизации
+// Фоновый запуск синхронизации (полный цикл может занимать минуты — HTTP-запрос не ждёт)
+let syncRunning = false;
+
+function startBackgroundSync() {
+  syncRunning = true;
+  runOneCSync()
+    .catch((e: any) => console.error('[onec-plugin] background sync error:', e.message))
+    .finally(() => { syncRunning = false; });
+}
+
+// POST /api/onec-plugin/sync — ручной запуск синхронизации в фоне
 router.post('/sync', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
-    const stats = await runOneCSync();
-    res.json(stats);
+    if (syncRunning) return res.status(409).json({ error: 'Синхронизация уже выполняется, дождитесь завершения' });
+    startBackgroundSync();
+    res.json({ started: true, message: 'Синхронизация запущена в фоне' });
   } catch (err: any) {
     console.error('[onec-plugin] sync error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/onec-plugin/sync-status — статус фоновой синхронизации
+router.get('/sync-status', authMiddleware, async (_req, res) => {
+  try {
+    const s = await prisma.oneCPluginSettings.findUnique({ where: { id: 1 } });
+    res.json({
+      running: syncRunning,
+      lastSyncAt: s?.lastSyncAt ?? null,
+      lastSyncResult: s?.lastSyncResult ?? null,
+    });
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });

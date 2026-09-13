@@ -65,15 +65,45 @@ export default function OneCSettings() {
     setSyncing(true);
     try {
       const r: any = await api.oneCPlugin.sync();
-      setSettings((prev: any) => ({
-        ...prev,
-        lastSyncAt: r.finishedAt ?? new Date().toISOString(),
-        lastSyncResult: r,
-      }));
-      flash(`Синхронизация завершена: товаров загр./выз. ${r.products.pulled}/${r.products.pushed}, контактов ${r.contacts.pulled}/${r.contacts.pushed}`);
+      if (r && !r.started && r.products) {
+        // синхронизация выполнилась синхронно (старый бэкенд) — результат сразу
+        setSettings((prev: any) => ({
+          ...prev,
+          lastSyncAt: r.finishedAt ?? new Date().toISOString(),
+          lastSyncResult: r,
+        }));
+        setSyncing(false);
+        flash(`Синхронизация завершена: товаров загр./выз. ${r.products.pulled}/${r.products.pushed}, контактов ${r.contacts.pulled}/${r.contacts.pushed}`);
+        return;
+      }
+      if (r && r.error && !r.started) throw new Error(r.error);
+      // фоновый режим: опрашиваем статус до смены lastSyncAt
+      flash('Синхронизация запущена в фоне…');
+      const startedAfter = Date.now() - 5000;
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const st: any = await api.oneCPlugin.get();
+          if (st.lastSyncAt && new Date(st.lastSyncAt).getTime() > startedAfter) {
+            clearInterval(poll);
+            const last: any = st.lastSyncResult;
+            setSettings((prev: any) => ({ ...prev, ...st }));
+            setSyncing(false);
+            flash(last
+              ? `Синхронизация завершена: товаров загр./выз. ${last.products?.pulled ?? 0}/${last.products?.pushed ?? 0}, контактов ${last.contacts?.pulled ?? 0}/${last.contacts?.pushed ?? 0}${last.products?.errors || last.contacts?.errors ? `, ошибок: тов. ${last.products?.errors ?? 0}, конт. ${last.contacts?.errors ?? 0}` : ''}`
+              : 'Синхронизация завершена');
+          } else if (attempts >= 36) { // ~3 минуты
+            clearInterval(poll);
+            setSyncing(false);
+            flash('Синхронизация выполняется дольше 3 минут — результат появится в блоке ниже');
+          }
+        } catch { /* опрос продолжается */ }
+      }, 5000);
     } catch (err: any) {
       flash('Ошибка синхронизации: ' + err.message);
-    } finally { setSyncing(false); }
+      setSyncing(false);
+    }
   };
 
   const inputStyle: React.CSSProperties = {
