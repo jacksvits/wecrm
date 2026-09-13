@@ -163,11 +163,20 @@ export async function runOneCSync(): Promise<OneCSyncStats> {
       const page = await client.getCounterparties();
       for (const c of page.items) {
         try {
-          const existing =
+          let target =
             (await prisma.contact.findFirst({ where: { onecId: c.id } })) ||
             (c.inn ? await prisma.contact.findFirst({ where: { inn: c.inn } }) : null) ||
             (c.phone ? await prisma.contact.findFirst({ where: { name: c.name, phone: c.phone } }) : null);
-          // Сильное совпадение (по GUID/ИНН) — вид берём из 1С; слабое (имя+телефон) — вид CRM сохраняем
+          if (!target) {
+            // Защита от дублей: контакт с таким именем уже есть в CRM
+            const byName = await prisma.contact.findFirst({ where: { name: c.name }, orderBy: { id: 'asc' } });
+            if (byName) {
+              if (byName.onecId) continue; // имя уже представлено привязанным контактом — запись 1С пропускаем
+              target = byName;             // свободный одноимённый контакт CRM «усыновляем» под запись 1С
+            }
+          }
+          const existing = target;
+          // Сильное совпадение (по GUID/ИНН) — вид берём из 1С; слабое (имя/имя+телефон) — вид CRM сохраняем
           const strongMatch = !!existing && (existing.onecId === c.id || (!!c.inn && existing.inn === c.inn));
           const data = {
             name: c.name,
