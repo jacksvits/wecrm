@@ -1127,6 +1127,7 @@ model OneCPluginSettings {
   syncIntervalMinutes Int       @default(15) @map("sync_interval_minutes")
   lastSyncAt          DateTime? @map("last_sync_at")
   lastSyncResult      Json?     @map("last_sync_result")
+  entitySync          Json?     @map("entity_sync") // {contacts|organizations|products|services|prices|stock: {enabled, direction: pull|push|both}}
   updatedAt           DateTime  @default(now()) @map("updated_at")
 
   @@map("onec_plugin_settings")

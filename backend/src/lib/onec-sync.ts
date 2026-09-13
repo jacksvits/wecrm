@@ -1,6 +1,38 @@
 import { prisma } from './prisma.js';
 import { OneCClient, OneCNomenclature, OneCCounterparty } from './onec.js';
 
+export type OneCDirection = 'pull' | 'push' | 'both';
+export interface OneCEntityCfg { enabled: boolean; direction: OneCDirection; }
+export type OneCEntityKey = 'contacts' | 'organizations' | 'products' | 'services' | 'prices' | 'stock';
+export type OneCEntitySync = Record<OneCEntityKey, OneCEntityCfg>;
+
+// По умолчанию всё включено; цены/остатки — только из 1С (запись в 1С через OData невозможна)
+export const DEFAULT_ENTITY_SYNC: OneCEntitySync = {
+  contacts: { enabled: true, direction: 'both' },
+  organizations: { enabled: true, direction: 'both' },
+  products: { enabled: true, direction: 'both' },
+  services: { enabled: true, direction: 'both' },
+  prices: { enabled: true, direction: 'pull' },
+  stock: { enabled: true, direction: 'pull' },
+};
+
+export function getEntitySync(raw: any): OneCEntitySync {
+  const out: OneCEntitySync = JSON.parse(JSON.stringify(DEFAULT_ENTITY_SYNC));
+  if (raw && typeof raw === 'object') {
+    for (const k of Object.keys(DEFAULT_ENTITY_SYNC) as OneCEntityKey[]) {
+      const v = raw[k];
+      if (!v || typeof v !== 'object') continue;
+      out[k] = {
+        enabled: !!v.enabled,
+        direction: (['pull', 'push', 'both'] as OneCDirection[]).includes(v.direction) ? v.direction : DEFAULT_ENTITY_SYNC[k].direction,
+      };
+    }
+  }
+  if (out.prices.direction === 'push') out.prices.direction = 'pull';
+  if (out.stock.direction === 'push') out.stock.direction = 'pull';
+  return out;
+}
+
 export interface OneCSyncStats {
   startedAt: string;
   finishedAt?: string;
@@ -66,6 +98,7 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
 
   const client = new OneCClient(s.serviceUrl, s.login, s.password);
   const lastSyncWatermark = s.lastSyncAt; // для определения изменённых в CRM контактов
+  const cfg = getEntitySync(s.entitySync); // пообъектные опции: вкл/выкл + направление
   const stats: OneCSyncStats = {
     startedAt: new Date().toISOString(),
     products: { pulled: 0, pushed: 0, errors: 0 },
@@ -73,6 +106,13 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
     pricesPulled: 0,
     stockRowsUpdated: 0,
   };
+  // Номенклатурные фазы нужны, если включён хотя бы один из видов в любом направлении
+  const nomNeeded = [cfg.products, cfg.services].some((c) => c.enabled);
+  const nomPull = [cfg.products, cfg.services].some((c) => c.enabled && c.direction !== 'push');
+  const nomPush = [cfg.products, cfg.services].some((c) => c.enabled && c.direction !== 'pull');
+  // Контрагенты
+  const ctpPull = [cfg.contacts, cfg.organizations].some((c) => c.enabled && c.direction !== 'push');
+  const ctpPush = [cfg.contacts, cfg.organizations].some((c) => c.enabled && c.direction !== 'pull');
 
   // ===== НОМЕНКЛАТУРА =====
   try {
@@ -86,6 +126,9 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
       for (const n of page.items) {
         if (seenIds.has(n.id)) continue;
         seenIds.add(n.id);
+        // Опция «товары/услуги»: выключена или только выгрузка (push) -> pull пропускаем
+        const entNom = n.kind === 'service' ? cfg.services : cfg.products;
+        if (!entNom.enabled || entNom.direction === 'push') continue;
         try {
           const skipIds = [...claimed];
           let existing = await prisma.product.findFirst({ where: { onecId: n.id } });
@@ -134,6 +177,9 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
     const linkedProducts = await prisma.product.findMany({ where: { onecId: { not: null } } });
     const changedProducts = linkedProducts.filter((p) => !p.onecSyncedAt || p.updatedAt > p.onecSyncedAt);
     for (const p of [...newProducts, ...changedProducts]) {
+      // Опция «товары/услуги»: выключена или только загрузка (pull) -> push пропускаем
+      const entNom = p.kind === 'service' ? cfg.services : cfg.products;
+      if (!entNom.enabled || entNom.direction === 'pull') continue;
       try {
         const payload: Partial<OneCNomenclature> = {
           name: p.name,
@@ -164,7 +210,7 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
   }
 
   // ===== ЦЕНЫ (1С -> CRM) =====
-  try {
+  if (cfg.prices.enabled && cfg.prices.direction !== 'push') try {
     const kinds = await client.getPriceKinds();
     const prices = await client.getPrices();
     for (const pr of prices) {
@@ -274,6 +320,9 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
       : [];
     for (const c of [...newContacts, ...changedContacts]) {
       if (c.onecId && pulledContactIds.has(c.onecId)) continue; // эхо pull-фазы
+      // Опция «контакты/юр. лица»: выключена или только загрузка (pull) -> push пропускаем
+      const entCtp = c.kind === 'contact' ? cfg.contacts : cfg.organizations;
+      if (!entCtp.enabled || entCtp.direction === 'pull') continue;
       try {
         const payload: Partial<OneCCounterparty> = {
           name: c.name,

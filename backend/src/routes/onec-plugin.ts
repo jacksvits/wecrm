@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { runOneCSync } from '../lib/onec-sync.js';
+import { runOneCSync, getEntitySync } from '../lib/onec-sync.js';
 import { OneCClient } from '../lib/onec.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
@@ -29,7 +29,7 @@ router.get('/', authMiddleware, async (_req, res) => {
 router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
-    const { isActive, serviceUrl, login, password, syncIntervalMinutes } = req.body || {};
+    const { isActive, serviceUrl, login, password, syncIntervalMinutes, entitySync } = req.body || {};
     if (isActive !== undefined && typeof isActive !== 'boolean') {
       return res.status(400).json({ error: 'Некорректный флаг активности' });
     }
@@ -60,6 +60,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
       syncIntervalMinutes: saved.syncIntervalMinutes,
       lastSyncAt: saved.lastSyncAt,
       lastSyncResult: saved.lastSyncResult,
+      entitySync: getEntitySync(saved.entitySync),
     });
   } catch (err: any) {
     console.error('[onec-plugin] POST error:', err.message);

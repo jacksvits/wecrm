@@ -2,9 +2,29 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 
 // === Плагин «1С УТ 8.3»: подключение и двусторонняя синхронизация номенклатуры и контрагентов ===
+// Пообъектные опции: вкл/выкл + направление (pull — с 1С в проект, push — с проекта в 1С, both — двусторонняя)
+const ENTITY_OPTS: { key: string; label: string; pullOnly?: boolean }[] = [
+  { key: 'contacts', label: 'Синхронизировать контакты' },
+  { key: 'organizations', label: 'Синхронизировать юр. лица' },
+  { key: 'products', label: 'Синхронизировать товары' },
+  { key: 'services', label: 'Синхронизировать услуги' },
+  { key: 'prices', label: 'Синхронизировать цены', pullOnly: true },
+  { key: 'stock', label: 'Синхронизировать остатки', pullOnly: true },
+];
+
+const DEFAULT_ENTITY_SYNC: any = {
+  contacts: { enabled: true, direction: 'both' },
+  organizations: { enabled: true, direction: 'both' },
+  products: { enabled: true, direction: 'both' },
+  services: { enabled: true, direction: 'both' },
+  prices: { enabled: true, direction: 'pull' },
+  stock: { enabled: true, direction: 'pull' },
+};
+
 export default function OneCSettings() {
   const [settings, setSettings] = useState<any>(null);
   const [form, setForm] = useState({ serviceUrl: '', login: '', password: '', syncIntervalMinutes: 15 });
+  const [entitySync, setEntitySync] = useState<any>(DEFAULT_ENTITY_SYNC);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState('');
@@ -38,6 +58,7 @@ export default function OneCSettings() {
         login: form.login.trim(),
         password: form.password,
         syncIntervalMinutes: Number(form.syncIntervalMinutes) || 15,
+        entitySync,
       });
       setSettings((prev: any) => ({ ...prev, ...res }));
       setForm((f) => ({ ...f, password: '' }));
@@ -184,6 +205,39 @@ export default function OneCSettings() {
         />
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
           Номенклатура и контрагенты синхронизируются двусторонне с указанным интервалом
+        </div>
+      </div>
+
+      {/* Пообъектные опции синхронизации */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ ...labelStyle, marginBottom: 10 }}>Объекты синхронизации</label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {ENTITY_OPTS.map((o) => {
+            const v = entitySync[o.key] ?? { enabled: false, direction: 'pull' };
+            return (
+              <div key={o.key} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 230, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!v.enabled}
+                    onChange={(e) => setEntitySync((prev: any) => ({ ...prev, [o.key]: { ...v, enabled: e.target.checked } }))}
+                  />
+                  <span style={{ fontSize: 13 }}>{o.label}</span>
+                </label>
+                <select
+                  value={o.pullOnly ? 'pull' : (v.direction || 'both')}
+                  disabled={!!o.pullOnly}
+                  onChange={(e) => setEntitySync((prev: any) => ({ ...prev, [o.key]: { ...v, direction: e.target.value } }))}
+                  style={{ ...inputStyle, width: 'auto', padding: '6px 10px', opacity: o.pullOnly ? 0.7 : 1 }}
+                >
+                  <option value="pull">С 1С в проект</option>
+                  {!o.pullOnly && <option value="push">С проекта в 1С</option>}
+                  {!o.pullOnly && <option value="both">Двусторонняя</option>}
+                </select>
+                {!!o.pullOnly && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>только из 1С (запись в 1С через OData невозможна)</span>}
+              </div>
+            );
+          })}
         </div>
       </div>
 
