@@ -13,7 +13,24 @@ export interface OneCSyncStats {
 
 // Двусторонняя синхронизация: номенклатура и контрагенты/контакты.
 // Сопоставление записей: onecId -> (sku/barcode/INN) -> name, дубли не создаются.
+//
+// Взаимное исключение между процессами (backend и worker работают одновременно):
+// без блокировки два параллельных цикла портят данные (наблюдалось: виды товаров
+// перезаписывались, услуги становились товарами). Только один процесс синхронизируется,
+// второй получает ошибку «уже выполняется».
+const ONEC_SYNC_LOCK_KEY = 742017;
+
 export async function runOneCSync(): Promise<OneCSyncStats> {
+  const lockRow: { ok: boolean }[] = await prisma.$queryRaw`SELECT pg_tryadvisory_lock(${ONEC_SYNC_LOCK_KEY}) AS ok`;
+  if (!lockRow[0]?.ok) throw new Error('Синхронизация уже выполняется другим процессом');
+  try {
+    return await runOneCSyncInner();
+  } finally {
+    try { await prisma.$queryRaw`SELECT pg_advisory_unlock(${ONEC_SYNC_LOCK_KEY})`; } catch { /* соединение закрыто — блокировка снимется автоматически */ }
+  }
+}
+
+async function runOneCSyncInner(): Promise<OneCSyncStats> {
   const s = await prisma.oneCPluginSettings.findUnique({ where: { id: 1 } });
   if (!s || !s.isActive) throw new Error('Плагин 1С не активен');
   if (!s.serviceUrl || !s.login || !s.password) throw new Error('Не заполнены ссылка, логин или пароль 1С');
