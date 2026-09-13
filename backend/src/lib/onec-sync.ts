@@ -82,7 +82,15 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
             await prisma.product.update({ where: { id: existing.id }, data });
             claimed.add(existing.id);
           } else {
-            const created = await prisma.product.create({ data });
+            // Одноимённая позиция получает свою строку; sku/barcode уникальны — при занятости не дублируем
+            let createData: any = { ...data };
+            if (n.sku && (await prisma.product.findFirst({ where: { sku: n.sku }, select: { id: true } }))) {
+              createData = { ...createData, sku: null };
+            }
+            if (n.barcode && (await prisma.product.findFirst({ where: { barcode: n.barcode }, select: { id: true } }))) {
+              createData = { ...createData, barcode: null };
+            }
+            const created = await prisma.product.create({ data: createData });
             claimed.add(created.id);
           }
           stats.products.pulled++;
