@@ -42,6 +42,8 @@ export async function runOneCSync(): Promise<OneCSyncStats> {
             barcode: n.barcode ?? existing?.barcode ?? null,
             unit: n.unit || existing?.unit || 'шт',
             kind: n.kind === 'service' ? 'service' : 'product',
+            category: n.categoryPath?.[0] ?? existing?.category ?? null,
+            subcategory: n.categoryPath && n.categoryPath.length > 1 ? n.categoryPath.slice(1).join(' / ') : (existing?.subcategory ?? null),
             description: n.description ?? existing?.description ?? null,
             isActive: n.isActive ?? true,
             onecId: n.id,

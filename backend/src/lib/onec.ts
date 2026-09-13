@@ -17,6 +17,7 @@ export interface OneCNomenclature {
   price?: number;
   description?: string;
   isActive?: boolean;
+  categoryPath?: string[];          // путь категорий: [категория, подкатегория, ...]
 }
 
 export interface OneCCounterparty {
@@ -154,10 +155,67 @@ export class OneCClient {
     }
   }
 
+  // --- Группы номенклатуры (категории) ---
+  private folderCache: { folders: Map<string, { name: string; parent?: string }>; loaded: boolean } = {
+    folders: new Map(),
+    loaded: false,
+  };
+
+  private async loadFolders(): Promise<Map<string, { name: string; parent?: string }>> {
+    if (this.folderCache.loaded) return this.folderCache.folders;
+    const rows = await this.readCollection(
+      encodeURI('Catalog_Номенклатура'),
+      'Ref_Key,Description,Parent_Key,IsFolder,DeletionMark'
+    );
+    for (const r of rows) {
+      if (r.IsFolder) this.folderCache.folders.set(r.Ref_Key, { name: r.Description || '', parent: r.Parent_Key || undefined });
+    }
+    this.folderCache.loaded = true;
+    return this.folderCache.folders;
+  }
+
+  // Путь категорий элемента по Parent_Key (сверху вниз: [категория, подкатегория, ...])
+  private async categoryPathOf(parentKey?: string): Promise<string[] | undefined> {
+    if (!parentKey) return undefined;
+    const folders = await this.loadFolders();
+    const path: string[] = [];
+    let cur: string | undefined = parentKey;
+    const guard = new Set<string>();
+    while (cur && folders.has(cur) && !guard.has(cur)) {
+      guard.add(cur);
+      const f: { name: string; parent?: string } = folders.get(cur)!;
+      path.unshift(f.name);
+      cur = f.parent;
+    }
+    return path.length ? path : undefined;
+  }
+
+  // Найти или создать группу по пути; возвращает Ref_Key группы
+  async ensureFolder(path: string[]): Promise<string | undefined> {
+    if (!path.length) return undefined;
+    const folders = await this.loadFolders();
+    let parentKey: string | undefined;
+    for (const name of path) {
+      const found = [...folders.entries()].find(([, f]) => f.name === name && f.parent === parentKey);
+      if (found) {
+        parentKey = found[0];
+        continue;
+      }
+      // создаём недостающий уровень
+      const body: Record<string, any> = { Description: name, IsFolder: true };
+      if (parentKey) body['Parent_Key'] = parentKey;
+      const key = await this.createEntity(encodeURI('Catalog_Номенклатура'), body);
+      if (!key) return undefined;
+      folders.set(key, { name, parent: parentKey });
+      parentKey = key;
+    }
+    return parentKey;
+  }
+
   // --- Номенклатура ---
   async getNomenclature(): Promise<{ items: OneCNomenclature[] }> {
     const entitySet = encodeURI('Catalog_Номенклатура');
-    const rows = await this.readCollection(entitySet, 'Ref_Key,Description,Артикул,ЕдиницаИзмерения,ВидНоменклатуры,DeletionMark');
+    const rows = await this.readCollection(entitySet, 'Ref_Key,Description,Артикул,ЕдиницаИзмерения,ВидНоменклатуры,Parent_Key,IsFolder,DeletionMark');
 
     // Штрихкоды из регистра сведений (best-effort — регистр может отсутствовать)
     const barcodes = new Map<string, string>();
@@ -168,10 +226,12 @@ export class OneCClient {
       }
     } catch { /* регистр недоступен — штрихкоды пропускаем */ }
 
-    const items: OneCNomenclature[] = rows.map((r) => {
+    const items: OneCNomenclature[] = [];
+    for (const r of rows) {
+      if (r.IsFolder) continue; // группы — это категории, обрабатываются отдельно
       const vid = r.ВидНоменклатуры;
       const typeName = typeof vid === 'object' ? vid?.ТипНоменклатуры : undefined;
-      return {
+      items.push({
         id: r.Ref_Key,
         name: r.Description || '',
         sku: r['Артикул'] || undefined,
@@ -179,8 +239,9 @@ export class OneCClient {
         unit: typeof r.ЕдиницаИзмерения === 'object' ? r.ЕдиницаИзмерения?.Description : undefined,
         kind: typeName === 'Услуга' || typeName === 'Работа' ? 'service' : 'product',
         isActive: !r.DeletionMark,
-      };
-    });
+        categoryPath: await this.categoryPathOf(r.Parent_Key || undefined),
+      });
+    }
     return { items };
   }
 
@@ -191,15 +252,22 @@ export class OneCClient {
     };
     const kindKey = await this.defaultKindKey(item.kind);
     if (kindKey) body['ВидНоменклатуры_Key'] = kindKey;
+    const folderKey = await this.ensureFolder(item.categoryPath ?? []);
+    if (folderKey) body['Parent_Key'] = folderKey;
     const id = await this.createEntity(encodeURI('Catalog_Номенклатура'), body);
     return { id };
   }
 
   async updateNomenclature(id: string, item: Partial<OneCNomenclature>): Promise<void> {
-    await this.updateEntity(encodeURI('Catalog_Номенклатура'), id, {
+    const body: Record<string, any> = {
       Description: item.name,
       Артикул: item.sku || '',
-    });
+    };
+    if (item.categoryPath) {
+      const folderKey = await this.ensureFolder(item.categoryPath);
+      if (folderKey) body['Parent_Key'] = folderKey;
+    }
+    await this.updateEntity(encodeURI('Catalog_Номенклатура'), id, body);
   }
 
   // --- Контрагенты / контакты ---
