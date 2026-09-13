@@ -105,7 +105,8 @@ export class OneCClient {
     const top = 200;
     let skip = 0;
     for (;;) {
-      const params = [`$format=json`, `$top=${top}`, `$skip=${skip}`];
+      // $orderby обязателен: без него 1С игнорирует $skip и каждая «страница» возвращает одно и то же начало каталога
+      const params = [`$format=json`, `$top=${top}`, `$skip=${skip}`, `$orderby=Ref_Key`];
       if (!skipDeletionFilter) params.push(`$filter=DeletionMark eq false`);
       if (select) params.push(`$select=${select}`);
       const data = await this.request(`${entitySet}?${params.join('&')}`);

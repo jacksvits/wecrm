@@ -82,7 +82,10 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
       // Строки CRM, занятые в этом цикле: одноимённые позиции 1С не перезаписывают чужую строку
       // (порядок строк OData не гарантирован — без этого виды «прыгали»: услуги/товары затирали друг друга)
       const claimed = new Set<string>();
+      const seenIds = new Set<string>(); // на случай дублей строк в ответе 1С
       for (const n of page.items) {
+        if (seenIds.has(n.id)) continue;
+        seenIds.add(n.id);
         try {
           const skipIds = [...claimed];
           let existing = await prisma.product.findFirst({ where: { onecId: n.id } });
