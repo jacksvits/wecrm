@@ -8,6 +8,21 @@ import { importMarketItems, syncProductsToVk, getVkSettings } from '../lib/vk-ma
 const router = Router();
 router.use(authMiddleware);
 
+// Полный путь категории «Группа / ... / Вид» — для выгрузки позиции в группу 1С
+async function categoryPathString(categoryId: string): Promise<string | null> {
+  const all = await prisma.productCategory.findMany({ select: { id: true, name: true, parentId: true } });
+  const byId = new Map(all.map((c) => [c.id, c]));
+  const path: string[] = [];
+  let cur = byId.get(categoryId);
+  const guard = new Set<string>();
+  while (cur && !guard.has(cur.id)) {
+    guard.add(cur.id);
+    path.unshift(cur.name);
+    cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+  }
+  return path.length ? path.join(' / ') : null;
+}
+
 /* ============ Справочники (до /:id!) ============ */
 
 /**
@@ -224,15 +239,32 @@ router.post('/meta/vk-sync', async (_req, res) => {
   }
 });
 
+/**
+ * GET /api/products/meta/categories
+ * Дерево категорий из 1С (группы и виды номенклатуры); плоский список — дерево строит фронтенд
+ */
+router.get('/meta/categories', async (_req, res) => {
+  try {
+    const categories = await prisma.productCategory.findMany({
+      orderBy: { name: 'asc' },
+      select: { id: true, onecId: true, name: true, isGroup: true, parentId: true },
+    });
+    res.json(categories);
+  } catch (err: any) {
+    console.error('[products:categories:list]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ============ Номенклатура ============ */
 
 /**
- * GET /api/products?q=
- * Список товаров с остатками и ценами
+ * GET /api/products?q=&categoryId=&noCategory=1&kind=
+ * Список товаров с остатками и ценами; categoryId — категория со всеми вложенными
  */
 router.get('/', async (req, res) => {
   try {
-    const { q } = req.query;
+    const { q, categoryId, noCategory, kind } = req.query;
     const where: any = {};
     if (q) {
       const s = q as string;
@@ -241,6 +273,26 @@ router.get('/', async (req, res) => {
         { sku: { contains: s, mode: 'insensitive' } },
         { category: { contains: s, mode: 'insensitive' } },
       ];
+    }
+    if (kind === 'product' || kind === 'service') where.kind = kind;
+    if (categoryId) {
+      const all = await prisma.productCategory.findMany({ select: { id: true, parentId: true } });
+      const children = new Map<string | null, string[]>();
+      for (const c of all) {
+        const list = children.get(c.parentId) ?? [];
+        list.push(c.id);
+        children.set(c.parentId, list);
+      }
+      const ids: string[] = [];
+      const stack = [categoryId as string];
+      while (stack.length) {
+        const id = stack.pop()!;
+        ids.push(id);
+        for (const ch of children.get(id) ?? []) stack.push(ch);
+      }
+      where.categoryId = { in: ids };
+    } else if (noCategory === '1') {
+      where.categoryId = null;
     }
     const products = await prisma.product.findMany({
       where,
@@ -260,16 +312,27 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, kind, syncToVk } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, kind, syncToVk, categoryId } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
     const productKind = kind === 'service' ? 'service' : 'product';
+    // Категория из дерева 1С (группы/виды номенклатуры)
+    let categoryIdValue: string | null = null;
+    if (categoryId) {
+      const node = await prisma.productCategory.findUnique({ where: { id: categoryId } });
+      if (!node) return res.status(400).json({ error: 'Категория не найдена' });
+      categoryIdValue = node.id;
+    }
+    // Строковый путь для выгрузки в 1С: наследуем от выбранной категории, если не задан вручную
+    let categoryValue = category?.trim() || null;
+    if (!categoryValue && categoryIdValue) categoryValue = await categoryPathString(categoryIdValue);
     const product = await prisma.product.create({
       data: {
         name: name.trim(),
         sku: sku?.trim() || null,
         kind: productKind,
         description: description || '',
-        category: category?.trim() || null,
+        categoryId: categoryIdValue,
+        category: categoryValue,
         subcategory: subcategory?.trim() || null,
         unit: unit?.trim() || 'шт',
         barcode: barcode?.trim() || null,

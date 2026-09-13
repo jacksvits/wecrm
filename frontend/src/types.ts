@@ -81,7 +81,10 @@ export interface ProductPrice { id: string; productId: string; priceTypeId: stri
 export interface StockMovement { id: string; productId: string; warehouseId: string; type: 'income' | 'outcome' | 'adjust'; quantity: number; price?: number | null; comment?: string | null; date: string; userId?: string | null; createdAt: string; product?: { name: string; sku?: string | null; unit: string }; warehouse?: { name: string }; user?: { name: string } | null; }
 export interface PriceHistory { id: string; productId: string; priceTypeId: string; oldPrice: number; newPrice: number; createdAt: string; priceType?: { label: string }; user?: { name: string } | null; }
 export interface ProductImage { id: string; productId: string; attachmentId: string; url: string; sortOrder: number; createdAt: string; }
-export interface Product { id: string; sku?: string | null; name: string; kind: 'product' | 'service'; description?: string | null; category?: string | null; subcategory?: string | null; unit: string; barcode?: string | null; syncToVk: boolean; vkItemId?: number | null; isActive: boolean; createdAt: string; updatedAt: string; stocks?: StockBalance[]; prices?: ProductPrice[]; images?: ProductImage[]; }
+export interface Product { id: string; sku?: string | null; name: string; kind: 'product' | 'service'; description?: string | null; category?: string | null; subcategory?: string | null; categoryId?: string | null; unit: string; barcode?: string | null; syncToVk: boolean; vkItemId?: number | null; isActive: boolean; createdAt: string; updatedAt: string; stocks?: StockBalance[]; prices?: ProductPrice[]; images?: ProductImage[]; }
+
+// Категория товара: группа/вид номенклатуры из 1С (дерево, как в «Виды и свойства»)
+export interface ProductCategory { id: string; onecId?: string | null; name: string; isGroup: boolean; parentId?: string | null; }
 
 // «Автоответчик»: триггеры и ответы в обсуждениях задач
 export interface AutoReplyTrigger {

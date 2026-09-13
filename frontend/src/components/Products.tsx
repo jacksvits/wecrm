@@ -3,7 +3,7 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { format } from 'date-fns';
 import { api } from '../api/client';
-import { Product, Warehouse, PriceType, StockMovement, PriceHistory } from '../types';
+import { Product, ProductCategory, Warehouse, PriceType, StockMovement, PriceHistory } from '../types';
 
 const quillModules = {
   toolbar: [
@@ -43,8 +43,11 @@ export function Products() {
   const [q, setQ] = useState('');
   const [whFilter, setWhFilter] = useState('all');
   const [loading, setLoading] = useState(true);
-  // свёрнутые группы: ключ "cat:<категория>" и "sub:<категория>::<подкатегория>"
+  // свёрнутые группы: ключ "cat:<id категории>"
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // Категории из 1С (группы и виды номенклатуры) + выбранный узел дерева
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [selCat, setSelCat] = useState<string>('all'); // 'all' | 'none' | categoryId
 
   const [productModal, setProductModal] = useState<Product | 'new' | null>(null);
   const [movementModal, setMovementModal] = useState<{ product: Product; type: 'income' | 'outcome' } | null>(null);
@@ -118,33 +121,86 @@ export function Products() {
 
   const searching = q.trim().length > 0;
 
-  // Дерево категорий из полных путей "A / B / C" (1С-группы + необязательная подкатегория)
-  const tree: CategoryNode[] = useMemo(() => {
-    const root: CategoryNode = { key: '', name: '', children: [], products: [] };
-    const findChild = (parent: CategoryNode, name: string) => parent.children.find(c => c.name === name);
-    for (const p of filtered) {
-      const segs = [
-        ...(p.category?.trim() ? p.category.split(' / ').map(s => s.trim()) : []),
-        ...(p.subcategory?.trim() ? p.subcategory.split(' / ').map(s => s.trim()) : []),
-      ].filter(Boolean);
-      if (!segs.length) segs.push('Без категории');
-      let node = root;
-      let path = '';
-      for (const seg of segs) {
-        path = path ? `${path} / ${seg}` : seg;
-        let child = findChild(node, seg);
-        if (!child) { child = { key: path, name: seg, children: [], products: [] }; node.children.push(child); }
-        node = child;
-      }
-      node.products.push(p);
+  // Дерево категорий 1С (группы и виды номенклатуры): дети по родителю, отсортировано
+  const catChildren = useMemo(() => {
+    const m = new Map<string | null, ProductCategory[]>();
+    for (const c of categories) {
+      const list = m.get(c.parentId ?? null) ?? [];
+      list.push(c);
+      m.set(c.parentId ?? null, list);
     }
-    const sortRec = (n: CategoryNode) => { n.children.sort((a, b) => a.name.localeCompare(b.name, 'ru')); n.children.forEach(sortRec); };
-    root.children.forEach(sortRec);
-    return root.children;
-  }, [filtered]);
+    for (const list of m.values()) list.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    return m;
+  }, [categories]);
+
+  // Все id узла-потомки (выбранная категория + вложенные)
+  const catDescendants = useMemo(() => {
+    const m = new Map<string, string[]>();
+    const walk = (id: string): string[] => {
+      if (m.has(id)) return m.get(id)!;
+      const ids = [id];
+      for (const ch of catChildren.get(id) ?? []) ids.push(...walk(ch.id));
+      m.set(id, ids);
+      return ids;
+    };
+    for (const c of categories) walk(c.id);
+    return m;
+  }, [categories, catChildren]);
+
+  // Товары выбранной категории (с вложенными)
+  const visible = useMemo(() => {
+    if (selCat === 'all') return filtered;
+    if (selCat === 'none') return filtered.filter(p => !p.categoryId);
+    const ids = new Set(catDescendants.get(selCat) ?? [selCat]);
+    return filtered.filter(p => p.categoryId && ids.has(p.categoryId));
+  }, [filtered, selCat, catDescendants]);
+
+  // Количество позиций по узлам дерева (с учётом поиска/фильтров вида и наличия)
+  const countByCat = useMemo(() => {
+    const m = new Map<string, number>();
+    const byId = new Map(categories.map(c => [c.id, c]));
+    for (const p of filtered) {
+      let cur = p.categoryId ? byId.get(p.categoryId) : undefined;
+      const guard = new Set<string>();
+      while (cur && !guard.has(cur.id)) {
+        guard.add(cur.id);
+        m.set(cur.id, (m.get(cur.id) ?? 0) + 1);
+        cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+      }
+    }
+    return m;
+  }, [filtered, categories]);
 
   const toggleGroup = (key: string) => setExpanded(c => ({ ...c, [key]: !c[key] }));
   const isCollapsed = (key: string) => !searching && !expanded[key];
+
+  // Рендер узла дерева категорий (как в «Виды и свойства» 1С: папки + виды)
+  const renderCatNode = (c: ProductCategory, depth: number): ReactNode => {
+    const key = `cat:${c.id}`;
+    const collapsed = isCollapsed(key);
+    const count = countByCat.get(c.id) ?? 0;
+    const selected = selCat === c.id;
+    return (
+      <div key={c.id}>
+        <div onClick={() => setSelCat(c.id)} style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          padding: `5px 8px 5px ${8 + depth * 18}px`, cursor: 'pointer', fontSize: 13,
+          background: selected ? 'var(--bg-hover)' : 'transparent',
+          fontWeight: c.isGroup ? 600 : 400,
+          color: c.isGroup ? 'var(--text-primary)' : 'var(--text-muted)',
+          borderLeft: selected ? '2px solid #007AFF' : '2px solid transparent',
+        }}>
+          {c.isGroup ? (
+            <span onClick={(e) => { e.stopPropagation(); toggleGroup(key); }}
+              style={{ width: 14, fontSize: 10, color: 'var(--text-muted)', transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
+          ) : <span style={{ width: 14 }} />}
+          <span>{c.name}</span>
+          <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 12 }}>{count || ''}</span>
+        </div>
+        {!collapsed && (catChildren.get(c.id) ?? []).map(ch => renderCatNode(ch, depth + 1))}
+      </div>
+    );
+  };
 
   const activePriceTypes = useMemo(() => priceTypes.filter(t => t.isActive), [priceTypes]);
 
@@ -260,7 +316,20 @@ export function Products() {
 
       {/* ===== Номенклатура ===== */}
       {tab === 'nomenclature' && (
-        <div>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+          {/* Дерево категорий из 1С (группы и виды номенклатуры) */}
+          <div style={{ width: 280, flexShrink: 0, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: '8px 0', maxHeight: 'calc(100vh - 220px)', overflow: 'auto' }}>
+            <div onClick={() => setSelCat('all')} style={{ display: 'flex', padding: '6px 8px', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: selCat === 'all' ? 'var(--bg-hover)' : 'transparent', borderLeft: selCat === 'all' ? '2px solid #007AFF' : '2px solid transparent' }}>
+              Все позиции
+              <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>{filtered.length}</span>
+            </div>
+            {(catChildren.get(null) ?? []).map(c => renderCatNode(c, 0))}
+            <div onClick={() => setSelCat('none')} style={{ display: 'flex', padding: '6px 8px', cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', background: selCat === 'none' ? 'var(--bg-hover)' : 'transparent', borderLeft: selCat === 'none' ? '2px solid #007AFF' : '2px solid transparent' }}>
+              Без категории
+              <span style={{ marginLeft: 'auto', fontSize: 12 }}>{filtered.filter(p => !p.categoryId).length}</span>
+            </div>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
             <input
               value={q}
@@ -305,8 +374,22 @@ export function Products() {
                 </tr>
               </thead>
               <tbody>
-                {tree.flatMap(node => renderNode(node, 0))}
-                {tree.length === 0 && (
+                {visible.map(p => (
+                  <ProductRow
+                    key={p.id}
+                    p={p}
+                    indent={12}
+                    priceTypes={activePriceTypes}
+                    totalStock={totalStock(p)}
+                    priceOf={priceOf}
+                    onOpen={() => setProductModal(p)}
+                    onDelete={async () => {
+                      if (!confirm(`Удалить «${p.name}»?`)) return;
+                      try { await api.products.delete(p.id); await load(); } catch (e: any) { alert(e.message); }
+                    }}
+                  />
+                ))}
+                {visible.length === 0 && (
                   <tr>
                     <td colSpan={5 + activePriceTypes.length} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
                       Позиции не найдены
@@ -315,6 +398,7 @@ export function Products() {
                 )}
               </tbody>
             </table>
+          </div>
           </div>
         </div>
       )}
@@ -535,7 +619,7 @@ export function Products() {
 
       {/* ===== Модалки ===== */}
       {productModal && (
-        <ProductModal product={productModal}
+        <ProductModal product={productModal} categories={categories}
           onClose={() => setProductModal(null)} onSaved={() => { setProductModal(null); load(); }} />
       )}
       {movementModal && (
@@ -610,19 +694,37 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
 }
 
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
-function ProductModal({ product, onClose, onSaved }: { product: Product | 'new'; onClose: () => void; onSaved: () => void }) {
+function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; category: string; subcategory: string; unit: string; barcode: string; syncToVk: boolean; description: string }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; syncToVk: boolean; description: string }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : product.kind,
     sku: isNew ? '' : product.sku || '',
-    category: isNew ? '' : product.category || '',
-    subcategory: isNew ? '' : product.subcategory || '',
     unit: isNew ? 'шт' : product.unit,
     barcode: isNew ? '' : product.barcode || '',
     syncToVk: isNew ? false : product.syncToVk,
     description: isNew ? '' : product.description || '',
   });
+  const [categoryId, setCategoryId] = useState(isNew ? '' : product.categoryId || '');
+  // Опции селекта категории: группы и виды номенклатуры с отступами по глубине
+  const categoryOptions = useMemo(() => {
+    const byParent = new Map<string | null, ProductCategory[]>();
+    for (const c of categories) {
+      const list = byParent.get(c.parentId ?? null) ?? [];
+      list.push(c);
+      byParent.set(c.parentId ?? null, list);
+    }
+    for (const l of byParent.values()) l.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    const out: { id: string; label: string }[] = [];
+    const walk = (parentId: string | null, depth: number) => {
+      for (const c of byParent.get(parentId) ?? []) {
+        out.push({ id: c.id, label: `${'— '.repeat(depth)}${c.name}` });
+        walk(c.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    return out;
+  }, [categories]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -633,8 +735,9 @@ function ProductModal({ product, onClose, onSaved }: { product: Product | 'new';
     if (!form.name.trim()) { setError('Название обязательно'); return; }
     setSaving(true); setError('');
     try {
-      if (isNew) await api.products.create(form);
-      else await api.products.update(product.id, form);
+      const payload = { ...form, categoryId: categoryId || null };
+      if (isNew) await api.products.create(payload);
+      else await api.products.update(product.id, payload);
       onSaved();
     } catch (e: any) { setError(e.message || 'Ошибка сохранения'); }
     finally { setSaving(false); }
@@ -682,10 +785,11 @@ function ProductModal({ product, onClose, onSaved }: { product: Product | 'new';
           </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Артикул</label>
           <input value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })} style={inputStyle} />
-          <label style={{ fontSize: 14, fontWeight: 500 }}>Категория (группы 1С)</label>
-          <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={inputStyle} placeholder="Полный путь групп из 1С: Товары на продажу / Камеры" />
-          <label style={{ fontSize: 14, fontWeight: 500 }}>Подкатегория (доп. уровень)</label>
-          <input value={form.subcategory} onChange={e => setForm({ ...form, subcategory: e.target.value })} style={inputStyle} placeholder="Необязательно — для ручной детализации" />
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Категория (виды номенклатуры 1С)</label>
+          <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={inputStyle}>
+            <option value="">— Без категории —</option>
+            {categoryOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
           <div style={{ display: 'flex', gap: 12 }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 14, fontWeight: 500 }}>Единица</label>

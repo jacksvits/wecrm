@@ -7,6 +7,9 @@
 // - запись: Accept application/json (verbose-вид на запись 1С не поддерживает -> HTTP 406),
 //   ответ — созданная сущность с Ref_Key на верхнем уровне.
 
+// Строка справочника «Виды номенклатуры» 1С
+interface KindRow { type?: string; parent?: string; isGroup: boolean; name: string; deleted?: boolean }
+
 export interface OneCNomenclature {
   id: string;                       // GUID (Ref_Key) номенклатуры в 1С
   name: string;
@@ -19,6 +22,7 @@ export interface OneCNomenclature {
   description?: string;
   isActive?: boolean;
   categoryPath?: string[];          // путь категорий: [категория, подкатегория, ...]
+  kindKey?: string;                 // Ref_Key вида номенклатуры (категория 1С)
 }
 
 export interface OneCCounterparty {
@@ -148,29 +152,55 @@ export class OneCClient {
 
   // Виды номенклатуры: Ref_Key -> ТипНоменклатуры ('Товар'/'Услуга'/'' — пусто у групп и видов без типа)
   private kindsCache: Map<string, string> | null = null;
+  // Сырые строки справочника «Виды номенклатуры» (группы + виды) — основа и kindsMap, и дерева категорий
+  private kindRowsCache: Map<string, KindRow> | null = null;
+
+  private async kindRows(): Promise<Map<string, KindRow>> {
+    if (this.kindRowsCache) return this.kindRowsCache;
+    // полные записи без $select: 1С в сессионном режиме может игнорировать $select с Parent_Key
+    const rows = await this.readCollection(encodeURI('Catalog_ВидыНоменклатуры'), undefined, true);
+    const raw = new Map<string, KindRow>();
+    for (const r of rows) {
+      raw.set(r.Ref_Key, {
+        type: r['ТипНоменклатуры'] || undefined,
+        parent: r.Parent_Key || undefined,
+        isGroup: !!r.IsFolder,
+        name: r.Description || '',
+        deleted: !!r.DeletionMark,
+      });
+    }
+    this.kindRowsCache = raw;
+    return raw;
+  }
 
   private async kindsMap(): Promise<Map<string, string>> {
     if (this.kindsCache) return this.kindsCache;
-    // полные записи без $select: 1С в сессионном режиме может игнорировать $select с Parent_Key
-    const rows = await this.readCollection(encodeURI('Catalog_ВидыНоменклатуры'), undefined, true);
+    const raw = await this.kindRows();
     // Виды иерархические: если тип не заполнен у вида, берём у родительского (с защитой от циклов)
-    const raw = new Map<string, { type?: string; parent?: string }>();
-    for (const r of rows) {
-      raw.set(r.Ref_Key, { type: r['ТипНоменклатуры'] || undefined, parent: r.Parent_Key || undefined });
-    }
     this.kindsCache = new Map<string, string>();
     for (const key of raw.keys()) {
       const guard = new Set<string>();
       let cur: string | undefined = key;
       while (cur && raw.has(cur) && !guard.has(cur)) {
         guard.add(cur);
-        const t: { type?: string; parent?: string } = raw.get(cur)!;
+        const t: KindRow = raw.get(cur)!;
         if (t.type) { this.kindsCache.set(key, t.type); break; }
         cur = t.parent;
       }
       if (!this.kindsCache.has(key)) this.kindsCache.set(key, '');
     }
     return this.kindsCache;
+  }
+
+  // Дерево «Виды и свойства» 1С: группы (папки) и виды номенклатуры (категории товаров)
+  async getKindTree(): Promise<{ onecId: string; name: string; parentOnecId?: string; isGroup: boolean }[]> {
+    const rows = await this.kindRows();
+    const out: { onecId: string; name: string; parentOnecId?: string; isGroup: boolean }[] = [];
+    for (const [onecId, r] of rows) {
+      if (r.deleted) continue; // помеченные на удаление в дерево не включаем
+      out.push({ onecId, name: r.name, parentOnecId: r.parent, isGroup: r.isGroup });
+    }
+    return out;
   }
 
   // Ключ вида номенклатуры по умолчанию (для создания товаров/услуг в 1С)

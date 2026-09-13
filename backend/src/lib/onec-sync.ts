@@ -119,6 +119,49 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
     // Pull: 1С -> CRM
     {
       const page = await client.getNomenclature();
+
+      // ===== Категории: группы и виды номенклатуры 1С -> дерево ProductCategory =====
+      // Узлы ищем/создаём по onecId (Ref_Key); устаревшие (удалённые в 1С) — удаляем
+      const catByOnecId = new Map<string, { id: string }>();
+      try {
+        const kindTree = await client.getKindTree();
+        if (kindTree.length) {
+          for (const c of await prisma.productCategory.findMany({ where: { onecId: { not: null } }, select: { id: true, onecId: true } })) {
+            if (c.onecId) catByOnecId.set(c.onecId, { id: c.id });
+          }
+          const seen = new Set<string>();
+          // Родители могут идти после детей в выборке 1С — проходим итеративно (родитель создаётся раньше ребёнка)
+          let pending = [...kindTree];
+          for (let guard = 0; guard < 10 && pending.length; guard++) {
+            const next: typeof pending = [];
+            for (const n of pending) {
+              const parent = n.parentOnecId ? catByOnecId.get(n.parentOnecId) : undefined;
+              if (n.parentOnecId && !parent) { next.push(n); continue; }
+              const existing = catByOnecId.get(n.onecId);
+              const parentId = parent?.id ?? null;
+              if (existing) {
+                await prisma.productCategory.update({ where: { id: existing.id }, data: { name: n.name, isGroup: n.isGroup, parentId } });
+              } else {
+                const created = await prisma.productCategory.create({
+                  data: { onecId: n.onecId, name: n.name, isGroup: n.isGroup, parentId },
+                });
+                catByOnecId.set(n.onecId, { id: created.id });
+              }
+              seen.add(n.onecId);
+            }
+            pending = next;
+          }
+          // Узлы, которых больше нет в 1С: удаляем (у товаров categoryId станет NULL по FK SetNull)
+          const stale = [...catByOnecId.keys()].filter((k) => !seen.has(k));
+          if (stale.length) {
+            await prisma.productCategory.deleteMany({ where: { onecId: { in: stale } } });
+            for (const k of stale) catByOnecId.delete(k);
+          }
+        }
+      } catch (e: any) {
+        console.error('[1c] kinds tree sync:', e.message);
+      }
+
       // Строки CRM, занятые в этом цикле: одноимённые позиции 1С не перезаписывают чужую строку
       // (порядок строк OData не гарантирован — без этого виды «прыгали»: услуги/товары затирали друг друга)
       const claimed = new Set<string>();

@@ -898,6 +898,10 @@ model Product {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  // Категория из дерева групп/видов номенклатуры 1С (синхронизируется автоматически)
+  categoryId String?          @map("category_id")
+  categoryNode ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
   stocks       StockBalance[]
   prices       ProductPrice[]
   movements    StockMovement[]
@@ -906,7 +910,27 @@ model Product {
 
   @@index([name])
   @@index([category])
+  @@index([categoryId])
   @@map("products")
+}
+
+// Дерево категорий товаров из 1С: группы (папки) и виды номенклатуры,
+// как в окне «Виды и свойства» 1С (Catalog_ВидыНоменклатуры)
+model ProductCategory {
+  id        String   @id @default(cuid())
+  onecId    String?  @unique @map("onec_id") // Ref_Key вида/группы в 1С
+  name      String
+  isGroup   Boolean  @default(true) @map("is_group") // true = группа (папка), false = вид номенклатуры
+  parentId  String?  @map("parent_id")
+  parent    ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children  ProductCategory[] @relation("CategoryTree")
+  products  Product[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([parentId])
+  @@map("product_categories")
 }
 
 model Warehouse {
