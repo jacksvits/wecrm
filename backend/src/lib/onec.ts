@@ -230,10 +230,24 @@ export class OneCClient {
     return parentKey;
   }
 
+  // Единицы измерения: Ref_Key -> наименование
+  private unitsCache: Map<string, string> | null = null;
+
+  private async unitsMap(): Promise<Map<string, string>> {
+    if (this.unitsCache) return this.unitsCache;
+    try {
+      const rows = await this.readCollection(encodeURI('Catalog_ЕдиницыИзмерения'), 'Ref_Key,Description,DeletionMark');
+      this.unitsCache = new Map(rows.map((r) => [r.Ref_Key, r.Description || '']));
+    } catch {
+      this.unitsCache = new Map();
+    }
+    return this.unitsCache;
+  }
+
   // --- Номенклатура ---
   async getNomenclature(): Promise<{ items: OneCNomenclature[] }> {
     const entitySet = encodeURI('Catalog_Номенклатура');
-    const rows = await this.readCollection(entitySet, 'Ref_Key,Description,Артикул,ЕдиницаИзмерения,ВидНоменклатуры,Parent_Key,IsFolder,Описание,DeletionMark');
+    const rows = await this.readCollection(entitySet, 'Ref_Key,Description,Артикул,ЕдиницаИзмерения_Key,ВидНоменклатуры_Key,Parent_Key,IsFolder,Описание,DeletionMark');
 
     // Штрихкоды из регистра сведений (best-effort — регистр может отсутствовать)
     const barcodes = new Map<string, string>();
@@ -246,18 +260,22 @@ export class OneCClient {
 
     const items: OneCNomenclature[] = [];
     const kinds = await this.kindsMap();
+    const units = await this.unitsMap();
     for (const r of rows) {
       if (r.IsFolder) continue; // группы — это категории, обрабатываются отдельно
       const vidKey = typeof r.ВидНоменклатуры === 'object'
         ? r.ВидНоменклатуры?.Ref_Key
         : (r.ВидНоменклатуры_Key ?? r.ВидНоменклатуры);
       const typeName = vidKey ? kinds.get(vidKey) : undefined;
+      const unitKey = typeof r.ЕдиницаИзмерения === 'object'
+        ? r.ЕдиницаИзмерения?.Ref_Key
+        : (r.ЕдиницаИзмерения_Key ?? r.ЕдиницаИзмерения);
       items.push({
         id: r.Ref_Key,
         name: r.Description || '',
         sku: r['Артикул'] || undefined,
         barcode: barcodes.get(r.Ref_Key),
-        unit: typeof r.ЕдиницаИзмерения === 'object' ? r.ЕдиницаИзмерения?.Description : undefined,
+        unit: (unitKey ? units.get(unitKey) : undefined) || undefined,
         kind: typeName === 'Услуга' || typeName === 'Работа' ? 'service' : 'product',
         description: r['Описание'] || undefined,
         isActive: !r.DeletionMark,
