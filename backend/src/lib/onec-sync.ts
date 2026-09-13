@@ -18,15 +18,14 @@ export interface OneCSyncStats {
 // без блокировки два параллельных цикла портят данные (наблюдалось: виды товаров
 // перезаписывались, услуги становились товарами). Только один процесс синхронизируется,
 // второй получает ошибку «уже выполняется».
-const ONEC_SYNC_LOCK_KEY = 742017;
 
 export async function runOneCSync(): Promise<OneCSyncStats> {
-  const lockRow: { ok: boolean }[] = await prisma.$queryRaw`SELECT pg_tryadvisory_lock(${ONEC_SYNC_LOCK_KEY}::int) AS ok`;
+  const lockRow: { ok: boolean }[] = await prisma.$queryRaw`SELECT pg_tryadvisory_lock(742017) AS ok`;
   if (!lockRow[0]?.ok) throw new Error('Синхронизация уже выполняется другим процессом');
   try {
     return await runOneCSyncInner();
   } finally {
-    try { await prisma.$queryRaw`SELECT pg_advisory_unlock(${ONEC_SYNC_LOCK_KEY}::int)`; } catch { /* соединение закрыто — блокировка снимется автоматически */ }
+    try { await prisma.$queryRaw`SELECT pg_advisory_unlock(742017)`; } catch { /* соединение закрыто — блокировка снимется автоматически */ }
   }
 }
 
