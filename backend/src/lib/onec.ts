@@ -351,11 +351,16 @@ export class OneCClient {
   }
 
   async createCounterparty(item: Partial<OneCCounterparty>): Promise<{ id: string }> {
+    // Дедупликация: если контрагент с таким именем уже есть в 1С — привязываемся к нему
+    const existingId = await this.findCounterpartyByName(item.name || '');
+    if (existingId) return { id: existingId };
     // УТ 11: Контрагент без Партнёра не записывается (обработчик ПриЗаписи -> HTTP 500)
-    let partnerKey: string | undefined;
-    try {
-      partnerKey = await this.createEntity(encodeURI('Catalog_Партнеры'), { Description: item.name });
-    } catch { /* если партнёры недоступны — пробуем создать контрагента без них */ }
+    let partnerKey = await this.findByName(encodeURI('Catalog_Партнеры'), item.name || '');
+    if (!partnerKey) {
+      try {
+        partnerKey = await this.createEntity(encodeURI('Catalog_Партнеры'), { Description: item.name });
+      } catch { /* если партнёры недоступны — пробуем создать контрагента без них */ }
+    }
     const body: Record<string, any> = {
       Description: item.name,
       ИНН: item.inn || '',
@@ -366,11 +371,26 @@ export class OneCClient {
     return { id };
   }
 
+  // Поиск контрагента/партнёра по точному имени (дедупликация при выгрузке)
+  private async findByName(entitySet: string, name: string): Promise<string | undefined> {
+    try {
+      const filter = encodeURIComponent(`Description eq '${name.replace(/'/g, "''")}' and DeletionMark eq false`);
+      const data = await this.request(`${entitySet}?$format=json&$top=1&$select=Ref_Key&$filter=${filter}`);
+      return this.rowsOf(data)[0]?.Ref_Key;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async findCounterpartyByName(name: string): Promise<string | undefined> {
+    return this.findByName(encodeURI('Catalog_Контрагенты'), name);
+  }
+
   async updateCounterparty(id: string, item: Partial<OneCCounterparty>): Promise<void> {
+    // Вид (ЮрЛицо/ФизЛицо) при обновлении НЕ меняем — только при создании
     await this.updateEntity(encodeURI('Catalog_Контрагенты'), id, {
       Description: item.name,
       ИНН: item.inn || '',
-      ЮридическоеФизическоеЛицо: item.kind === 'contact' ? 'ФизическоеЛицо' : 'ЮридическоеЛицо',
     });
   }
 

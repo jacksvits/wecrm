@@ -163,10 +163,12 @@ export async function runOneCSync(): Promise<OneCSyncStats> {
           const existing =
             (await prisma.contact.findFirst({ where: { onecId: c.id } })) ||
             (c.inn ? await prisma.contact.findFirst({ where: { inn: c.inn } }) : null) ||
-            (await prisma.contact.findFirst({ where: { name: c.name, phone: c.phone ?? undefined } }));
+            (c.phone ? await prisma.contact.findFirst({ where: { name: c.name, phone: c.phone } }) : null);
+          // Сильное совпадение (по GUID/ИНН) — вид берём из 1С; слабое (имя+телефон) — вид CRM сохраняем
+          const strongMatch = !!existing && (existing.onecId === c.id || (!!c.inn && existing.inn === c.inn));
           const data = {
             name: c.name,
-            kind: c.kind === 'contact' ? 'contact' : 'organization',
+            kind: strongMatch ? (c.kind === 'contact' ? 'contact' : 'organization') : (existing?.kind ?? (c.kind === 'contact' ? 'contact' : 'organization')),
             company: c.kind === 'organization' ? c.name : existing?.company ?? null,
             inn: c.inn ?? existing?.inn ?? null,
             ogrn: c.ogrn ?? existing?.ogrn ?? null,
