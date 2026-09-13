@@ -19,6 +19,23 @@ export interface OneCSyncStats {
 // перезаписывались, услуги становились товарами). Только один процесс синхронизируется,
 // второй получает ошибку «уже выполняется».
 
+// Самопроверка: существенно ли услуг в БД меньше, чем видит клиент 1С
+// (1С в переиспользуемой сессии иногда отдаёт виды без типов — тогда pull сохраняет старые виды)
+async function kindMismatch(): Promise<boolean> {
+  try {
+    const s = await prisma.oneCPluginSettings.findUnique({ where: { id: 1 } });
+    if (!s?.isActive || !s.serviceUrl) return false;
+    const c = new OneCClient(s.serviceUrl, s.login, s.password);
+    const items = (await c.getNomenclature()).items;
+    const svcItems = items.filter((i) => i.kind === 'service').length;
+    if (!svcItems) return false;
+    const svcLinked = await prisma.product.count({ where: { kind: 'service', onecId: { not: null } } });
+    return svcLinked < Math.floor(svcItems * 0.8);
+  } catch {
+    return false;
+  }
+}
+
 export async function runOneCSync(): Promise<OneCSyncStats> {
   // Взаимное исключение через таблицу-муьекс (advisory-функции недоступны в этой сборке Postgres).
   // Занятая блокировка считается протухшей через 30 минут (защита от зависшего процесса).
@@ -29,7 +46,14 @@ export async function runOneCSync(): Promise<OneCSyncStats> {
   `;
   if (!acquired) throw new Error('Синхронизация уже выполняется другим процессом');
   try {
-    return await runOneCSyncInner();
+    let stats = await runOneCSyncInner();
+    // Если 1С в момент цикла отдала неполные виды — повторяем целиком (идемпотентно) до 2 раз
+    for (let attempt = 0; attempt < 2 && (await kindMismatch()); attempt++) {
+      console.log(`[1c] расхождение видов: повтор полного цикла синхронизации (попытка ${attempt + 1}/2)`);
+      await new Promise((r) => setTimeout(r, 10000));
+      stats = await runOneCSyncInner();
+    }
+    return stats;
   } finally {
     try { await prisma.$executeRaw`DELETE FROM onec_sync_lock WHERE id = 1`; } catch { /* строка останется, снимется по таймауту 30 минут */ }
   }
