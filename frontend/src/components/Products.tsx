@@ -100,18 +100,21 @@ export function Products() {
 
   // Фильтр по виду: все / товары / услуги
   const [kindFilter, setKindFilter] = useState<'all' | 'product' | 'service'>('all');
+  // Фильтр «В наличии»: только позиции с суммарным остатком >= 1
+  const [inStockOnly, setInStockOnly] = useState(false);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     let list = products;
     if (kindFilter !== 'all') list = list.filter(p => (p.kind || 'product') === kindFilter);
+    if (inStockOnly) list = list.filter(p => (p.stocks || []).reduce((sum, x) => sum + x.quantity, 0) >= 1);
     if (!s) return list;
     return list.filter(p =>
       p.name.toLowerCase().includes(s) ||
       (p.sku || '').toLowerCase().includes(s) ||
       (p.category || '').toLowerCase().includes(s) ||
       (p.subcategory || '').toLowerCase().includes(s));
-  }, [products, q, kindFilter]);
+  }, [products, q, kindFilter, inStockOnly]);
 
   const searching = q.trim().length > 0;
 
@@ -284,6 +287,10 @@ export function Products() {
                 </button>
               ))}
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border-color)', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
+              <input type="checkbox" checked={inStockOnly} onChange={e => setInStockOnly(e.target.checked)} />
+              В наличии
+            </label>
           </div>
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>

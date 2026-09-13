@@ -55,13 +55,16 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
     // Pull: 1С -> CRM
     {
       const page = await client.getNomenclature();
+      // Строки CRM, занятые в этом цикле: одноимённые позиции 1С не перезаписывают чужую строку
+      // (порядок строк OData не гарантирован — без этого виды «прыгали»: услуги/товары затирали друг друга)
+      const claimed = new Set<string>();
       for (const n of page.items) {
         try {
-          const existing =
-            (await prisma.product.findFirst({ where: { onecId: n.id } })) ||
-            (n.sku ? await prisma.product.findFirst({ where: { sku: n.sku } }) : null) ||
-            (n.barcode ? await prisma.product.findFirst({ where: { barcode: n.barcode } }) : null) ||
-            (await prisma.product.findFirst({ where: { name: n.name } }));
+          const skipIds = [...claimed];
+          let existing = await prisma.product.findFirst({ where: { onecId: n.id } });
+          if (!existing && n.sku) existing = await prisma.product.findFirst({ where: { sku: n.sku, id: { notIn: skipIds } } });
+          if (!existing && n.barcode) existing = await prisma.product.findFirst({ where: { barcode: n.barcode, id: { notIn: skipIds } } });
+          if (!existing) existing = await prisma.product.findFirst({ where: { name: n.name, id: { notIn: skipIds } } });
           const data = {
             name: n.name,
             sku: n.sku ?? existing?.sku ?? null,
@@ -75,8 +78,13 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
             onecId: n.id,
             onecSyncedAt: new Date(),
           };
-          if (existing) await prisma.product.update({ where: { id: existing.id }, data });
-          else await prisma.product.create({ data });
+          if (existing) {
+            await prisma.product.update({ where: { id: existing.id }, data });
+            claimed.add(existing.id);
+          } else {
+            const created = await prisma.product.create({ data });
+            claimed.add(created.id);
+          }
           stats.products.pulled++;
         } catch (e: any) {
           stats.products.errors++;
