@@ -276,7 +276,19 @@ export class OneCClient {
     } catch { /* регистр недоступен — штрихкоды пропускаем */ }
 
     const items: OneCNomenclature[] = [];
-    const kinds = await this.kindsMap();
+    let kinds = await this.kindsMap();
+    // 1С под нагрузкой иногда отдаёт виды без типов — перечитываем, пока доля неразрешённых < 30% (макс. 3 раза)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const goods = rows.filter((r: any) => !r.IsFolder);
+      const unresolved = goods.filter((r: any) => {
+        const k = typeof r.ВидНоменклатуры === 'object' ? r.ВидНоменклатуры?.Ref_Key : (r.ВидНоменклатуры_Key ?? r.ВидНоменклатуры);
+        return !k || !kinds.get(k);
+      }).length;
+      if (!goods.length || unresolved / goods.length < 0.3) break;
+      this.kindsCache = null;
+      await new Promise((res) => setTimeout(res, 2000));
+      kinds = await this.kindsMap();
+    }
     const units = await this.unitsMap();
     for (const r of rows) {
       if (r.IsFolder) continue; // группы — это категории, обрабатываются отдельно
