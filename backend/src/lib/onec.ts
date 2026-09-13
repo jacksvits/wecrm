@@ -195,10 +195,12 @@ export class OneCClient {
   // Дерево «Виды и свойства» 1С: группы (папки) и виды номенклатуры (категории товаров)
   async getKindTree(): Promise<{ onecId: string; name: string; parentOnecId?: string; isGroup: boolean }[]> {
     const rows = await this.kindRows();
+    // у корневых узлов 1С Parent_Key = пустой GUID, а не undefined
+    const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
     const out: { onecId: string; name: string; parentOnecId?: string; isGroup: boolean }[] = [];
     for (const [onecId, r] of rows) {
       if (r.deleted) continue; // помеченные на удаление в дерево не включаем
-      out.push({ onecId, name: r.name, parentOnecId: r.parent, isGroup: r.isGroup });
+      out.push({ onecId, name: r.name, parentOnecId: r.parent && r.parent !== EMPTY_GUID ? r.parent : undefined, isGroup: r.isGroup });
     }
     return out;
   }

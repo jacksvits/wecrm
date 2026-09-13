@@ -151,6 +151,7 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
             }
             pending = next;
           }
+          if (pending.length) console.error('[1c] kinds tree sync: не удалось разместить узлы (нет родителей в 1С):', pending.map(n => n.name).join(', '));
           // Узлы, которых больше нет в 1С: удаляем (у товаров categoryId станет NULL по FK SetNull)
           const stale = [...catByOnecId.keys()].filter((k) => !seen.has(k));
           if (stale.length) {
