@@ -87,6 +87,16 @@ export class OneCClient {
     return data?.d?.results ?? data?.value ?? [];
   }
 
+  // Записи регистров: 1С группирует их по регистратору — {Recorder, Recorder_Type, RecordSet: [...]}
+  private recordsOf(data: any): any[] {
+    const out: any[] = [];
+    for (const r of this.rowsOf(data)) {
+      if (Array.isArray(r.RecordSet)) out.push(...r.RecordSet);
+      else out.push(r);
+    }
+    return out;
+  }
+
   // Чтение коллекции с постраничностью ($top/$skip).
   // skipDeletionFilter — для регистров (у записей регистров нет DeletionMark)
   private async readCollection(entitySet: string, select?: string, skipDeletionFilter = false): Promise<any[]> {
@@ -286,10 +296,10 @@ export class OneCClient {
     // полные записи без $select — состав ресурсов варьируется по версиям УТ
     const rows = await this.readCollection(encodeURI('AccumulationRegister_ТоварыНаСкладах'), undefined, true);
     const sums = new Map<string, number>();
-    for (const r of rows) {
+    for (const r of this.recordsOf({ value: rows })) {
       if (!r.Номенклатура_Key || !r.Склад_Key) continue;
       const q = Number(r['ВНаличии'] ?? r['Количество'] ?? 0) || 0;
-      const sign = r.ВидДвижения === 'Расход' ? -1 : 1; // нет ВидДвижения -> считаем Приход
+      const sign = r.RecordType === 'Expense' || r.ВидДвижения === 'Расход' ? -1 : 1;
       const k = `${r.Номенклатура_Key}|${r.Склад_Key}`;
       sums.set(k, (sums.get(k) ?? 0) + q * sign);
     }
@@ -308,7 +318,7 @@ export class OneCClient {
   async getPrices(): Promise<{ nomenclatureKey: string; priceKindKey: string; price: number }[]> {
     const rows = await this.readCollection(encodeURI('InformationRegister_ЦеныНоменклатуры'), undefined, true);
     const latest = new Map<string, { nomenclatureKey: string; priceKindKey: string; price: number; period: number }>();
-    for (const r of rows) {
+    for (const r of this.recordsOf({ value: rows })) {
       if (!r.Номенклатура_Key || !r.ВидЦены_Key) continue;
       const period = r.Period ? new Date(r.Period).getTime() : 0;
       const k = `${r.Номенклатура_Key}|${r.ВидЦены_Key}`;
