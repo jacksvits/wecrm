@@ -33,6 +33,8 @@ export default function OneCSettings() {
     api.oneCPlugin.get().then((s: any) => {
       setSettings(s);
       setForm({ serviceUrl: s.serviceUrl, login: s.login, password: '', syncIntervalMinutes: s.syncIntervalMinutes });
+      // подгружаем сохранённые пообъектные опции (без слияния показывались бы значения по умолчанию)
+      if (s.entitySync) setEntitySync((prev: any) => ({ ...prev, ...s.entitySync }));
     }).catch(() => {});
   }, []);
 
