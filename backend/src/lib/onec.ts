@@ -344,6 +344,7 @@ export class OneCClient {
         description: r['Описание'] || undefined,
         isActive: !r.DeletionMark,
         categoryPath: await this.categoryPathOf(r.Parent_Key || undefined),
+        kindKey: vidKey || undefined, // Ref_Key вида номенклатуры → категория CRM
       });
     }
     return { items };

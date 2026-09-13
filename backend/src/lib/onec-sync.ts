@@ -188,6 +188,8 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
             kind: n.kind === 'service' ? 'service' : (n.kindResolved ? 'product' : (existing?.kind ?? 'product')),
             category: n.categoryPath?.length ? n.categoryPath.join(' / ') : (existing?.category ?? null),
             subcategory: null,
+            // Категория по виду номенклатуры 1С; вид не отдан (база занята) — сохраняем текущую привязку
+            categoryId: n.kindKey ? (catByOnecId.get(n.kindKey)?.id ?? null) : (existing?.categoryId ?? null),
             description: n.description ?? existing?.description ?? null,
             isActive: n.isActive ?? true,
             onecId: n.id,
