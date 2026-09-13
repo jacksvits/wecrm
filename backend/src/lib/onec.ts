@@ -14,6 +14,7 @@ export interface OneCNomenclature {
   barcode?: string;                 // штрихкод
   unit?: string;                    // ед. измерения
   kind?: 'product' | 'service';
+  kindResolved?: boolean;           // false = 1С не отдала тип вида (база занята) — вид в CRM не меняем
   price?: number;
   description?: string;
   isActive?: boolean;
@@ -293,6 +294,7 @@ export class OneCClient {
         barcode: barcodes.get(r.Ref_Key),
         unit: (unitKey ? units.get(unitKey) : undefined) || undefined,
         kind: typeName === 'Услуга' || typeName === 'Работа' ? 'service' : 'product',
+        kindResolved: typeName === 'Услуга' || typeName === 'Работа' || typeName === 'Товар',
         description: r['Описание'] || undefined,
         isActive: !r.DeletionMark,
         categoryPath: await this.categoryPathOf(r.Parent_Key || undefined),

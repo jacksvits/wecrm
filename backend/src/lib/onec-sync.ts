@@ -70,7 +70,8 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
             sku: n.sku ?? existing?.sku ?? null,
             barcode: n.barcode ?? existing?.barcode ?? null,
             unit: n.unit || existing?.unit || 'шт',
-            kind: n.kind === 'service' ? 'service' : 'product',
+            // Вид меняем только по достоверным данным 1С; если тип вида не отдан (база занята) — сохраняем вид CRM
+            kind: n.kind === 'service' ? 'service' : (n.kindResolved ? 'product' : (existing?.kind ?? 'product')),
             category: n.categoryPath?.length ? n.categoryPath.join(' / ') : (existing?.category ?? null),
             subcategory: null,
             description: n.description ?? existing?.description ?? null,
