@@ -6,6 +6,8 @@ export interface OneCSyncStats {
   finishedAt?: string;
   products: { pulled: number; pushed: number; errors: number };
   contacts: { pulled: number; pushed: number; errors: number };
+  pricesPulled: number;
+  stockRowsUpdated: number;
   error?: string;
 }
 
@@ -22,6 +24,8 @@ export async function runOneCSync(): Promise<OneCSyncStats> {
     startedAt: new Date().toISOString(),
     products: { pulled: 0, pushed: 0, errors: 0 },
     contacts: { pulled: 0, pushed: 0, errors: 0 },
+    pricesPulled: 0,
+    stockRowsUpdated: 0,
   };
 
   // ===== НОМЕНКЛАТУРА =====
@@ -88,6 +92,64 @@ export async function runOneCSync(): Promise<OneCSyncStats> {
     }
   } catch (e: any) {
     stats.error = `Номенклатура: ${e.message}`;
+  }
+
+  // ===== ЦЕНЫ (1С -> CRM) =====
+  try {
+    const kinds = await client.getPriceKinds();
+    const prices = await client.getPrices();
+    for (const pr of prices) {
+      try {
+        const p = await prisma.product.findFirst({ where: { onecId: pr.nomenclatureKey } });
+        if (!p) continue;
+        const kindName = kinds.get(pr.priceKindKey) || 'Цена 1С';
+        let pt = await prisma.priceType.findFirst({ where: { name: kindName } });
+        if (!pt) pt = await prisma.priceType.create({ data: { name: kindName, label: kindName } });
+        await prisma.productPrice.upsert({
+          where: { productId_priceTypeId: { productId: p.id, priceTypeId: pt.id } },
+          create: { productId: p.id, priceTypeId: pt.id, price: pr.price, currency: 'RUB' },
+          update: { price: pr.price },
+        });
+        stats.pricesPulled++;
+      } catch (e: any) {
+        stats.products.errors++;
+        console.error('[1c] price pull:', e.message);
+      }
+    }
+  } catch (e: any) {
+    stats.error = stats.error ? `${stats.error}; Цены: ${e.message}` : `Цены: ${e.message}`;
+  }
+
+  // ===== ОСТАТКИ (1С -> CRM) =====
+  try {
+    const warehouses = await client.getWarehouses();
+    const whMap = new Map<string, string>();
+    for (const w of warehouses) {
+      let wh = await prisma.warehouse.findFirst({ where: { name: w.name } });
+      if (!wh) wh = await prisma.warehouse.create({ data: { name: w.name } });
+      whMap.set(w.id, wh.id);
+    }
+    const stock = await client.getStock();
+    for (const s of stock) {
+      try {
+        const whId = whMap.get(s.warehouseKey);
+        if (!whId) continue;
+        const p = await prisma.product.findFirst({ where: { onecId: s.nomenclatureKey } });
+        if (!p) continue;
+        const q = Math.round(s.quantity * 1000) / 1000;
+        await prisma.stockBalance.upsert({
+          where: { productId_warehouseId: { productId: p.id, warehouseId: whId } },
+          create: { productId: p.id, warehouseId: whId, quantity: q },
+          update: { quantity: q },
+        });
+        stats.stockRowsUpdated++;
+      } catch (e: any) {
+        stats.products.errors++;
+        console.error('[1c] stock pull:', e.message);
+      }
+    }
+  } catch (e: any) {
+    stats.error = stats.error ? `${stats.error}; Остатки: ${e.message}` : `Остатки: ${e.message}`;
   }
 
   // ===== КОНТРАГЕНТЫ / КОНТАКТЫ =====

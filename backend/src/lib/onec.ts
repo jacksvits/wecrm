@@ -87,13 +87,15 @@ export class OneCClient {
     return data?.d?.results ?? data?.value ?? [];
   }
 
-  // Чтение коллекции с постраничностью ($top/$skip)
-  private async readCollection(entitySet: string, select?: string): Promise<any[]> {
+  // Чтение коллекции с постраничностью ($top/$skip).
+  // skipDeletionFilter — для регистров (у записей регистров нет DeletionMark)
+  private async readCollection(entitySet: string, select?: string, skipDeletionFilter = false): Promise<any[]> {
     const items: any[] = [];
     const top = 200;
     let skip = 0;
     for (;;) {
-      const params = [`$format=json`, `$top=${top}`, `$skip=${skip}`, `$filter=DeletionMark eq false`];
+      const params = [`$format=json`, `$top=${top}`, `$skip=${skip}`];
+      if (!skipDeletionFilter) params.push(`$filter=DeletionMark eq false`);
       if (select) params.push(`$select=${select}`);
       const data = await this.request(`${entitySet}?${params.join('&')}`);
       const rows = this.rowsOf(data);
@@ -215,12 +217,12 @@ export class OneCClient {
   // --- Номенклатура ---
   async getNomenclature(): Promise<{ items: OneCNomenclature[] }> {
     const entitySet = encodeURI('Catalog_Номенклатура');
-    const rows = await this.readCollection(entitySet, 'Ref_Key,Description,Артикул,ЕдиницаИзмерения,ВидНоменклатуры,Parent_Key,IsFolder,DeletionMark');
+    const rows = await this.readCollection(entitySet, 'Ref_Key,Description,Артикул,ЕдиницаИзмерения,ВидНоменклатуры,Parent_Key,IsFolder,Описание,DeletionMark');
 
     // Штрихкоды из регистра сведений (best-effort — регистр может отсутствовать)
     const barcodes = new Map<string, string>();
     try {
-      const bcRows = await this.readCollection(encodeURI('InformationRegister_ШтрихкодыНоменклатуры'), 'Номенклатура_Key,Штрихкод');
+      const bcRows = await this.readCollection(encodeURI('InformationRegister_ШтрихкодыНоменклатуры'), 'Номенклатура_Key,Штрихкод', true);
       for (const r of bcRows) {
         if (r.Номенклатура_Key && r.Штрихкод) barcodes.set(r.Номенклатура_Key, r.Штрихкод);
       }
@@ -238,6 +240,7 @@ export class OneCClient {
         barcode: barcodes.get(r.Ref_Key),
         unit: typeof r.ЕдиницаИзмерения === 'object' ? r.ЕдиницаИзмерения?.Description : undefined,
         kind: typeName === 'Услуга' || typeName === 'Работа' ? 'service' : 'product',
+        description: r['Описание'] || undefined,
         isActive: !r.DeletionMark,
         categoryPath: await this.categoryPathOf(r.Parent_Key || undefined),
       });
@@ -252,6 +255,7 @@ export class OneCClient {
     };
     const kindKey = await this.defaultKindKey(item.kind);
     if (kindKey) body['ВидНоменклатуры_Key'] = kindKey;
+    body['Описание'] = item.description || '';
     const folderKey = await this.ensureFolder(item.categoryPath ?? []);
     if (folderKey) body['Parent_Key'] = folderKey;
     const id = await this.createEntity(encodeURI('Catalog_Номенклатура'), body);
@@ -262,12 +266,58 @@ export class OneCClient {
     const body: Record<string, any> = {
       Description: item.name,
       Артикул: item.sku || '',
+      Описание: item.description || '',
     };
     if (item.categoryPath) {
       const folderKey = await this.ensureFolder(item.categoryPath);
       if (folderKey) body['Parent_Key'] = folderKey;
     }
     await this.updateEntity(encodeURI('Catalog_Номенклатура'), id, body);
+  }
+
+  // --- Склады ---
+  async getWarehouses(): Promise<{ id: string; name: string }[]> {
+    const rows = await this.readCollection(encodeURI('Catalog_Склады'), 'Ref_Key,Description,DeletionMark');
+    return rows.map((r) => ({ id: r.Ref_Key, name: r.Description || '' }));
+  }
+
+  // --- Остатки (AccumulationRegister_ТоварыНаСкладах), свёртка по номенклатуре+складу ---
+  async getStock(): Promise<{ nomenclatureKey: string; warehouseKey: string; quantity: number }[]> {
+    // полные записи без $select — состав ресурсов варьируется по версиям УТ
+    const rows = await this.readCollection(encodeURI('AccumulationRegister_ТоварыНаСкладах'), undefined, true);
+    const sums = new Map<string, number>();
+    for (const r of rows) {
+      if (!r.Номенклатура_Key || !r.Склад_Key) continue;
+      const q = Number(r['ВНаличии'] ?? r['Количество'] ?? 0) || 0;
+      const sign = r.ВидДвижения === 'Расход' ? -1 : 1; // нет ВидДвижения -> считаем Приход
+      const k = `${r.Номенклатура_Key}|${r.Склад_Key}`;
+      sums.set(k, (sums.get(k) ?? 0) + q * sign);
+    }
+    return [...sums.entries()].map(([k, quantity]) => {
+      const [nomenclatureKey, warehouseKey] = k.split('|');
+      return { nomenclatureKey, warehouseKey, quantity };
+    });
+  }
+
+  // --- Цены: виды цен и актуальные цены (последний период по каждой паре) ---
+  async getPriceKinds(): Promise<Map<string, string>> {
+    const rows = await this.readCollection(encodeURI('Catalog_ВидыЦен'), 'Ref_Key,Description,DeletionMark');
+    return new Map(rows.map((r) => [r.Ref_Key, r.Description || '']));
+  }
+
+  async getPrices(): Promise<{ nomenclatureKey: string; priceKindKey: string; price: number }[]> {
+    const rows = await this.readCollection(encodeURI('InformationRegister_ЦеныНоменклатуры'), undefined, true);
+    const latest = new Map<string, { nomenclatureKey: string; priceKindKey: string; price: number; period: number }>();
+    for (const r of rows) {
+      if (!r.Номенклатура_Key || !r.ВидЦены_Key) continue;
+      const period = r.Period ? new Date(r.Period).getTime() : 0;
+      const k = `${r.Номенклатура_Key}|${r.ВидЦены_Key}`;
+      const cur = latest.get(k);
+      if (!cur || period > cur.period) {
+        latest.set(k, { nomenclatureKey: r.Номенклатура_Key, priceKindKey: r.ВидЦены_Key, price: Number(r.Цена) || 0, period });
+      }
+    }
+    return [...latest.values()].map(({ period, ...rest }) => rest);
   }
 
   // --- Контрагенты / контакты ---
