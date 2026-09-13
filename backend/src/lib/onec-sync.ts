@@ -27,9 +27,8 @@ export async function runOneCSync(): Promise<OneCSyncStats> {
   // ===== НОМЕНКЛАТУРА =====
   try {
     // Pull: 1С -> CRM
-    let after: string | undefined;
-    do {
-      const page = await client.getNomenclature(after);
+    {
+      const page = await client.getNomenclature();
       for (const n of page.items) {
         try {
           const existing =
@@ -56,8 +55,7 @@ export async function runOneCSync(): Promise<OneCSyncStats> {
           console.error('[1c] nomenclature pull:', e.message);
         }
       }
-      after = page.hasMore && page.items.length ? page.items[page.items.length - 1].id : undefined;
-    } while (after);
+      }
 
     // Push: CRM -> 1С (новые + изменённые после последней синхронизации)
     const newProducts = await prisma.product.findMany({ where: { onecId: null } });
@@ -94,9 +92,8 @@ export async function runOneCSync(): Promise<OneCSyncStats> {
   const pulledContactIds = new Set<string>();
   try {
     // Pull: 1С -> CRM
-    let after: string | undefined;
-    do {
-      const page = await client.getCounterparties(after);
+    {
+      const page = await client.getCounterparties();
       for (const c of page.items) {
         try {
           const existing =
@@ -123,8 +120,7 @@ export async function runOneCSync(): Promise<OneCSyncStats> {
           console.error('[1c] counterparty pull:', e.message);
         }
       }
-      after = page.hasMore && page.items.length ? page.items[page.items.length - 1].id : undefined;
-    } while (after);
+    }
 
     // Push: CRM -> 1С (новые + изменённые после прошлой синхронизации; то, что только что pulled, пропускаем)
     const newContacts = await prisma.contact.findMany({ where: { onecId: null } });
