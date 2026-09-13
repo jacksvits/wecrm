@@ -1,6 +1,11 @@
-// Клиент 1С УТ 8.3 через стандартный OData-интерфейс (odata/standard.odata, JSON verbose + Basic Auth).
+// Клиент 1С УТ 8.3 через стандартный OData-интерфейс (odata/standard.odata, Basic Auth).
 // Публикация: https://host/<base>/ -> OData: https://host/<base>/odata/standard.odata
 // Локаль веб-клиента (/ru, /en) из базового URL отсекается автоматически.
+//
+// Особенности платформы:
+// - чтение: Accept application/json;odata=verbose, ответ {d:{results:[...]}} или {value:[...]}
+// - запись: Accept application/json (verbose-вид на запись 1С не поддерживает -> HTTP 406),
+//   ответ — созданная сущность с Ref_Key на верхнем уровне.
 
 export interface OneCNomenclature {
   id: string;                       // GUID (Ref_Key) номенклатуры в 1С
@@ -27,6 +32,8 @@ export interface OneCCounterparty {
 }
 
 export class OneCClient {
+  private kindKeyCache: { service?: string; product?: string } = {};
+
   constructor(
     private baseUrl: string,
     private login: string,
@@ -56,13 +63,30 @@ export class OneCClient {
     let data: any = null;
     try { data = text ? JSON.parse(text) : null; } catch { /* 1С может вернуть не-JSON */ }
     if (!res.ok) {
-      const msg = data?.error?.message?.value || data?.message || `Ошибка 1С: HTTP ${res.status}`;
+      const msg = data?.error?.message?.value || data?.error?.message || data?.message || `Ошибка 1С: HTTP ${res.status}`;
       throw new Error(msg);
     }
     return data;
   }
 
-  // Чтение коллекции с постраничностью ($top/$skip; __next не используется — надежнее счётчик)
+  // Запись: Accept только application/json (verbose -> 406)
+  private async writeRequest(path: string, method: string, body: Record<string, any>): Promise<any> {
+    return this.request(path, {
+      method,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json;odata=verbose',
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  // Строки коллекции в любом из форматов ответа 1С
+  private rowsOf(data: any): any[] {
+    return data?.d?.results ?? data?.value ?? [];
+  }
+
+  // Чтение коллекции с постраничностью ($top/$skip)
   private async readCollection(entitySet: string, select?: string): Promise<any[]> {
     const items: any[] = [];
     const top = 200;
@@ -71,7 +95,7 @@ export class OneCClient {
       const params = [`$format=json`, `$top=${top}`, `$skip=${skip}`, `$filter=DeletionMark eq false`];
       if (select) params.push(`$select=${select}`);
       const data = await this.request(`${entitySet}?${params.join('&')}`);
-      const rows = data?.d?.results ?? [];
+      const rows = this.rowsOf(data);
       items.push(...rows);
       if (rows.length < top) break;
       skip += top;
@@ -85,29 +109,48 @@ export class OneCClient {
 
   // Создание сущности; возвращает Ref_Key созданной записи
   private async createEntity(entitySet: string, body: Record<string, any>): Promise<string> {
-    const res = await this.request(entitySet, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json;odata=verbose' },
-      body: JSON.stringify(body),
-    });
-    return res?.d?.Ref_Key;
+    const res = await this.writeRequest(entitySet, 'POST', body);
+    return res?.d?.Ref_Key ?? res?.Ref_Key;
   }
 
   // Обновление: PATCH, при неудаче — MERGE (OData v3)
   private async updateEntity(entitySet: string, id: string, body: Record<string, any>): Promise<void> {
     const url = this.entityUrl(entitySet, id);
     try {
-      await this.request(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json;odata=verbose' },
-        body: JSON.stringify(body),
-      });
+      await this.writeRequest(url, 'PATCH', body);
     } catch (e: any) {
       await this.request(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json;odata=verbose', 'X-HTTP-Method': 'MERGE' },
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json;odata=verbose',
+          'X-HTTP-Method': 'MERGE',
+        },
         body: JSON.stringify(body),
       });
+    }
+  }
+
+  // Ключ вида номенклатуры по умолчанию (для создания товаров в 1С)
+  private async defaultKindKey(kind?: 'product' | 'service'): Promise<string | undefined> {
+    const cached = kind === 'service' ? this.kindKeyCache.service : this.kindKeyCache.product;
+    if (cached) return cached;
+    try {
+      if (kind === 'service') {
+        const r = await this.request(
+          `${encodeURI('Catalog_ВидыНоменклатуры')}?$format=json&$top=1&$select=Ref_Key&$filter=${encodeURIComponent("ТипНоменклатуры eq 'Услуга'")}`
+        );
+        const k = this.rowsOf(r)[0]?.Ref_Key;
+        if (k) { this.kindKeyCache.service = k; return k; }
+      }
+      const r = await this.request(`${encodeURI('Catalog_ВидыНоменклатуры')}?$format=json&$top=1&$select=Ref_Key`);
+      const k = this.rowsOf(r)[0]?.Ref_Key;
+      if (k) {
+        if (kind === 'service') this.kindKeyCache.service = k; else this.kindKeyCache.product = k;
+      }
+      return k;
+    } catch {
+      return undefined;
     }
   }
 
@@ -116,7 +159,7 @@ export class OneCClient {
     const entitySet = encodeURI('Catalog_Номенклатура');
     const rows = await this.readCollection(entitySet, 'Ref_Key,Description,Артикул,ЕдиницаИзмерения,ВидНоменклатуры,DeletionMark');
 
-    // Штрихкоды из регистра сведений (лучшее усилие — регистр может отсутствовать в конфигурации)
+    // Штрихкоды из регистра сведений (best-effort — регистр может отсутствовать)
     const barcodes = new Map<string, string>();
     try {
       const bcRows = await this.readCollection(encodeURI('InformationRegister_ШтрихкодыНоменклатуры'), 'Номенклатура_Key,Штрихкод');
@@ -142,10 +185,13 @@ export class OneCClient {
   }
 
   async createNomenclature(item: Partial<OneCNomenclature>): Promise<{ id: string }> {
-    const id = await this.createEntity(encodeURI('Catalog_Номенклатура'), {
+    const body: Record<string, any> = {
       Description: item.name,
       Артикул: item.sku || '',
-    });
+    };
+    const kindKey = await this.defaultKindKey(item.kind);
+    if (kindKey) body['ВидНоменклатуры_Key'] = kindKey;
+    const id = await this.createEntity(encodeURI('Catalog_Номенклатура'), body);
     return { id };
   }
 
@@ -160,7 +206,7 @@ export class OneCClient {
   async getCounterparties(): Promise<{ items: OneCCounterparty[] }> {
     const rows = await this.readCollection(
       encodeURI('Catalog_Контрагенты'),
-      'Ref_Key,Description,ИНН,ОГРН,ЮридическоеФизическоеЛицо,DeletionMark'
+      'Ref_Key,Description,ИНН,ЮридическоеФизическоеЛицо,DeletionMark'
     );
     const items: OneCCounterparty[] = rows.map((r) => {
       const jf = r['ЮридическоеФизическоеЛицо'];
@@ -170,7 +216,6 @@ export class OneCClient {
         name: r.Description || '',
         kind: isOrg ? 'organization' : 'contact',
         inn: r['ИНН'] || undefined,
-        ogrn: r['ОГРН'] || undefined,
         isActive: !r.DeletionMark,
       };
     });
@@ -181,7 +226,6 @@ export class OneCClient {
     const id = await this.createEntity(encodeURI('Catalog_Контрагенты'), {
       Description: item.name,
       ИНН: item.inn || '',
-      ОГРН: item.ogrn || '',
       ЮридическоеФизическоеЛицо: item.kind === 'contact' ? 'ФизическоеЛицо' : 'ЮридическоеЛицо',
     });
     return { id };
@@ -191,7 +235,6 @@ export class OneCClient {
     await this.updateEntity(encodeURI('Catalog_Контрагенты'), id, {
       Description: item.name,
       ИНН: item.inn || '',
-      ОГРН: item.ogrn || '',
       ЮридическоеФизическоеЛицо: item.kind === 'contact' ? 'ФизическоеЛицо' : 'ЮридическоеЛицо',
     });
   }
