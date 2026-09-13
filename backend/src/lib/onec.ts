@@ -150,7 +150,8 @@ export class OneCClient {
 
   private async kindsMap(): Promise<Map<string, string>> {
     if (this.kindsCache) return this.kindsCache;
-    const rows = await this.readCollection(encodeURI('Catalog_ВидыНоменклатуры'), 'Ref_Key,ТипНоменклатуры,Parent_Key,DeletionMark');
+    // полные записи без $select: 1С в сессионном режиме может игнорировать $select с Parent_Key
+    const rows = await this.readCollection(encodeURI('Catalog_ВидыНоменклатуры'), undefined, true);
     // Виды иерархические: если тип не заполнен у вида, берём у родительского (с защитой от циклов)
     const raw = new Map<string, { type?: string; parent?: string }>();
     for (const r of rows) {
