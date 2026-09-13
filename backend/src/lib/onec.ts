@@ -144,24 +144,30 @@ export class OneCClient {
     }
   }
 
-  // Ключ вида номенклатуры по умолчанию (для создания товаров в 1С)
+  // Виды номенклатуры: Ref_Key -> ТипНоменклатуры ('Товар'/'Услуга'/'' — пусто у групп и видов без типа)
+  private kindsCache: Map<string, string> | null = null;
+
+  private async kindsMap(): Promise<Map<string, string>> {
+    if (this.kindsCache) return this.kindsCache;
+    const rows = await this.readCollection(encodeURI('Catalog_ВидыНоменклатуры'), 'Ref_Key,ТипНоменклатуры,DeletionMark');
+    this.kindsCache = new Map(rows.map((r) => [r.Ref_Key, r['ТипНоменклатуры'] || '']));
+    return this.kindsCache;
+  }
+
+  // Ключ вида номенклатуры по умолчанию (для создания товаров/услуг в 1С)
   private async defaultKindKey(kind?: 'product' | 'service'): Promise<string | undefined> {
-    const cached = kind === 'service' ? this.kindKeyCache.service : this.kindKeyCache.product;
+    const cacheKey = kind === 'service' ? 'service' : 'product';
+    const cached = this.kindKeyCache[cacheKey];
     if (cached) return cached;
     try {
-      if (kind === 'service') {
-        const r = await this.request(
-          `${encodeURI('Catalog_ВидыНоменклатуры')}?$format=json&$top=1&$select=Ref_Key&$filter=${encodeURIComponent("ТипНоменклатуры eq 'Услуга'")}`
-        );
-        const k = this.rowsOf(r)[0]?.Ref_Key;
-        if (k) { this.kindKeyCache.service = k; return k; }
-      }
-      const r = await this.request(`${encodeURI('Catalog_ВидыНоменклатуры')}?$format=json&$top=1&$select=Ref_Key`);
-      const k = this.rowsOf(r)[0]?.Ref_Key;
-      if (k) {
-        if (kind === 'service') this.kindKeyCache.service = k; else this.kindKeyCache.product = k;
-      }
-      return k;
+      const kinds = await this.kindsMap();
+      const byType = (t: string) => [...kinds.entries()].find(([, type]) => type === t)?.[0];
+      let key: string | undefined;
+      if (kind === 'service') key = byType('Услуга') || byType('Работа');
+      // для товара: сначала тип «Товар», иначе любой вид (у части видов тип не заполнен)
+      key = key || byType('Товар') || [...kinds.keys()][0];
+      if (key) this.kindKeyCache[cacheKey] = key;
+      return key;
     } catch {
       return undefined;
     }
@@ -239,10 +245,13 @@ export class OneCClient {
     } catch { /* регистр недоступен — штрихкоды пропускаем */ }
 
     const items: OneCNomenclature[] = [];
+    const kinds = await this.kindsMap();
     for (const r of rows) {
       if (r.IsFolder) continue; // группы — это категории, обрабатываются отдельно
-      const vid = r.ВидНоменклатуры;
-      const typeName = typeof vid === 'object' ? vid?.ТипНоменклатуры : undefined;
+      const vidKey = typeof r.ВидНоменклатуры === 'object'
+        ? r.ВидНоменклатуры?.Ref_Key
+        : (r.ВидНоменклатуры_Key ?? r.ВидНоменклатуры);
+      const typeName = vidKey ? kinds.get(vidKey) : undefined;
       items.push({
         id: r.Ref_Key,
         name: r.Description || '',
