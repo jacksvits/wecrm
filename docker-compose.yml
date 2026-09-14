@@ -38,13 +38,6 @@ services:
       TOCHKA_REDIRECT_URI: "https://welans.cc/api/tochka/auth-url"
       TOCHKA_ACCESS_TOKEN: ""
       FRONTEND_URL: "https://welans.cc"
-      GEMINI_API_KEY: "${GEMINI_API_KEY}"
-      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
-      OPENROUTER_MODEL: "${OPENROUTER_MODEL:-google/gemini-2.0-flash-exp:free}"
-      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY}"
-      DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-chat}"
-      OLLAMA_URL: "http://ollama:11434"
-      OLLAMA_MODEL: "${OLLAMA_MODEL:-llama3.2:3b}"
     depends_on:
       db:
         condition: service_healthy
@@ -99,20 +92,6 @@ services:
       - ./backend/prisma:/app/prisma:ro
     restart: unless-stopped
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: wecrm-ollama
-    restart: unless-stopped
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-
 volumes:
   pgdata:
-  ollama_data:
 

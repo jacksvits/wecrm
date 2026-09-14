@@ -88,7 +88,6 @@ model User {
   vkGroupSettings   VkGroupSettings[]
   reminderRecipients ReminderRecipient[]
   maxSettings       MaxSettings[]
-  assistantDialogs  AssistantDialog[]
 
   news            News[]
   newsReactions   NewsReaction[]
@@ -941,19 +940,6 @@ model FileTabSetting {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("file_tab_settings")
-}
-
-model AssistantDialog {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  messages  Json
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("assistant_dialogs")
 }
 
 model YandexSettings {

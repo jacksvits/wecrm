@@ -41,8 +41,6 @@ import notesRouter from './routes/notes.js';
 import productsRoutes from './routes/products.js';
 import reminderRoutes from './routes/reminders.js';
 import { startReminderScheduler } from './lib/reminder-scheduler.js';
-import assistantRoutes from './routes/assistant.js';
-import aiRoutes from './routes/ai.js';
 import brandingRoutes from './routes/branding.js';
 import integrationsRoutes from './routes/integrations.js';
 import begetSettingsRoutes from './routes/beget-settings.js';
@@ -128,7 +126,6 @@ app.use('/api/files', filesRoutes);
 app.use('/api/notes', notesRouter);
 app.use('/api/products', productsRoutes);
 app.use('/api/reminders', reminderRoutes);
-app.use('/api/assistant', assistantRoutes);
 app.use('/api/branding', brandingRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/beget-settings', begetSettingsRoutes);
@@ -138,7 +135,6 @@ app.use('/api/onec-plugin', onecPluginRoutes);
 app.use('/api/handler-settings', handlerSettingsRoutes);
 app.use('/api/auto-reply-settings', autoReplySettingsRoutes);
 app.use('/api/yandex', yandexRoutes);
-app.use('/api/ai', aiRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', connections: getActiveConnections(), time: new Date().toISOString() }));
 
