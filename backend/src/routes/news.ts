@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { broadcast, CHANNELS } from '../lib/events.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -97,6 +98,29 @@ router.get('/drafts', async (req, res) => {
 });
 
 /**
+ * GET /api/news/pinned
+ * Закреплённые на главной опубликованные новости (слайдер дашборда)
+ */
+router.get('/pinned', async (_req, res) => {
+  try {
+    const news = await prisma.news.findMany({
+      where: { isPublished: true, pinnedToHome: true },
+      include: {
+        author: { select: { id: true, name: true, avatar: true } },
+        category: true,
+        tags: true,
+      },
+      orderBy: { publishedAt: 'desc' },
+      take: 10,
+    });
+    res.json(news);
+  } catch (err: any) {
+    console.error('[news:pinned]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/news/:id
  * Получить новость по ID
  */
@@ -123,6 +147,7 @@ router.get('/:id', async (req, res) => {
             tagIds: true,
             coverImage: true,
             isPublished: true,
+            pinnedToHome: true,
             editorName: true,
             createdAt: true,
           },
@@ -165,6 +190,7 @@ router.post('/', async (req, res) => {
       tagIds,
       labels,
       isPublished,
+      pinnedToHome,
     } = req.body;
 
     if (!title?.trim()) {
@@ -183,6 +209,7 @@ router.post('/', async (req, res) => {
         content: content?.trim() || '',
         coverImage: coverImage?.trim() || null,
         isPublished: !!isPublished,
+        pinnedToHome: !!pinnedToHome,
         publishedAt: isPublished ? new Date() : null,
         authorId: user.id,
         categoryId: categoryId || null,
@@ -211,6 +238,7 @@ router.post('/', async (req, res) => {
         tagIds: tagIds || [],
         coverImage: news.coverImage,
         isPublished: news.isPublished,
+        pinnedToHome: news.pinnedToHome,
         editorId: user.id,
         editorName: user.name || user.email,
       },
@@ -244,6 +272,7 @@ router.patch('/:id', async (req, res) => {
       tagIds,
       labels,
       isPublished,
+      pinnedToHome,
     } = req.body;
 
     const existing = await prisma.news.findUnique({
@@ -273,6 +302,7 @@ router.patch('/:id', async (req, res) => {
       data.isPublished = !!isPublished;
       data.publishedAt = isPublished ? new Date() : null;
     }
+    if (pinnedToHome !== undefined) data.pinnedToHome = !!pinnedToHome;
     if (tagIds !== undefined) {
       data.tags = {
         set: tagIds.map((id: string) => ({ id })),
@@ -303,6 +333,7 @@ router.patch('/:id', async (req, res) => {
         tagIds: news.tags.map((t: any) => t.id),
         coverImage: news.coverImage,
         isPublished: news.isPublished,
+        pinnedToHome: news.pinnedToHome,
         editorId: user.id,
         editorName: user.name || user.email,
       },
@@ -338,6 +369,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     await prisma.news.delete({ where: { id: req.params.id } });
+    broadcast(CHANNELS.NEWS, { action: 'delete', entity: 'news', id: req.params.id });
     res.json({ success: true });
   } catch (err: any) {
     console.error('[news:delete]', err);
@@ -634,6 +666,7 @@ router.post('/:id/history/:historyId/restore', async (req, res) => {
         subcategoryId: historyEntry.subcategoryId,
         coverImage: historyEntry.coverImage,
         isPublished: historyEntry.isPublished,
+        pinnedToHome: historyEntry.pinnedToHome,
         tags: {
           set: historyEntry.tagIds.map((id: string) => ({ id })),
         },
@@ -659,6 +692,7 @@ router.post('/:id/history/:historyId/restore', async (req, res) => {
         tagIds: historyEntry.tagIds,
         coverImage: news.coverImage,
         isPublished: news.isPublished,
+        pinnedToHome: news.pinnedToHome,
         editorId: user.id,
         editorName: user.name || user.email,
       },

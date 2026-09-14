@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
 import { DashboardStats, Task, Status } from '../types';
 import { Avatar } from './Avatar';
+import { NewsSlider } from './NewsSlider';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -96,6 +97,9 @@ export function Dashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Слайдер закреплённых на главной новостей */}
+      <NewsSlider />
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16, flexShrink: 0 }}>
         {metrics.map((m, i) => (
           <div key={i} style={{ padding: 20, borderRadius: 16, border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: 'var(--shadow)' }}>

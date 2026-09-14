@@ -32,6 +32,7 @@ export function NewsEditor() {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [labels, setLabels] = useState('');
   const [isPublished, setIsPublished] = useState(false);
+  const [pinnedToHome, setPinnedToHome] = useState(false);
 
   // Справочники
   const [categories, setCategories] = useState<NewsCategory[]>([]);
@@ -440,6 +441,20 @@ export function NewsEditor() {
         />
         <label htmlFor="isPublished" style={{ fontSize: 14, cursor: 'pointer', color: 'var(--text-color)' }}>
           Опубликовать сразу
+        </label>
+      </div>
+
+      {/* Закрепление на главной */}
+      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <input
+          type="checkbox"
+          id="pinnedToHome"
+          checked={pinnedToHome}
+          onChange={e => setPinnedToHome(e.target.checked)}
+          style={{ width: 18, height: 18, cursor: 'pointer' }}
+        />
+        <label htmlFor="pinnedToHome" style={{ fontSize: 14, cursor: 'pointer', color: 'var(--text-color)' }}>
+          📌 Закрепить на главной
         </label>
       </div>
 

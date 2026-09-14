@@ -70,6 +70,7 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     update: (id: string, data: any) => fetchApi(`/api/news/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => fetchApi(`/api/news/${id}`, { method: 'DELETE' }),
     drafts: () => fetchApi('/api/news/drafts'),
+    pinned: () => fetchApi('/api/news/pinned'),
     categories: () => fetchApi('/api/news/categories/list'),
     createCategory: (data: any) => fetchApi('/api/news/categories', { method: 'POST', body: JSON.stringify(data) }),
     updateCategory: (id: string, data: any) => fetchApi(`/api/news/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),

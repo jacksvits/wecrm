@@ -753,6 +753,7 @@ model News {
   content       String
   coverImage    String?  @map("cover_image")
   isPublished   Boolean  @default(false) @map("is_published")
+  pinnedToHome  Boolean  @default(false) @map("pinned_to_home")
   publishedAt   DateTime? @map("published_at")
   views         Int      @default(0)
   labels        String[] @default([])
@@ -785,6 +786,7 @@ model NewsHistory {
   tagIds        String[] @default([])
   coverImage    String?  @map("cover_image")
   isPublished   Boolean  @default(false) @map("is_published")
+  pinnedToHome  Boolean  @default(false) @map("pinned_to_home")
   editorId      String
   editorName    String
   createdAt     DateTime @default(now())
