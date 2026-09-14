@@ -57,6 +57,7 @@ function VideoNotePlayer({ src }: { src: string }) {
         borderRadius: '50%',
         overflow: 'hidden',
         background: '#000',
+        border: '2px solid rgba(255,255,255,0.85)',
         WebkitMaskImage: 'radial-gradient(circle, #000 99%, transparent 100%)',
         maskImage: 'radial-gradient(circle, #000 99%, transparent 100%)',
         boxShadow: '0 4px 16px rgba(0,0,0,0.20)',
@@ -448,6 +449,13 @@ export function GlobalChat() {
           const isMe = msg.authorId === user?.id;
           const isDeleted = !!msg.deletedAt;
           const reactionGroups = getReactionGroups(msg.reactions as any);
+          // Сообщение-видеокружок (как в Telegram): все вложения — кружочки,
+          // текст — служебный «🎥 Видеокружок» → рендерим без пузыря и заголовка,
+          // только круг и время под ним
+          const isVideoNoteOnly = (msg.attachments || []).length > 0
+            && (msg.attachments || []).every(a => a.path?.includes('/video_notes/'))
+            && msg.content === '🎥 Видеокружок'
+            && !msg.replyTo;
           const recipientNames = msg.recipients?.map(r => r.user?.name).filter(Boolean) || [];
           const showAvatar = !isMe && (idx === 0 || messages[idx - 1].authorId !== msg.authorId);
 
@@ -494,7 +502,21 @@ export function GlobalChat() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 
-                  <div style={{
+                  {isVideoNoteOnly && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', gap: 6 }}>
+                          {msg.attachments!.map(a => {
+                            const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                            const previewUrl = a.path.startsWith('http') ? a.path : `${origin}${a.path}`;
+                            return <VideoNotePlayer key={a.id} src={previewUrl} />;
+                          })}
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', opacity: 0.9, fontWeight: 500, marginRight: isMe ? 14 : 0, marginLeft: isMe ? 0 : 46 }}>
+                            {formatTime(msg.createdAt)}
+                          </span>
+                        </div>
+                      )}
+
+                      {!isVideoNoteOnly && (
+                      <div style={{
                     maxWidth: '100%',
                     minWidth: 48,
                     padding: '12px 16px',
@@ -623,6 +645,8 @@ export function GlobalChat() {
                       </div>
                     )}
                   </div>
+
+)}
 
                   {reactionGroups.length > 0 && (
                     <div style={{
