@@ -211,9 +211,9 @@ export function NewsDetail() {
       )}
 
       {/* Обложка */}
-      {news.coverImage && (
+      {(news.coverImage || defaultCover) && (
         <img
-          src={news.coverImage}
+          src={news.coverImage || defaultCover || undefined}
           alt={news.title}
           style={{
             width: '100%',

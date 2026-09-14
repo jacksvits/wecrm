@@ -314,9 +314,9 @@ export function NewsList() {
                 }}
               >
                 {/* Обложка */}
-                {item.coverImage ? (
+                {item.coverImage || defaultCover ? (
                   <img
-                    src={item.coverImage}
+                    src={item.coverImage || defaultCover || undefined}
                     alt={item.title}
                     style={{
                       width: '100%',
