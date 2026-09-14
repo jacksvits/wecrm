@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
+import { useAuth } from '../hooks/useAuth';
 import { NewsCategory, NewsTag } from '../types';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -97,6 +98,16 @@ export function NewsEditor() {
   };
 
   const subcategories = categories.find(c => c.id === categoryId)?.subcategories || [];
+
+  const { user } = useAuth();
+  // Запрет создания новости без права у роли (дублируется проверкой 403 на backend)
+  if (id === 'new' && user && user.role !== 'admin' && (user as any)?.canCreateNews === false) {
+    return (
+      <div style={{ maxWidth: 800, margin: '40px auto', padding: 24, textAlign: 'center', color: 'var(--text-secondary)' }}>
+        У вашей роли нет права создавать новости
+      </div>
+    );
+  }
 
   // Загрузка обложки новости (своя картинка вместо URL)
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

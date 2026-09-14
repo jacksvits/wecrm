@@ -179,6 +179,9 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const user = (req as any).user;
+    if (user.role !== 'admin' && user.canCreateNews === false) {
+      return res.status(403).json({ error: 'У вашей роли нет права создавать новости' });
+    }
     const {
       title,
       slug,
@@ -261,6 +264,9 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   try {
     const user = (req as any).user;
+    if (user.role !== 'admin' && user.canEditNews === false) {
+      return res.status(403).json({ error: 'У вашей роли нет права редактировать новости' });
+    }
     const {
       title,
       slug,
@@ -356,6 +362,9 @@ router.patch('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const user = (req as any).user;
+    if (user.role !== 'admin' && user.canEditNews === false) {
+      return res.status(403).json({ error: 'У вашей роли нет права редактировать новости' });
+    }
     const existing = await prisma.news.findUnique({
       where: { id: req.params.id },
     });
@@ -634,6 +643,9 @@ router.get('/:id/history', async (req, res) => {
 router.post('/:id/history/:historyId/restore', async (req, res) => {
   try {
     const user = (req as any).user;
+    if (user.role !== 'admin' && user.canEditNews === false) {
+      return res.status(403).json({ error: 'У вашей роли нет права редактировать новости' });
+    }
     const historyEntry = await prisma.newsHistory.findUnique({
       where: { id: req.params.historyId },
     });

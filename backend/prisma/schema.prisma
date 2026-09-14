@@ -22,6 +22,9 @@ model Role {
   // (пустой массив allowedTaskStatuses = доступны все статусы)
   canChangeTaskStatus Boolean @default(true) @map("can_change_task_status")
   allowedTaskStatuses String[] @default([]) @map("allowed_task_statuses")
+  // Разрешения на работу с новостями: создание и редактирование
+  canCreateNews      Boolean @default(true) @map("can_create_news")
+  canEditNews        Boolean @default(true) @map("can_edit_news")
   notifyOnNewTask    Boolean @default(true)  @map("notify_on_new_task")
   notifyOnNewDeal    Boolean @default(false) @map("notify_on_new_deal")
   notifyOnNewComment Boolean @default(false) @map("notify_on_new_comment")

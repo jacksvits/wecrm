@@ -5,16 +5,21 @@ import { News, NewsHistory } from '../types';
 import { LinkifyText } from './LinkifyText';
 import { stripHtml } from '../lib/stripHtml';
 import { useBrandNewsCover } from '../lib/branding';
+import { useAuth } from '../hooks/useAuth';
 
 export function NewsDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const defaultCover = useBrandNewsCover();
+  const { user } = useAuth();
   const [news, setNews] = useState<News | null>(null);
   const [loading, setLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [historyList, setHistoryList] = useState<NewsHistory[]>([]);
   const [restoring, setRestoring] = useState(false);
+
+  // Право на редактирование новостей у текущей роли
+  const canEditNews = !user || user.role === 'admin' || (user as any)?.canEditNews !== false;
 
   useEffect(() => {
     if (!id) return;
@@ -60,288 +65,288 @@ export function NewsDetail() {
   };
 
   if (loading) {
-    return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Загрузка...</div>;
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
+        Загрузка...
+      </div>
+    );
   }
 
   if (!news) {
-    return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Новость не найдена</div>;
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
+        Новость не найдена
+      </div>
+    );
   }
 
+  const coverSrc = news.coverImage || defaultCover;
+
   return (
-    <div style={{
-      maxWidth: 800,
-      margin: '0 auto',
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border-color)',
-      borderRadius: 16,
-      padding: 24,
-      boxShadow: 'var(--shadow)',
-    }}>
-      {/* Шапка */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-        <button
-          onClick={() => navigate('/news')}
-          style={{ background: 'none', border: 'none', color: '#007AFF', cursor: 'pointer', fontSize: 14 }}
-        >
-          ← Назад к новостям
-        </button>
-        <div style={{ display: 'flex', gap: 8 }}>
+    <>
+      {/* Кнопка «Назад» — вне блока новости */}
+      <button
+        onClick={() => navigate('/news')}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '8px 14px',
+          borderRadius: 10,
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          color: 'var(--text-primary)',
+          cursor: 'pointer',
+          fontSize: 14,
+          marginBottom: 12,
+        }}
+      >
+        ← Назад к новостям
+      </button>
+
+      <div style={{
+        maxWidth: 800,
+        margin: '0 auto',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-color)',
+        borderRadius: 16,
+        padding: 24,
+        boxShadow: 'var(--shadow)',
+      }}>
+        {/* Действия */}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginBottom: 16, flexWrap: 'wrap' }}>
           <button
             onClick={() => setShowHistory(!showHistory)}
             style={{
-              padding: '8px 16px',
-              borderRadius: 10,
-              background: showHistory ? '#007AFF' : 'var(--bg-hover)',
-              color: showHistory ? '#fff' : 'var(--text-color)',
-              border: '1px solid var(--border-color)',
-              cursor: 'pointer',
-              fontSize: 14,
-            }}
-          >
-            История изменений
-          </button>
-          <button
-            onClick={() => navigate(`/news/${id}/edit`)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 10,
+              padding: '6px 14px',
+              borderRadius: 8,
               background: 'var(--bg-hover)',
               border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
               cursor: 'pointer',
-              fontSize: 14,
+              fontSize: 13,
             }}
           >
-            Редактировать
+            {showHistory ? 'Скрыть историю' : 'История'}
           </button>
-          <button
-            onClick={handleDelete}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 10,
-              background: '#dc2626',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 14,
-            }}
-          >
-            Удалить
-          </button>
-        </div>
-      </div>
-
-      {/* История изменений */}
-      {showHistory && (
-        <div style={{
-          marginBottom: 24,
-          padding: 16,
-          borderRadius: 12,
-          background: 'var(--bg-hover)',
-          border: '1px solid var(--border-color)',
-        }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600 }}>История изменений</h3>
-          {historyList.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>История пуста</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {historyList.map((h, idx) => (
-                <div
-                  key={h.id}
-                  style={{
-                    padding: 12,
-                    borderRadius: 10,
-                    background: 'var(--bg-color)',
-                    border: '1px solid var(--border-color)',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>
-                      Версия #{historyList.length - idx}
-                      {idx === 0 && <span style={{ marginLeft: 8, fontSize: 11, color: '#007AFF' }}>(текущая)</span>}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                      {new Date(h.createdAt).toLocaleString('ru-RU')}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                    <span style={{ fontWeight: 500 }}>{h.editorName}</span>
-                    {' '}• {h.isPublished ? 'Опубликовано' : 'Черновик'}
-                  </div>
-                  <div style={{ fontSize: 13, marginBottom: 4 }}>
-                    <strong>{h.title}</strong>
-                  </div>
-                  {h.summary && (
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      {stripHtml(h.summary).slice(0, 100)}{stripHtml(h.summary).length > 100 ? '...' : ''}
-                    </div>
-                  )}
-                  {h.labels?.length > 0 && (
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-                      {h.labels.map(l => (
-                        <span key={l} style={{ fontSize: 11, color: '#f59e0b', background: '#f59e0b15', padding: '2px 6px', borderRadius: 8 }}>
-                          {l}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {idx > 0 && (
-                    <button
-                      onClick={() => handleRestore(h.id)}
-                      disabled={restoring}
-                      style={{
-                        marginTop: 8,
-                        padding: '6px 12px',
-                        borderRadius: 8,
-                        background: '#007AFF15',
-                        color: '#007AFF',
-                        border: 'none',
-                        cursor: restoring ? 'not-allowed' : 'pointer',
-                        fontSize: 12,
-                        fontWeight: 500,
-                      }}
-                    >
-                      {restoring ? 'Восстановление...' : 'Восстановить эту версию'}
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
+          {canEditNews && (
+            <>
+              <button
+                onClick={() => navigate(`/news/${news.id}/edit`)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  background: '#007AFF',
+                  border: 'none',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                Редактировать
+              </button>
+              <button
+                onClick={handleDelete}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  background: '#FF3B30',
+                  border: 'none',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                Удалить
+              </button>
+            </>
           )}
         </div>
-      )}
 
-      {/* Обложка */}
-      {(news.coverImage || defaultCover) && (
-        <img
-          src={news.coverImage || defaultCover || undefined}
-          alt={news.title}
-          style={{
-            width: '100%',
-            maxHeight: 400,
-            objectFit: 'cover',
-            borderRadius: 16,
-            marginBottom: 20,
-          }}
-        />
-      )}
-
-      {/* Заголовок и мета */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
-          {news.category && (
-            <span style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: news.category.color || '#007AFF',
-              background: (news.category.color || '#007AFF') + '15',
-              padding: '4px 10px',
-              borderRadius: 8,
-            }}>
-              {news.category.name}
-              {news.subcategory && ` / ${news.subcategory.name}`}
-            </span>
-          )}
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {news.publishedAt
-              ? new Date(news.publishedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
-              : new Date(news.createdAt).toLocaleDateString('ru-RU')}
-          </span>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {news.views} просмотров
-          </span>
-        </div>
-
+        {/* Заголовок — над картинкой */}
         <h1 style={{
-          fontSize: 28,
-          fontWeight: 700,
           margin: '0 0 16px',
-          color: 'var(--text-color)',
+          fontSize: 24,
+          fontWeight: 600,
+          color: 'var(--text-primary)',
           lineHeight: 1.3,
         }}>
           {news.title}
         </h1>
 
-        {/* Автор */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {news.author?.avatar ? (
-            <img src={news.author.avatar} alt="" style={{ width: 36, height: 36, borderRadius: '50%' }} />
-          ) : (
-            <div style={{
-              width: 36,
-              height: 36,
-              borderRadius: '50%',
-              background: '#007AFF',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 14,
-              fontWeight: 600,
-            }}>
-              {(news.author?.name || 'U')[0].toUpperCase()}
-            </div>
-          )}
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 500 }}>{news.author?.name || 'Неизвестно'}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Автор</div>
+        {/* Обложка с кратким описанием слева снизу */}
+        {coverSrc ? (
+          <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', margin: '0 0 18px' }}>
+            <img
+              src={coverSrc}
+              alt={news.title}
+              style={{
+                width: '100%',
+                maxHeight: 380,
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+            {news.summary && (
+              <div style={{
+                position: 'absolute',
+                left: 14,
+                bottom: 14,
+                maxWidth: '70%',
+                background: 'rgba(0,0,0,0.55)',
+                color: '#fff',
+                padding: '8px 12px',
+                borderRadius: 10,
+                fontSize: 13,
+                lineHeight: 1.5,
+              }}>
+                {stripHtml(news.summary)}
+              </div>
+            )}
           </div>
-        </div>
-      </div>
-
-      {/* Теги и метки */}
-      {(news.tags?.length > 0 || news.labels?.length > 0) && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-          {news.tags?.map(tag => (
-            <span key={tag.id} style={{
-              fontSize: 12,
-              color: tag.color || '#10b981',
-              background: (tag.color || '#10b981') + '15',
-              padding: '4px 10px',
-              borderRadius: 12,
+        ) : (
+          news.summary && (
+            <div style={{
+              fontSize: 15,
+              color: 'var(--text-secondary)',
+              fontStyle: 'italic',
+              margin: '0 0 18px',
+              lineHeight: 1.6,
             }}>
-              #{tag.name}
-            </span>
-          ))}
-          {news.labels?.map(label => (
-            <span key={label} style={{
-              fontSize: 12,
-              color: '#f59e0b',
-              background: '#f59e0b15',
-              padding: '4px 10px',
-              borderRadius: 12,
-            }}>
-              {label}
-            </span>
-          ))}
-        </div>
-      )}
+              {stripHtml(news.summary)}
+            </div>
+          )
+        )}
 
-      {/* Описание */}
-      {news.summary && (
+        {/* Полное описание — под картинкой */}
+        {news.content && (
+          <div style={{
+            fontSize: 15,
+            lineHeight: 1.7,
+            color: 'var(--text-primary)',
+            margin: '0 0 18px',
+            wordBreak: 'break-word',
+          }}>
+            <LinkifyText text={news.content} />
+          </div>
+        )}
+
+        {/* Дата создания, теги, метки — под описанием */}
         <div style={{
-          padding: 16,
-          borderRadius: 12,
-          background: 'var(--bg-hover)',
-          border: '1px solid var(--border-color)',
-          marginBottom: 24,
-          fontSize: 15,
-          lineHeight: 1.6,
-          color: 'var(--text-muted)',
-          fontStyle: 'italic',
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          fontSize: 12,
+          color: 'var(--text-secondary)',
+          borderTop: '1px solid var(--border-color)',
+          paddingTop: 14,
         }}>
-          {news.summary}
+          <span>
+            {new Date(news.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+          </span>
+          {news.category && (
+            <span style={{
+              color: news.category.color,
+              background: news.category.color + '18',
+              padding: '2px 8px',
+              borderRadius: 10,
+              fontWeight: 500,
+            }}>
+              {news.category.name}
+            </span>
+          )}
+          <span>{news.views} просмотров</span>
+          {news.labels && news.labels.length > 0 && (
+            <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {news.labels.map((label, i) => (
+                <span key={i} style={{
+                  padding: '2px 8px',
+                  borderRadius: 10,
+                  background: 'var(--bg-hover)',
+                  border: '1px solid var(--border-color)',
+                }}>
+                  {label}
+                </span>
+              ))}
+            </span>
+          )}
+          {news.tags && news.tags.length > 0 && (
+            <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {news.tags.map((tag) => (
+                <span key={tag.id} style={{
+                  padding: '2px 8px',
+                  borderRadius: 10,
+                  background: 'rgba(0,122,255,0.1)',
+                  color: '#007AFF',
+                }}>
+                  #{tag.name}
+                </span>
+              ))}
+            </span>
+          )}
         </div>
-      )}
 
-      {/* Контент */}
-      <div style={{
-        fontSize: 16,
-        lineHeight: 1.75,
-        color: 'var(--text-color)',
-        whiteSpace: 'pre-wrap',
-      }}>
-        <LinkifyText text={news.content} />
+        {/* История изменений */}
+        {showHistory && (
+          <div style={{ marginTop: 24 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 12px' }}>
+              История изменений
+            </h3>
+            {historyList.length === 0 ? (
+              <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>История пуста</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {historyList.map((h) => (
+                  <div
+                    key={h.id}
+                    style={{
+                      padding: 12,
+                      borderRadius: 10,
+                      background: 'var(--bg-hover)',
+                      border: '1px solid var(--border-color)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
+                          {h.title}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                          {new Date(h.createdAt).toLocaleString('ru-RU')} · {h.editorName}
+                        </div>
+                        {h.summary && (
+                          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                            {stripHtml(h.summary).slice(0, 100)}{stripHtml(h.summary).length > 100 ? '...' : ''}
+                          </div>
+                        )}
+                      </div>
+                      {canEditNews && (
+                        <button
+                          onClick={() => handleRestore(h.id)}
+                          disabled={restoring}
+                          style={{
+                            padding: '4px 12px',
+                            borderRadius: 8,
+                            background: '#34C759',
+                            border: 'none',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            opacity: restoring ? 0.6 : 1,
+                          }}
+                        >
+                          Восстановить
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
-    </div>
+    </>
   );
 }
