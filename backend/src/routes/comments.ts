@@ -22,8 +22,8 @@ function resolveUploadDiskPath(publicPath: string): string | null {
 // По документации (dev.max.ru) загрузка происходит в два шага:
 //  1. POST /uploads?type={type} → получаем { url, token }
 //  2. multipart POST на url (поле data) с содержимым файла
-// Для image/file токен возвращается в ответе на загрузку файла; для audio/video ответ — XML retval,
-// поэтому для них берём token, полученный на первом шаге
+// Токен ищем в трёх местах: JSON ответа загрузки, поле token из шага 1,
+// plain-text тело ответа загрузки (CDN MAX может вернуть токен простым текстом)
 async function uploadMaxAttachment(
   file: { path: string; originalName: string; mimeType: string },
   type: 'image' | 'file' | 'audio' | 'video',
@@ -41,13 +41,20 @@ async function uploadMaxAttachment(
       method: 'POST',
       headers: { Authorization: apiToken },
     });
+    const uploadsBody = await uploadsRes.text();
     if (!uploadsRes.ok) {
-      console.error('[MAX Comment Send] Uploads request failed:', uploadsRes.status, await uploadsRes.text());
+      console.error('[MAX Comment Send] Uploads request failed:', uploadsRes.status, uploadsBody.slice(0, 300));
       return null;
     }
-    const uploadsInfo = await uploadsRes.json() as { url?: string; token?: string };
+    let uploadsInfo: { url?: string; token?: string };
+    try {
+      uploadsInfo = JSON.parse(uploadsBody);
+    } catch {
+      console.error('[MAX Comment Send] /uploads response is not JSON:', uploadsBody.slice(0, 300));
+      return null;
+    }
     if (!uploadsInfo.url) {
-      console.error('[MAX Comment Send] No upload URL in /uploads response');
+      console.error('[MAX Comment Send] No upload URL in /uploads response:', uploadsBody.slice(0, 300));
       return null;
     }
 
@@ -59,20 +66,44 @@ async function uploadMaxAttachment(
       file.originalName || 'file',
     );
     const uploadRes = await fetch(uploadsInfo.url, { method: 'POST', body: form });
+    const uploadBody = await uploadRes.text();
     if (!uploadRes.ok) {
-      console.error('[MAX Comment Send] File upload failed:', uploadRes.status, await uploadRes.text());
+      console.error('[MAX Comment Send] File upload failed:', uploadRes.status, uploadBody.slice(0, 300));
       return null;
     }
 
-    // Для image/file token приходит в ответе на загрузку; для audio/video — используем token из шага 1
+    // Токен: 1) JSON ответа загрузки (корневой token), 2) вложенный photos.<id>.token
+    // (реальный формат CDN MAX при type=image), 3) token из шага 1 (для audio/video),
+    // 4) plain-text тело ответа загрузки
     let token: string | null = null;
     try {
-      const uploadData = await uploadRes.json() as { token?: string };
+      const uploadData = JSON.parse(uploadBody) as {
+        token?: string;
+        photos?: Record<string, { token?: string }>;
+      };
       token = uploadData?.token || null;
+      if (!token && uploadData?.photos) {
+        const firstPhoto = Object.values(uploadData.photos)[0];
+        token = firstPhoto?.token || null;
+      }
     } catch {
-      token = null; // ответ не JSON (например, XML retval для audio/video)
+      token = null; // ответ не JSON
     }
-    return token || uploadsInfo.token || null;
+    if (!token && uploadsInfo.token) {
+      token = uploadsInfo.token; // для audio/video token приходит на шаге 1
+    }
+    if (!token) {
+      const trimmed = uploadBody.trim();
+      // Токен plain-text'ом (исключаем XML/JSON-подобные тела)
+      if (trimmed && trimmed.length < 500 && !/[<>{}\[\]"]/.test(trimmed)) {
+        token = trimmed;
+      }
+    }
+
+    if (!token) {
+      console.error('[MAX Comment Send] No token extracted. /uploads:', uploadsBody.slice(0, 300), '| upload:', uploadBody.slice(0, 300));
+    }
+    return token;
   } catch (err: any) {
     console.error('[MAX Comment Send] uploadMaxAttachment error:', err.message);
     return null;
