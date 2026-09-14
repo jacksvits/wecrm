@@ -130,6 +130,7 @@ export function NewsDetail() {
           >
             {showHistory ? 'Скрыть историю' : 'История'}
           </button>
+          )}
           {canEditNews && (
             <>
               <button
