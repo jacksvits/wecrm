@@ -5,12 +5,16 @@ import { useRealtime } from '../hooks/useRealtime';
 import { News, NewsCategory, NewsTag } from '../types';
 import { stripHtml } from '../lib/stripHtml';
 import { useBrandNewsCover } from '../lib/branding';
+import { useAuth } from '../hooks/useAuth';
 
 export function NewsList() {
   const navigate = useNavigate();
   const [news, setNews] = useState<News[]>([]);
   const [search, setSearch] = useState('');
   const defaultCover = useBrandNewsCover();
+  const { user } = useAuth();
+  // Кнопка создания новости — только если у роли есть право (дублируется 403 на backend)
+  const canCreateNews = !user || user.role === 'admin' || (user as any)?.canCreateNews !== false;
   const [categories, setCategories] = useState<NewsCategory[]>([]);
   const [tags, setTags] = useState<NewsTag[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -115,6 +119,7 @@ export function NewsList() {
                 Черновики ({drafts.length})
               </button>
             )}
+            {canCreateNews && (
             <button
               onClick={() => navigate('/news/new')}
               style={{
@@ -130,6 +135,7 @@ export function NewsList() {
             >
               + Создать новость
             </button>
+            )}
           </div>
         </div>
 
