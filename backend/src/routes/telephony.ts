@@ -235,48 +235,65 @@ router.post("/webhook", async (req, res) => {
           : settings?.autoCreateTaskOnIncoming;
         if (shouldCreateTask && settings?.defaultUserId) {
           const directionLabel = isOutgoing ? "Исходящий" : "Входящий";
-          const task = await prisma.task.create({
-            data: {
-              title: `${directionLabel} звонок ${isOutgoing ? "на" : "от"} ${callerId || calledDid}`,
-              description: `<p><strong>Направление:</strong> ${directionLabel}</p><p><strong>${isOutgoing ? "Кому:" : "От кого:"}</strong> ${callerId}</p><p><strong>На номер:</strong> ${calledDid}</p><p><strong>Время:</strong> ${new Date().toLocaleString("ru-RU")}</p>`,
-              status: "open",
-              priority: "medium",
-              contactId,
-              creatorId: settings.defaultUserId,
-              assignees: {
-                create: Array.from(
-                  new Set([settings.defaultUserId, ...defaultAssignees]),
-                ).map((uid) => ({ userId: uid })),
+          // Повторный входящий звонок: если у контакта уже есть незакрытая задача —
+          // новая задача не создаётся, звонок привязывается к существующей задаче
+          // и на NOTIFY_END в её обсуждение добавляется запись с информацией о звонке
+          const existingTask =
+            !isOutgoing && contactId
+              ? await findActiveContactTask(contactId)
+              : null;
+          if (existingTask) {
+            await prisma.call.update({
+              where: { id: call.id },
+              data: { taskId: existingTask.id, notes: REPEAT_CALL_MARKER },
+            });
+            console.log(
+              `[Novofon] Повторный звонок от ${callerId} — привязан к задаче ${existingTask.id}, новая задача не создана`,
+            );
+          } else {
+            const task = await prisma.task.create({
+              data: {
+                title: `${directionLabel} звонок ${isOutgoing ? "на" : "от"} ${callerId || calledDid}`,
+                description: `<p><strong>Направление:</strong> ${directionLabel}</p><p><strong>${isOutgoing ? "Кому:" : "От кого:"}</strong> ${callerId}</p><p><strong>На номер:</strong> ${calledDid}</p><p><strong>Время (МСК):</strong> ${mskDateTime(new Date())}</p>`,
+                status: "open",
+                priority: "medium",
+                contactId,
+                creatorId: settings.defaultUserId,
+                assignees: {
+                  create: Array.from(
+                    new Set([settings.defaultUserId, ...defaultAssignees]),
+                  ).map((uid) => ({ userId: uid })),
+                },
+                curators: defaultCurators.length
+                  ? { create: defaultCurators.map((uid) => ({ userId: uid })) }
+                  : undefined,
               },
-              curators: defaultCurators.length
-                ? { create: defaultCurators.map((uid) => ({ userId: uid })) }
-                : undefined,
-            },
-          });
-          await prisma.call.update({
-            where: { id: call.id },
-            data: { taskId: task.id },
-          });
-          const { sendPushToTaskAssignees, sendPushToTaskCurators } =
-            await import("../lib/push.js");
-          sendPushToTaskAssignees(
-            task.id,
-            {
-              title: `Новый звонок — задача`,
-              body: `${directionLabel} звонок ${isOutgoing ? "на" : "от"} ${callerId || calledDid}`,
-              url: `/tasks/${task.id}`,
-            },
-            settings.defaultUserId,
-          ).catch(() => {});
-          sendPushToTaskCurators(
-            task.id,
-            {
-              title: `Новый звонок — задача`,
-              body: `${directionLabel} звонок ${isOutgoing ? "на" : "от"} ${callerId || calledDid}`,
-              url: `/tasks/${task.id}`,
-            },
-            settings.defaultUserId,
-          ).catch(() => {});
+            });
+            await prisma.call.update({
+              where: { id: call.id },
+              data: { taskId: task.id },
+            });
+            const { sendPushToTaskAssignees, sendPushToTaskCurators } =
+              await import("../lib/push.js");
+            sendPushToTaskAssignees(
+              task.id,
+              {
+                title: `Новый звонок — задача`,
+                body: `${directionLabel} звонок ${isOutgoing ? "на" : "от"} ${callerId || calledDid}`,
+                url: `/tasks/${task.id}`,
+              },
+              settings.defaultUserId,
+            ).catch(() => {});
+            sendPushToTaskCurators(
+              task.id,
+              {
+                title: `Новый звонок — задача`,
+                body: `${directionLabel} звонок ${isOutgoing ? "на" : "от"} ${callerId || calledDid}`,
+                url: `/tasks/${task.id}`,
+              },
+              settings.defaultUserId,
+            ).catch(() => {});
+          }
         }
       }
     } else if (event === "NOTIFY_END") {
@@ -298,10 +315,12 @@ router.post("/webhook", async (req, res) => {
         },
         include: { task: true, contact: true },
       });
+      // Повторный звонок, привязанный на NOTIFY_START к существующей незакрытой задаче контакта
+      const isRepeatCall = call.notes === REPEAT_CALL_MARKER;
       if (call.disposition === "missed") {
         const settings = await prisma.telephonySettings.findFirst();
         if (settings?.autoCreateTask && settings.defaultUserId) {
-          if (call.taskId) {
+          if (call.taskId && !isRepeatCall) {
             await prisma.task.update({
               where: { id: call.taskId },
               data: {
@@ -309,52 +328,82 @@ router.post("/webhook", async (req, res) => {
                 priority: "high",
               },
             });
-          } else {
-            const task = await prisma.task.create({
-              data: {
-                title: `Пропущенный звонок от ${call.callerId}`,
-                description: `<p><strong>Пропущенный звонок</strong></p><p><strong>От:</strong> ${call.callerId}</p><p><strong>На номер:</strong> ${call.calledDid}</p><p><strong>Длительность ожидания:</strong> ${call.duration} сек</p><p><strong>Время:</strong> ${new Date().toLocaleString("ru-RU")}</p>`,
-                status: "open",
-                priority: "high",
-                contactId: call.contactId,
-                creatorId: settings.defaultUserId,
-                assignees: {
-                  create: Array.from(
-                    new Set([settings.defaultUserId, ...defaultAssignees]),
-                  ).map((uid) => ({ userId: uid })),
+          } else if (!call.taskId) {
+            // Пропущенный звонок без задачи: если у контакта есть незакрытая задача —
+            // привязываем к ней и добавляем запись в обсуждение, новая задача не создаётся
+            let linkedTaskId: string | null = null;
+            if (call.contactId) {
+              const activeTask = await findActiveContactTask(call.contactId);
+              if (activeTask) {
+                await prisma.call.update({
+                  where: { id: call.id },
+                  data: { taskId: activeTask.id },
+                });
+                await addCallDiscussionEntry(
+                  activeTask.id,
+                  settings.defaultUserId,
+                  {
+                    callerId: call.callerId,
+                    calledDid: call.calledDid,
+                    callStart: call.callStart,
+                    durationSec: call.duration,
+                    missed: true,
+                  },
+                );
+                linkedTaskId = activeTask.id;
+              }
+            }
+            if (!linkedTaskId) {
+              const task = await prisma.task.create({
+                data: {
+                  title: `Пропущенный звонок от ${call.callerId}`,
+                  description: `<p><strong>Пропущенный звонок</strong></p><p><strong>От:</strong> ${call.callerId}</p><p><strong>На номер:</strong> ${call.calledDid}</p><p><strong>Длительность ожидания:</strong> ${call.duration} сек</p><p><strong>Время (МСК):</strong> ${mskDateTime(new Date())}</p>`,
+                  status: "open",
+                  priority: "high",
+                  contactId: call.contactId,
+                  creatorId: settings.defaultUserId,
+                  assignees: {
+                    create: Array.from(
+                      new Set([settings.defaultUserId, ...defaultAssignees]),
+                    ).map((uid) => ({ userId: uid })),
+                  },
+                  curators: defaultCurators.length
+                    ? {
+                        create: defaultCurators.map((uid) => ({ userId: uid })),
+                      }
+                    : undefined,
                 },
-                curators: defaultCurators.length
-                  ? { create: defaultCurators.map((uid) => ({ userId: uid })) }
-                  : undefined,
-              },
-            });
-            await prisma.call.update({
-              where: { id: call.id },
-              data: { taskId: task.id },
-            });
-            const { sendPushToTaskAssignees, sendPushToTaskCurators } =
-              await import("../lib/push.js");
-            sendPushToTaskAssignees(
-              task.id,
-              {
-                title: `Пропущенный звонок — задача`,
-                body: `Пропущенный звонок от ${call.callerId}`,
-                url: `/tasks/${task.id}`,
-              },
-              settings.defaultUserId,
-            ).catch(() => {});
-            sendPushToTaskCurators(
-              task.id,
-              {
-                title: `Пропущенный звонок — задача`,
-                body: `Пропущенный звонок от ${call.callerId}`,
-                url: `/tasks/${task.id}`,
-              },
-              settings.defaultUserId,
-            ).catch(() => {});
+              });
+              await prisma.call.update({
+                where: { id: call.id },
+                data: { taskId: task.id },
+              });
+              const { sendPushToTaskAssignees, sendPushToTaskCurators } =
+                await import("../lib/push.js");
+              sendPushToTaskAssignees(
+                task.id,
+                {
+                  title: `Пропущенный звонок — задача`,
+                  body: `Пропущенный звонок от ${call.callerId}`,
+                  url: `/tasks/${task.id}`,
+                },
+                settings.defaultUserId,
+              ).catch(() => {});
+              sendPushToTaskCurators(
+                task.id,
+                {
+                  title: `Пропущенный звонок — задача`,
+                  body: `Пропущенный звонок от ${call.callerId}`,
+                  url: `/tasks/${task.id}`,
+                },
+                settings.defaultUserId,
+              ).catch(() => {});
+            }
           }
         }
       }
+      // Для повторного звонка запись разговора включается в общую запись обсуждения
+      let repeatCallRecordUrl: string | null = null;
       if (
         call.isRecorded &&
         call.callIdWithRec &&
@@ -386,63 +435,85 @@ router.post("/webhook", async (req, res) => {
                 },
               });
               const recordUrl = `/uploads/records/${path.basename(localPath)}`;
-              await prisma.comment.create({
-                data: {
-                  content: `<p><strong>Запись разговора</strong> (${formatDuration(record.data?.duration || call.duration)})</p><p><audio controls src='${recordUrl}' style='width:100%'></audio></p><p><a href='${recordUrl}' download target='_blank'>Скачать запись</a></p>`,
-                  taskId: call.taskId,
-                  authorId: settings.defaultUserId!,
-                  isInternal: false,
-                },
-              });
-              broadcast(CHANNELS.TASKS, {
-                action: "new_comment",
-                entity: "task",
-                id: call.taskId!,
-              });
-              try {
-                const taskForNotify = await prisma.task.findUnique({
-                  where: { id: call.taskId! },
-                  include: {
-                    assignees: { include: { user: true } },
-                    curators: { include: { user: true } },
-                    creator: true,
+              if (isRepeatCall) {
+                repeatCallRecordUrl = recordUrl;
+              } else {
+                await prisma.comment.create({
+                  data: {
+                    content: `<p><strong>Запись разговора</strong> (${formatDuration(record.data?.duration || call.duration)})</p><p><audio controls src='${recordUrl}' style='width:100%'></audio></p><p><a href='${recordUrl}' download target='_blank'>Скачать запись</a></p>`,
+                    taskId: call.taskId,
+                    authorId: settings.defaultUserId!,
+                    isInternal: false,
                   },
                 });
-                if (taskForNotify) {
-                  const notifyPayload = {
-                    title: "Новая запись разговора",
-                    body: `Добавлена запись разговора к задаче "${taskForNotify.title}"`,
-                    url: "/tasks/" + taskForNotify.id,
-                  };
-                  const excludeUserId =
-                    settings.defaultUserId || taskForNotify.creatorId;
-                  await notifyTaskAssignees(
-                    taskForNotify.id,
-                    notifyPayload,
-                    excludeUserId,
-                  );
-                  await notifyTaskCurators(
-                    taskForNotify.id,
-                    notifyPayload,
-                    excludeUserId,
-                  );
-                  await notifyTaskCreator(taskForNotify.id, notifyPayload);
-                  await notifyRoleUsers(
-                    ["admin"],
-                    notifyPayload,
-                    excludeUserId,
+                broadcast(CHANNELS.TASKS, {
+                  action: "new_comment",
+                  entity: "task",
+                  id: call.taskId!,
+                });
+                try {
+                  const taskForNotify = await prisma.task.findUnique({
+                    where: { id: call.taskId! },
+                    include: {
+                      assignees: { include: { user: true } },
+                      curators: { include: { user: true } },
+                      creator: true,
+                    },
+                  });
+                  if (taskForNotify) {
+                    const notifyPayload = {
+                      title: "Новая запись разговора",
+                      body: `Добавлена запись разговора к задаче "${taskForNotify.title}"`,
+                      url: "/tasks/" + taskForNotify.id,
+                    };
+                    const excludeUserId =
+                      settings.defaultUserId || taskForNotify.creatorId;
+                    await notifyTaskAssignees(
+                      taskForNotify.id,
+                      notifyPayload,
+                      excludeUserId,
+                    );
+                    await notifyTaskCurators(
+                      taskForNotify.id,
+                      notifyPayload,
+                      excludeUserId,
+                    );
+                    await notifyTaskCreator(taskForNotify.id, notifyPayload);
+                    await notifyRoleUsers(
+                      ["admin"],
+                      notifyPayload,
+                      excludeUserId,
+                    );
+                  }
+                } catch (notifyErr) {
+                  console.error(
+                    "[Novofon] Failed to send notifications:",
+                    notifyErr,
                   );
                 }
-              } catch (notifyErr) {
-                console.error(
-                  "[Novofon] Failed to send notifications:",
-                  notifyErr,
-                );
               }
             }
           } catch (err: any) {
             console.error("[Novofon] Failed to attach record:", err.message);
           }
+        }
+      }
+      // Повторный звонок: добавляем запись с информацией о звонке в обсуждение задачи
+      if (isRepeatCall && call.taskId) {
+        const settings = await prisma.telephonySettings.findFirst();
+        if (settings?.defaultUserId) {
+          await addCallDiscussionEntry(call.taskId, settings.defaultUserId, {
+            callerId: call.callerId,
+            calledDid: call.calledDid,
+            callStart: call.callStart,
+            durationSec: call.duration,
+            recordUrl: repeatCallRecordUrl,
+            missed: call.disposition === "missed",
+          });
+          await prisma.call.update({
+            where: { id: call.id },
+            data: { notes: null },
+          });
         }
       }
     } else if (event === "NOTIFY_RECORD") {
@@ -798,5 +869,103 @@ function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+// Маркер в call.notes: звонок привязан к уже существующей незакрытой задаче контакта
+// (повторный звонок) — на NOTIFY_END в обсуждение добавляется запись о звонке,
+// новая задача не создаётся
+const REPEAT_CALL_MARKER = "repeat_call_existing_task";
+// Активные (незакрытые) статусы задач: win/cancelled считаются закрытыми/выполненными
+const ACTIVE_TASK_STATUSES = ["open", "in_progress", "load"];
+// Дата и время по часовому поясу сервера (Москва)
+function mskDateTime(date: Date): string {
+  return new Date(date).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
+}
+// Первая (самая ранняя) незакрытая задача контакта
+async function findActiveContactTask(contactId: string) {
+  return prisma.task.findFirst({
+    where: { contactId, status: { in: ACTIVE_TASK_STATUSES } },
+    orderBy: { createdAt: "asc" },
+  });
+}
+// HTML записи о звонке для обсуждения задачи
+function buildCallInfoHtml(opts: {
+  callerId: string;
+  calledDid: string;
+  callStart: Date;
+  durationSec: number;
+  recordUrl?: string | null;
+  missed?: boolean;
+}): string {
+  const durationLabel = opts.missed
+    ? "Длительность ожидания"
+    : "Длительность разговора";
+  const parts = [
+    `<p><strong>${opts.missed ? "Пропущенный звонок" : "Повторный входящий звонок"}</strong></p>`,
+    `<p><strong>От:</strong> ${opts.callerId}</p>`,
+    `<p><strong>На номер:</strong> ${opts.calledDid}</p>`,
+    `<p><strong>${durationLabel}:</strong> ${formatDuration(opts.durationSec)}</p>`,
+    `<p><strong>Время (МСК):</strong> ${mskDateTime(opts.callStart)}</p>`,
+  ];
+  if (opts.recordUrl) {
+    parts.push(
+      `<p><audio controls src='${opts.recordUrl}' style='width:100%'></audio></p>`,
+      `<p><a href='${opts.recordUrl}' download target='_blank'>Скачать запись</a></p>`,
+    );
+  }
+  return parts.join("");
+}
+// Добавление записи о звонке в обсуждение задачи + уведомление исполнителям
+async function addCallDiscussionEntry(
+  taskId: string,
+  authorId: string,
+  opts: {
+    callerId: string;
+    calledDid: string;
+    callStart: Date;
+    durationSec: number;
+    recordUrl?: string | null;
+    missed?: boolean;
+  },
+): Promise<void> {
+  await prisma.comment.create({
+    data: {
+      content: buildCallInfoHtml(opts),
+      taskId,
+      authorId,
+      isInternal: false,
+    },
+  });
+  broadcast(CHANNELS.TASKS, {
+    action: "new_comment",
+    entity: "task",
+    id: taskId,
+  });
+  try {
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: {
+        assignees: { include: { user: true } },
+        curators: { include: { user: true } },
+        creator: true,
+      },
+    });
+    if (task) {
+      const label = opts.missed ? "Пропущенный звонок" : "Повторный звонок";
+      const payload = {
+        title: label,
+        body: `${label} от ${opts.callerId} — информация добавлена в обсуждение задачи "${task.title}"`,
+        url: "/tasks/" + task.id,
+      };
+      await notifyTaskAssignees(task.id, payload, authorId);
+      await notifyTaskCurators(task.id, payload, authorId);
+      await notifyTaskCreator(task.id, payload);
+      await notifyRoleUsers(["admin"], payload, authorId);
+    }
+  } catch (notifyErr) {
+    console.error(
+      "[Novofon] Failed to send discussion notifications:",
+      notifyErr,
+    );
+  }
 }
 export default router;
