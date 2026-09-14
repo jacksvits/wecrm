@@ -8,6 +8,98 @@ import { Avatar } from './Avatar';
 import { VideoNoteRecorder } from './VideoNoteRecorder';
 
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+// Круглый плеер видеокружочка (как в Telegram): без нативной панели управления,
+// только кнопка play/пауза по центру; при воспроизведении кнопка скрывается
+// и показывается повторно на время при тапе
+function VideoNotePlayer({ src }: { src: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [showPause, setShowPause] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, []);
+
+  const flashPause = () => {
+    setShowPause(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => setShowPause(false), 1200);
+  };
+
+  const toggle = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      // Останавливаем остальные кружочки, как в Telegram
+      document.querySelectorAll('.video-note-player video').forEach(other => {
+        if (other !== v) (other as HTMLVideoElement).pause();
+      });
+      v.play().catch(() => {});
+      setPlaying(true);
+      flashPause();
+    } else {
+      v.pause();
+      setPlaying(false);
+    }
+  };
+
+  return (
+    <div
+      className="video-note-player"
+      onClick={toggle}
+      style={{
+        position: 'relative',
+        width: 200,
+        height: 200,
+        borderRadius: '50%',
+        overflow: 'hidden',
+        background: '#000',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.20)',
+        cursor: 'pointer',
+        flexShrink: 0,
+      }}
+    >
+      <video
+        ref={videoRef}
+        src={src}
+        playsInline
+        preload="metadata"
+        onEnded={() => setPlaying(false)}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+      />
+      {(!playing || showPause) && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: playing ? 'transparent' : 'rgba(0,0,0,0.25)',
+        }}>
+          <div style={{
+            width: 64,
+            height: 64,
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.28)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 26,
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.35)',
+          }}>
+            {playing ? '⏸' : '▶'}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 export function GlobalChat() {
   const { user } = useAuth();
@@ -470,22 +562,7 @@ export function GlobalChat() {
                           const isImage = !isVideoNote && a.mimeType?.startsWith('image/');
                           if (isVideoNote) {
                             return (
-                              <video
-                                key={a.id}
-                                src={previewUrl}
-                                controls
-                                playsInline
-                                preload="metadata"
-                                style={{
-                                  width: 200,
-                                  height: 200,
-                                  borderRadius: '50%',
-                                  objectFit: 'cover',
-                                  display: 'block',
-                                  background: '#000',
-                                  boxShadow: '0 4px 16px rgba(0,0,0,0.20)',
-                                }}
-                              />
+                              <VideoNotePlayer key={a.id} src={previewUrl} />
                             );
                           }
                           if (isImage) {
