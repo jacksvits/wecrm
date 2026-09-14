@@ -5,6 +5,7 @@ import { ChatMessage, FileAttachment, User } from '../types';
 import { FileUpload } from './FileUpload';
 import { LinkifyText } from './LinkifyText';
 import { Avatar } from './Avatar';
+import { VideoNoteRecorder } from './VideoNoteRecorder';
 
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
@@ -32,6 +33,7 @@ export function GlobalChat() {
   const [isAllSelected, setIsAllSelected] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
   const [showReactionsFor, setShowReactionsFor] = useState<string | null>(null);
+  const [showRecorder, setShowRecorder] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -226,6 +228,23 @@ export function GlobalChat() {
 
   const handleFileUpload = async (attachment: FileAttachment) => {
     setPendingAttachments((prev) => [...prev, attachment]);
+  };
+
+  // Видеокружочек (как в Telegram): файл из рекордера грузим с kind=video_note —
+  // бэкенд кладёт его в /uploads/global_chat/video_notes, фронт рисует круглым
+  const handleVideoNote = async (file: File) => {
+    const attachment = await api.uploads.upload(file, 'chat', 'global', 'video_note');
+    stickToBottomRef.current = true;
+    const msg = await api.chat.send(
+      '🎥 Видеокружок',
+      replyTo?.id,
+      recipientIds.length > 0 ? recipientIds : undefined,
+      [attachment.id]
+    );
+    setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
+    setReplyTo(null);
+    setRecipientIds([]);
+    setIsAllSelected(true);
   };
 
   // Выбор конкретного получателя: снимаем режим "Всем", добавляем/убираем ID
@@ -447,7 +466,28 @@ export function GlobalChat() {
                         {msg.attachments.map(a => {
                           const origin = typeof window !== 'undefined' ? window.location.origin : '';
                           const previewUrl = a.path.startsWith('http') ? a.path : `${origin}${a.path}`;
-                          const isImage = a.mimeType?.startsWith('image/');
+                          const isVideoNote = a.path?.includes('/video_notes/');
+                          const isImage = !isVideoNote && a.mimeType?.startsWith('image/');
+                          if (isVideoNote) {
+                            return (
+                              <video
+                                key={a.id}
+                                src={previewUrl}
+                                controls
+                                playsInline
+                                preload="metadata"
+                                style={{
+                                  width: 200,
+                                  height: 200,
+                                  borderRadius: '50%',
+                                  objectFit: 'cover',
+                                  display: 'block',
+                                  background: '#000',
+                                  boxShadow: '0 4px 16px rgba(0,0,0,0.20)',
+                                }}
+                              />
+                            );
+                          }
                           if (isImage) {
                             return (
                               <a key={a.id} href={previewUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', display: 'block' }}>
@@ -874,6 +914,28 @@ export function GlobalChat() {
       }}>
         <FileUpload entityType="chat" entityId="global" onUpload={handleFileUpload} isDark={isDark} variant="button" multiple={true} />
 
+        <button
+          onClick={() => setShowRecorder(true)}
+          title="Записать видеокружок"
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            border: 'none',
+            background: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)',
+            color: isDark ? 'rgba(255,255,255,0.70)' : 'rgba(0,0,0,0.50)',
+            fontSize: 18,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'all 0.2s ease',
+          }}
+        >
+          🎥
+        </button>
+
         <input
           type="text"
           value={text}
@@ -919,6 +981,10 @@ export function GlobalChat() {
           ↑
         </button>
       </div>
+
+      {showRecorder && (
+        <VideoNoteRecorder isDark={isDark} onSend={handleVideoNote} onClose={() => setShowRecorder(false)} />
+      )}
     </div>
   );
 }

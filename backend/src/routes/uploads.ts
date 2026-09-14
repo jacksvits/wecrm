@@ -113,13 +113,20 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
       dbPath = `/uploads/tasks/${ticketNum}/${finalName}`;
       filename = finalName;
     } else if (entityType === 'chat') {
+      // Видеокружочки (как в Telegram) храним в отдельной подпапке video_notes —
+      // фронтенд отличает их по path и рисует круглыми
+      const isVideoNote = req.body.kind === 'video_note';
+      const targetDir = isVideoNote ? path.join(CHAT_DIR, 'video_notes') : CHAT_DIR;
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
       const srcPath = path.join(UPLOAD_DIR, filename);
-      const destPath = path.join(CHAT_DIR, filename);
+      const destPath = path.join(targetDir, filename);
       if (fs.existsSync(srcPath)) {
         fs.renameSync(srcPath, destPath);
-        console.log('[uploads] moved to global_chat:', destPath);
+        console.log('[uploads] moved to', isVideoNote ? 'video_notes' : 'global_chat', ':', destPath);
       }
-      dbPath = `/uploads/global_chat/${filename}`;
+      dbPath = `/uploads/global_chat${isVideoNote ? '/video_notes' : ''}/${filename}`;
     } else {
       dbPath = `/uploads/${filename}`;
     }
@@ -192,7 +199,8 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
         filePath = path.join(COMMENTS_DIR, attachment.filename);
       }
     } else if (attachment.entityType === 'chat') {
-      filePath = path.join(CHAT_DIR, attachment.filename);
+      const notesPath = path.join(CHAT_DIR, 'video_notes', attachment.filename);
+      filePath = fs.existsSync(notesPath) ? notesPath : path.join(CHAT_DIR, attachment.filename);
     } else {
       filePath = path.join(UPLOAD_DIR, attachment.filename);
     }
@@ -228,7 +236,8 @@ router.get('/:id/download', async (req, res) => {
         filePath = path.join(COMMENTS_DIR, attachment.filename);
       }
     } else if (attachment.entityType === 'chat') {
-      filePath = path.join(CHAT_DIR, attachment.filename);
+      const notesPath = path.join(CHAT_DIR, 'video_notes', attachment.filename);
+      filePath = fs.existsSync(notesPath) ? notesPath : path.join(CHAT_DIR, attachment.filename);
     } else {
       filePath = path.join(UPLOAD_DIR, attachment.filename);
     }

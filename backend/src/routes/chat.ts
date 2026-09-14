@@ -173,11 +173,13 @@ router.post('/', async (req: AuthRequest, res) => {
 
     // Broadcast через SSE для обновления чата
     // Для общих сообщений — всем, для личных — только автору и получателям
+    // Шлём messageWithAttachments, иначе у других пользователей вложения
+    // (в т.ч. видеокружочки) не появляются до перезагрузки страницы
     if (isGeneralMessage) {
-      broadcast('chat', { action: 'new_message', message });
+      broadcast('chat', { action: 'new_message', message: messageWithAttachments });
     } else {
       const targetUserIds = [...new Set([req.user!.id, ...(recipientIds || [])])];
-      broadcastToUsers('chat', targetUserIds, { action: 'new_message', message });
+      broadcastToUsers('chat', targetUserIds, { action: 'new_message', message: messageWithAttachments });
     }
 
     res.status(201).json(messageWithAttachments);
