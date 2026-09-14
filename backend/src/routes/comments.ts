@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import fs from 'fs';
+import path from 'path';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
@@ -8,6 +10,74 @@ import { processAutoReply } from '../lib/auto-reply.js';
 
 const router = Router();
 const MAX_API_BASE = 'https://platform-api2.max.ru';
+const UPLOAD_DIR = '/app/uploads';
+
+// Возвращает абсолютный путь к загруженному файлу на диске по его публичному пути (/uploads/...)
+function resolveUploadDiskPath(publicPath: string): string | null {
+  if (!publicPath || !publicPath.startsWith('/uploads/')) return null;
+  return path.join(UPLOAD_DIR, publicPath.slice('/uploads/'.length));
+}
+
+// Загружает файл в MAX Bot API и возвращает токен вложения.
+// По документации (dev.max.ru) загрузка происходит в два шага:
+//  1. POST /uploads?type={type} → получаем { url, token }
+//  2. multipart POST на url (поле data) с содержимым файла
+// Для image/file токен возвращается в ответе на загрузку файла; для audio/video ответ — XML retval,
+// поэтому для них берём token, полученный на первом шаге
+async function uploadMaxAttachment(
+  file: { path: string; originalName: string; mimeType: string },
+  type: 'image' | 'file' | 'audio' | 'video',
+  apiToken: string,
+): Promise<string | null> {
+  try {
+    const diskPath = resolveUploadDiskPath(file.path);
+    if (!diskPath || !fs.existsSync(diskPath)) {
+      console.error('[MAX Comment Send] File not found on disk:', file.path);
+      return null;
+    }
+
+    // Шаг 1: получаем URL и token для загрузки
+    const uploadsRes = await fetch(`${MAX_API_BASE}/uploads?type=${type}`, {
+      method: 'POST',
+      headers: { Authorization: apiToken },
+    });
+    if (!uploadsRes.ok) {
+      console.error('[MAX Comment Send] Uploads request failed:', uploadsRes.status, await uploadsRes.text());
+      return null;
+    }
+    const uploadsInfo = await uploadsRes.json() as { url?: string; token?: string };
+    if (!uploadsInfo.url) {
+      console.error('[MAX Comment Send] No upload URL in /uploads response');
+      return null;
+    }
+
+    // Шаг 2: загружаем файл мультипартом (поле data)
+    const form = new FormData();
+    form.append(
+      'data',
+      new Blob([fs.readFileSync(diskPath)], { type: file.mimeType || 'application/octet-stream' }),
+      file.originalName || 'file',
+    );
+    const uploadRes = await fetch(uploadsInfo.url, { method: 'POST', body: form });
+    if (!uploadRes.ok) {
+      console.error('[MAX Comment Send] File upload failed:', uploadRes.status, await uploadRes.text());
+      return null;
+    }
+
+    // Для image/file token приходит в ответе на загрузку; для audio/video — используем token из шага 1
+    let token: string | null = null;
+    try {
+      const uploadData = await uploadRes.json() as { token?: string };
+      token = uploadData?.token || null;
+    } catch {
+      token = null; // ответ не JSON (например, XML retval для audio/video)
+    }
+    return token || uploadsInfo.token || null;
+  } catch (err: any) {
+    console.error('[MAX Comment Send] uploadMaxAttachment error:', err.message);
+    return null;
+  }
+}
 
 const createSchema = z.object({
   content: z.string().min(1, 'Комментарий не может быть пустым').max(2000),
@@ -135,21 +205,41 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
           const authorName = req.user!.name || 'Сотрудник';
           let messageText = `${authorName}:\n${content}`;
 
-          // Get file attachments for this comment
+          // Вложения комментария
           const fileAttachments = await prisma.fileAttachment.findMany({
             where: { entityType: 'comment', entityId: comment.id },
           });
 
-          // Append file links to message text
-          if (fileAttachments.length > 0) {
+          // Загружаем файлы в MAX и отправляем настоящими вложениями — контакт получает файл, а не ссылку
+          const maxAttachments: any[] = [];
+          const failedFiles: typeof fileAttachments = [];
+          for (const file of fileAttachments) {
+            const maxType = file.mimeType?.startsWith('image/')
+              ? 'image'
+              : file.mimeType?.startsWith('audio/')
+                ? 'audio'
+                : file.mimeType?.startsWith('video/')
+                  ? 'video'
+                  : 'file';
+            const token = await uploadMaxAttachment(file, maxType, maxSettings.apiToken);
+            if (token) {
+              maxAttachments.push({ type: maxType, payload: { token } });
+            } else {
+              // Загрузка не удалась — отправим ссылку, чтобы файл не потерялся
+              failedFiles.push(file);
+            }
+          }
+
+          // Ссылки добавляем только для файлов, которые не удалось загрузить как вложения
+          if (failedFiles.length > 0) {
             messageText += '\n\n📎 Вложения:';
-            for (const file of fileAttachments) {
+            for (const file of failedFiles) {
               const fileUrl = `https://welans.cc${file.path}`;
               messageText += `\n${file.originalName}: ${fileUrl}`;
             }
           }
 
-          console.log('[MAX Comment Send] Sending to user_id:', task.maxUserId, 'text:', messageText.substring(0, 100));
+          console.log('[MAX Comment Send] Sending to user_id:', task.maxUserId, 'text:', messageText.substring(0, 100), 'attachments:', maxAttachments.length);
 
           const response = await fetch(`${MAX_API_BASE}/messages?user_id=${task.maxUserId}`, {
             method: 'POST',
@@ -159,6 +249,7 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
             },
             body: JSON.stringify({
               text: messageText,
+              ...(maxAttachments.length > 0 ? { attachments: maxAttachments } : {}),
             }),
           });
 
