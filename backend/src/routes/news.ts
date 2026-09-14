@@ -61,8 +61,34 @@ router.get('/', async (req, res) => {
       prisma.news.count({ where }),
     ]);
 
+    // Счётчики лайков/дизлайков и комментариев для карточек списка
+    const newsIds = news.map((n) => n.id);
+    const [reactionCounts, commentCounts] = await Promise.all([
+      prisma.newsReaction.groupBy({
+        by: ['newsId', 'type'],
+        where: { newsId: { in: newsIds } },
+        _count: { _all: true },
+      }),
+      prisma.newsComment.groupBy({
+        by: ['newsId'],
+        where: { newsId: { in: newsIds } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const newsWithCounts = news.map((n) => ({
+      ...n,
+      likes: reactionCounts
+        .filter((c) => c.newsId === n.id && c.type === 'like')
+        .reduce((s, c) => s + c._count._all, 0),
+      dislikes: reactionCounts
+        .filter((c) => c.newsId === n.id && c.type === 'dislike')
+        .reduce((s, c) => s + c._count._all, 0),
+      commentsCount: commentCounts.find((c) => c.newsId === n.id)?._count._all || 0,
+    }));
+
     res.json({
-      news,
+      news: newsWithCounts,
       total,
       pages: Math.ceil(total / take),
       page: parseInt(page as string),

@@ -423,28 +423,15 @@ export function NewsList() {
                     ))}
                   </div>
 
-                  {/* Автор и просмотры */}
+                  {/* Лайки, комментарии и просмотры */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {item.author?.avatar ? (
-                        <img src={item.author.avatar} alt="" style={{ width: 20, height: 20, borderRadius: '50%' }} />
-                      ) : (
-                        <div style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: '50%',
-                          background: '#007AFF',
-                          color: '#fff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 10,
-                          fontWeight: 600,
-                        }}>
-                          {(item.author?.name || 'U')[0].toUpperCase()}
-                        </div>
-                      )}
-                      <span>{item.author?.name || 'Неизвестно'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        👍 {item.likes || 0}
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        💬 {item.commentsCount || 0}
+                      </span>
                     </div>
                     <span>{item.views || 0} просмотров</span>
                   </div>
