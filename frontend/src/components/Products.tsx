@@ -83,16 +83,18 @@ export function Products() {
 
   const load = async () => {
     try {
-      const [p, w, t, m] = await Promise.all([
+      const [p, w, t, m, c] = await Promise.all([
         api.products.list(),
         api.products.warehouses.list(),
         api.products.priceTypes.list(),
         api.products.movements(),
+        api.products.categories.list(),
       ]);
       setProducts(p);
       setWarehouses(w);
       setPriceTypes(t);
       setMovements(m);
+      setCategories(c);
     } catch (e: any) {
       alert(e.message || 'Ошибка загрузки');
     } finally {
@@ -202,6 +204,21 @@ export function Products() {
     );
   };
 
+  // Сайдбар дерева категорий — общий для вкладок «Номенклатура», «Склад» и «Цены»
+  const categorySidebar = (
+    <div style={{ width: 280, flexShrink: 0, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: '8px 0', maxHeight: 'calc(100vh - 220px)', overflow: 'auto' }}>
+      <div onClick={() => setSelCat('all')} style={{ display: 'flex', padding: '6px 8px', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: selCat === 'all' ? 'var(--bg-hover)' : 'transparent', borderLeft: selCat === 'all' ? '2px solid #007AFF' : '2px solid transparent' }}>
+        Все позиции
+        <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>{filtered.length}</span>
+      </div>
+      {(catChildren.get(null) ?? []).map(c => renderCatNode(c, 0))}
+      <div onClick={() => setSelCat('none')} style={{ display: 'flex', padding: '6px 8px', cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', background: selCat === 'none' ? 'var(--bg-hover)' : 'transparent', borderLeft: selCat === 'none' ? '2px solid #007AFF' : '2px solid transparent' }}>
+        Без категории
+        <span style={{ marginLeft: 'auto', fontSize: 12 }}>{filtered.filter(p => !p.categoryId).length}</span>
+      </div>
+    </div>
+  );
+
   const activePriceTypes = useMemo(() => priceTypes.filter(t => t.isActive), [priceTypes]);
 
   const totalStock = (p: Product) => (p.stocks || []).reduce((sum, s) => sum + s.quantity, 0);
@@ -267,7 +284,7 @@ export function Products() {
     [movements, whFilter]);
 
   // товары (не услуги) для складского учёта
-  const stockProducts = useMemo(() => products.filter(p => p.kind !== 'service'), [products]);
+  const stockProducts = useMemo(() => visible.filter(p => p.kind !== 'service'), [visible]);
 
   if (loading) return <div style={{ padding: 24 }}>Загрузка...</div>;
 
@@ -317,18 +334,7 @@ export function Products() {
       {/* ===== Номенклатура ===== */}
       {tab === 'nomenclature' && (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-          {/* Дерево категорий из 1С (группы и виды номенклатуры) */}
-          <div style={{ width: 280, flexShrink: 0, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: '8px 0', maxHeight: 'calc(100vh - 220px)', overflow: 'auto' }}>
-            <div onClick={() => setSelCat('all')} style={{ display: 'flex', padding: '6px 8px', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: selCat === 'all' ? 'var(--bg-hover)' : 'transparent', borderLeft: selCat === 'all' ? '2px solid #007AFF' : '2px solid transparent' }}>
-              Все позиции
-              <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>{filtered.length}</span>
-            </div>
-            {(catChildren.get(null) ?? []).map(c => renderCatNode(c, 0))}
-            <div onClick={() => setSelCat('none')} style={{ display: 'flex', padding: '6px 8px', cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', background: selCat === 'none' ? 'var(--bg-hover)' : 'transparent', borderLeft: selCat === 'none' ? '2px solid #007AFF' : '2px solid transparent' }}>
-              Без категории
-              <span style={{ marginLeft: 'auto', fontSize: 12 }}>{filtered.filter(p => !p.categoryId).length}</span>
-            </div>
-          </div>
+          {categorySidebar}
           <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
             <input
@@ -405,7 +411,9 @@ export function Products() {
 
       {/* ===== Склад ===== */}
       {tab === 'stock' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <>
+          {categorySidebar}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <button
               onClick={() => setWhFilter('all')}
@@ -528,11 +536,14 @@ export function Products() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {/* ===== Цены ===== */}
       {tab === 'prices' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <>
+          {categorySidebar}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {priceTypes.map(t => (
               <div
@@ -567,7 +578,7 @@ export function Products() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(p => (
+                {visible.map(p => (
                   <tr key={p.id}>
                     <td style={tdStyle}>
                       <div style={{ fontWeight: 500 }}>{p.name}</div>
@@ -615,6 +626,7 @@ export function Products() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {/* ===== Модалки ===== */}

@@ -154,7 +154,19 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     downloadGameFolder: (path: string) => downloadBlob(`/api/files/games/download-folder?path=${encodeURIComponent(path)}`, `${path.split("/").pop() || "folder"}.zip`),
   },
   products: {
-    list: (q?: string): Promise<Product[]> => fetchApi(`/api/products${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    list: (params?: string | { q?: string; categoryId?: string; noCategory?: boolean; kind?: string }): Promise<Product[]> => {
+      const p = typeof params === 'string' ? { q: params } : (params ?? {});
+      const qs = new URLSearchParams();
+      if (p.q) qs.set('q', p.q);
+      if (p.categoryId) qs.set('categoryId', p.categoryId);
+      if (p.noCategory) qs.set('noCategory', '1');
+      if (p.kind) qs.set('kind', p.kind);
+      const str = qs.toString();
+      return fetchApi(`/api/products${str ? `?${str}` : ''}`);
+    },
+    categories: {
+      list: (): Promise<ProductCategory[]> => fetchApi('/api/products/meta/categories'),
+    },
     get: (id: string): Promise<Product> => fetchApi(`/api/products/${id}`),
     create: (data: Partial<Product>) => fetchApi('/api/products', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Product>) => fetchApi(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
