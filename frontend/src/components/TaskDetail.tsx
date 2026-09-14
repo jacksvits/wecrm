@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../api/client";
 import { YandexMap } from "./YandexMap";
@@ -56,6 +56,9 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
 export function TaskDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Якорь комментария из уведомления (#comment-<id>): подсветка и скролл вместо скролла вниз
+  const highlightCommentRef = useRef<string | null>(null);
   const onTagClick = useTaskHashtagClick();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -134,11 +137,33 @@ export function TaskDetail() {
       api.deals.list().then(setDeals).catch(() => {});
     }
   }, [id]);
+  // Якорь комментария из уведомления (#comment-<id>)
+  useEffect(() => {
+    if (location.hash.startsWith("#comment-")) {
+      highlightCommentRef.current = location.hash.slice("#comment-".length);
+    }
+  }, [location.hash]);
   useEffect(() => {
     const el = commentsRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    const highlightId = highlightCommentRef.current;
+    if (highlightId) {
+      highlightCommentRef.current = null;
+      // Ждём, чтобы список комментариев успел отрендериться
+      setTimeout(() => {
+        const target = document.getElementById(`comment-${highlightId}`);
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+          target.style.transition = "background 0.5s";
+          target.style.background = "rgba(255, 193, 7, 0.18)";
+          setTimeout(() => {
+            target.style.background = "";
+          }, 2500);
+        }
+      }, 150);
+      return;
     }
+    el.scrollTop = el.scrollHeight;
   }, [comments]);
   useEffect(() => {
     if (activeTab === "history" && id) {
@@ -1466,12 +1491,14 @@ export function TaskDetail() {
                     return (
                       <div
                         key={c.id}
+                        id={`comment-${c.id}`}
                         style={{
                           display: "flex",
                           flexDirection: "column",
                           alignItems: isMe ? "flex-end" : "flex-start",
                           maxWidth: "100%",
                           padding: "2px 8px",
+                          scrollMarginTop: 80,
                         }}
                       >
                         {" "}

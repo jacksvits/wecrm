@@ -196,6 +196,11 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
     
     notifyUserIds.delete(req.user!.id);
 
+    // Обрезаем длинный текст комментария для уведомления
+    const commentPreview = content.length > 200 ? `${content.slice(0, 200)}…` : content;
+    // Ссылка на обсуждение задачи с якорем к комментарию
+    const commentUrl = `/tasks/${task.id}#comment-${comment.id}`;
+
     // Create in-app notifications
     for (const userId of notifyUserIds) {
       try {
@@ -204,9 +209,10 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
             userId,
             type: 'comment',
             title: 'Новый комментарий',
-            body: `${req.user!.name || 'Пользователь'} добавил комментарий к задаче "${task.title}"`,
+            body: `${req.user!.name || 'Пользователь'}: ${commentPreview}`,
             entityType: 'task',
             entityId: task.id,
+            url: commentUrl,
           },
         });
       } catch (e) {
@@ -219,8 +225,8 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
       try {
         await sendPushToUser(userId, {
           title: 'Новый комментарий',
-          body: `${req.user!.name || 'Пользователь'} добавил комментарий к задаче "${task.title}"`,
-          url: '/tasks/' + task.id,
+          body: `${req.user!.name || 'Пользователь'}: ${commentPreview}`,
+          url: commentUrl,
         }, 'comment');
       } catch (e) {
         console.error('Failed to send push notification:', e);
