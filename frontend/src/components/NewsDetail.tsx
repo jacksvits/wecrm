@@ -115,6 +115,7 @@ export function NewsDetail() {
       }}>
         {/* Действия */}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginBottom: 16, flexWrap: 'wrap' }}>
+          {canEditNews && (
           <button
             onClick={() => setShowHistory(!showHistory)}
             style={{

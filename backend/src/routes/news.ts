@@ -126,6 +126,9 @@ router.get('/pinned', async (_req, res) => {
  */
 router.get('/:id', async (req, res) => {
   try {
+    // Историю изменений видят только те, кто может редактировать новости
+    const user = (req as any).user;
+    const canSeeHistory = !user || user.role === 'admin' || user.canEditNews !== false;
     const news = await prisma.news.findUnique({
       where: { id: req.params.id },
       include: {
@@ -133,25 +136,27 @@ router.get('/:id', async (req, res) => {
         category: true,
         subcategory: true,
         tags: true,
-        history: {
-          orderBy: { createdAt: 'desc' },
-          take: 50,
-          select: {
-            id: true,
-            title: true,
-            summary: true,
-            content: true,
-            labels: true,
-            categoryId: true,
-            subcategoryId: true,
-            tagIds: true,
-            coverImage: true,
-            isPublished: true,
-            pinnedToHome: true,
-            editorName: true,
-            createdAt: true,
+        ...(canSeeHistory ? {
+          history: {
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+            select: {
+              id: true,
+              title: true,
+              summary: true,
+              content: true,
+              labels: true,
+              categoryId: true,
+              subcategoryId: true,
+              tagIds: true,
+              coverImage: true,
+              isPublished: true,
+              pinnedToHome: true,
+              editorName: true,
+              createdAt: true,
+            },
           },
-        },
+        } : {}),
       },
     });
 
