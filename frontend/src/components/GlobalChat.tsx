@@ -57,6 +57,8 @@ function VideoNotePlayer({ src }: { src: string }) {
         borderRadius: '50%',
         overflow: 'hidden',
         background: '#000',
+        WebkitMaskImage: 'radial-gradient(circle, #000 99%, transparent 100%)',
+        maskImage: 'radial-gradient(circle, #000 99%, transparent 100%)',
         boxShadow: '0 4px 16px rgba(0,0,0,0.20)',
         cursor: 'pointer',
         flexShrink: 0,
@@ -68,7 +70,7 @@ function VideoNotePlayer({ src }: { src: string }) {
         playsInline
         preload="metadata"
         onEnded={() => setPlaying(false)}
-        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: '50%' }}
       />
       {(!playing || showPause) && (
         <div style={{
