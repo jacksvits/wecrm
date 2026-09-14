@@ -413,84 +413,17 @@ router.post("/webhook", async (req, res) => {
         const settings = await prisma.telephonySettings.findFirst();
         if (settings?.autoAttachRecord) {
           try {
-            const record = await novofon.getCallRecord(
-              { apiKey: settings.apiKey, apiSecret: settings.apiSecret },
-              call.callIdWithRec,
-            );
-            {
-              const buffer = await downloadRecordWithRetry(record.url);
-              const filename =
-                record.data?.file_name || `record_${call.pbxCallId}.mp3`;
-              const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-              const localPath = path.join(
-                RECORDS_DIR,
-                `${randomUUID()}_${safeName}`,
-              );
-              fs.writeFileSync(localPath, Buffer.from(buffer));
-              await prisma.call.update({
-                where: { id: call.id },
-                data: {
-                  recordLocalPath: localPath,
-                  recordDownloadedAt: new Date(),
-                },
-              });
-              const recordUrl = `/uploads/records/${path.basename(localPath)}`;
+            const attached = await attachCallRecord(call, settings);
+            if (attached) {
               if (isRepeatCall) {
-                repeatCallRecordUrl = recordUrl;
+                repeatCallRecordUrl = attached.url;
               } else {
-                await prisma.comment.create({
-                  data: {
-                    content: `<p><strong>Запись разговора</strong> (${formatDuration(record.data?.duration || call.duration)})</p><p><audio controls src='${recordUrl}' style='width:100%'></audio></p><p><a href='${recordUrl}' download target='_blank'>Скачать запись</a></p>`,
-                    taskId: call.taskId,
-                    authorId: settings.defaultUserId!,
-                    isInternal: false,
-                  },
-                });
-                broadcast(CHANNELS.TASKS, {
-                  action: "new_comment",
-                  entity: "task",
-                  id: call.taskId!,
-                });
-                try {
-                  const taskForNotify = await prisma.task.findUnique({
-                    where: { id: call.taskId! },
-                    include: {
-                      assignees: { include: { user: true } },
-                      curators: { include: { user: true } },
-                      creator: true,
-                    },
-                  });
-                  if (taskForNotify) {
-                    const notifyPayload = {
-                      title: "Новая запись разговора",
-                      body: `Добавлена запись разговора к задаче "${taskForNotify.title}"`,
-                      url: "/tasks/" + taskForNotify.id,
-                    };
-                    const excludeUserId =
-                      settings.defaultUserId || taskForNotify.creatorId;
-                    await notifyTaskAssignees(
-                      taskForNotify.id,
-                      notifyPayload,
-                      excludeUserId,
-                    );
-                    await notifyTaskCurators(
-                      taskForNotify.id,
-                      notifyPayload,
-                      excludeUserId,
-                    );
-                    await notifyTaskCreator(taskForNotify.id, notifyPayload);
-                    await notifyRoleUsers(
-                      ["admin"],
-                      notifyPayload,
-                      excludeUserId,
-                    );
-                  }
-                } catch (notifyErr) {
-                  console.error(
-                    "[Novofon] Failed to send notifications:",
-                    notifyErr,
-                  );
-                }
+                await postRecordComment(
+                  call.taskId,
+                  attached.url,
+                  attached.duration || call.duration,
+                  settings.defaultUserId!,
+                );
               }
             }
           } catch (err: any) {
@@ -535,81 +468,14 @@ router.post("/webhook", async (req, res) => {
             settings.apiSecret
           ) {
             try {
-              const record = await novofon.getCallRecord(
-                { apiKey: settings.apiKey, apiSecret: settings.apiSecret },
-                call.callIdWithRec,
-              );
-              {
-                const buffer = await downloadRecordWithRetry(record.url);
-                const filename =
-                  record.data?.file_name || `record_${call.pbxCallId}.mp3`;
-                const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-                const localPath = path.join(
-                  RECORDS_DIR,
-                  `${randomUUID()}_${safeName}`,
+              const attached = await attachCallRecord(call, settings);
+              if (attached) {
+                await postRecordComment(
+                  call.taskId,
+                  attached.url,
+                  attached.duration || call.duration,
+                  settings.defaultUserId!,
                 );
-                fs.writeFileSync(localPath, Buffer.from(buffer));
-                await prisma.call.update({
-                  where: { id: call.id },
-                  data: {
-                    recordLocalPath: localPath,
-                    recordDownloadedAt: new Date(),
-                  },
-                });
-                const recordUrl = `/uploads/records/${path.basename(localPath)}`;
-                await prisma.comment.create({
-                  data: {
-                    content: `<p><strong>Запись разговора</strong> (${formatDuration(record.data?.duration || call.duration)})</p><p><audio controls src='${recordUrl}' style='width:100%'></audio></p><p><a href='${recordUrl}' download target='_blank'>Скачать запись</a></p>`,
-                    taskId: call.taskId,
-                    authorId: settings.defaultUserId!,
-                    isInternal: false,
-                  },
-                });
-                broadcast(CHANNELS.TASKS, {
-                  action: "new_comment",
-                  entity: "task",
-                  id: call.taskId,
-                });
-                try {
-                  const taskForNotify = await prisma.task.findUnique({
-                    where: { id: call.taskId },
-                    include: {
-                      assignees: { include: { user: true } },
-                      curators: { include: { user: true } },
-                      creator: true,
-                    },
-                  });
-                  if (taskForNotify) {
-                    const notifyPayload = {
-                      title: "Новая запись разговора",
-                      body: `Добавлена запись разговора к задаче "${taskForNotify.title}"`,
-                      url: "/tasks/" + taskForNotify.id,
-                    };
-                    const excludeUserId =
-                      settings.defaultUserId || taskForNotify.creatorId;
-                    await notifyTaskAssignees(
-                      taskForNotify.id,
-                      notifyPayload,
-                      excludeUserId,
-                    );
-                    await notifyTaskCurators(
-                      taskForNotify.id,
-                      notifyPayload,
-                      excludeUserId,
-                    );
-                    await notifyTaskCreator(taskForNotify.id, notifyPayload);
-                    await notifyRoleUsers(
-                      ["admin"],
-                      notifyPayload,
-                      excludeUserId,
-                    );
-                  }
-                } catch (notifyErr) {
-                  console.error(
-                    "[Novofon NOTIFY_RECORD] Failed to send notifications:",
-                    notifyErr,
-                  );
-                }
               }
             } catch (err: any) {
               console.error(
@@ -966,6 +832,106 @@ async function addCallDiscussionEntry(
       "[Novofon] Failed to send discussion notifications:",
       notifyErr,
     );
+  }
+}
+// Атомарная привязка записи разговора к звонку.
+// NOTIFY_END и NOTIFY_RECORD приходят одновременно — резервируем звонок через
+// updateMany, чтобы второй обработчик не создал дублирующий комментарий.
+// Возвращает URL локального файла и длительность записи либо null, если запись
+// уже привязана другим обработчиком или ещё не готова на стороне АТС.
+async function attachCallRecord(
+  call: any,
+  settings: any,
+): Promise<{ url: string; duration: number } | null> {
+  const claim = await prisma.call.updateMany({
+    where: { id: call.id, recordLocalPath: null },
+    data: { recordLocalPath: "downloading" },
+  });
+  if (claim.count === 0) return null;
+  const release = async () => {
+    await prisma.call
+      .update({
+        where: { id: call.id },
+        data: { recordLocalPath: null },
+      })
+      .catch(() => {});
+  };
+  try {
+    const record = await novofon.getCallRecord(
+      { apiKey: settings.apiKey, apiSecret: settings.apiSecret },
+      call.callIdWithRec,
+    );
+    const buffer = await downloadRecordWithRetry(record.url);
+    const duration = record.data?.duration || 0;
+    // Запись ещё не обработана АТС (пустой файл или нулевая длительность при
+    // состоявшемся разговоре) — сбрасываем резервирование, придёт повторное событие
+    if (buffer.length === 0 || (duration === 0 && call.duration > 0)) {
+      await release();
+      console.log(
+        `[Novofon] Запись звонка ${call.pbxCallId} ещё не готова (duration=${duration}), ожидаем повторное событие`,
+      );
+      return null;
+    }
+    const filename = record.data?.file_name || `record_${call.pbxCallId}.mp3`;
+    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const localPath = path.join(RECORDS_DIR, `${randomUUID()}_${safeName}`);
+    fs.writeFileSync(localPath, Buffer.from(buffer));
+    await prisma.call.update({
+      where: { id: call.id },
+      data: {
+        recordLocalPath: localPath,
+        recordDownloadedAt: new Date(),
+      },
+    });
+    return { url: `/uploads/records/${path.basename(localPath)}`, duration };
+  } catch (err) {
+    await release();
+    throw err;
+  }
+}
+// Публикация комментария «Запись разговора» в обсуждении задачи + уведомления
+// (общий код обработчиков NOTIFY_END и NOTIFY_RECORD)
+async function postRecordComment(
+  taskId: string,
+  recordUrl: string,
+  durationSec: number,
+  authorId: string,
+): Promise<void> {
+  await prisma.comment.create({
+    data: {
+      content: `<p><strong>Запись разговора</strong> (${formatDuration(durationSec)})</p><p><audio controls src='${recordUrl}' style='width:100%'></audio></p><p><a href='${recordUrl}' download target='_blank'>Скачать запись</a></p>`,
+      taskId,
+      authorId,
+      isInternal: false,
+    },
+  });
+  broadcast(CHANNELS.TASKS, {
+    action: "new_comment",
+    entity: "task",
+    id: taskId,
+  });
+  try {
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: {
+        assignees: { include: { user: true } },
+        curators: { include: { user: true } },
+        creator: true,
+      },
+    });
+    if (task) {
+      const payload = {
+        title: "Новая запись разговора",
+        body: `Добавлена запись разговора к задаче "${task.title}"`,
+        url: "/tasks/" + task.id,
+      };
+      await notifyTaskAssignees(task.id, payload, authorId);
+      await notifyTaskCurators(task.id, payload, authorId);
+      await notifyTaskCreator(task.id, payload);
+      await notifyRoleUsers(["admin"], payload, authorId);
+    }
+  } catch (notifyErr) {
+    console.error("[Novofon] Failed to send notifications:", notifyErr);
   }
 }
 export default router;

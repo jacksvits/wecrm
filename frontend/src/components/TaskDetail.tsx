@@ -1444,6 +1444,8 @@ export function TaskDetail() {
                   )}{" "}
                   {comments.map((c, idx) => {
                     const isMe = c.authorId === user?.id;
+                    // Сообщения с аудио-записью растягиваем на всю ширину чата
+                    const hasAudio = c.content?.includes("<audio") ?? false;
                     const showName =
                       !isMe &&
                       (idx === 0 || comments[idx - 1].authorId !== c.authorId);
@@ -1488,8 +1490,8 @@ export function TaskDetail() {
                         )}{" "}
                         <div
                           style={{
-                            maxWidth: "78%",
-                            minWidth: 48,
+                            maxWidth: hasAudio ? "100%" : "78%",
+                            minWidth: hasAudio ? 280 : 48,
                             padding: "12px 16px",
                             borderRadius: isMe
                               ? "22px 22px 6px 22px"
