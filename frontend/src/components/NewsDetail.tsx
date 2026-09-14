@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { News, NewsHistory } from '../types';
 import { LinkifyText } from './LinkifyText';
+import { stripHtml } from '../lib/stripHtml';
 
 export function NewsDetail() {
   const { id } = useParams();
@@ -65,7 +66,15 @@ export function NewsDetail() {
   }
 
   return (
-    <div>
+    <div style={{
+      maxWidth: 800,
+      margin: '0 auto',
+      background: 'var(--bg-card)',
+      border: '1px solid var(--border-color)',
+      borderRadius: 16,
+      padding: 24,
+      boxShadow: 'var(--shadow)',
+    }}>
       {/* Шапка */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <button
@@ -161,7 +170,7 @@ export function NewsDetail() {
                   </div>
                   {h.summary && (
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      {h.summary.slice(0, 100)}{h.summary.length > 100 ? '...' : ''}
+                      {stripHtml(h.summary).slice(0, 100)}{stripHtml(h.summary).length > 100 ? '...' : ''}
                     </div>
                   )}
                   {h.labels?.length > 0 && (

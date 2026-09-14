@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { NewsCategory, NewsTag } from '../types';
@@ -33,6 +33,8 @@ export function NewsEditor() {
   const [labels, setLabels] = useState('');
   const [isPublished, setIsPublished] = useState(false);
   const [pinnedToHome, setPinnedToHome] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   // Справочники
   const [categories, setCategories] = useState<NewsCategory[]>([]);
@@ -95,6 +97,26 @@ export function NewsEditor() {
   };
 
   const subcategories = categories.find(c => c.id === categoryId)?.subcategories || [];
+
+  // Загрузка обложки новости (своя картинка вместо URL)
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Можно загружать только изображения');
+      return;
+    }
+    setError('');
+    setUploadingCover(true);
+    try {
+      const att = await api.uploads.upload(file, 'news', id || `draft-${Date.now()}`);
+      setCoverImage(att.path || '');
+    } catch (err: any) {
+      setError(err.message || 'Ошибка загрузки обложки');
+    }
+    setUploadingCover(false);
+  };
 
   const handleSave = async (publish: boolean = false) => {
     if (!title.trim()) {
@@ -315,6 +337,63 @@ export function NewsEditor() {
             outline: 'none',
           }}
         />
+        {/* Загрузка своей картинки обложкой */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => coverInputRef.current?.click()}
+            disabled={uploadingCover}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 10,
+              background: 'var(--bg-hover)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-color)',
+              cursor: uploadingCover ? 'not-allowed' : 'pointer',
+              fontSize: 13,
+              opacity: uploadingCover ? 0.6 : 1,
+            }}
+          >
+            {uploadingCover ? 'Загрузка...' : '🖼 Загрузить обложку'}
+          </button>
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleCoverUpload}
+            style={{ display: 'none' }}
+          />
+          {coverImage && (
+            <>
+              <img
+                src={coverImage}
+                alt="Обложка"
+                style={{
+                  width: 72,
+                  height: 44,
+                  objectFit: 'cover',
+                  borderRadius: 8,
+                  border: '1px solid var(--border-color)',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setCoverImage('')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  background: 'none',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                }}
+              >
+                Убрать
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Категория и подкатегория */}

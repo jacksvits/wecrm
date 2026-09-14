@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
 import { News, NewsCategory, NewsTag } from '../types';
+import { stripHtml } from '../lib/stripHtml';
 
 export function NewsList() {
   const navigate = useNavigate();
@@ -264,7 +265,7 @@ export function NewsList() {
               >
                 <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>{item.title}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {item.summary ? item.summary.slice(0, 80) + '...' : 'Нет описания'}
+                  {item.summary ? stripHtml(item.summary).slice(0, 80) + '...' : 'Нет описания'}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
                   Редактировать черновик
@@ -384,7 +385,7 @@ export function NewsList() {
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
                     }}>
-                      {item.summary}
+                      {stripHtml(item.summary)}
                     </p>
                   )}
 
