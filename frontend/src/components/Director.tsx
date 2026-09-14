@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { api } from "../api/client";
-import { Task, Deal, User, Activity, DashboardStats } from "../types";
+import { Task, Deal, User, Activity, DashboardStats, EmailFilterLog } from "../types";
 import { useAuth } from "../hooks/useAuth";
 
 type WidgetSize = "small" | "medium" | "large";
@@ -45,6 +45,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "widget-deals", size: "medium", label: "Активные сделки", tab: "Основное" },
   { id: "widget-history", size: "medium", label: "История", tab: "Основное" },
   { id: "widget-push-status", size: "medium", label: "Push-уведомления пользователей", tab: "Основное" },
+  { id: "widget-email-filter-log", size: "medium", label: "Журнал срабатываний почты", tab: "Основное" },
   // === Вкладка: Камеры ===
   { id: "widget-camera-1", size: "medium", label: "Видеокамера 1", tab: "Камеры" },
   { id: "widget-camera-2", size: "medium", label: "Видеокамера 2", tab: "Камеры" },
@@ -228,6 +229,7 @@ export function Director() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [pushStatusUsers, setPushStatusUsers] = useState<any[]>([]);
+  const [emailFilterLogs, setEmailFilterLogs] = useState<EmailFilterLog[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
   const [overdueTasks, setOverdueTasks] = useState<Task[]>([]);
@@ -322,6 +324,7 @@ export function Director() {
       );
       setActiveDeals(d.slice(0, 5));
       setPushStatusUsers(psu || []);
+      api.emailFilters.logs().then((l) => setEmailFilterLogs(l || [])).catch(() => {});
       api.beget.account().then(setBegetAccount).catch(() => {});
       api.begetSettings.get().then(setBegetPlugin).catch(() => {});
       api.beget.domains().then(setBegetDomains).catch(() => {});
@@ -640,6 +643,32 @@ export function Director() {
                 ))
               )}
             </div>
+          </>
+        );
+      case "widget-email-filter-log":
+        return (
+          <>
+            <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 12 }}>Журнал срабатываний фильтров почты</div>
+            {emailFilterLogs.length === 0 ? (
+              <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Срабатываний фильтров нет</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflow: "auto" }}>
+                {emailFilterLogs.slice(0, 20).map((l) => (
+                  <div key={l.id} style={{ padding: "8px 12px", borderRadius: 10, background: "var(--bg-input)" }}>
+                    <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                      <strong style={{ color: "var(--text-primary)", fontWeight: 500 }}>{l.filter?.name || "фильтр удалён"}</strong>
+                      {" — "}{l.action === "ignore" ? "письмо проигнорировано" : "создана задача"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      от {l.emailFrom || "?"} · «{l.subject || "без темы"}»
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, opacity: 0.7 }}>
+                      {new Date(l.createdAt).toLocaleString("ru-RU")}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         );
       case "widget-beget":

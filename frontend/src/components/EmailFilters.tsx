@@ -27,9 +27,8 @@ export function EmailFilters() {
 
   const load = useCallback(async () => {
     try {
-      const [f, l] = await Promise.all([api.emailFilters.list(), api.emailFilters.logs()]);
+      const f = await api.emailFilters.list();
       setFilters(f || []);
-      setLogs(l || []);
     } catch (e: any) {
       setMessage('Ошибка загрузки фильтров: ' + e.message);
     }
@@ -257,18 +256,6 @@ export function EmailFilters() {
           </div>
         </div>
       ))}
-
-      {logs.length > 0 && (
-        <>
-          <h3 style={{ fontSize: 16, fontWeight: 600, margin: '20px 0 8px' }}>Журнал срабатываний</h3>
-          {logs.slice(0, 20).map(l => (
-            <div key={l.id} style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '4px 0', borderBottom: '1px solid var(--border-color)' }}>
-              {new Date(l.createdAt).toLocaleString('ru-RU')} — {l.filter?.name || 'фильтр удалён'}:{' '}
-              {l.action === 'ignore' ? 'письмо проигнорировано' : 'создана задача'} · от {l.emailFrom || '?'} · «{l.subject || 'без темы'}»
-            </div>
-          ))}
-        </>
-      )}
     </div>
   );
 }
