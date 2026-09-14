@@ -259,7 +259,7 @@ export function EmailFilters() {
               type="submit"
               style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#007AFF', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
             >
-              Создать фильтр
+              {editingId ? 'Сохранить изменения' : 'Создать фильтр'}
             </button>
           </div>
         </form>
@@ -282,6 +282,12 @@ export function EmailFilters() {
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>То: {actionsSummary(f)}</div>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => startEdit(f)}
+              style={{ padding: '6px 12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', fontSize: 13, cursor: 'pointer' }}
+            >
+              Редактировать
+            </button>
             <button
               onClick={() => toggle(f)}
               style={{ padding: '6px 12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', fontSize: 13, cursor: 'pointer' }}
