@@ -411,7 +411,7 @@ export function Products() {
 
       {/* ===== Склад ===== */}
       {tab === 'stock' && (
-        <>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           {categorySidebar}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -536,12 +536,12 @@ export function Products() {
             </table>
           </div>
         </div>
-        </>
+        </div>
       )}
 
       {/* ===== Цены ===== */}
       {tab === 'prices' && (
-        <>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           {categorySidebar}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -626,7 +626,7 @@ export function Products() {
             </table>
           </div>
         </div>
-        </>
+        </div>
       )}
 
       {/* ===== Модалки ===== */}
