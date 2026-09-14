@@ -75,6 +75,12 @@ export async function loadBranding(): Promise<Branding> {
     if (res.ok) {
       current = await res.json();
       applyIconLinks();
+      // Применяем кастомный цвет акцента к CSS-переменной (null — вернуть дефолт из index.css)
+      if (current.accentColor) {
+        document.documentElement.style.setProperty('--custom-accent', current.accentColor);
+      } else {
+        document.documentElement.style.removeProperty('--custom-accent');
+      }
       window.dispatchEvent(new CustomEvent('brandingchange'));
     }
   } catch {
