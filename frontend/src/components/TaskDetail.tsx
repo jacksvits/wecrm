@@ -335,8 +335,18 @@ export function TaskDetail() {
   const getTaskBorderLeft = (statusColor: string) => {
     return `3px solid ${statusColor}`;
   };
+  // Права роли на смену статуса: опция "Разрешить смену статуса у задач" + список доступных статусов
+  const canChangeTaskStatus = isAdmin || (user as any)?.canChangeTaskStatus !== false;
+  const allowedTaskStatusNames: string[] = (user as any)?.allowedTaskStatuses || [];
+  const visibleStatuses = statuses.filter(
+    (s) => allowedTaskStatusNames.length === 0 || allowedTaskStatusNames.includes(s.name)
+  );
   const handleStatusChange = async (status: string) => {
     if (!task) return;
+    if (!canChangeTaskStatus) {
+      alert("Ваша роль не позволяет менять статус задач");
+      return;
+    }
     try {
       await api.tasks.update(task.id, { status });
       loadTask();
@@ -603,7 +613,7 @@ export function TaskDetail() {
                   overflow: "hidden",
                 }}
               >
-                {statuses.map((s) => {
+                {visibleStatuses.map((s) => {
                   const active = task.status === s.name;
                   const style = getStatusStyle(s.name);
                   return (

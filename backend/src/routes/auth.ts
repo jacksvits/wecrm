@@ -40,7 +40,7 @@ router.post('/register', async (req, res) => {
         password: hash,
         name: data.name,
       },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, canChangeTaskStatus: true, allowedTaskStatuses: true } } },
     });
 
     const roleName = user.role?.name || 'user';
@@ -75,13 +75,13 @@ router.post('/login', async (req, res) => {
     // Try to find by email first, then by username
     let user = await prisma.user.findUnique({
       where: { email: data.login },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, canChangeTaskStatus: true, allowedTaskStatuses: true } } },
     });
 
     if (!user) {
       user = await prisma.user.findUnique({
         where: { username: data.login },
-        include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true } } },
+        include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, canChangeTaskStatus: true, allowedTaskStatuses: true } } },
       });
     }
 
@@ -123,7 +123,7 @@ router.get('/me', async (req, res) => {
     const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET) as any;
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, canChangeTaskStatus: true, allowedTaskStatuses: true } } },
     });
     if (!user) return res.status(401).json({ error: 'User not found' });
 
@@ -144,6 +144,8 @@ router.get('/me', async (req, res) => {
       emails: user.emails,
       allowedPages: user.role?.allowedPages || [],
       showFinancesTab: user.role?.showFinancesTab ?? false,
+      canChangeTaskStatus: user.role?.canChangeTaskStatus ?? true,
+      allowedTaskStatuses: user.role?.allowedTaskStatuses ?? [],
       lastActiveAt: user.lastActiveAt,
       impersonatorId: decoded.imp || null,
       impersonatorName,
@@ -189,7 +191,7 @@ router.post('/impersonate', authMiddleware, adminOnly, async (req: AuthRequest, 
     if (userId === req.user!.id) return res.status(400).json({ error: 'Вы уже в своём аккаунте' });
     const target = await prisma.user.findUnique({
       where: { id: userId },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, canChangeTaskStatus: true, allowedTaskStatuses: true } } },
     });
     if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
     const { token, roleName, allowedPages } = issueToken(target, req.user!.id);
@@ -215,7 +217,7 @@ router.post('/stop-impersonation', authMiddleware, async (req: AuthRequest, res)
     if (!impersonatorId) return res.status(400).json({ error: 'Нет активного переключения аккаунта' });
     const admin = await prisma.user.findUnique({
       where: { id: impersonatorId },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, canChangeTaskStatus: true, allowedTaskStatuses: true } } },
     });
     if (!admin) return res.status(401).json({ error: 'User not found' });
     const { token, roleName, allowedPages } = issueToken(admin);

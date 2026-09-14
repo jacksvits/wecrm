@@ -29,6 +29,12 @@ export function TaskList() {
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
+  // Права роли на смену статуса: опция "Разрешить смену статуса у задач" + список доступных статусов
+  const canChangeTaskStatus = isAdmin || (user as any)?.canChangeTaskStatus !== false;
+  const allowedTaskStatusNames: string[] = (user as any)?.allowedTaskStatuses || [];
+  const visibleStatuses = statuses.filter(
+    (s) => allowedTaskStatusNames.length === 0 || allowedTaskStatusNames.includes(s.name)
+  );
   const [hideCompleted, setHideCompleted] = useState(() => {
     const fromUrl = searchParams.get("hideCompleted");
     return fromUrl !== null ? fromUrl === "true" : true;
@@ -1445,7 +1451,7 @@ export function TaskList() {
                 }}
               >
                 {" "}
-                {statuses.map((s) => (
+                {visibleStatuses.map((s) => (
                   <option key={s.name} value={s.name}>
                     {s.label}
                   </option>
