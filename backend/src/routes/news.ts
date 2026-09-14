@@ -170,7 +170,25 @@ router.get('/:id', async (req, res) => {
       data: { views: { increment: 1 } },
     });
 
-    res.json(news);
+    // Статистика реакций и реакция текущего пользователя
+    const [reactionCounts, myReaction] = await Promise.all([
+      prisma.newsReaction.groupBy({
+        by: ['type'],
+        where: { newsId: req.params.id },
+        _count: { _all: true },
+      }),
+      prisma.newsReaction.findUnique({
+        where: { newsId_userId: { newsId: req.params.id, userId: user.id } },
+        select: { type: true },
+      }),
+    ]);
+
+    res.json({
+      ...news,
+      likes: reactionCounts.find((c) => c.type === 'like')?._count._all || 0,
+      dislikes: reactionCounts.find((c) => c.type === 'dislike')?._count._all || 0,
+      myReaction: myReaction?.type || null,
+    });
   } catch (err: any) {
     console.error('[news:get]', err);
     res.status(500).json({ error: err.message });
@@ -718,6 +736,167 @@ router.post('/:id/history/:historyId/restore', async (req, res) => {
     res.json(news);
   } catch (err: any) {
     console.error('[news:restore]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== РЕАКЦИИ (ЛАЙКИ/ДИЗЛАЙКИ) ==========
+
+/**
+ * POST /api/news/:id/reaction
+ * Поставить/сменить/убрать реакцию на новость
+ * Body: { type: 'like' | 'dislike' | null }
+ */
+router.post('/:id/reaction', async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { type } = req.body;
+
+    if (type !== undefined && type !== null && type !== 'like' && type !== 'dislike') {
+      return res.status(400).json({ error: 'Некорректный тип реакции' });
+    }
+
+    const news = await prisma.news.findUnique({ where: { id: req.params.id } });
+    if (!news) {
+      return res.status(404).json({ error: 'Новость не найдена' });
+    }
+
+    if (type) {
+      await prisma.newsReaction.upsert({
+        where: { newsId_userId: { newsId: req.params.id, userId: user.id } },
+        create: { newsId: req.params.id, userId: user.id, type },
+        update: { type },
+      });
+    } else {
+      await prisma.newsReaction.deleteMany({
+        where: { newsId: req.params.id, userId: user.id },
+      });
+    }
+
+    const counts = await prisma.newsReaction.groupBy({
+      by: ['type'],
+      where: { newsId: req.params.id },
+      _count: { _all: true },
+    });
+
+    const result = {
+      likes: counts.find((c) => c.type === 'like')?._count._all || 0,
+      dislikes: counts.find((c) => c.type === 'dislike')?._count._all || 0,
+      myReaction: type || null,
+    };
+
+    broadcast(CHANNELS.NEWS, { action: 'reaction', entity: 'news', id: req.params.id, ...result });
+    res.json(result);
+  } catch (err: any) {
+    console.error('[news:reaction]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== КОММЕНТАРИИ ==========
+
+/**
+ * GET /api/news/:id/comments
+ * Список комментариев к новости
+ */
+router.get('/:id/comments', async (req, res) => {
+  try {
+    const comments = await prisma.newsComment.findMany({
+      where: { newsId: req.params.id },
+      include: {
+        author: { select: { id: true, name: true, avatar: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json(comments);
+  } catch (err: any) {
+    console.error('[news:comments]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/news/:id/comments
+ * Добавить комментарий к новости
+ */
+router.post('/:id/comments', async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { content } = req.body;
+
+    if (!content?.trim() || !content.replace(/<[^>]*>/g, '').trim()) {
+      return res.status(400).json({ error: 'Комментарий не может быть пустым' });
+    }
+    if (content.length > 5000) {
+      return res.status(400).json({ error: 'Комментарий слишком длинный' });
+    }
+
+    const news = await prisma.news.findUnique({ where: { id: req.params.id } });
+    if (!news) {
+      return res.status(404).json({ error: 'Новость не найдена' });
+    }
+
+    const comment = await prisma.newsComment.create({
+      data: {
+        newsId: req.params.id,
+        authorId: user.id,
+        content: content.trim(),
+      },
+      include: {
+        author: { select: { id: true, name: true, avatar: true } },
+      },
+    });
+
+    // Уведомляем автора новости (кроме самого комментатора)
+    if (news.authorId !== user.id) {
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: news.authorId,
+            type: 'comment',
+            title: 'Новый комментарий',
+            body: `${user.name || 'Пользователь'} прокомментировал новость "${news.title}"`,
+            entityType: 'news',
+            entityId: news.id,
+          },
+        });
+      } catch (e) {
+        console.error('Failed to create notification:', e);
+      }
+    }
+
+    broadcast(CHANNELS.NEWS, { action: 'new_comment', entity: 'news', id: req.params.id, comment });
+    res.status(201).json(comment);
+  } catch (err: any) {
+    console.error('[news:addComment]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/news/:id/comments/:commentId
+ * Удалить комментарий (автор или админ)
+ */
+router.delete('/:id/comments/:commentId', async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const comment = await prisma.newsComment.findUnique({
+      where: { id: req.params.commentId },
+    });
+
+    if (!comment || comment.newsId !== req.params.id) {
+      return res.status(404).json({ error: 'Комментарий не найден' });
+    }
+
+    if (comment.authorId !== user.id && user.role !== 'admin') {
+      return res.status(403).json({ error: 'Нет прав на удаление' });
+    }
+
+    await prisma.newsComment.delete({ where: { id: comment.id } });
+    broadcast(CHANNELS.NEWS, { action: 'delete_comment', entity: 'news', id: req.params.id, commentId: comment.id });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[news:deleteComment]', err);
     res.status(500).json({ error: err.message });
   }
 });

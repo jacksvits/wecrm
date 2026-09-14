@@ -84,6 +84,10 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     deleteTag: (id: string) => fetchApi(`/api/news/tags/${id}`, { method: 'DELETE' }),
     history: (id: string) => fetchApi(`/api/news/${id}/history`),
     restoreHistory: (id: string, historyId: string) => fetchApi(`/api/news/${id}/history/${historyId}/restore`, { method: 'POST' }),
+    setReaction: (id: string, type: 'like' | 'dislike' | null) => fetchApi(`/api/news/${id}/reaction`, { method: 'POST', body: JSON.stringify({ type }) }),
+    comments: (id: string) => fetchApi(`/api/news/${id}/comments`),
+    addComment: (id: string, content: string) => fetchApi(`/api/news/${id}/comments`, { method: 'POST', body: JSON.stringify({ content }) }),
+    deleteComment: (id: string, commentId: string) => fetchApi(`/api/news/${id}/comments/${commentId}`, { method: 'DELETE' }),
   },
   tochka: {
     accounts: () => fetchApi('/api/tochka/accounts'),

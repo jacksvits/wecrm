@@ -91,6 +91,8 @@ model User {
   assistantDialogs  AssistantDialog[]
 
   news            News[]
+  newsReactions   NewsReaction[]
+  newsComments    NewsComment[]
   notes           Note[]
   telegramSettings TelegramSettings[]
   telegramSettingsDefaultCreator TelegramSettings[] @relation("TelegramDefaultCreator")
@@ -768,6 +770,8 @@ model News {
   subcategory   NewsSubcategory? @relation(fields: [subcategoryId], references: [id])
   tags          NewsTag[]
   history       NewsHistory[]
+  reactions     NewsReaction[]
+  comments      NewsComment[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   @@index([isPublished, publishedAt])
@@ -795,6 +799,34 @@ model NewsHistory {
   createdAt     DateTime @default(now())
   @@index([newsId, createdAt])
   @@map("news_history")
+}
+
+model NewsReaction {
+  id        String   @id @default(cuid())
+  newsId    String   @map("news_id")
+  news      News     @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // 'like' | 'dislike'
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([newsId, userId])
+  @@map("news_reactions")
+}
+
+model NewsComment {
+  id        String   @id @default(cuid())
+  newsId    String   @map("news_id")
+  news      News     @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  authorId  String   @map("author_id")
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([newsId, createdAt])
+  @@map("news_comments")
 }
 
 

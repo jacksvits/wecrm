@@ -15,7 +15,8 @@ export interface NewsCategory { id: string; name: string; slug: string; color: s
 export interface NewsSubcategory { id: string; name: string; slug: string; categoryId: string; }
 export interface NewsTag { id: string; name: string; slug: string; color: string; }
 export interface NewsHistory { id: string; newsId: string; title: string; summary?: string; content: string; labels: string[]; categoryId?: string; subcategoryId?: string; tagIds: string[]; coverImage?: string; isPublished: boolean; pinnedToHome?: boolean; editorName: string; createdAt: string; }
-export interface News { id: string; title: string; slug: string; summary?: string; content: string; coverImage?: string; isPublished: boolean; pinnedToHome?: boolean; publishedAt?: string; views: number; labels: string[]; authorId: string; author?: { id: string; name: string; avatar?: string }; categoryId?: string; category?: NewsCategory; subcategoryId?: string; subcategory?: NewsSubcategory; tags: NewsTag[]; history: NewsHistory[]; createdAt: string; updatedAt: string; }
+export interface NewsComment { id: string; newsId: string; authorId: string; author?: { id: string; name: string; avatar?: string }; content: string; createdAt: string; updatedAt: string; }
+export interface News { id: string; title: string; slug: string; summary?: string; content: string; coverImage?: string; isPublished: boolean; pinnedToHome?: boolean; publishedAt?: string; views: number; labels: string[]; authorId: string; author?: { id: string; name: string; avatar?: string }; categoryId?: string; category?: NewsCategory; subcategoryId?: string; subcategory?: NewsSubcategory; tags: NewsTag[]; history: NewsHistory[]; likes?: number; dislikes?: number; myReaction?: 'like' | 'dislike' | null; createdAt: string; updatedAt: string; }
 
 export interface TaskTransaction {
   id: string;

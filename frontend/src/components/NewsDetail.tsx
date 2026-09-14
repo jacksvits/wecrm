@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { News, NewsHistory } from '../types';
 import { LinkifyText } from './LinkifyText';
+import { NewsReactions } from './NewsReactions';
+import { NewsComments } from './NewsComments';
 import { stripHtml } from '../lib/stripHtml';
 import { useBrandNewsCover } from '../lib/branding';
 import { useAuth } from '../hooks/useAuth';
@@ -291,6 +293,17 @@ export function NewsDetail() {
             </span>
           )}
         </div>
+
+        {/* Лайки/дизлайки */}
+        <NewsReactions
+          newsId={news.id}
+          likes={news.likes || 0}
+          dislikes={news.dislikes || 0}
+          myReaction={news.myReaction || null}
+        />
+
+        {/* Комментарии */}
+        <NewsComments newsId={news.id} />
 
         {/* История изменений */}
         {showHistory && (
