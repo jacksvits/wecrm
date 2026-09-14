@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../api/client';
-import { EmailFilter, EmailFilterLog, Project, User } from '../types';
+import { EmailFilter, Project, User } from '../types';
 
 const inputStyle: React.CSSProperties = {
   padding: '8px 14px', borderRadius: 12, border: '1px solid var(--border-color)',
@@ -18,10 +18,10 @@ const emptyForm = {
 
 export function EmailFilters() {
   const [filters, setFilters] = useState<EmailFilter[]>([]);
-  const [logs, setLogs] = useState<EmailFilterLog[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [message, setMessage] = useState('');
 
@@ -59,29 +59,65 @@ export function EmailFilters() {
     }
   };
 
+  const startEdit = (f: EmailFilter) => {
+    setForm({
+      name: f.name,
+      fromContains: f.fromContains || '',
+      toContains: f.toContains || '',
+      subjectContains: f.subjectContains || '',
+      bodyContains: f.bodyContains || '',
+      hasAttachments: f.hasAttachments === null || f.hasAttachments === undefined ? '' : f.hasAttachments ? 'yes' : 'no',
+      createTask: f.createTask,
+      projectId: f.projectId || '',
+      assigneeIds: f.assigneeIds || [],
+      priority: f.priority || '',
+      status: f.status || '',
+      markRead: f.markRead === null || f.markRead === undefined ? '' : f.markRead ? 'yes' : 'no',
+      moveToFolder: f.moveToFolder || '',
+      stopProcessing: f.stopProcessing,
+      sortOrder: f.sortOrder,
+    });
+    setEditingId(f.id);
+    setShowForm(true);
+    setMessage('');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setShowForm(false);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const data = {
+      name: form.name,
+      fromContains: form.fromContains || null,
+      toContains: form.toContains || null,
+      subjectContains: form.subjectContains || null,
+      bodyContains: form.bodyContains || null,
+      hasAttachments: form.hasAttachments === '' ? null : form.hasAttachments === 'yes',
+      createTask: form.createTask,
+      projectId: form.projectId || null,
+      assigneeIds: form.assigneeIds,
+      priority: form.priority || null,
+      status: form.status || null,
+      markRead: form.markRead === '' ? null : form.markRead === 'yes',
+      moveToFolder: form.moveToFolder || null,
+      stopProcessing: form.stopProcessing,
+      sortOrder: form.sortOrder,
+    };
     try {
-      await api.emailFilters.create({
-        name: form.name,
-        fromContains: form.fromContains || null,
-        toContains: form.toContains || null,
-        subjectContains: form.subjectContains || null,
-        bodyContains: form.bodyContains || null,
-        hasAttachments: form.hasAttachments === '' ? null : form.hasAttachments === 'yes',
-        createTask: form.createTask,
-        projectId: form.projectId || null,
-        assigneeIds: form.assigneeIds,
-        priority: form.priority || null,
-        status: form.status || null,
-        markRead: form.markRead === '' ? null : form.markRead === 'yes',
-        moveToFolder: form.moveToFolder || null,
-        stopProcessing: form.stopProcessing,
-        sortOrder: form.sortOrder,
-      });
+      if (editingId) {
+        await api.emailFilters.update(editingId, data);
+        setMessage('Фильтр обновлён');
+      } else {
+        await api.emailFilters.create(data);
+        setMessage('Фильтр создан');
+      }
       setForm(emptyForm);
+      setEditingId(null);
       setShowForm(false);
-      setMessage('Фильтр создан');
       load();
     } catch (err: any) {
       setMessage('Ошибка: ' + err.message);
@@ -118,10 +154,10 @@ export function EmailFilters() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Фильтры писем</h3>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => (showForm ? cancelEdit() : setShowForm(true))}
           style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#007AFF', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
         >
-          {showForm ? 'Скрыть' : '+ Новый фильтр'}
+          {showForm ? (editingId ? 'Отмена' : 'Скрыть') : '+ Новый фильтр'}
         </button>
       </div>
       {message && <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--text-secondary)' }}>{message}</div>}
@@ -131,6 +167,11 @@ export function EmailFilters() {
           onSubmit={submit}
           style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 16, padding: 16, borderRadius: 12, background: 'var(--bg-hover)' }}
         >
+          {editingId && (
+            <div style={{ gridColumn: '1 / -1', fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>
+              Редактирование фильтра «{filters.find(f => f.id === editingId)?.name || ''}»
+            </div>
+          )}
           <div>
             <label style={labelStyle}>Название *</label>
             <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inputStyle} />
