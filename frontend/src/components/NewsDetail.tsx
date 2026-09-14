@@ -227,7 +227,10 @@ export function NewsDetail() {
             margin: '0 0 18px',
             wordBreak: 'break-word',
           }}>
-            <LinkifyText text={news.content} />
+            <div
+              className="rich-text"
+              dangerouslySetInnerHTML={{ __html: news.content }}
+            />
           </div>
         )}
 
