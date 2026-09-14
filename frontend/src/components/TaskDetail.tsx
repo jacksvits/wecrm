@@ -59,6 +59,7 @@ export function TaskDetail() {
   const onTagClick = useTaskHashtagClick();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const canSeeFinances = isAdmin || (user as any)?.showFinancesTab === true;
   const [task, setTask] = useState<Task | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [taskAttachments, setTaskAttachments] = useState<FileAttachment[]>([]);
@@ -119,6 +120,7 @@ export function TaskDetail() {
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchEndX, setTouchEndX] = useState<number | null>(null);
   const tabsOrder: Array<"comments" | "details" | "subtasks" | "history" | "finances" | "files"> = ["comments", "details", "subtasks", "history", "finances", "files"];
+  const visibleTabsOrder = canSeeFinances ? tabsOrder : tabsOrder.filter((t) => t !== "finances");
   const minSwipeDistance = 50;
   useEffect(() => {
     setIsDark(localStorage.getItem("darkTheme") === "true");
@@ -142,7 +144,7 @@ export function TaskDetail() {
     if (activeTab === "history" && id) {
       loadHistory();
     }
-    if (activeTab === "finances" && id) {
+    if (canSeeFinances && activeTab === "finances" && id) {
       loadFinances();
     }
   }, [activeTab, id]);
@@ -991,12 +993,14 @@ export function TaskDetail() {
             >
               История ({taskHistory.length})
             </button>
+            {canSeeFinances && (
             <button
               style={tabStyle(activeTab === "finances")}
               onClick={() => setActiveTab("finances")}
             >
               Финансы
-            </button>{" "}
+            </button>
+            )}{" "}
             <button
               style={tabStyle(activeTab === "files")}
               onClick={() => setActiveTab("files")}
@@ -2061,7 +2065,7 @@ export function TaskDetail() {
               </div>{" "}
             </div>
           )}{" "}
-          {activeTab === "finances" && (
+          {canSeeFinances && activeTab === "finances" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div
                 style={{
