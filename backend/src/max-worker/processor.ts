@@ -304,6 +304,21 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
       console.log('[MAX Processor] Created task', task.id);
       postHandlerGreeting(task.id); // Обработчик: «Приветствие» в обсуждение новой задачи
 
+      // Первое сообщение клиента дублируем в обсуждение новой задачи от контакта
+      const senderName = msg.sender_name || 'Клиент';
+      const contactUrl = contactId ? `https://welans.cc/contacts/${contactId}` : null;
+      const authorLink = contactUrl ? `[${senderName}](${contactUrl})` : senderName;
+      const firstMessageText = text ? `${authorLink}:\n${text}` : '📎 Вложение из MAX';
+      await prisma.comment.create({
+        data: {
+          content: firstMessageText,
+          authorId: creatorId,
+          taskId: task.id,
+          maxMessageId: msg.id,
+        },
+      });
+      console.log('[MAX Processor] First message added to discussion of task', task.id);
+
       const taskDir = path.join(TASKS_DIR, String(task.ticketNumber || task.id));
       if (!fs.existsSync(taskDir)) {
         fs.mkdirSync(taskDir, { recursive: true });

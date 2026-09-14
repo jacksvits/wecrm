@@ -340,6 +340,21 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
       console.log(`[VK Processor] Created task ${task.id} for peer ${fromId} (msg ${msg.id})`);
       postHandlerGreeting(task.id); // Обрабо «Приветствие» в обсуждение новой задачи
 
+      // Первое сообщение клиента дублируем в обсуждение новой задачи от контакта
+      const senderName = contact?.name || `VK ${fromId}`;
+      const contactUrl = contactId ? `https://welans.cc/contacts/${contactId}` : null;
+      const authorLink = contactUrl ? `[${senderName}](${contactUrl})` : senderName;
+      const firstMessageText = text ? `${authorLink}:\n${text}` : '📎 Вложение из ВК';
+      await prisma.comment.create({
+        data: {
+          content: firstMessageText,
+          authorId: creatorId,
+          taskId: task.id,
+          vkMessageId: msg.id,
+        },
+      });
+      console.log(`[VK Processor] First message added to discussion of task ${task.id}`);
+
       const taskDir = path.join(TASKS_DIR, String(task.ticketNumber || task.id));
       if (!fs.existsSync(taskDir)) {
         fs.mkdirSync(taskDir, { recursive: true });
