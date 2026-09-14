@@ -87,6 +87,7 @@ export function NewsEditor() {
       setSelectedTagIds(n.tags?.map((t: any) => t.id) || []);
       setLabels(n.labels?.join(', ') || '');
       setIsPublished(n.isPublished || false);
+      setPinnedToHome(n.pinnedToHome || false);
     } catch (e: any) {
       setError('Не удалось загрузить новость');
     }
@@ -115,6 +116,7 @@ export function NewsEditor() {
         tagIds: selectedTagIds,
         labels: labels.split(',').map(l => l.trim()).filter(Boolean),
         isPublished: publish,
+        pinnedToHome,
       };
 
       if (isEdit && id) {
