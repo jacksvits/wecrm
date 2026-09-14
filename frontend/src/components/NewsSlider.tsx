@@ -88,9 +88,9 @@ export function NewsSlider() {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {item.coverImage && (
+        {cover && (
           <img
-            src={item.coverImage}
+            src={cover}
             alt=""
             style={{
               position: 'absolute',
