@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { EmailSettings } from "./EmailSettings";
+import { EmailFilters } from "./EmailFilters";
 import { RoleManager } from "./RoleManager";
 import { TelephonySettings } from "./TelephonySettings";
 import { StatusManager } from "./StatusManager";
@@ -58,7 +59,12 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
 function renderPluginSettings(pluginKey: PluginKey) {
   switch (pluginKey) {
     case "email":
-      return <EmailSettings />;
+      return (
+        <>
+          <EmailSettings />
+          <EmailFilters />
+        </>
+      );
     case "telephony":
       return <TelephonySettings />;
     case "max":

@@ -175,8 +175,51 @@ model Project {
   tasks       Task[]
   deals       Deal[]
   contacts    ContactProject[]
+  emailFilters EmailFilter[]
 
   @@map("projects")
+}
+
+model EmailFilter {
+  id              String   @id @default(cuid())
+  name            String
+  isActive        Boolean  @default(true) @map("is_active")
+  sortOrder       Int      @default(0) @map("sort_order")
+  fromContains    String?  @map("from_contains")
+  toContains      String?  @map("to_contains")
+  subjectContains String?  @map("subject_contains")
+  bodyContains    String?  @map("body_contains")
+  hasAttachments  Boolean? @map("has_attachments")
+  createTask      Boolean  @default(true) @map("create_task")
+  projectId       String?  @map("project_id")
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  assigneeIds     String[] @default([]) @map("assignee_ids")
+  priority        String?
+  status          String?
+  markRead        Boolean? @map("mark_read")
+  moveToFolder    String?  @map("move_to_folder")
+  stopProcessing  Boolean  @default(true) @map("stop_processing")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  logs            EmailFilterLog[]
+
+  @@index([sortOrder])
+  @@map("email_filters")
+}
+
+model EmailFilterLog {
+  id        String       @id @default(cuid())
+  filterId  String?      @map("filter_id")
+  filter    EmailFilter? @relation(fields: [filterId], references: [id], onDelete: SetNull)
+  emailFrom String?      @map("email_from")
+  emailTo   String?      @map("email_to")
+  subject   String?
+  action    String
+  taskId    String?      @map("task_id")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("email_filter_logs")
 }
 
 model ContactProject {

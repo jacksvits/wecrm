@@ -8,6 +8,7 @@ import { sendPushToRoleUsers, sendPushToTaskAssignees, sendPushToTaskCurators } 
 import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { resolveContactAuto } from '../lib/contact-dedup.js';
+import { applyEmailFilters } from '../lib/email-filters.js';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -101,21 +102,44 @@ export class EmailWorker {
         const messageId = parsed.messageId || `fallback-${uid}`;
         const senderEmail = parsed.from?.value[0]?.address?.toLowerCase() || null;
         const senderName = parsed.from?.value[0]?.name || senderEmail || 'Неизвестный отправитель';
+        const subject = parsed.subject || '';
+        const allAttachments = parsed.attachments || [];
+
+        // Фильтры писем: условия (отправитель/получатель/тема/тело/вложения) и действия
+        const toField = parsed.to as any;
+        const toAddresses = ((toField ? toField.value : []) as any[])
+          .map((v: any) => (v.address || '').toLowerCase())
+          .filter(Boolean);
+        const decision = await applyEmailFilters({
+          from: senderEmail || '',
+          to: toAddresses,
+          subject,
+          body: (parsed.text || '').toLowerCase(),
+          hasAttachments: allAttachments.some((a: any) => a.filename && a.content && a.content.length > 0),
+        });
 
         const existing = await prisma.task.findUnique({
           where: { emailMessageId: messageId },
         });
         if (existing) {
           console.log(`[EmailWorker] Task already exists for message ${messageId}`);
-          await this.markProcessed(client, uid);
+          await this.markProcessed(client, uid, { folder: decision.moveToFolder, markSeen: decision.markRead });
           continue;
         }
 
-        let priority = 'medium';
-        const subject = parsed.subject || '';
-        if (subject.includes('#urgent')) priority = 'urgent';
-        else if (subject.includes('#high')) priority = 'high';
-        else if (subject.includes('#low')) priority = 'low';
+        // Фильтр с действием «не создавать задачу»: письмо обрабатывается только по флагам/папке
+        if (decision.matched && !decision.createTask) {
+          console.log(`[EmailWorker] Filter "${decision.filterName}" ignored email from ${senderEmail}`);
+          await this.markProcessed(client, uid, { folder: decision.moveToFolder, markSeen: decision.markRead });
+          continue;
+        }
+
+        let priority = decision.priority || 'medium';
+        if (!decision.priority) {
+          if (subject.includes('#urgent')) priority = 'urgent';
+          else if (subject.includes('#high')) priority = 'high';
+          else if (subject.includes('#low')) priority = 'low';
+        }
 
         const cleanTitle = subject.replace(/#\w+/g, '').trim() || 'Задача из email';
 
@@ -203,8 +227,7 @@ export class EmailWorker {
         }
 
         // Обработка вложений из письма: сохраняем на диск и создаём комментарий
-        const attachments = parsed.attachments || [];
-        const hasRealAttachments = attachments.filter(
+        const hasRealAttachments = allAttachments.filter(
           (a: any) => a.filename && a.content && a.content.length > 0
         );
         if (hasRealAttachments.length > 0) {
@@ -301,16 +324,38 @@ export class EmailWorker {
   }
 
   /**
-   * Перемещает письмо в указанную папку через messageMove.
-   * Если сервер не удаляет письмо из INBOX — помечает \Seen, чтобы остановить зацикливание.
-   * Если папка не задана — помечает \Seen (не трогает папки).
+   * Перемещает письмо в папку (folder фильтра или processedFolder по умолчанию) через messageMove.
+   * markSeen: true — пометить \Seen, false — оставить непрочитанным (снять \Seen),
+   * undefined — старое поведение: \Seen, если письмо осталось в INBOX после MOVE.
    */
-  private async markProcessed(client: ImapFlow, uid: number) {
+  private async markProcessed(client: ImapFlow, uid: number, options?: { folder?: string; markSeen?: boolean }) {
     try {
-      if (this.config.processedFolder) {
-        console.log(`[EmailWorker] Moving UID ${uid} to folder "${this.config.processedFolder}"`);
-        await client.messageMove(uid, this.config.processedFolder, { uid: true });
+      const folder = options?.folder ?? this.config.processedFolder;
+      if (folder) {
+        console.log(`[EmailWorker] Moving UID ${uid} to folder "${folder}"`);
+        await client.messageMove(uid, folder, { uid: true });
         console.log(`[EmailWorker] UID ${uid} moved successfully`);
+      }
+
+      if (options?.markSeen === false) {
+        // Оставить письмо непрочитанным
+        try {
+          await client.messageFlagsRemove(uid, ['\\Seen'], { uid: true });
+          console.log(`[EmailWorker] UID ${uid} left unread`);
+        } catch {
+          // Флаг мог отсутствовать
+        }
+        return;
+      }
+
+      if (options?.markSeen === true) {
+        try {
+          await client.messageFlagsSet(uid, ['\\Seen'], { uid: true });
+          console.log(`[EmailWorker] UID ${uid} marked as \\Seen`);
+        } catch {
+          // Игнорируем ошибки флагов
+        }
+        return;
       }
 
       // Проверяем, осталось ли письмо в INBOX (некоторые серверы не удаляют при MOVE)

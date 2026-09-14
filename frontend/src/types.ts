@@ -96,3 +96,20 @@ export interface AutoReplyTrigger {
   createdAt?: string;
   updatedAt?: string;
 }
+export interface EmailFilter {
+  id: string; name: string; isActive: boolean; sortOrder: number;
+  fromContains?: string | null; toContains?: string | null;
+  subjectContains?: string | null; bodyContains?: string | null;
+  hasAttachments?: boolean | null;
+  createTask: boolean; projectId?: string | null;
+  project?: { id: string; name: string } | null;
+  assigneeIds: string[]; priority?: string | null; status?: string | null;
+  markRead?: boolean | null; moveToFolder?: string | null;
+  stopProcessing: boolean; createdAt: string; updatedAt: string;
+}
+export interface EmailFilterLog {
+  id: string; filterId?: string | null;
+  filter?: { name: string } | null;
+  emailFrom?: string | null; emailTo?: string | null; subject?: string | null;
+  action: string; taskId?: string | null; createdAt: string;
+}
