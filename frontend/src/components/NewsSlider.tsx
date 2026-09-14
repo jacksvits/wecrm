@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
 import { stripHtml } from '../lib/stripHtml';
+import { useBrandNewsCover } from '../lib/branding';
 import { News } from '../types';
 
 const AUTOPLAY_MS = 6000;
@@ -19,6 +20,8 @@ export function NewsSlider() {
   const navigate = useNavigate();
   const [news, setNews] = useState<News[]>([]);
   const [index, setIndex] = useState(0);
+  const [slideDir, setSlideDir] = useState<'left' | 'right'>('left');
+  const defaultCover = useBrandNewsCover();
   const touchStartX = useRef<number | null>(null);
 
   const load = useCallback(() => {
@@ -35,12 +38,18 @@ export function NewsSlider() {
   // Обновление при публикации/изменении новостей в реальном времени
   useRealtime(['news'], () => { load(); });
 
+  // Переход к слайду с анимацией по направлению
+  const goTo = useCallback((next: number, dir: 'left' | 'right') => {
+    setSlideDir(dir);
+    setIndex(next);
+  }, []);
+
   // Автопрокрутка (только если новостей больше одной)
   useEffect(() => {
     if (news.length <= 1) return;
-    const t = setInterval(() => setIndex(i => (i + 1) % news.length), AUTOPLAY_MS);
+    const t = setInterval(() => goTo((index + 1) % news.length, 'left'), AUTOPLAY_MS);
     return () => clearInterval(t);
-  }, [news.length]);
+  }, [news.length, index, goTo]);
 
   // Свайп для листания на мобильных устройствах
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -50,7 +59,8 @@ export function NewsSlider() {
     if (touchStartX.current === null || news.length <= 1) return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     if (Math.abs(dx) > SWIPE_THRESHOLD) {
-      setIndex(i => (dx < 0 ? (i + 1) % news.length : (i - 1 + news.length) % news.length));
+      if (dx < 0) goTo((index + 1) % news.length, 'left');
+      else goTo((index - 1 + news.length) % news.length, 'right');
     }
     touchStartX.current = null;
   };
@@ -58,6 +68,7 @@ export function NewsSlider() {
   if (!news.length) return null;
 
   const item = news[index];
+  const cover = item.coverImage || defaultCover;
 
   return (
     <div style={{ flexShrink: 0 }}>
@@ -91,14 +102,18 @@ export function NewsSlider() {
             }}
           />
         )}
-        <div style={{
-          position: 'relative',
-          padding: '28px 32px',
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: SLIDER_HEIGHT,
-          boxSizing: 'border-box',
-        }}>
+        <div
+          key={item.id}
+          className={slideDir === 'left' ? 'news-slide-l' : 'news-slide-r'}
+          style={{
+            position: 'relative',
+            padding: '28px 32px',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: SLIDER_HEIGHT,
+            boxSizing: 'border-box',
+          }}
+        >
           {/* Верхний блок: категория + заголовок (слева вверху) */}
           <div>
             {item.category && (
@@ -151,7 +166,7 @@ export function NewsSlider() {
           {news.map((n, i) => (
             <div
               key={n.id}
-              onClick={() => setIndex(i)}
+              onClick={() => goTo(i, i > index ? 'left' : i < index ? 'right' : slideDir)}
               style={{
                 width: 8,
                 height: 8,

@@ -520,3 +520,15 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .login-split *, .login-split *::before, .login-split *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* === Анимация смены слайдов слайдера новостей на дашборде === */
+@keyframes newsSlideInL {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes newsSlideInR {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.news-slide-l { animation: newsSlideInL 0.45s ease both; }
+.news-slide-r { animation: newsSlideInR 0.45s ease both; }

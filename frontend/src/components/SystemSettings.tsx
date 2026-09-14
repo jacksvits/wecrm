@@ -39,8 +39,9 @@ export function SystemSettings() {
   const [saving, setSaving] = useState<string | null>(null);
 
   // === Брендинг: иконка приложения, логотип компании, логотип тёмной темы, цвет акцента ===
-  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null });
+  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null; newsCoverUrl: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null, newsCoverUrl: null });
   const [iconFile, setIconFile] = useState<File | null>(null);
+  const [newsCoverFile, setNewsCoverFile] = useState<File | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [darkLogoFile, setDarkLogoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
@@ -179,13 +180,13 @@ export function SystemSettings() {
       .then((r) => (r.ok ? r.json() : null))
       .then((b) => {
         if (!b) return;
-        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor });
+        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor, newsCoverUrl: b.newsCoverUrl });
         setAccentInput(b.accentColor || "");
       })
       .catch(() => {});
   }, []);
 
-  const uploadBranding = async (kind: "icon" | "logo" | "dark-logo", file: File) => {
+  const uploadBranding = async (kind: "icon" | "logo" | "dark-logo" | "news-cover", file: File) => {
     setUploading(kind);
     try {
       const fd = new FormData();
@@ -200,17 +201,36 @@ export function SystemSettings() {
       if (!res.ok) throw new Error(data.error || "Ошибка загрузки");
       setBranding((prev) => ({
         ...prev,
-        ...(kind === "icon" ? { iconUrl: data.iconUrl } : kind === "logo" ? { logoUrl: data.logoUrl } : { darkLogoUrl: data.darkLogoUrl }),
+        ...(kind === "icon" ? { iconUrl: data.iconUrl } : kind === "logo" ? { logoUrl: data.logoUrl } : kind === "news-cover" ? { newsCoverUrl: data.newsCoverUrl } : { darkLogoUrl: data.darkLogoUrl }),
       }));
       await loadBranding(); // применить сразу: favicon, manifest PWA, логотип, цвет акцента
       if (kind === "icon") setIconFile(null);
       else if (kind === "logo") setLogoFile(null);
+      else if (kind === "news-cover") setNewsCoverFile(null);
       else setDarkLogoFile(null);
       alert("Сохранено");
     } catch (e: any) {
       alert("Ошибка: " + e.message);
     } finally {
       setUploading(null);
+    }
+  };
+
+  // Сброс обложки новостей к дефолту (без картинки)
+  const resetNewsCover = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/branding/news-cover", {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Ошибка сброса");
+      setBranding((prev) => ({ ...prev, newsCoverUrl: null }));
+      await loadBranding();
+      alert("Сброшено");
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
     }
   };
 
@@ -626,6 +646,64 @@ export function SystemSettings() {
               }}
             >
               По умолчанию
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Обложка новости по умолчанию */}
+      <div style={{ marginBottom: 20, padding: 20, borderRadius: 12, border: "1px solid var(--border-color)", background: "var(--bg-card)" }}>
+        <h4 style={{ margin: "0 0 8px 0", fontSize: 15 }}>Обложка новости по умолчанию</h4>
+        <p style={{ margin: "0 0 14px 0", fontSize: 13, color: "var(--text-muted)" }}>
+          Используется для новостей без своей картинки: в списке новостей, на странице новости и в слайдере на дашборде
+        </p>
+        <div
+          style={{
+            width: 160,
+            height: 90,
+            borderRadius: 8,
+            marginBottom: 14,
+            background: branding.newsCoverUrl ? `url(${branding.newsCoverUrl}) center/cover no-repeat` : "linear-gradient(135deg, #667eea, #764ba2)",
+            border: "1px solid var(--border-color)",
+          }}
+        />
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setNewsCoverFile(e.target.files?.[0] || null)}
+            style={{ fontSize: 13, color: "var(--text-secondary)" }}
+          />
+          <button
+            onClick={() => newsCoverFile && uploadBranding("news-cover", newsCoverFile)}
+            disabled={!newsCoverFile || uploading === "news-cover"}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              background: "#007AFF",
+              color: "#fff",
+              border: "none",
+              cursor: !newsCoverFile || uploading === "news-cover" ? "default" : "pointer",
+              fontSize: 14,
+              opacity: !newsCoverFile || uploading === "news-cover" ? 0.7 : 1,
+            }}
+          >
+            {uploading === "news-cover" ? "Загрузка..." : "Загрузить"}
+          </button>
+          {branding.newsCoverUrl && (
+            <button
+              onClick={resetNewsCover}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 10,
+                background: "transparent",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border-color)",
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+            >
+              Сбросить
             </button>
           )}
         </div>

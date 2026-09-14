@@ -4,10 +4,12 @@ import { api } from '../api/client';
 import { News, NewsHistory } from '../types';
 import { LinkifyText } from './LinkifyText';
 import { stripHtml } from '../lib/stripHtml';
+import { useBrandNewsCover } from '../lib/branding';
 
 export function NewsDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const defaultCover = useBrandNewsCover();
   const [news, setNews] = useState<News | null>(null);
   const [loading, setLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);

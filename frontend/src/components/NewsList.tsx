@@ -4,11 +4,13 @@ import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
 import { News, NewsCategory, NewsTag } from '../types';
 import { stripHtml } from '../lib/stripHtml';
+import { useBrandNewsCover } from '../lib/branding';
 
 export function NewsList() {
   const navigate = useNavigate();
   const [news, setNews] = useState<News[]>([]);
   const [search, setSearch] = useState('');
+  const defaultCover = useBrandNewsCover();
   const [categories, setCategories] = useState<NewsCategory[]>([]);
   const [tags, setTags] = useState<NewsTag[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');

@@ -43,6 +43,12 @@ router.get('/', async (_req, res) => {
       logoUrl: branding?.logoPath ? fileUrl('logo.png', branding.updatedAt) : null,
       darkLogoUrl: branding?.darkLogoPath ? fileUrl('logo-dark.png', branding.updatedAt) : null,
       accentColor: branding?.accentColor || null,
+      // Обложка новостей по умолчанию: кастомная (с версией для сброса кэша) или внешний URL
+      newsCoverUrl: branding?.newsCoverPath
+        ? (branding.newsCoverPath.startsWith('/uploads/branding/')
+            ? fileUrl('news-cover.jpg', branding.updatedAt)
+            : branding.newsCoverPath)
+        : null,
       updatedAt: branding?.updatedAt || null,
     });
   } catch (err: any) {

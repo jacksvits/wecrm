@@ -8,6 +8,7 @@ export interface Branding {
   logoUrl: string | null;
   darkLogoUrl: string | null;
   accentColor: string | null;
+  newsCoverUrl: string | null;
   updatedAt: string | null;
 }
 
@@ -18,6 +19,7 @@ let current: Branding = {
   logoUrl: null,
   darkLogoUrl: null,
   accentColor: null,
+  newsCoverUrl: null,
   updatedAt: null,
 };
 
@@ -101,4 +103,15 @@ export function useBrandIcon(): string {
     return () => window.removeEventListener('brandingchange', handler);
   }, []);
   return icon;
+}
+
+// Хук: обложка новостей по умолчанию (null — у новости без своей картинки нет обложки)
+export function useBrandNewsCover(): string | null {
+  const [cover, setCover] = useState<string | null>(current.newsCoverUrl);
+  useEffect(() => {
+    const handler = () => setCover(current.newsCoverUrl);
+    window.addEventListener('brandingchange', handler);
+    return () => window.removeEventListener('brandingchange', handler);
+  }, []);
+  return cover;
 }

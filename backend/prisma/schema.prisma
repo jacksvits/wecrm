@@ -1096,6 +1096,7 @@ model Branding {
   logoPath     String?  @map("logo_path")
   darkLogoPath String?  @map("dark_logo_path")
   accentColor  String?  @map("accent_color")
+  newsCoverPath String? @map("news_cover_path")
   updatedAt    DateTime @default(now()) @map("updated_at")
 
   @@map("branding")
