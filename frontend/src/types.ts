@@ -97,8 +97,11 @@ export interface AutoReplyTrigger {
   createdAt?: string;
   updatedAt?: string;
 }
+export type EmailParseMode = 'regex' | 'toEol' | 'toWord';
 export interface EmailParseRule {
   pattern: string;
+  pattern2?: string | null;
+  mode?: EmailParseMode;
   field: 'title' | 'description' | 'address' | 'priority' | 'status';
   group?: number;
 }

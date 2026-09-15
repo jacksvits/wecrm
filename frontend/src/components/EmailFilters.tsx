@@ -274,12 +274,41 @@ export function EmailFilters() {
             <label style={labelStyle}>Парсинг текста письма (шаблон → поле задачи)</label>
             {form.parseRules.map((rule, idx) => (
               <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <select
+                  value={rule.mode || 'regex'}
+                  onChange={e => setForm({ ...form, parseRules: form.parseRules.map((r, i) => i === idx ? { ...r, mode: e.target.value as EmailParseRule['mode'] } : r) })}
+                  title="Режим извлечения"
+                  style={{ ...inputStyle, width: 190 }}
+                >
+                  <option value="regex">Регулярное выражение</option>
+                  <option value="toEol">От слова до конца строки</option>
+                  <option value="toWord">От слова до слова</option>
+                </select>
                 <input
                   value={rule.pattern}
                   onChange={e => setForm({ ...form, parseRules: form.parseRules.map((r, i) => i === idx ? { ...r, pattern: e.target.value } : r) })}
-                  placeholder="напр. Адрес:\s*(.+)"
-                  style={{ ...inputStyle, flex: 2, minWidth: 200 }}
+                  placeholder={rule.mode === 'toEol' ? 'напр. Адрес объекта:' : rule.mode === 'toWord' ? 'начальное слово' : 'напр. Адрес:\\s*(.+)'}
+                  style={{ ...inputStyle, flex: 2, minWidth: 180 }}
                 />
+                {(rule.mode || 'regex') === 'toWord' && (
+                  <>
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>до</span>
+                    <input
+                      value={rule.pattern2 || ''}
+                      onChange={e => setForm({ ...form, parseRules: form.parseRules.map((r, i) => i === idx ? { ...r, pattern2: e.target.value } : r) })}
+                      placeholder="конечное слово"
+                      style={{ ...inputStyle, flex: 1, minWidth: 120 }}
+                    />
+                  </>
+                )}
+                {(rule.mode || 'regex') === 'regex' && (
+                  <input
+                    type="number" min={0} max={9} value={rule.group ?? 1}
+                    onChange={e => setForm({ ...form, parseRules: form.parseRules.map((r, i) => i === idx ? { ...r, group: +e.target.value || 0 } : r) })}
+                    title="Номер группы захвата"
+                    style={{ ...inputStyle, width: 70 }}
+                  />
+                )}
                 <select
                   value={rule.field}
                   onChange={e => setForm({ ...form, parseRules: form.parseRules.map((r, i) => i === idx ? { ...r, field: e.target.value as EmailParseRule['field'] } : r) })}
@@ -289,12 +318,6 @@ export function EmailFilters() {
                     <option key={f} value={f}>{PARSE_FIELD_LABELS[f]}</option>
                   ))}
                 </select>
-                <input
-                  type="number" min={0} max={9} value={rule.group ?? 1}
-                  onChange={e => setForm({ ...form, parseRules: form.parseRules.map((r, i) => i === idx ? { ...r, group: +e.target.value || 0 } : r) })}
-                  title="Номер группы захвата"
-                  style={{ ...inputStyle, width: 70 }}
-                />
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, parseRules: form.parseRules.filter((_, i) => i !== idx) })}
@@ -306,7 +329,7 @@ export function EmailFilters() {
             ))}
             <button
               type="button"
-              onClick={() => setForm({ ...form, parseRules: [...form.parseRules, { pattern: '', field: 'description', group: 1 }] })}
+              onClick={() => setForm({ ...form, parseRules: [...form.parseRules, { pattern: '', mode: 'toEol', field: 'address', group: 1 }] })}
               style={{ padding: '6px 12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', fontSize: 13, cursor: 'pointer' }}
             >
               + Правило парсинга

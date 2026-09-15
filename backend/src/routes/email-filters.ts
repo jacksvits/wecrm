@@ -24,6 +24,8 @@ const filterSchema = z.object({
   moveToFolder: z.string().optional().nullable(),
   parseRules: z.array(z.object({
     pattern: z.string().min(1),
+    pattern2: z.string().optional().nullable(),
+    mode: z.enum(['regex', 'toEol', 'toWord']).optional().default('regex'),
     field: z.enum(['title', 'description', 'address', 'priority', 'status']),
     group: z.number().int().min(0).max(9).default(1),
   })).optional().nullable(),
@@ -31,9 +33,13 @@ const filterSchema = z.object({
 });
 
 // Проверка компиляции регулярных выражений правил парсинга
-const validateParseRules = (rules?: { pattern: string }[] | null): string | null => {
+const validateParseRules = (rules?: { pattern: string; pattern2?: string | null; mode?: string }[] | null): string | null => {
   for (const r of rules || []) {
     try { new RegExp(r.pattern); } catch { return `Некорректное регулярное выражение: ${r.pattern}`; }
+    if (r.mode === 'toWord') {
+      if (!r.pattern2) return 'Для режима «от слова до слова» укажите конечное слово';
+      try { new RegExp(r.pattern2); } catch { return `Некорректное конечное выражение: ${r.pattern2}`; }
+    }
   }
   return null;
 };

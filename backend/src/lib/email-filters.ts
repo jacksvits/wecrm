@@ -33,23 +33,55 @@ const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 
 /**
  * Парсинг тела письма по правилам фильтра (parseRules).
- * Каждое правило: { pattern — regex, field — поле задачи, group — группа захвата (def 1) }.
+ * Каждое правило: { pattern — начальный шаблон, field — поле задачи,
+ * mode — режим извлечения (regex | toEol | toWord), pattern2 — конечное слово для toWord,
+ * group — группа захвата для regex (def 1) }.
  * Первое совпадение по каждому полю побеждает; в description значения добавляются по порядку правил.
  */
+/**
+ * Извлекает значение из текста письма по правилу в зависимости от режима:
+ * - regex: первое совпадение (группа захвата rule.group, по умолчанию 1, при её отсутствии — всё совпадение);
+ * - toEol: от конца совпадения pattern до конца строки;
+ * - toWord: текст между совпадением pattern и последующим pattern2.
+ */
+function extractByMode(rule: any, bodyText: string): string | null {
+  const mode = rule.mode || 'regex';
+  let startRe: RegExp;
+  try {
+    startRe = new RegExp(rule.pattern, 'i');
+  } catch {
+    return null; // некорректный regex пропускаем (на этапе сохранения уже провалидирован)
+  }
+  const m = bodyText.match(startRe);
+  if (!m) return null;
+
+  if (mode === 'toEol') {
+    const rest = bodyText.slice(m.index! + m[0].length);
+    return rest.split('\n')[0].trim() || null;
+  }
+  if (mode === 'toWord') {
+    if (!rule.pattern2) return null;
+    let endRe: RegExp;
+    try {
+      endRe = new RegExp(rule.pattern2, 'i');
+    } catch {
+      return null;
+    }
+    const rest = bodyText.slice(m.index! + m[0].length);
+    const end = rest.match(endRe);
+    if (!end) return null;
+    return rest.slice(0, end.index).trim() || null;
+  }
+  // regex
+  const group = typeof rule.group === 'number' ? rule.group : 1;
+  return (m[group] ?? m[0] ?? '').toString().trim() || null;
+}
+
 function applyParseRules(filter: any, bodyText: string, decision: FilterDecision) {
   const rules = Array.isArray(filter.parseRules) ? filter.parseRules : [];
   for (const rule of rules) {
     if (!rule?.pattern || !rule?.field) continue;
-    let re: RegExp;
-    try {
-      re = new RegExp(rule.pattern, 'i');
-    } catch {
-      continue; // некорректный regex пропускаем (на этапе сохранения уже провалидирован)
-    }
-    const m = bodyText.match(re);
-    if (!m) continue;
-    const group = typeof rule.group === 'number' ? rule.group : 1;
-    const value = (m[group] ?? m[0] ?? '').toString().trim();
+    const value = extractByMode(rule, bodyText);
     if (!value) continue;
     if (rule.field === 'title') decision.parsed = { ...decision.parsed, title: value.slice(0, 200) };
     else if (rule.field === 'description') {
@@ -57,8 +89,8 @@ function applyParseRules(filter: any, bodyText: string, decision: FilterDecision
       const next = value.slice(0, 4000);
       decision.parsed = { ...decision.parsed, description: prev ? `${prev}\n${next}` : next };
     } else if (rule.field === 'address') {
-      // Отрезаем служебную метку вида «Адрес:» / «Address:» — в поле задачи только сам адрес
-      const cleanAddress = value.replace(/^\s*(адрес|address)\s*[:：]\s*/i, '').trim();
+      // Отрезаем служебную метку вида «Адрес:» / «Адрес объекта:» / «Address:» — в поле задачи только сам адрес
+      const cleanAddress = value.replace(/^\s*(адрес|address)((\s+[а-яёa-z]+){0,2})?\s*[:：]\s*/i, '').trim();
       if (cleanAddress) decision.parsed = { ...decision.parsed, address: cleanAddress.slice(0, 500) };
     }
     else if (rule.field === 'priority') {
