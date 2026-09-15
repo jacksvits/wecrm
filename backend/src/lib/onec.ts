@@ -236,8 +236,11 @@ export class OneCClient {
       encodeURI('Catalog_Номенклатура'),
       'Ref_Key,Description,Parent_Key,IsFolder,DeletionMark'
     );
+    // у корневых групп 1С Parent_Key = пустой GUID, а не undefined — нормализуем,
+    // иначе ensureFolder не находит корневую группу (сравнение с undefined) и создаёт дубль
+    const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
     for (const r of rows) {
-      if (r.IsFolder) this.folderCache.folders.set(r.Ref_Key, { name: r.Description || '', parent: r.Parent_Key || undefined });
+      if (r.IsFolder) this.folderCache.folders.set(r.Ref_Key, { name: r.Description || '', parent: r.Parent_Key && r.Parent_Key !== EMPTY_GUID ? r.Parent_Key : undefined });
     }
     this.folderCache.loaded = true;
     return this.folderCache.folders;
