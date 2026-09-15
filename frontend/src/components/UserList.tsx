@@ -14,6 +14,10 @@ export function UserList() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [passwordModal, setPasswordModal] = useState<{ id: string; name: string } | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({
@@ -76,6 +80,32 @@ export function UserList() {
       loadUsers();
     } catch (err: any) {
       setError(err.message || "Ошибка");
+    }
+  };
+  const openResetPassword = (u: User) => {
+    setPasswordModal({ id: u.id, name: u.name });
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordError("");
+  };
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+    if (newPassword.length < 6) {
+      setPasswordError("Пароль должен быть не менее 6 символов");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Пароли не совпадают");
+      return;
+    }
+    try {
+      const target = passwordModal!;
+      await api.users.resetPassword(target.id, newPassword);
+      setPasswordModal(null);
+      alert(`Пароль пользователя ${target.name} изменён`);
+    } catch (err: any) {
+      setPasswordError(err.message || "Ошибка");
     }
   };
   const handleDelete = async (id: string) => {
@@ -343,6 +373,20 @@ export function UserList() {
                     <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                       {" "}
                       <button
+                        onClick={() => openResetPassword(u)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--text-muted)",
+                          cursor: "pointer",
+                          fontSize: 12,
+                          padding: 4,
+                        }}
+                        title="Сменить пароль"
+                      >
+                        🔑
+                      </button>{" "}
+                      <button
                         onClick={() => openEdit(u)}
                         style={{
                           background: "none",
@@ -600,6 +644,131 @@ export function UserList() {
                   }}
                 >
                   {editingId ? "Сохранить" : "Создать"}
+                </button>{" "}
+              </div>{" "}
+            </form>{" "}
+          </div>{" "}
+        </div>
+      )}{" "}
+      {passwordModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          {" "}
+          <div
+            style={{
+              background: "var(--bg-card)",
+              borderRadius: 12,
+              padding: 24,
+              width: "100%",
+              maxWidth: 420,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            }}
+          >
+            {" "}
+            <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>
+              Смена пароля: {passwordModal.name}
+            </h3>{" "}
+            <div
+              style={{
+                fontSize: 13,
+                color: "var(--text-muted)",
+                marginBottom: 12,
+              }}
+            >
+              Новый пароль будет установлен без ввода текущего
+            </div>{" "}
+            {passwordError && (
+              <div
+                style={{
+                  color: "#dc2626",
+                  fontSize: 13,
+                  marginBottom: 12,
+                  padding: "8px 12px",
+                  background: "#fef2f2",
+                  borderRadius: 10,
+                }}
+              >
+                {passwordError}
+              </div>
+            )}{" "}
+            <form
+              onSubmit={handleResetPassword}
+              style={{ display: "flex", flexDirection: "column", gap: 12 }}
+            >
+              {" "}
+              <input
+                placeholder="Новый пароль (мин. 6 символов)"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                style={{
+                  padding: 10,
+                  borderRadius: 12,
+                  border: "1px solid var(--border-color)",
+                  fontSize: 14,
+                }}
+              />{" "}
+              <input
+                placeholder="Подтверждение пароля"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                style={{
+                  padding: 10,
+                  borderRadius: 12,
+                  border: "1px solid var(--border-color)",
+                  fontSize: 14,
+                }}
+              />{" "}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  justifyContent: "flex-end",
+                  marginTop: 8,
+                }}
+              >
+                {" "}
+                <button
+                  type="button"
+                  onClick={() => setPasswordModal(null)}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 12,
+                    border: "1px solid var(--border-color)",
+                    background: "var(--bg-card)",
+                    cursor: "pointer",
+                  }}
+                >
+                  Отмена
+                </button>{" "}
+                <button
+                  type="submit"
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 12,
+                    border: "none",
+                    background: "#1a1a1a",
+                    color: "#fff",
+                    cursor: "pointer",
+                  }}
+                >
+                  Сохранить
                 </button>{" "}
               </div>{" "}
             </form>{" "}

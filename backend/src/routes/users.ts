@@ -83,6 +83,33 @@ router.patch('/:id', adminOnly, async (req: AuthRequest, res) => {
   }
 });
 
+// Администратор меняет пароль пользователя без ввода текущего пароля
+const resetPasswordSchema = z.object({
+  password: z.string().min(6),
+});
+
+router.post('/:id/reset-password', adminOnly, async (req: AuthRequest, res) => {
+  try {
+    const data = resetPasswordSchema.parse(req.body);
+    const target = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+    const hash = await bcrypt.hash(data.password, 10);
+    await prisma.user.update({ where: { id: target.id }, data: { password: hash } });
+    await prisma.activity.create({
+      data: {
+        action: 'reset-password',
+        entity: 'user',
+        entityId: target.id,
+        details: `Администратор ${req.user!.name} сменил пароль пользователя ${target.name}`,
+        userId: req.user!.id,
+      },
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Avatar routes must be defined BEFORE /:id to avoid "avatar" being treated as user id
 router.post('/avatar', authMiddleware, async (req: AuthRequest, res) => {
   try {
