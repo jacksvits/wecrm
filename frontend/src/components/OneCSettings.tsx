@@ -60,6 +60,7 @@ export default function OneCSettings() {
         login: form.login.trim(),
         password: form.password,
         syncIntervalMinutes: Number(form.syncIntervalMinutes) || 15,
+        kindFolder: form.kindFolder.trim(),
         entitySync,
       });
       setSettings((prev: any) => ({ ...prev, ...res }));
