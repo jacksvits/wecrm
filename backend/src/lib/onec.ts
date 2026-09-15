@@ -428,6 +428,29 @@ export class OneCClient {
         latest.set(k, { nomenclatureKey: r.Номенклатура_Key, priceKindKey: r.ВидЦены_Key, price: Number(r.Цена) || 0, period });
       }
     }
+    // Документы «Установка цен» (ТЧ «Товары2_5»): в этой конфигурации проведение НЕ пишет их
+    // в регистр «Цены номенклатуры», поэтому цены из проведённых документов накладываем поверх
+    // регистра — дата документа новее периода регистра, документ считаем актуальным источником
+    try {
+      const docsData = await this.request(encodeURI(`Document_УстановкаЦенНоменклатуры?$format=json&$top=100&$orderby=Date desc&$select=Ref_Key,Date,Posted`));
+      const docs = this.rowsOf(docsData)
+        .filter((d: any) => d.Posted)
+        .sort((a: any, b: any) => new Date(a.Date).getTime() - new Date(b.Date).getTime()); // старые → новые, новые перекрывают
+      for (const d of docs) {
+        const dp = d.Date ? new Date(d.Date).getTime() : 0;
+        const linesData = await this.request(encodeURI(`Document_УстановкаЦенНоменклатуры(guid'${d.Ref_Key}')/Товары2_5?$format=json&$top=1000`));
+        for (const l of this.rowsOf(linesData)) {
+          if (!l.Номенклатура_Key || !l.ВидЦены_Key) continue;
+          const k = `${l.Номенклатура_Key}|${l.ВидЦены_Key}`;
+          const cur = latest.get(k);
+          if (!cur || dp > cur.period) {
+            latest.set(k, { nomenclatureKey: l.Номенклатура_Key, priceKindKey: l.ВидЦены_Key, price: Number(l.Цена) || 0, period: dp });
+          }
+        }
+      }
+    } catch (e: any) {
+      console.error('[1c] prices from УстановкаЦен documents:', e.message);
+    }
     return [...latest.values()].map(({ period, ...rest }) => rest);
   }
 
