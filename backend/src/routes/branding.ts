@@ -49,6 +49,13 @@ router.get('/', async (_req, res) => {
             ? fileUrl('news-cover.jpg', branding.updatedAt)
             : branding.newsCoverPath)
         : null,
+      // Заставка при запуске: опция показа и кастомное видео (null — дефолт /splash.mp4)
+      splashEnabled: branding?.splashEnabled ?? true,
+      splashUrl: branding?.splashPath
+        ? (branding.splashPath.startsWith('/uploads/branding/')
+            ? fileUrl('splash.mp4', branding.updatedAt)
+            : branding.splashPath)
+        : null,
       updatedAt: branding?.updatedAt || null,
     });
   } catch (err: any) {
@@ -180,6 +187,89 @@ router.post('/accent-color', authMiddleware, async (req: AuthRequest, res) => {
     res.json({ accentColor: branding.accentColor });
   } catch (err: any) {
     console.error('[branding] accent color error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Загрузка видео-заставки: больше лимит и только видео (отдельный multer-инстанс)
+const videoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype.startsWith('video/')) {
+      return cb(new Error('Допустимы только видеофайлы'));
+    }
+    cb(null, true);
+  },
+});
+
+// POST /api/branding/splash — загрузка своего видео заставки (по умолчанию — /splash.mp4)
+router.post('/splash', authMiddleware, videoUpload.single('file'), async (req: AuthRequest, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Только администратор' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл не загружен' });
+    }
+
+    await fs.promises.writeFile(path.join(BRANDING_DIR, 'splash.mp4'), req.file.buffer);
+
+    const branding = await prisma.branding.upsert({
+      where: { id: 1 },
+      create: { id: 1, splashPath: '/uploads/branding/splash.mp4', updatedAt: new Date() },
+      update: { splashPath: '/uploads/branding/splash.mp4', updatedAt: new Date() },
+    });
+
+    console.log(`[branding] splash video updated: ${req.file.size} bytes`);
+    res.json({ splashUrl: fileUrl('splash.mp4', branding.updatedAt) });
+  } catch (err: any) {
+    console.error('[branding] splash upload error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/branding/splash/enabled — вкл/выкл показа заставки при запуске
+router.post('/splash/enabled', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Только администратор' });
+    }
+    const enabled = !!req.body?.enabled;
+
+    const branding = await prisma.branding.upsert({
+      where: { id: 1 },
+      create: { id: 1, splashEnabled: enabled, updatedAt: new Date() },
+      update: { splashEnabled: enabled, updatedAt: new Date() },
+    });
+
+    console.log(`[branding] splash enabled: ${enabled}`);
+    res.json({ splashEnabled: branding.splashEnabled });
+  } catch (err: any) {
+    console.error('[branding] splash enabled error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/branding/splash — сброс заставки к видео по умолчанию (/splash.mp4)
+router.delete('/splash', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Только администратор' });
+    }
+
+    await fs.promises.rm(path.join(BRANDING_DIR, 'splash.mp4'), { force: true });
+
+    const branding = await prisma.branding.upsert({
+      where: { id: 1 },
+      create: { id: 1, splashPath: null, updatedAt: new Date() },
+      update: { splashPath: null, updatedAt: new Date() },
+    });
+
+    console.log('[branding] splash reset to default');
+    res.json({ splashUrl: null, updatedAt: branding.updatedAt });
+  } catch (err: any) {
+    console.error('[branding] splash reset error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

@@ -39,9 +39,11 @@ export function SystemSettings() {
   const [saving, setSaving] = useState<string | null>(null);
 
   // === Брендинг: иконка приложения, логотип компании, логотип тёмной темы, цвет акцента ===
-  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null; newsCoverUrl: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null, newsCoverUrl: null });
+  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null; newsCoverUrl: string | null; splashEnabled: boolean; splashUrl: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null, newsCoverUrl: null, splashEnabled: true, splashUrl: null });
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [newsCoverFile, setNewsCoverFile] = useState<File | null>(null);
+  const [splashVideoFile, setSplashVideoFile] = useState<File | null>(null);
+  const [splashToggling, setSplashToggling] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [darkLogoFile, setDarkLogoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
@@ -180,7 +182,7 @@ export function SystemSettings() {
       .then((r) => (r.ok ? r.json() : null))
       .then((b) => {
         if (!b) return;
-        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor, newsCoverUrl: b.newsCoverUrl });
+        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor, newsCoverUrl: b.newsCoverUrl, splashEnabled: b.splashEnabled ?? true, splashUrl: b.splashUrl || null });
         setAccentInput(b.accentColor || "");
       })
       .catch(() => {});
@@ -228,6 +230,69 @@ export function SystemSettings() {
       if (!res.ok) throw new Error(data.error || "Ошибка сброса");
       setBranding((prev) => ({ ...prev, newsCoverUrl: null }));
       await loadBranding();
+      alert("Сброшено");
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    }
+  };
+
+  // === Заставка при запуске: показ вкл/выкл, загрузка своего видео, сброс к дефолту ===
+  const toggleSplashEnabled = async () => {
+    setSplashToggling(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/branding/splash/enabled", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ enabled: !branding.splashEnabled }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка сохранения");
+      setBranding((prev) => ({ ...prev, splashEnabled: data.splashEnabled }));
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    } finally {
+      setSplashToggling(false);
+    }
+  };
+
+  const uploadSplash = async (file: File) => {
+    setUploading("splash");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/branding/splash", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка загрузки");
+      setBranding((prev) => ({ ...prev, splashUrl: data.splashUrl }));
+      setSplashVideoFile(null);
+      alert("Сохранено");
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  // Сброс заставки к видео по умолчанию (/splash.mp4)
+  const resetSplash = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/branding/splash", {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Ошибка сброса");
+      setBranding((prev) => ({ ...prev, splashUrl: null }));
       alert("Сброшено");
     } catch (e: any) {
       alert("Ошибка: " + e.message);
@@ -704,6 +769,85 @@ export function SystemSettings() {
               }}
             >
               Сбросить
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Заставка при запуске: видео на весь экран при открытии приложения */}
+      <div style={{ marginBottom: 20, padding: 20, borderRadius: 12, border: "1px solid var(--border-color)", background: "var(--bg-card)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6, flexWrap: "wrap" }}>
+          <h4 style={{ margin: 0, fontSize: 15, flex: 1 }}>Заставка при запуске</h4>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-muted)", cursor: splashToggling ? "default" : "pointer" }}>
+            <input
+              type="checkbox"
+              checked={branding.splashEnabled}
+              onChange={toggleSplashEnabled}
+              disabled={splashToggling}
+              style={{ width: 16, height: 16, cursor: "inherit" }}
+            />
+            Показывать заставку
+          </label>
+        </div>
+        <p style={{ margin: "0 0 14px 0", fontSize: 13, color: "var(--text-muted)" }}>
+          Видео на весь экран при запуске приложения (только мобильные устройства, один раз за сессию). Если выключено — заставка не показывается
+        </p>
+        <div
+          style={{
+            maxWidth: 280,
+            borderRadius: 8,
+            marginBottom: 14,
+            overflow: "hidden",
+            border: "1px solid var(--border-color)",
+            background: "#0a0a0f",
+            opacity: branding.splashEnabled ? 1 : 0.5,
+          }}
+        >
+          <video
+            src={branding.splashUrl || "/splash.mp4"}
+            controls
+            muted
+            playsInline
+            style={{ display: "block", width: "100%", maxHeight: 180, objectFit: "contain" }}
+          />
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <input
+            type="file"
+            accept="video/*"
+            onChange={(e) => setSplashVideoFile(e.target.files?.[0] || null)}
+            style={{ fontSize: 13, color: "var(--text-secondary)" }}
+          />
+          <button
+            onClick={() => splashVideoFile && uploadSplash(splashVideoFile)}
+            disabled={!splashVideoFile || uploading === "splash"}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              background: "#007AFF",
+              color: "#fff",
+              border: "none",
+              cursor: !splashVideoFile || uploading === "splash" ? "default" : "pointer",
+              fontSize: 14,
+              opacity: !splashVideoFile || uploading === "splash" ? 0.7 : 1,
+            }}
+          >
+            {uploading === "splash" ? "Загрузка..." : "Загрузить"}
+          </button>
+          {branding.splashUrl && (
+            <button
+              onClick={resetSplash}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 10,
+                background: "transparent",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border-color)",
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+            >
+              По умолчанию
             </button>
           )}
         </div>

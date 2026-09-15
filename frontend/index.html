@@ -43,7 +43,7 @@
     }
   </style>
   <div id="wecrm-splash" hidden>
-    <video id="wecrm-splash-video" src="/splash.mp4"
+    <video id="wecrm-splash-video"
            autoplay muted playsinline preload="auto"></video>
   </div>
   <script>
@@ -58,50 +58,83 @@
       var shown = false;
       try { shown = sessionStorage.getItem('wecrm-splash-shown') === '1'; } catch (e) {}
 
+      // Не показываем заставку: десктоп, reduced-motion или уже показана в сессии
       if (!isMobile || reduced || shown || !video) {
         if (el) el.remove();
         window.__wecrmAppReady = true;
         return;
       }
 
-      try { sessionStorage.setItem('wecrm-splash-shown', '1'); } catch (e) {}
-
-      var videoDone = false, appReady = false, hidden = false;
-      el.hidden = false;
-
-      function tryHide() {
-        if (hidden || !videoDone || !appReady) return;
-        hidden = true;
-        el.classList.add('hide');
-        setTimeout(function () { el.remove(); }, 600);
+      // Опция «Показывать заставку» и своё видео из настроек дизайна.
+      // Фолбэк: при недоступности API заставка показывается как раньше (дефолтное видео).
+      function start(splashEnabled, splashUrl) {
+        if (!splashEnabled) {
+          if (el) el.remove();
+          window.__wecrmAppReady = true;
+          return;
+        }
+        video.src = splashUrl || '/splash.mp4';
+        showSplash();
       }
-      // React сигнализирует о готовности через __wecrmSplashCheck (см. AuthContext)
-      window.__wecrmSplashCheck = function () {
-        appReady = true;
-        tryHide();
-      };
-      // Видео проигрывается один раз — после 'ended' фейд к приложению
-      video.addEventListener('ended', function () {
-        videoDone = true;
-        tryHide();
-      });
-      // Фолбэки: ошибка видео или лимит времени — не блокируем вход
-      video.addEventListener('error', function () {
-        videoDone = true;
-        tryHide();
-      });
-      setTimeout(function () {
-        videoDone = true;
-        tryHide();
-      }, 15000);
-      // Абсолютный предел: заставка не держится дольше 20 секунд
-      setTimeout(function () {
-        if (!hidden) { hidden = true; el.classList.add('hide'); setTimeout(function () { el.remove(); }, 600); }
-      }, 20000);
-      var p = video.play();
-      if (p && p.catch) p.catch(function () {
-        videoDone = true; tryHide();
-      });
+
+      function showSplash() {
+        try { sessionStorage.setItem('wecrm-splash-shown', '1'); } catch (e) {}
+
+        var videoDone = false, appReady = false, hidden = false;
+        el.hidden = false;
+
+        function tryHide() {
+          if (hidden || !videoDone || !appReady) return;
+          hidden = true;
+          el.classList.add('hide');
+          setTimeout(function () { el.remove(); }, 600);
+        }
+        // React сигнализирует о готовности через __wecrmSplashCheck (см. AuthContext)
+        window.__wecrmSplashCheck = function () {
+          appReady = true;
+          tryHide();
+        };
+        // Видео проигрывается один раз — после 'ended' фейд к приложению
+        video.addEventListener('ended', function () {
+          videoDone = true;
+          tryHide();
+        });
+        // Фолбэки: ошибка видео или лимит времени — не блокируем вход
+        video.addEventListener('error', function () {
+          videoDone = true;
+          tryHide();
+        });
+        setTimeout(function () {
+          videoDone = true;
+          tryHide();
+        }, 15000);
+        // Абсолютный предел: заставка не держится дольше 20 секунд
+        setTimeout(function () {
+          if (!hidden) { hidden = true; el.classList.add('hide'); setTimeout(function () { el.remove(); }, 600); }
+        }, 20000);
+        var p = video.play();
+        if (p && p.catch) p.catch(function () {
+          videoDone = true; tryHide();
+        });
+      }
+
+      // Запрашиваем настройки заставки; при недоступности API — поведение по умолчанию
+      var settled = false;
+      function fallbackStart() {
+        if (settled) return;
+        settled = true;
+        start(true, null);
+      }
+      setTimeout(fallbackStart, 2000);
+      fetch('/api/branding')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (b) {
+          if (settled) return;
+          settled = true;
+          if (!b) return fallbackStart();
+          start(b.splashEnabled !== false, b.splashUrl || null);
+        })
+        .catch(fallbackStart);
     })();
   </script>
   <div id="root"></div>
