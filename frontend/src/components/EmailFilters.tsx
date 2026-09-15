@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../api/client';
-import { EmailFilter, Project, User } from '../types';
+import { EmailFilter, EmailParseRule, Project, User } from '../types';
 
 const inputStyle: React.CSSProperties = {
   padding: '8px 14px', borderRadius: 12, border: '1px solid var(--border-color)',
@@ -14,6 +14,14 @@ const emptyForm = {
   createTask: true, projectId: '', assigneeIds: [] as string[],
   priority: '', status: '', markRead: '' as '' | 'yes' | 'no',
   moveToFolder: '', stopProcessing: true, sortOrder: 0,
+  parseRules: [] as EmailParseRule[],
+};
+
+const PARSE_FIELD_LABELS: Record<EmailParseRule['field'], string> = {
+  title: 'Тема задачи',
+  description: 'Описание',
+  priority: 'Приоритет',
+  status: 'Статус',
 };
 
 export function EmailFilters() {
@@ -76,6 +84,7 @@ export function EmailFilters() {
       moveToFolder: f.moveToFolder || '',
       stopProcessing: f.stopProcessing,
       sortOrder: f.sortOrder,
+      parseRules: (f.parseRules as EmailParseRule[]) || [],
     });
     setEditingId(f.id);
     setShowForm(true);
@@ -104,6 +113,9 @@ export function EmailFilters() {
       status: form.status || null,
       markRead: form.markRead === '' ? null : form.markRead === 'yes',
       moveToFolder: form.moveToFolder || null,
+      parseRules: form.parseRules.filter(r => r.pattern.trim()).length
+        ? form.parseRules.filter(r => r.pattern.trim())
+        : null,
       stopProcessing: form.stopProcessing,
       sortOrder: form.sortOrder,
     };
@@ -136,6 +148,9 @@ export function EmailFilters() {
     if (f.markRead === true) parts.push('прочитанным');
     if (f.markRead === false) parts.push('непрочитанным');
     if (f.moveToFolder) parts.push(`папка: ${f.moveToFolder}`);
+    if (f.parseRules?.length) {
+      parts.push(`парсинг: ${f.parseRules.map(r => PARSE_FIELD_LABELS[r.field] || r.field).join(', ')}`);
+    }
     return parts.join(' · ') || 'без действий';
   };
 
@@ -253,6 +268,48 @@ export function EmailFilters() {
               <input type="checkbox" checked={form.stopProcessing} onChange={e => setForm({ ...form, stopProcessing: e.target.checked })} />
               Остановить обработку (не применять фильтры ниже)
             </label>
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={labelStyle}>Парсинг текста письма (шаблон → поле задачи)</label>
+            {form.parseRules.map((rule, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  value={rule.pattern}
+                  onChange={e => setForm({ ...form, parseRules: form.parseRules.map((r, i) => i === idx ? { ...r, pattern: e.target.value } : r) })}
+                  placeholder="напр. Адрес:\s*(.+)"
+                  style={{ ...inputStyle, flex: 2, minWidth: 200 }}
+                />
+                <select
+                  value={rule.field}
+                  onChange={e => setForm({ ...form, parseRules: form.parseRules.map((r, i) => i === idx ? { ...r, field: e.target.value as EmailParseRule['field'] } : r) })}
+                  style={{ ...inputStyle, flex: 1, minWidth: 130 }}
+                >
+                  {(Object.keys(PARSE_FIELD_LABELS) as EmailParseRule['field'][]).map(f => (
+                    <option key={f} value={f}>{PARSE_FIELD_LABELS[f]}</option>
+                  ))}
+                </select>
+                <input
+                  type="number" min={0} max={9} value={rule.group ?? 1}
+                  onChange={e => setForm({ ...form, parseRules: form.parseRules.map((r, i) => i === idx ? { ...r, group: +e.target.value || 0 } : r) })}
+                  title="Номер группы захвата"
+                  style={{ ...inputStyle, width: 70 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, parseRules: form.parseRules.filter((_, i) => i !== idx) })}
+                  style={{ padding: '6px 12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', fontSize: 13, cursor: 'pointer' }}
+                >
+                  Удалить
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, parseRules: [...form.parseRules, { pattern: '', field: 'description', group: 1 }] })}
+              style={{ padding: '6px 12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', fontSize: 13, cursor: 'pointer' }}
+            >
+              + Правило парсинга
+            </button>
           </div>
           <div style={{ gridColumn: '1 / -1' }}>
             <button

@@ -114,7 +114,7 @@ export class EmailWorker {
           from: senderEmail || '',
           to: toAddresses,
           subject,
-          body: (parsed.text || '').toLowerCase(),
+          body: parsed.text || '', // оригинальный регистр: сравнение и парсинг — внутри applyEmailFilters
           hasAttachments: allAttachments.some((a: any) => a.filename && a.content && a.content.length > 0),
         });
 

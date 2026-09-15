@@ -22,8 +22,21 @@ const filterSchema = z.object({
   status: z.string().optional().nullable(),
   markRead: z.boolean().optional().nullable(),
   moveToFolder: z.string().optional().nullable(),
+  parseRules: z.array(z.object({
+    pattern: z.string().min(1),
+    field: z.enum(['title', 'description', 'priority', 'status']),
+    group: z.number().int().min(0).max(9).default(1),
+  })).optional().nullable(),
   stopProcessing: z.boolean().default(true),
 });
+
+// Проверка компиляции регулярных выражений правил парсинга
+const validateParseRules = (rules?: { pattern: string }[] | null): string | null => {
+  for (const r of rules || []) {
+    try { new RegExp(r.pattern); } catch { return `Некорректное регулярное выражение: ${r.pattern}`; }
+  }
+  return null;
+};
 
 router.get('/', async (_req: AuthRequest, res) => {
   const filters = await prisma.emailFilter.findMany({
@@ -45,6 +58,8 @@ router.get('/logs', async (_req: AuthRequest, res) => {
 router.post('/', async (req: AuthRequest, res) => {
   try {
     const data = filterSchema.parse(req.body);
+    const regexError = validateParseRules(data.parseRules);
+    if (regexError) return res.status(400).json({ error: regexError });
     const filter = await prisma.emailFilter.create({ data: data as any });
     res.json(filter);
   } catch (err: any) {
@@ -55,6 +70,8 @@ router.post('/', async (req: AuthRequest, res) => {
 router.patch('/:id', async (req: AuthRequest, res) => {
   try {
     const data = filterSchema.partial().parse(req.body);
+    const regexError = validateParseRules(data.parseRules);
+    if (regexError) return res.status(400).json({ error: regexError });
     const filter = await prisma.emailFilter.update({
       where: { id: req.params.id },
       data: data as any,

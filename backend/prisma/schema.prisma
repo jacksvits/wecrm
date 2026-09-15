@@ -209,6 +209,7 @@ model EmailFilter {
   status          String?
   markRead        Boolean? @map("mark_read")
   moveToFolder    String?  @map("move_to_folder")
+  parseRules      Json?    @map("parse_rules") // правила парсинга тела письма: [{pattern, field, group}]
   stopProcessing  Boolean  @default(true) @map("stop_processing")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")

@@ -97,6 +97,11 @@ export interface AutoReplyTrigger {
   createdAt?: string;
   updatedAt?: string;
 }
+export interface EmailParseRule {
+  pattern: string;
+  field: 'title' | 'description' | 'priority' | 'status';
+  group?: number;
+}
 export interface EmailFilter {
   id: string; name: string; isActive: boolean; sortOrder: number;
   fromContains?: string | null; toContains?: string | null;
@@ -106,6 +111,7 @@ export interface EmailFilter {
   project?: { id: string; name: string } | null;
   assigneeIds: string[]; priority?: string | null; status?: string | null;
   markRead?: boolean | null; moveToFolder?: string | null;
+  parseRules?: EmailParseRule[] | null;
   stopProcessing: boolean; createdAt: string; updatedAt: string;
 }
 export interface EmailFilterLog {

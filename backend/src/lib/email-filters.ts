@@ -19,7 +19,49 @@ export interface FilterDecision {
   status?: string;
   markRead?: boolean;      // true — прочитанным, false — непрочитанным, undefined — не менять
   moveToFolder?: string;   // своя IMAP-папка фильтра
+  parsed?: {               // значения, извлечённые из тела письма правилами парсинга
+    title?: string;
+    description?: string;
+    priority?: string;
+    status?: string;
+  };
   stopProcessing: boolean;
+}
+
+const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+
+/**
+ * Парсинг тела письма по правилам фильтра (parseRules).
+ * Каждое правило: { pattern — regex, field — поле задачи, group — группа захвата (def 1) }.
+ * Первое совпадение по каждому полю побеждает; в description значения добавляются по порядку правил.
+ */
+function applyParseRules(filter: any, bodyText: string, decision: FilterDecision) {
+  const rules = Array.isArray(filter.parseRules) ? filter.parseRules : [];
+  for (const rule of rules) {
+    if (!rule?.pattern || !rule?.field) continue;
+    let re: RegExp;
+    try {
+      re = new RegExp(rule.pattern, 'i');
+    } catch {
+      continue; // некорректный regex пропускаем (на этапе сохранения уже провалидирован)
+    }
+    const m = bodyText.match(re);
+    if (!m) continue;
+    const group = typeof rule.group === 'number' ? rule.group : 1;
+    const value = (m[group] ?? m[0] ?? '').toString().trim();
+    if (!value) continue;
+    if (rule.field === 'title') decision.parsed = { ...decision.parsed, title: value.slice(0, 200) };
+    else if (rule.field === 'description') {
+      const prev = decision.parsed?.description;
+      const next = value.slice(0, 4000);
+      decision.parsed = { ...decision.parsed, description: prev ? `${prev}\n${next}` : next };
+    } else if (rule.field === 'priority') {
+      const v = value.toLowerCase();
+      if (PRIORITIES.includes(v)) decision.parsed = { ...decision.parsed, priority: v };
+    } else if (rule.field === 'status') {
+      decision.parsed = { ...decision.parsed, status: value.slice(0, 50) };
+    }
+  }
 }
 
 const hasAnyCondition = (f: any) =>
@@ -33,7 +75,7 @@ function matches(filter: any, ctx: EmailContext): boolean {
     if (!ctx.to.some((a) => a.includes(needle))) return false;
   }
   if (filter.subjectContains && !ctx.subject.toLowerCase().includes(filter.subjectContains.toLowerCase())) return false;
-  if (filter.bodyContains && !ctx.body.includes(filter.bodyContains.toLowerCase())) return false;
+  if (filter.bodyContains && !ctx.body.toLowerCase().includes(filter.bodyContains.toLowerCase())) return false;
   if (filter.hasAttachments !== null && ctx.hasAttachments !== filter.hasAttachments) return false;
   return true;
 }
