@@ -26,7 +26,7 @@ export default function TochkaSettings() {
     load();
     api.users.list().then(setUsers).catch(() => {});
     const token = localStorage.getItem('token');
-    fetch('/api/tochka/account-users', { headers: token ? { 'X-Auth-Token': token } : {} })
+    fetch('/api/tochka/account-users', { headers: token ? { 'X-Auth-Token': token as string } : {} })
       .then((r) => (r.ok ? r.json() : {}))
       .then((m) => setAccountUsers(m || {}))
       .catch(() => {});
@@ -42,7 +42,7 @@ export default function TochkaSettings() {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch('/api/tochka/auth-url', {
-        headers: token ? { 'X-Auth-Token': token } : {},
+        headers: token ? { 'X-Auth-Token': token as string } : {},
       }).then((r) => (r.ok ? r.json() : Promise.reject(new Error('Ошибка запроса'))));
       if (res.authUrl) window.location.href = res.authUrl;
     } catch (e: any) {
@@ -56,7 +56,7 @@ export default function TochkaSettings() {
       const token = localStorage.getItem('token');
       await fetch('/api/tochka/account-names', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Auth-Token': token } : {}) },
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Auth-Token': token as string } : {}) },
         body: JSON.stringify({ accountId, name }),
       });
       load();
@@ -76,7 +76,7 @@ export default function TochkaSettings() {
       const token = localStorage.getItem('token');
       await fetch('/api/tochka/account-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Auth-Token': token } : {}) },
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Auth-Token': token as string } : {}) },
         body: JSON.stringify({ order }),
       });
       load();
@@ -91,7 +91,7 @@ export default function TochkaSettings() {
       const token = localStorage.getItem('token');
       await fetch('/api/tochka/account-users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Auth-Token': token } : {}) },
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Auth-Token': token as string } : {}) },
         body: JSON.stringify({ accountId, userId }),
       });
       setAccountUsers((prev) => {

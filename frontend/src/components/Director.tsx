@@ -337,7 +337,7 @@ export function Director() {
       loadPskovlineData();
       const token = localStorage.getItem('token');
       api.camera.getSettings().then((list: any[]) => setCameraSettingsList(list)).catch(() => {});
-      fetch("/api/dashboard/task-finances", { headers: token ? { 'X-Auth-Token': token } : {} })
+      fetch("/api/dashboard/task-finances", { headers: token ? { 'X-Auth-Token': token as string } : {} })
         .then(r => r.ok ? r.json() : null)
         .then(setTaskFinanceStats)
         .catch(() => {});
@@ -357,7 +357,7 @@ export function Director() {
     try {
       const token = localStorage.getItem('token');
       const r = await fetch(`/api/dashboard/task-finances/month-tasks?month=${encodeURIComponent(key)}`, {
-        headers: token ? { 'X-Auth-Token': token } : {},
+        headers: token ? { 'X-Auth-Token': token as string } : {},
       });
       const data = r.ok ? await r.json() : null;
       setMonthTaskDetails((prev) => ({ ...prev, [key]: data?.tasks || [] }));
@@ -748,7 +748,7 @@ export function Director() {
                 try {
                   const token = localStorage.getItem('token');
                   const res = await fetch('/api/tochka/auth-url', {
-                    headers: token ? { 'X-Auth-Token': token } : {}
+                    headers: token ? { 'X-Auth-Token': token as string } : {}
                   });
                   const data = await res.json();
                   if (data.authUrl) window.open(data.authUrl, '_blank');
