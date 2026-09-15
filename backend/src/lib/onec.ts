@@ -441,10 +441,12 @@ export class OneCClient {
         const linesData = await this.request(encodeURI(`Document_УстановкаЦенНоменклатуры(guid'${d.Ref_Key}')/Товары2_5?$format=json&$top=1000`));
         for (const l of this.rowsOf(linesData)) {
           if (!l.Номенклатура_Key || !l.ВидЦены_Key) continue;
+          const price = Number(l.Цена) || 0;
+          if (price <= 0) continue; // пустая ячейка документа = цена не задана, не обнуляем
           const k = `${l.Номенклатура_Key}|${l.ВидЦены_Key}`;
           const cur = latest.get(k);
           if (!cur || dp > cur.period) {
-            latest.set(k, { nomenclatureKey: l.Номенклатура_Key, priceKindKey: l.ВидЦены_Key, price: Number(l.Цена) || 0, period: dp });
+            latest.set(k, { nomenclatureKey: l.Номенклатура_Key, priceKindKey: l.ВидЦены_Key, price, period: dp });
           }
         }
       }
