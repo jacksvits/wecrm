@@ -205,7 +205,7 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     },
   },
   emailFilters: {
-    list: (): Promise<EmailFilter[]> => fetchApi('/api/email-filters'),
+    list: (spam?: boolean): Promise<EmailFilter[]> => fetchApi(`/api/email-filters${spam ? '?spam=1' : ''}`),
     logs: (): Promise<EmailFilterLog[]> => fetchApi('/api/email-filters/logs'),
     create: (data: Partial<EmailFilter>) => fetchApi('/api/email-filters', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Partial<EmailFilter>) => fetchApi(`/api/email-filters/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),

@@ -115,6 +115,7 @@ export interface EmailFilter {
   assigneeIds: string[]; priority?: string | null; status?: string | null;
   markRead?: boolean | null; moveToFolder?: string | null;
   parseRules?: EmailParseRule[] | null;
+  isSpam?: boolean;
   stopProcessing: boolean; createdAt: string; updatedAt: string;
 }
 export interface EmailFilterLog {

@@ -34,21 +34,24 @@ export function EmailFilters() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [message, setMessage] = useState('');
+  const [tab, setTab] = useState<'filters' | 'spam'>('filters');
 
   const load = useCallback(async () => {
     try {
-      const f = await api.emailFilters.list();
+      const f = await api.emailFilters.list(tab === 'spam');
       setFilters(f || []);
     } catch (e: any) {
       setMessage('Ошибка загрузки фильтров: ' + e.message);
     }
-  }, []);
+  }, [tab]);
 
   useEffect(() => {
     load();
-    api.projects.list().then(setProjects).catch(() => {});
-    api.users.list().then(setUsers).catch(() => {});
-  }, [load]);
+    if (tab === 'filters') {
+      api.projects.list().then(setProjects).catch(() => {});
+      api.users.list().then(setUsers).catch(() => {});
+    }
+  }, [load, tab]);
 
   const toggle = async (f: EmailFilter) => {
     try {
@@ -70,6 +73,7 @@ export function EmailFilters() {
   };
 
   const startEdit = (f: EmailFilter) => {
+    if (!!f.isSpam !== (tab === 'spam')) setTab(f.isSpam ? 'spam' : 'filters');
     setForm({
       name: f.name,
       fromContains: f.fromContains || '',
@@ -102,7 +106,7 @@ export function EmailFilters() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const data = {
-      name: form.name,
+      name: form.name || (tab === 'spam' ? form.fromContains : ''),
       fromContains: form.fromContains || null,
       toContains: form.toContains || null,
       subjectContains: form.subjectContains || null,
@@ -119,7 +123,8 @@ export function EmailFilters() {
         ? form.parseRules.filter(r => r.pattern.trim())
         : null,
       stopProcessing: form.stopProcessing,
-      sortOrder: form.sortOrder,
+      isSpam: tab === 'spam',
+      sortOrder: tab === 'spam' ? 0 : form.sortOrder,
     };
     try {
       if (editingId) {
@@ -168,8 +173,25 @@ export function EmailFilters() {
 
   return (
     <div style={{ marginTop: 24 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        {([['filters', 'Фильтры'], ['spam', 'СПАМ']] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => { setTab(key); cancelEdit(); }}
+            style={{
+              padding: '8px 16px', borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: 'pointer',
+              border: '1px solid var(--border-color)',
+              background: tab === key ? '#007AFF' : 'transparent',
+              color: tab === key ? '#fff' : 'var(--text-color)',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Фильтры писем</h3>
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{tab === 'spam' ? 'СПАМ-фильтры' : 'Фильтры писем'}</h3>
         <button
           onClick={() => (showForm ? cancelEdit() : setShowForm(true))}
           style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#007AFF', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
@@ -190,25 +212,37 @@ export function EmailFilters() {
             </div>
           )}
           <div>
-            <label style={labelStyle}>Название *</label>
-            <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inputStyle} />
+            <label style={labelStyle}>{tab === 'spam' ? 'Название (необязательно)' : 'Название *'}</label>
+            <input required={tab === 'filters'} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inputStyle} />
           </div>
+          {tab === 'spam' && (
+          <div style={{ gridColumn: '1 / -1', fontSize: 13, color: 'var(--text-secondary)' }}>
+            Письма от указанного адреса или домена не создают задачи и перемещаются в выбранную IMAP-папку.
+          </div>
+          )}
           <div>
-            <label style={labelStyle}>Отправитель содержит</label>
+            <label style={labelStyle}>{tab === 'spam' ? 'Адрес или домен' : 'Отправитель содержит'}</label>
             <input value={form.fromContains} onChange={e => setForm({ ...form, fromContains: e.target.value })} placeholder="email или домен" style={inputStyle} />
           </div>
+          {tab === 'filters' && (
           <div>
             <label style={labelStyle}>Получатель содержит</label>
             <input value={form.toContains} onChange={e => setForm({ ...form, toContains: e.target.value })} style={inputStyle} />
           </div>
+          )}
+          {tab === 'filters' && (
           <div>
             <label style={labelStyle}>Тема содержит</label>
             <input value={form.subjectContains} onChange={e => setForm({ ...form, subjectContains: e.target.value })} style={inputStyle} />
           </div>
+          )}
+          {tab === 'filters' && (
           <div>
             <label style={labelStyle}>Текст письма содержит</label>
             <input value={form.bodyContains} onChange={e => setForm({ ...form, bodyContains: e.target.value })} style={inputStyle} />
           </div>
+          )}
+          {tab === 'filters' && (
           <div>
             <label style={labelStyle}>Вложения</label>
             <select value={form.hasAttachments} onChange={e => setForm({ ...form, hasAttachments: e.target.value as any })} style={inputStyle}>
@@ -217,6 +251,8 @@ export function EmailFilters() {
               <option value="no">Нет</option>
             </select>
           </div>
+          )}
+          {tab === 'filters' && (
           <div>
             <label style={labelStyle}>Проект</label>
             <select value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })} style={inputStyle}>
@@ -224,6 +260,8 @@ export function EmailFilters() {
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
+          )}
+          {tab === 'filters' && (
           <div>
             <label style={labelStyle}>Исполнители (Ctrl — несколько)</label>
             <select
@@ -235,6 +273,8 @@ export function EmailFilters() {
               {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </div>
+          )}
+          {tab === 'filters' && (
           <div>
             <label style={labelStyle}>Приоритет</label>
             <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} style={inputStyle}>
@@ -245,6 +285,8 @@ export function EmailFilters() {
               <option value="urgent">Срочный</option>
             </select>
           </div>
+          )}
+          {tab === 'filters' && (
           <div>
             <label style={labelStyle}>Прочитанность на сервере</label>
             <select value={form.markRead} onChange={e => setForm({ ...form, markRead: e.target.value as any })} style={inputStyle}>
@@ -253,24 +295,34 @@ export function EmailFilters() {
               <option value="no">Непрочитанным</option>
             </select>
           </div>
+          )}
           <div>
-            <label style={labelStyle}>Переместить в IMAP-папку</label>
+            <label style={labelStyle}>{tab === 'spam' ? 'Перемещать в IMAP-папку (напр. Junk или Trash)' : 'Переместить в IMAP-папку'}</label>
             <input value={form.moveToFolder} onChange={e => setForm({ ...form, moveToFolder: e.target.value })} placeholder="напр. INBOX/Обработано" style={inputStyle} />
           </div>
+          {tab === 'filters' && (
           <div>
             <label style={labelStyle}>Порядок применения</label>
             <input type="number" value={form.sortOrder} onChange={e => setForm({ ...form, sortOrder: +e.target.value || 0 })} style={inputStyle} />
           </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center' }}>
+            {tab === 'filters' && (
             <label style={{ fontSize: 13, display: 'flex', gap: 6, alignItems: 'center' }}>
               <input type="checkbox" checked={form.createTask} onChange={e => setForm({ ...form, createTask: e.target.checked })} />
               Создавать задачу
             </label>
+            )}
             <label style={{ fontSize: 13, display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input type="checkbox" checked={form.stopProcessing} onChange={e => setForm({ ...form, stopProcessing: e.target.checked })} />
-              Остановить обработку (не применять фильтры ниже)
+              <input
+                type="checkbox"
+                checked={tab === 'spam' ? !form.createTask : form.stopProcessing}
+                onChange={e => tab === 'spam' ? setForm({ ...form, createTask: !e.target.checked }) : setForm({ ...form, stopProcessing: e.target.checked })}
+              />
+              {tab === 'spam' ? 'Не создавать задачу' : 'Остановить обработку (не применять фильтры ниже)'}
             </label>
           </div>
+          {tab === 'filters' && (
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={labelStyle}>Парсинг текста письма (шаблон → поле задачи)</label>
             {form.parseRules.map((rule, idx) => (
@@ -336,6 +388,7 @@ export function EmailFilters() {
               + Правило парсинга
             </button>
           </div>
+          )}
           <div style={{ gridColumn: '1 / -1' }}>
             <button
               type="submit"

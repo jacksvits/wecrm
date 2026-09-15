@@ -29,6 +29,7 @@ const filterSchema = z.object({
     field: z.enum(['title', 'description', 'address', 'priority', 'status', 'discussion']),
     group: z.number().int().min(0).max(9).default(1),
   })).optional().nullable(),
+  isSpam: z.boolean().default(false),
   stopProcessing: z.boolean().default(true),
 });
 
@@ -44,8 +45,10 @@ const validateParseRules = (rules?: { pattern: string; pattern2?: string | null;
   return null;
 };
 
-router.get('/', async (_req: AuthRequest, res) => {
+router.get('/', async (req: AuthRequest, res) => {
+  const spam = req.query.spam === '1' || req.query.spam === 'true';
   const filters = await prisma.emailFilter.findMany({
+    where: { isSpam: spam },
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     include: { project: { select: { id: true, name: true } } },
   });
