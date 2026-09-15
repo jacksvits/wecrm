@@ -56,7 +56,11 @@ function applyParseRules(filter: any, bodyText: string, decision: FilterDecision
       const prev = decision.parsed?.description;
       const next = value.slice(0, 4000);
       decision.parsed = { ...decision.parsed, description: prev ? `${prev}\n${next}` : next };
-    } else if (rule.field === 'address') decision.parsed = { ...decision.parsed, address: value.slice(0, 500) };
+    } else if (rule.field === 'address') {
+      // Отрезаем служебную метку вида «Адрес:» / «Address:» — в поле задачи только сам адрес
+      const cleanAddress = value.replace(/^\s*(адрес|address)\s*[:：]\s*/i, '').trim();
+      if (cleanAddress) decision.parsed = { ...decision.parsed, address: cleanAddress.slice(0, 500) };
+    }
     else if (rule.field === 'priority') {
       const v = value.toLowerCase();
       if (PRIORITIES.includes(v)) decision.parsed = { ...decision.parsed, priority: v };
