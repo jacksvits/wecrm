@@ -6,6 +6,30 @@ import { authMiddleware } from '../middleware/auth.js';
 import { importMarketItems, syncProductsToVk, getVkSettings } from '../lib/vk-market.js';
 
 const router = Router();
+
+/**
+ * GET /api/products/vitrine
+ * Витрина магазина: активные позиции с отметкой «На витрине», с ценами, остатками и фото.
+ * Публичный роут — объявлен до authMiddleware, чтобы витрину видели посетители без входа в CRM
+ */
+router.get('/vitrine', async (_req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: { onVitrine: true, isActive: true },
+      include: {
+        stocks: { include: { warehouse: { select: { name: true } } } },
+        prices: { include: { priceType: { select: { label: true, sortOrder: true } } } },
+        images: { orderBy: { sortOrder: 'asc' } },
+      },
+      orderBy: { name: 'asc' },
+    });
+    res.json(products);
+  } catch (err: any) {
+    console.error('[products:vitrine]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.use(authMiddleware);
 
 // Полный путь категории «Группа / ... / Вид» — для выгрузки позиции в группу 1С
@@ -252,28 +276,6 @@ router.get('/meta/categories', async (_req, res) => {
     res.json(categories);
   } catch (err: any) {
     console.error('[products:categories:list]', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * GET /api/products/vitrine
- * Витрина магазина: активные позиции с отметкой «На витрине», с ценами, остатками и фото
- */
-router.get('/vitrine', async (_req, res) => {
-  try {
-    const products = await prisma.product.findMany({
-      where: { onVitrine: true, isActive: true },
-      include: {
-        stocks: { include: { warehouse: { select: { name: true } } } },
-        prices: { include: { priceType: { select: { label: true, sortOrder: true } } } },
-        images: { orderBy: { sortOrder: 'asc' } },
-      },
-      orderBy: { name: 'asc' },
-    });
-    res.json(products);
-  } catch (err: any) {
-    console.error('[products:vitrine]', err);
     res.status(500).json({ error: err.message });
   }
 });
