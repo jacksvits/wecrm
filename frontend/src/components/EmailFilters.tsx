@@ -20,6 +20,7 @@ const emptyForm = {
 const PARSE_FIELD_LABELS: Record<EmailParseRule['field'], string> = {
   title: 'Тема задачи',
   description: 'Описание',
+  address: 'Адрес',
   priority: 'Приоритет',
   status: 'Статус',
 };

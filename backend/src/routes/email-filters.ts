@@ -24,7 +24,7 @@ const filterSchema = z.object({
   moveToFolder: z.string().optional().nullable(),
   parseRules: z.array(z.object({
     pattern: z.string().min(1),
-    field: z.enum(['title', 'description', 'priority', 'status']),
+    field: z.enum(['title', 'description', 'address', 'priority', 'status']),
     group: z.number().int().min(0).max(9).default(1),
   })).optional().nullable(),
   stopProcessing: z.boolean().default(true),

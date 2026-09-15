@@ -22,6 +22,7 @@ export interface FilterDecision {
   parsed?: {               // значения, извлечённые из тела письма правилами парсинга
     title?: string;
     description?: string;
+    address?: string;
     priority?: string;
     status?: string;
   };
@@ -55,7 +56,8 @@ function applyParseRules(filter: any, bodyText: string, decision: FilterDecision
       const prev = decision.parsed?.description;
       const next = value.slice(0, 4000);
       decision.parsed = { ...decision.parsed, description: prev ? `${prev}\n${next}` : next };
-    } else if (rule.field === 'priority') {
+    } else if (rule.field === 'address') decision.parsed = { ...decision.parsed, address: value.slice(0, 500) };
+    else if (rule.field === 'priority') {
       const v = value.toLowerCase();
       if (PRIORITIES.includes(v)) decision.parsed = { ...decision.parsed, priority: v };
     } else if (rule.field === 'status') {

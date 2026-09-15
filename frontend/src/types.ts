@@ -99,7 +99,7 @@ export interface AutoReplyTrigger {
 }
 export interface EmailParseRule {
   pattern: string;
-  field: 'title' | 'description' | 'priority' | 'status';
+  field: 'title' | 'description' | 'address' | 'priority' | 'status';
   group?: number;
 }
 export interface EmailFilter {

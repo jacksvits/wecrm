@@ -206,6 +206,7 @@ export class EmailWorker {
               ? `${current}\n\n${decision.parsed.description}`
               : decision.parsed.description;
           }
+          if (decision.parsed.address) updateData.address = decision.parsed.address;
           if (decision.parsed.priority) updateData.priority = decision.parsed.priority;
           if (decision.parsed.status) {
             const status = await prisma.status.findUnique({
@@ -217,6 +218,24 @@ export class EmailWorker {
           if (Object.keys(updateData).length) {
             await prisma.task.update({ where: { id: task.id }, data: updateData });
             console.log(`[EmailWorker] Applied parsed fields to task ${task.id}: ${Object.keys(updateData).join(', ')}`);
+          }
+
+          // Распарсенные данные — отдельным сообщением в обсуждение задачи
+          const parsedLines: string[] = [];
+          if (decision.parsed.title) parsedLines.push(`Тема: ${decision.parsed.title}`);
+          if (decision.parsed.address) parsedLines.push(`Адрес: ${decision.parsed.address}`);
+          if (decision.parsed.priority) parsedLines.push(`Приоритет: ${decision.parsed.priority}`);
+          if (decision.parsed.status) parsedLines.push(`Статус: ${decision.parsed.status}`);
+          if (decision.parsed.description) parsedLines.push(decision.parsed.description);
+          if (parsedLines.length) {
+            await prisma.comment.create({
+              data: {
+                content: `📋 Данные из письма:\n${parsedLines.join('\n')}`,
+                authorId: creatorId,
+                taskId: task.id,
+              },
+            });
+            console.log(`[EmailWorker] Posted parsed data to discussion of task ${task.id}`);
           }
         }
 
