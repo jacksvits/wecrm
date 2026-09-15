@@ -283,10 +283,34 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
   if (cfg.prices.enabled && cfg.prices.direction !== 'push') try {
     const kinds = await client.getPriceKinds();
     const prices = await client.getPrices();
+    // Fallback для дублей-карточек в 1С: цена может стоять на карточке-дубле с почти тем же
+    // наименованием, а товар CRM ссылаться на другую карточку (без цен). Индексируем товары
+    // CRM по onecId и по нормализованному наименованию; наименования карточек 1С — отдельно.
+    const normName = (s: string) => (s || '').toLowerCase().replace(/[^a-zа-я0-9]+/gi, '');
+    const nomNames = await client.getNomenclatureNames();
+    const pricedKeys = new Set(prices.map((pr) => pr.nomenclatureKey));
+    const allProducts = await prisma.product.findMany({ select: { id: true, name: true, onecId: true } });
+    const byOnec = new Map(allProducts.filter((p) => p.onecId).map((p) => [p.onecId as string, p]));
+    const byNorm = new Map<string, typeof allProducts>();
+    for (const p of allProducts) {
+      const k = normName(p.name);
+      if (!byNorm.has(k)) byNorm.set(k, []);
+      byNorm.get(k)!.push(p);
+    }
+    const nameMatched = new Set<string>();
     for (const pr of prices) {
       try {
-        const p = await prisma.product.findFirst({ where: { onecId: pr.nomenclatureKey } });
-        if (!p) continue;
+        let p = byOnec.get(pr.nomenclatureKey);
+        if (!p) {
+          // карточка с ценой не привязана к CRM: ищем товар с совпадающим наименованием,
+          // у которого нет собственной карточки с ценами (иначе цена от дубля перетирает правильную)
+          const nk = normName(nomNames.get(pr.nomenclatureKey) || '');
+          const cands = nk ? (byNorm.get(nk) ?? []).filter((c) => !c.onecId || !pricedKeys.has(c.onecId)) : [];
+          if (cands.length !== 1) continue; // нет совпадений или неоднозначно — пропускаем
+          if (nameMatched.has(cands[0].id)) continue; // цена от дубля этому товару уже применена
+          nameMatched.add(cands[0].id);
+          p = cands[0];
+        }
         const kindName = kinds.get(pr.priceKindKey) || 'Цена 1С';
         let pt = await prisma.priceType.findFirst({ where: { name: kindName } });
         if (!pt) pt = await prisma.priceType.create({ data: { name: kindName, label: kindName } });

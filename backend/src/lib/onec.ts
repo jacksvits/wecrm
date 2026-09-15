@@ -405,6 +405,12 @@ export class OneCClient {
   }
 
   // --- Цены: виды цен и актуальные цены (последний период по каждой паре) ---
+  // Наименования номенклатуры (для fallback-матчинга цен по дублирующим карточкам)
+  async getNomenclatureNames(): Promise<Map<string, string>> {
+    const rows = await this.readCollection(encodeURI('Catalog_Номенклатура'), 'Ref_Key,Description,IsFolder', true);
+    return new Map(rows.filter((r: any) => !r.IsFolder).map((r: any) => [r.Ref_Key, r.Description || '']));
+  }
+
   async getPriceKinds(): Promise<Map<string, string>> {
     const rows = await this.readCollection(encodeURI('Catalog_ВидыЦен'), 'Ref_Key,Description,DeletionMark');
     return new Map(rows.map((r) => [r.Ref_Key, r.Description || '']));
