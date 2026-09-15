@@ -115,6 +115,39 @@ router.post('/sync', authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+// POST /api/onec-plugin/prune-categories — удалить категории CRM, чьи виды 1С вне выбранной папки kindFolder
+// (у товаров categoryId станет NULL по FK SetNull; сами товары не удаляются)
+router.post('/prune-categories', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
+    const s = await prisma.oneCPluginSettings.findUnique({ where: { id: 1 } });
+    const kindFolder = (s?.kindFolder || '').trim();
+    if (!kindFolder) return res.status(400).json({ error: 'Сначала укажите «Папку видов номенклатуры» в настройках' });
+    if (!s?.serviceUrl || !s?.login || !s?.password) return res.status(400).json({ error: 'Заполните подключение к 1С (ссылка, логин, пароль)' });
+
+    const client = new OneCClient(s.serviceUrl, s.login, s.password);
+    const kindTree = await client.getKindTree();
+    const lower = kindFolder.toLowerCase();
+    const folderIds = new Set(kindTree.filter((n) => n.isGroup && n.name.trim().toLowerCase() === lower).map((n) => n.onecId));
+    if (!folderIds.size) return res.status(404).json({ error: `Папка «${kindFolder}» не найдена в справочнике видов номенклатуры 1С` });
+
+    // onecId узлов выбранной папки и всех её потомков
+    const scope = new Set<string>();
+    const walk = (id: string) => {
+      if (scope.has(id)) return;
+      scope.add(id);
+      for (const n of kindTree) if (n.parentOnecId === id) walk(n.onecId);
+    };
+    for (const id of folderIds) walk(id);
+
+    const result = await prisma.productCategory.deleteMany({ where: { onecId: { not: null, notIn: [...scope] } } });
+    res.json({ success: true, deleted: result.count });
+  } catch (err: any) {
+    console.error('[onec-plugin] prune-categories error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/onec-plugin/sync-status — статус фоновой синхронизации
 router.get('/sync-status', authMiddleware, async (_req, res) => {
   try {
