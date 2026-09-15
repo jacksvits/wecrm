@@ -14,6 +14,7 @@ export interface AuthRequest extends Request {
     impersonatorId?: string;
     canCreateNews?: boolean;
     canEditNews?: boolean;
+      canHandleSpam?: boolean;
   };
 }
 
@@ -37,7 +38,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
     // Always load fresh user data from DB to get current role and name
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      include: { role: { select: { name: true, allowedPages: true, canAccessChat: true, showFinancesTab: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true } } },
+      include: { role: { select: { name: true, allowedPages: true, canAccessChat: true, showFinancesTab: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
     });
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
@@ -52,6 +53,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       showFinancesTab: user.role?.showFinancesTab ?? false,
     canCreateNews: user.role?.canCreateNews ?? true,
     canEditNews: user.role?.canEditNews ?? true,
+      canHandleSpam: user.role?.canHandleSpam ?? false,
       impersonatorId: decoded.imp,
     };
     next();

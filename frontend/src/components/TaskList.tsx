@@ -30,6 +30,7 @@ export function TaskList() {
   const [statuses, setStatuses] = useState<Status[]>([]);
   // Права роли на смену статуса: опция "Разрешить смену статуса у задач" + список доступных статусов
   const canChangeTaskStatus = isAdmin || (user as any)?.canChangeTaskStatus !== false;
+  const canHandleSpam = isAdmin || (user as any)?.canHandleSpam === true;
   const allowedTaskStatusNames: string[] = (user as any)?.allowedTaskStatuses || [];
   const visibleStatuses = statuses.filter(
     (s) => allowedTaskStatusNames.length === 0 || allowedTaskStatusNames.includes(s.name)
@@ -211,6 +212,16 @@ export function TaskList() {
     setShowModal(false);
     loadTasks();
   };
+  const handleMarkSpam = async (task: Task) => {
+    if (!window.confirm(`Отметить как СПАМ?\nАдрес ${task.sourceEmail} попадёт в спам-фильтры, письма будут уходить в Junk без создания задач.`)) return;
+    try {
+      const res = await api.tasks.markSpam(task.id);
+      if (res.message) window.alert(res.message);
+    } catch (e: any) {
+      window.alert(e.message || 'Ошибка обработки СПАМА');
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Удалить задачу?")) return;
     await api.tasks.delete(id);
@@ -1025,6 +1036,23 @@ export function TaskList() {
                                 gap: 4,
                               }}
                             >
+                              {" "}
+                              {canHandleSpam && task.sourceEmail && task.status !== "spam" && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMarkSpam(task);
+                                  }}
+                                  title="СПАМ: добавить адрес в спам-фильтры (Junk), задача → «Спам»"
+                                  style={{
+                                    width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+                                    borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
+                                    fontSize: 15, cursor: "pointer", lineHeight: 1,
+                                  }}
+                                >
+                                  ☠️
+                                </button>
+                              )}
                               {" "}
                               {canEditTask(task) && (
                                 <button
