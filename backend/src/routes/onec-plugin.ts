@@ -30,12 +30,15 @@ router.get('/', authMiddleware, async (_req, res) => {
 router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
-    const { isActive, serviceUrl, login, password, syncIntervalMinutes, entitySync } = req.body || {};
+    const { isActive, serviceUrl, login, password, syncIntervalMinutes, entitySync, kindFolder } = req.body || {};
     if (isActive !== undefined && typeof isActive !== 'boolean') {
       return res.status(400).json({ error: 'Некорректный флаг активности' });
     }
     if (serviceUrl !== undefined && typeof serviceUrl !== 'string') {
       return res.status(400).json({ error: 'Некорректная ссылка веб-версии 1С' });
+    }
+    if (kindFolder !== undefined && typeof kindFolder !== 'string') {
+      return res.status(400).json({ error: 'Некорректная папка видов номенклатуры' });
     }
     const existing = await prisma.oneCPluginSettings.findUnique({ where: { id: 1 } });
     const data = {
@@ -60,6 +63,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
       login: saved.login,
       hasPassword: !!saved.password,
       syncIntervalMinutes: saved.syncIntervalMinutes,
+      kindFolder: saved.kindFolder,
       lastSyncAt: saved.lastSyncAt,
       lastSyncResult: saved.lastSyncResult,
       entitySync: getEntitySync(saved.entitySync),

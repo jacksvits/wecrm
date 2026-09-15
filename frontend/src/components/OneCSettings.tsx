@@ -23,7 +23,7 @@ const DEFAULT_ENTITY_SYNC: any = {
 
 export default function OneCSettings() {
   const [settings, setSettings] = useState<any>(null);
-  const [form, setForm] = useState({ serviceUrl: '', login: '', password: '', syncIntervalMinutes: 15 });
+  const [form, setForm] = useState({ serviceUrl: '', login: '', password: '', syncIntervalMinutes: 15, kindFolder: '' });
   const [entitySync, setEntitySync] = useState<any>(DEFAULT_ENTITY_SYNC);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -32,7 +32,7 @@ export default function OneCSettings() {
   useEffect(() => {
     api.oneCPlugin.get().then((s: any) => {
       setSettings(s);
-      setForm({ serviceUrl: s.serviceUrl, login: s.login, password: '', syncIntervalMinutes: s.syncIntervalMinutes });
+      setForm({ serviceUrl: s.serviceUrl, login: s.login, password: '', syncIntervalMinutes: s.syncIntervalMinutes, kindFolder: s.kindFolder || '' });
       // подгружаем сохранённые пообъектные опции (без слияния показывались бы значения по умолчанию)
       if (s.entitySync) setEntitySync((prev: any) => ({ ...prev, ...s.entitySync }));
     }).catch(() => {});
@@ -207,6 +207,20 @@ export default function OneCSettings() {
         />
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
           Номенклатура и контрагенты синхронизируются двусторонне с указанным интервалом
+        </div>
+      </div>
+
+      {/* Папка видов номенклатуры для синхронизации */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={labelStyle}>Папка видов номенклатуры</label>
+        <input
+          value={form.kindFolder}
+          onChange={(e) => setForm({ ...form, kindFolder: e.target.value })}
+          style={{ ...inputStyle, maxWidth: 360 }}
+          placeholder="Например: Магазин"
+        />
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+          Синхронизируются только виды из этой папки 1С (включая подпапки) и товары с этими видами. Оставьте пустым, чтобы синхронизировать все виды
         </div>
       </div>
 

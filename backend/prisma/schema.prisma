@@ -1254,6 +1254,8 @@ model OneCPluginSettings {
   lastSyncAt          DateTime? @map("last_sync_at")
   lastSyncResult      Json?     @map("last_sync_result")
   entitySync          Json?     @map("entity_sync") // {contacts|organizations|products|services|prices|stock: {enabled, direction: pull|push|both}}
+  // имя папки справочника «Виды номенклатуры» 1С: синхронизируются только виды из этой ветки (пусто = все)
+  kindFolder          String    @default("") @map("kind_folder")
   updatedAt           DateTime  @default(now()) @map("updated_at")
 
   @@map("onec_plugin_settings")
