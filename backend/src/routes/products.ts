@@ -460,6 +460,46 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/products/bulk-delete
+ * Массовое удаление позиций { ids: string[] } (каскадно, как одиночное удаление)
+ */
+router.post('/bulk-delete', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids обязателен' });
+    const result = await prisma.product.deleteMany({ where: { id: { in: ids } } });
+    res.json({ success: true, deleted: result.count });
+  } catch (err: any) {
+    console.error('[products:bulk-delete]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/products/bulk-category
+ * Массовый перенос в категорию { ids: string[], categoryId: string | null }
+ * (categoryId = null — снять категорию)
+ */
+router.post('/bulk-category', async (req, res) => {
+  try {
+    const { ids, categoryId } = req.body;
+    if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids обязателен' });
+    if (categoryId) {
+      const cat = await prisma.productCategory.findUnique({ where: { id: categoryId } });
+      if (!cat) return res.status(404).json({ error: 'Категория не найдена' });
+    }
+    const result = await prisma.product.updateMany({
+      where: { id: { in: ids } },
+      data: { categoryId: categoryId || null },
+    });
+    res.json({ success: true, updated: result.count });
+  } catch (err: any) {
+    console.error('[products:bulk-category]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 /* ============ Изображения ============ */
 

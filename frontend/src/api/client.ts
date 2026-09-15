@@ -178,6 +178,8 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     create: (data: Partial<Product>) => fetchApi('/api/products', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Product>) => fetchApi(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => fetchApi(`/api/products/${id}`, { method: 'DELETE' }),
+    bulkDelete: (ids: string[]) => fetchApi('/api/products/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
+    bulkCategory: (ids: string[], categoryId: string | null) => fetchApi('/api/products/bulk-category', { method: 'POST', body: JSON.stringify({ ids, categoryId }) }),
     createMovement: (id: string, data: Partial<StockMovement>) => fetchApi(`/api/products/${id}/movements`, { method: 'POST', body: JSON.stringify(data) }),
     setPrice: (id: string, priceTypeId: string, price: number) => fetchApi(`/api/products/${id}/prices`, { method: 'PUT', body: JSON.stringify({ priceTypeId, price }) }),
     priceHistory: (id: string): Promise<PriceHistory[]> => fetchApi(`/api/products/${id}/history`),

@@ -57,6 +57,11 @@ export function Products() {
   const [editingCell, setEditingCell] = useState<{ productId: string; priceTypeId: string; value: string } | null>(null);
   const [vkBusy, setVkBusy] = useState<'import' | 'sync' | null>(null);
 
+  // Массовый выбор позиций (удаление / перенос в категорию)
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkCat, setBulkCat] = useState('');
+  const [bulkBusy, setBulkBusy] = useState(false);
+
   const importFromVk = async () => {
     if (!confirm('Импортировать все товары маркета группы ВК в проект? Позиции с совпадающим названием будут привязаны, не продублированы.')) return;
     setVkBusy('import');
@@ -224,6 +229,53 @@ export function Products() {
   const totalStock = (p: Product) => (p.stocks || []).reduce((sum, s) => sum + s.quantity, 0);
   const priceOf = (p: Product, ptId: string) => (p.prices || []).find(x => x.priceTypeId === ptId)?.price;
 
+  const toggleSelect = (id: string) => setSelected(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  // Плоский список категорий с отступами по глубине (как в карточке товара)
+  const categoryOptions = useMemo(() => {
+    const out: { id: string; label: string }[] = [];
+    const walk = (parentId: string | null, depth: number) => {
+      for (const c of catChildren.get(parentId) ?? []) {
+        out.push({ id: c.id, label: `${'— '.repeat(depth)}${c.name}` });
+        walk(c.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    return out;
+  }, [catChildren]);
+
+  const bulkDelete = async () => {
+    if (!confirm(`Удалить выбранные позиции (${selected.size})?`)) return;
+    setBulkBusy(true);
+    try {
+      await api.products.bulkDelete([...selected]);
+      setSelected(new Set());
+      await load();
+    } catch (e: any) {
+      alert(e.message || 'Ошибка удаления');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const bulkMove = async () => {
+    setBulkBusy(true);
+    try {
+      await api.products.bulkCategory([...selected], bulkCat || null);
+      setSelected(new Set());
+      setBulkCat('');
+      await load();
+    } catch (e: any) {
+      alert(e.message || 'Ошибка переноса');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   // Рекурсивный рендер узла дерева категорий (свёрнут по умолчанию)
   const countNode = (n: CategoryNode): number => n.products.length + n.children.reduce((s, c) => s + countNode(c), 0);
   const renderNode = (node: CategoryNode, depth: number): ReactNode[] => {
@@ -259,6 +311,8 @@ export function Products() {
             if (!confirm(`Удалить «${p.name}»?`)) return;
             try { await api.products.delete(p.id); await load(); } catch (e: any) { alert(e.message); }
           }}
+          selected={selected.has(p.id)}
+          onToggle={() => toggleSelect(p.id)}
         />
       )));
     }
@@ -367,10 +421,32 @@ export function Products() {
               В наличии
             </label>
           </div>
+
+          {/* Панель массовых действий */}
+          {selected.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Выбрано: {selected.size}</span>
+              <select value={bulkCat} onChange={e => setBulkCat(e.target.value)} style={{ ...inputStyle, maxWidth: 280 }}>
+                <option value="">— Без категории —</option>
+                {categoryOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+              <button onClick={bulkMove} disabled={bulkBusy} style={{ ...btnPrimary, opacity: bulkBusy ? 0.6 : 1 }}>Перенести</button>
+              <button onClick={bulkDelete} disabled={bulkBusy} style={{ ...btnPrimary, background: '#dc2626', opacity: bulkBusy ? 0.6 : 1 }}>Удалить</button>
+              <button onClick={() => { setSelected(new Set()); setBulkCat(''); }} style={btnGhost}>Снять выбор</button>
+            </div>
+          )}
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
+                  <th style={thStyle}>
+                    <input
+                      type="checkbox"
+                      style={{ width: 15, height: 15, cursor: 'pointer' }}
+                      checked={visible.length > 0 && visible.every(p => selected.has(p.id))}
+                      onChange={e => setSelected(e.target.checked ? new Set(visible.map(p => p.id)) : new Set())}
+                    />
+                  </th>
                   <th style={thStyle}>Позиция</th>
                   <th style={thStyle}>Вид</th>
                   <th style={thStyle}>Ед.</th>
@@ -393,6 +469,8 @@ export function Products() {
                       if (!confirm(`Удалить «${p.name}»?`)) return;
                       try { await api.products.delete(p.id); await load(); } catch (e: any) { alert(e.message); }
                     }}
+                    selected={selected.has(p.id)}
+                    onToggle={() => toggleSelect(p.id)}
                   />
                 ))}
                 {visible.length === 0 && (
@@ -654,11 +732,12 @@ export function Products() {
 }
 
 /* ---------- Строка позиции в номенклатуре ---------- */
-function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDelete }: {
+function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDelete, selected, onToggle }: {
   p: Product; indent: number; priceTypes: PriceType[];
   totalStock: number;
   priceOf: (p: Product, ptId: string) => number | undefined;
   onOpen: () => void; onDelete: () => void;
+  selected: boolean; onToggle: () => void;
 }) {
   const origin = window.location.origin;
   const mainImage = (p.images || [])[0];
