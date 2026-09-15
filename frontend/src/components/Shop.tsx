@@ -37,18 +37,24 @@ export function Shop() {
           ))}
         </div>
       </div>
-      <iframe
-        key={current.key}
-        src={current.url}
-        title={current.label}
-        style={{
-          flex: 1,
-          width: "100%",
-          border: "1px solid var(--border-color)",
-          borderRadius: 12,
-          background: "var(--bg-card)",
-        }}
-      />
+      {current.key === "vitrine" ? (
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <Vitrine />
+        </div>
+      ) : (
+        <iframe
+          key={current.key}
+          src={current.url}
+          title={current.label}
+          style={{
+            flex: 1,
+            width: "100%",
+            border: "1px solid var(--border-color)",
+            borderRadius: 12,
+            background: "var(--bg-card)",
+          }}
+        />
+      )}
     </div>
   );
 }
