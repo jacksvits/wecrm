@@ -16,6 +16,7 @@ router.get('/', authMiddleware, async (_req, res) => {
       login: s?.login ?? '',
       hasPassword: !!s?.password,
       syncIntervalMinutes: s?.syncIntervalMinutes ?? 15,
+      kindFolder: s?.kindFolder ?? '',
       lastSyncAt: s?.lastSyncAt ?? null,
       lastSyncResult: s?.lastSyncResult ?? null,
       entitySync: getEntitySync(s?.entitySync),
@@ -50,6 +51,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
         ? Math.max(5, Math.min(1440, Number(syncIntervalMinutes) || 15))
         : (existing?.syncIntervalMinutes ?? 15),
       entitySync: entitySync !== undefined ? (getEntitySync(entitySync) as any) : (existing?.entitySync ?? (getEntitySync(undefined) as any)),
+      kindFolder: kindFolder !== undefined ? kindFolder.trim() : (existing?.kindFolder ?? ''),
       updatedAt: new Date(),
     };
     const saved = await prisma.oneCPluginSettings.upsert({
