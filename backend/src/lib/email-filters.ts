@@ -25,6 +25,7 @@ export interface FilterDecision {
     address?: string;
     priority?: string;
     status?: string;
+    discussion?: string; // значения, направленные в обсуждение задачи
   };
   stopProcessing: boolean;
 }
@@ -98,6 +99,10 @@ function applyParseRules(filter: any, bodyText: string, decision: FilterDecision
       if (PRIORITIES.includes(v)) decision.parsed = { ...decision.parsed, priority: v };
     } else if (rule.field === 'status') {
       decision.parsed = { ...decision.parsed, status: value.slice(0, 50) };
+    } else if (rule.field === 'discussion') {
+      const prev = decision.parsed?.discussion;
+      const next = value.slice(0, 4000);
+      decision.parsed = { ...decision.parsed, discussion: prev ? `${prev}\n${next}` : next };
     }
   }
 }

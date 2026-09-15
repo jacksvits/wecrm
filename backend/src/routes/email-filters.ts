@@ -26,7 +26,7 @@ const filterSchema = z.object({
     pattern: z.string().min(1),
     pattern2: z.string().optional().nullable(),
     mode: z.enum(['regex', 'toEol', 'toWord']).optional().default('regex'),
-    field: z.enum(['title', 'description', 'address', 'priority', 'status']),
+    field: z.enum(['title', 'description', 'address', 'priority', 'status', 'discussion']),
     group: z.number().int().min(0).max(9).default(1),
   })).optional().nullable(),
   stopProcessing: z.boolean().default(true),

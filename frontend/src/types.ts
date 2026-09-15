@@ -102,7 +102,7 @@ export interface EmailParseRule {
   pattern: string;
   pattern2?: string | null;
   mode?: EmailParseMode;
-  field: 'title' | 'description' | 'address' | 'priority' | 'status';
+  field: 'title' | 'description' | 'address' | 'priority' | 'status' | 'discussion';
   group?: number;
 }
 export interface EmailFilter {

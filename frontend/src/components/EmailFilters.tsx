@@ -22,6 +22,7 @@ const PARSE_FIELD_LABELS: Record<EmailParseRule['field'], string> = {
   description: 'Описание',
   address: 'Адрес',
   priority: 'Приоритет',
+  discussion: 'Сообщение в обсуждение',
   status: 'Статус',
 };
 

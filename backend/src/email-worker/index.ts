@@ -227,6 +227,7 @@ export class EmailWorker {
           if (decision.parsed.priority) parsedLines.push(`Приоритет: ${decision.parsed.priority}`);
           if (decision.parsed.status) parsedLines.push(`Статус: ${decision.parsed.status}`);
           if (decision.parsed.description) parsedLines.push(decision.parsed.description);
+          if (decision.parsed.discussion) parsedLines.push(decision.parsed.discussion);
           if (parsedLines.length) {
             await prisma.comment.create({
               data: {
