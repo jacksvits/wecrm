@@ -708,13 +708,14 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; syncToVk: boolean; description: string }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; syncToVk: boolean; onVitrine: boolean; description: string }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : product.kind,
     sku: isNew ? '' : product.sku || '',
     unit: isNew ? 'шт' : product.unit,
     barcode: isNew ? '' : product.barcode || '',
     syncToVk: isNew ? false : product.syncToVk,
+    onVitrine: isNew ? false : product.onVitrine,
     description: isNew ? '' : product.description || '',
   });
   const [categoryId, setCategoryId] = useState(isNew ? '' : product.categoryId || '');

@@ -256,6 +256,28 @@ router.get('/meta/categories', async (_req, res) => {
   }
 });
 
+/**
+ * GET /api/products/vitrine
+ * Витрина магазина: активные позиции с отметкой «На витрине», с ценами, остатками и фото
+ */
+router.get('/vitrine', async (_req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: { onVitrine: true, isActive: true },
+      include: {
+        stocks: { include: { warehouse: { select: { name: true } } } },
+        prices: { include: { priceType: { select: { label: true, sortOrder: true } } } },
+        images: { orderBy: { sortOrder: 'asc' } },
+      },
+      orderBy: { name: 'asc' },
+    });
+    res.json(products);
+  } catch (err: any) {
+    console.error('[products:vitrine]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ============ Номенклатура ============ */
 
 /**
@@ -312,7 +334,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, kind, syncToVk, categoryId } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, kind, syncToVk, onVitrine, categoryId } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
     const productKind = kind === 'service' ? 'service' : 'product';
     // Категория из дерева 1С (группы/виды номенклатуры)
@@ -337,6 +359,7 @@ router.post('/', async (req, res) => {
         unit: unit?.trim() || 'шт',
         barcode: barcode?.trim() || null,
         syncToVk: !!syncToVk,
+        onVitrine: !!onVitrine,
       },
       include: { stocks: true, prices: true, images: { orderBy: { sortOrder: 'asc' } } },
     });

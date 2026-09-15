@@ -992,6 +992,8 @@ model Product {
   onecId      String?  @unique @map("onec_id")
   onecSyncedAt DateTime? @map("onec_synced_at")
   isActive    Boolean  @default(true) @map("is_active")
+  // «На витрине»: показывать товар во вкладке «Витрина» магазина
+  onVitrine   Boolean  @default(false) @map("on_vitrine")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

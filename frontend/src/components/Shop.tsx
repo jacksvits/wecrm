@@ -1,12 +1,14 @@
 import { useState } from "react";
+import { Vitrine } from "./Vitrine";
 
 const TABS = [
+  { key: "vitrine", label: "Витрина" },
   { key: "services", label: "Услуги", url: "https://welans.tochkaplace.com" },
   { key: "cartridges", label: "Картриджи", url: "https://wetoner.tochkaplace.com" },
 ];
 
 export function Shop() {
-  const [activeTab, setActiveTab] = useState("services");
+  const [activeTab, setActiveTab] = useState("vitrine");
   const current = TABS.find((t) => t.key === activeTab) || TABS[0];
 
   return (
