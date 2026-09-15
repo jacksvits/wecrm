@@ -133,6 +133,30 @@ async function cacheFirstWithNetworkFallback(request) {
 
 self.addEventListener('push', (event) => {
   const data = event.data?.json() || {};
+  // Входящий аудио/видеозвонок: системное уведомление с кнопками действий.
+  // WebRTC нельзя поднять из SW — кнопки открывают CRM (?call=<id> для
+  // автопринятия, ?call=<id>&reject=1 для отклонения), звонок подхватывает
+  // CallContext (уровень 1; полный ответ с экрана блокировки — нативный
+  // Capacitor-клиент, уровень 2).
+  if (data.kind === 'incoming-call' && data.callId) {
+    event.waitUntil(
+      self.registration.showNotification(data.title || 'Входящий звонок', {
+        body: data.body || '',
+        icon: data.icon || '/icon-192x192.png',
+        badge: data.icon || '/icon-192x192.png',
+        tag: 'call-' + data.callId,
+        data: { kind: 'incoming-call', callId: data.callId },
+        requireInteraction: true,
+        renotify: true,
+        silent: false,
+        actions: [
+          { action: 'accept', title: 'Принять' },
+          { action: 'reject', title: 'Отклонить' },
+        ],
+      })
+    );
+    return;
+  }
   event.waitUntil(
     self.registration.showNotification(data.title || 'WeCRM', {
       body: data.body || '',
@@ -147,19 +171,28 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
-  event.waitUntil(
-    self.clients
-      .matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => {
-        for (const client of clientList) {
-          if (client.url.includes(url) && 'focus' in client)
-            return client.focus();
-        }
-        if (self.clients.openWindow) return self.clients.openWindow(url);
-      })
-  );
+  const nd = event.notification.data || {};
+  // Клик по уведомлению о звонке: открываем CRM — CallContext сам ответит
+  // на звонок (accept) или отклонит его (reject) по параметрам URL
+  if (nd.kind === 'incoming-call' && nd.callId) {
+    const url = event.action === 'reject'
+      ? '/?call=' + encodeURIComponent(nd.callId) + '&reject=1'
+      : '/?call=' + encodeURIComponent(nd.callId);
+    event.waitUntil(openOrFocus(url));
+    return;
+  }
+  const url = nd.url || '/';
+  event.waitUntil(openOrFocus(url));
 });
+
+// Фокус существующей вкладки CRM с нужным URL или открытие новой
+async function openOrFocus(url) {
+  const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const client of clientList) {
+    if (client.url.includes(url) && 'focus' in client) return client.focus();
+  }
+  if (self.clients.openWindow) return self.clients.openWindow(url);
+}
 
 
 // Handle subscription change (browser rotates keys)

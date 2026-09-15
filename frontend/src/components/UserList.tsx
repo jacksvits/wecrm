@@ -3,11 +3,13 @@ import { api } from "../api/client";
 import { useRealtime } from "../hooks/useRealtime";
 import { User, Role } from "../types";
 import { useAuth } from "../hooks/useAuth";
+import { useCall } from "../context/CallContext";
 function isRoleObject(role: Role | string | undefined): role is Role {
   return typeof role === "object" && role !== null && "id" in role;
 }
 export function UserList() {
   const { user: currentUser } = useAuth();
+  const { startCall } = useCall();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -304,6 +306,39 @@ export function UserList() {
                       </div>
                     )}{" "}
                   </div>{" "}
+                  {u.id !== currentUser?.id && (
+                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                      {" "}
+                      <button
+                        onClick={() => startCall({ id: u.id, name: u.name, avatar: u.avatar }, "audio")}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--text-muted)",
+                          cursor: "pointer",
+                          fontSize: 14,
+                          padding: 4,
+                        }}
+                        title="Аудиозвонок"
+                      >
+                        📞
+                      </button>{" "}
+                      <button
+                        onClick={() => startCall({ id: u.id, name: u.name, avatar: u.avatar }, "video")}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--text-muted)",
+                          cursor: "pointer",
+                          fontSize: 14,
+                          padding: 4,
+                        }}
+                        title="Видеозвонок"
+                      >
+                        🎥
+                      </button>{" "}
+                    </div>
+                  )}{" "}
                   {isAdmin && u.id !== currentUser?.id && (
                     <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                       {" "}

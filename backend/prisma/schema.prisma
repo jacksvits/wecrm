@@ -102,6 +102,8 @@ model User {
   priceHistory    PriceHistory[]
   @@map("users")
   reminders     Reminder[]
+  webCallsMade     WebCall[] @relation("WebCallCaller")
+  webCallsReceived WebCall[] @relation("WebCallCallee")
 }
 
 model ContactType {
@@ -608,6 +610,27 @@ model Notification {
   @@index([userId, readAt])
   @@index([createdAt])
   @@map("notifications")
+}
+
+// Аудио/видеозвонки 1-на-1 между пользователями (WebRTC peer-to-peer,
+// сигнальный сервер — WebSocket /api/calls/ws). Отдельная таблица web_calls,
+// т.к. таблица calls занята телефонией (Novofon).
+model WebCall {
+  id         String    @id @default(cuid())
+  callerId   String    @map("caller_id")
+  caller     User      @relation("WebCallCaller", fields: [callerId], references: [id], onDelete: Cascade)
+  calleeId   String    @map("callee_id")
+  callee     User      @relation("WebCallCallee", fields: [calleeId], references: [id], onDelete: Cascade)
+  type       String    @default("audio") // audio | video
+  status     String    @default("ringing") // ringing | ongoing | ended | rejected | missed | cancelled | busy
+  answeredAt DateTime? @map("answered_at")
+  endedAt    DateTime? @map("ended_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([callerId, createdAt])
+  @@index([calleeId, createdAt])
+  @@index([status])
+  @@map("web_calls")
 }
 
 model Status {

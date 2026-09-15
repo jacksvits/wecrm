@@ -41,6 +41,8 @@ import notesRouter from './routes/notes.js';
 import productsRoutes from './routes/products.js';
 import reminderRoutes from './routes/reminders.js';
 import { setupPushWs } from './routes/push-ws.js';
+import { setupCallsWs } from './routes/calls-ws.js';
+import callRoutes from './routes/calls.js';
 import { startReminderScheduler } from './lib/reminder-scheduler.js';
 import brandingRoutes from './routes/branding.js';
 import integrationsRoutes from './routes/integrations.js';
@@ -136,14 +138,22 @@ app.use('/api/onec-plugin', onecPluginRoutes);
 app.use('/api/handler-settings', handlerSettingsRoutes);
 app.use('/api/auto-reply-settings', autoReplySettingsRoutes);
 app.use('/api/yandex', yandexRoutes);
+app.use('/api/calls', callRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', connections: getActiveConnections(), time: new Date().toISOString() }));
 
-app.listen(PORT, () => {
+// Один HTTP-сервер на приложение: поверх него работают WebSocket-каналы
+// /api/push/ws (нативный Android-клиент) и /api/calls/ws (сигнальник WebRTC)
+const server = http.createServer(app);
+setupPushWs(server);
+setupCallsWs(server);
+
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   startReminderScheduler();
   console.log(`Uploads route mounted at /api/uploads`);
   console.log(`Camera proxy mounted at /api/camera/stream`);
+  console.log(`Calls WS mounted at /api/calls/ws`);
 });
 
 

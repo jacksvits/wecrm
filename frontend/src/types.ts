@@ -114,3 +114,16 @@ export interface EmailFilterLog {
   emailFrom?: string | null; emailTo?: string | null; subject?: string | null;
   action: string; taskId?: string | null; createdAt: string;
 }
+export interface WebCall {
+  id: string;
+  callerId: string;
+  calleeId: string;
+  type: 'audio' | 'video';
+  status: 'ringing' | 'ongoing' | 'ended' | 'rejected' | 'missed' | 'cancelled' | 'busy';
+  answeredAt?: string | null;
+  endedAt?: string | null;
+  createdAt: string;
+  duration?: number;
+  caller?: { id: string; name: string; avatar?: string | null };
+  callee?: { id: string; name: string; avatar?: string | null };
+}
