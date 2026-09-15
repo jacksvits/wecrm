@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { markPushWorks, markPushMissing } from '../lib/appInstall'
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -51,6 +52,7 @@ export function PushSubscriber() {
       .then(async (sub) => {
         if (sub) {
           console.log('[PushSubscriber] Already subscribed')
+          markPushWorks()
           return
         }
         const reg = await navigator.serviceWorker.ready
@@ -66,10 +68,13 @@ export function PushSubscriber() {
           headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
           body: JSON.stringify({ endpoint: newSub.endpoint, keys: { p256dh, auth } }),
         })
+        markPushWorks() // авто-подписка прошла → Google-сервисы есть
         console.log('[PushSubscriber] Auto-subscribed successfully')
       })
       .catch(err => {
         console.error('[PushSubscriber] Auto-subscribe error:', err)
+        // «push service error»/«unavailable» на Android = нет Google-сервисов (FCM)
+        if (/push service|unavailable|network/i.test(err?.message || '')) markPushMissing()
       })
   }, [user, vapidKey])
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { markPushWorks, markPushMissing } from '../lib/appInstall';
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -55,6 +56,7 @@ export function usePush() {
       })
       .then(sub => {
         console.log('[Push] Existing subscription:', !!sub);
+        if (sub) markPushWorks(); // push-подписка живая → Google-сервисы есть
         setSubscribed(!!sub);
       })
       .catch(err => {
@@ -88,9 +90,12 @@ export function usePush() {
         keys: { p256dh, auth },
       });
       console.log('[Push] Saved to server');
+      markPushWorks();
       setSubscribed(true);
     } catch (err: any) {
       console.error('[Push] Subscribe error:', err);
+      // «push service error»/«unavailable» на Android = нет Google-сервисов (FCM)
+      if (/push service|unavailable|network/i.test(err?.message || '')) markPushMissing();
       setError(err.message || 'Failed to subscribe');
     }
   };
