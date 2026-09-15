@@ -691,6 +691,12 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
             ВК
           </span>
         )}
+        {p.onVitrine && (
+          <span title="Показывается на витрине магазина"
+            style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#16a34a', color: '#fff' }}>
+            Витрина
+          </span>
+        )}
       </td>
       <td style={tdStyle}>{p.unit}</td>
       <td style={tdStyle}>{p.kind === 'service' ? '—' : fmtMoney(totalStock)}</td>
@@ -816,6 +822,10 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
             <input type="checkbox" checked={form.syncToVk} onChange={e => setForm({ ...form, syncToVk: e.target.checked })} style={{ width: 16, height: 16 }} />
             Синхронизировать с ВКонтакте
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.onVitrine} onChange={e => setForm({ ...form, onVitrine: e.target.checked })} style={{ width: 16, height: 16 }} />
+            На витрине
           </label>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Описание</label>
           <ReactQuill theme="snow" value={form.description} onChange={v => setForm({ ...form, description: v })}
