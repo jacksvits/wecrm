@@ -195,36 +195,23 @@ async function openOrFocus(url) {
 }
 
 
-// Handle subscription change (browser rotates keys)
+// Handle subscription change (browser rotates keys / инвалидация при смене SW
+// — фикс Safari, где пуши молча переставали отображаться после деплоя нового
+// sw.js). Из SW нельзя достать JWT (localStorage недоступен), поэтому просим
+// открытые вкладки CRM переподписаться — у них есть токен. Если вкладок нет,
+// переподписка произойдёт при следующем открытии приложения (PushSubscriber
+// проверяет подписку на загрузке и слушает это же сообщение).
 self.addEventListener('pushsubscriptionchange', (event) => {
-  console.log('[SW] Subscription changed, re-subscribing...');
+  console.log('[SW] Subscription changed, asking clients to re-subscribe...');
   event.waitUntil(
-    fetch('/api/push/vapid-public-key')
-      .then(r => r.json())
-      .then(data => {
-        if (!data.publicKey) throw new Error('No VAPID key available');
-        const padding = '='.repeat((4 - (data.publicKey.length % 4)) % 4);
-        const base64 = (data.publicKey + padding).replace(/-/g, '+').replace(/_/g, '/');
-        const rawData = self.atob(base64);
-        const key = Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
-        return self.registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: key,
-        });
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          client.postMessage({ type: 'wecrm-resubscribe' });
+        }
+        console.log('[SW] Re-subscribe request sent to', clientList.length, 'clients');
       })
-      .then((newSubscription) => {
-        const p256dh = self.btoa(String.fromCharCode(...new Uint8Array(newSubscription.getKey('p256dh'))));
-        const auth = self.btoa(String.fromCharCode(...new Uint8Array(newSubscription.getKey('auth'))));
-        return fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            endpoint: newSubscription.endpoint,
-            keys: { p256dh, auth },
-          }),
-        });
-      })
-      .then(() => console.log('[SW] Re-subscribed successfully'))
-      .catch(err => console.error('[SW] Re-subscribe failed:', err))
+      .catch((err) => console.error('[SW] Re-subscribe request failed:', err))
   );
 });
