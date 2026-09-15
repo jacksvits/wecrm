@@ -89,11 +89,19 @@ export async function loadBranding(): Promise<Branding> {
   return current;
 }
 
-// Хук: текущий логотип с реакцией на обновление брендинга
+// Логотип из настроек: в тёмной теме — darkLogoUrl, в светлой — logoUrl;
+// если логотип текущей темы не задан — используется основной логотип
+function pickLogo(isDark: boolean): string {
+  const custom = isDark ? current.darkLogoUrl : current.logoUrl;
+  return custom || current.logoUrl || defaultLogo(isDark);
+}
+
+// Хук: текущий логотип с реакцией на смену темы и на обновление брендинга
 export function useBrandLogo(isDark: boolean): string {
-  const [logo, setLogo] = useState<string>(current.logoUrl || defaultLogo(isDark));
+  const [logo, setLogo] = useState<string>(pickLogo(isDark));
   useEffect(() => {
-    const handler = () => setLogo(current.logoUrl || defaultLogo(isDark));
+    setLogo(pickLogo(isDark));
+    const handler = () => setLogo(pickLogo(isDark));
     window.addEventListener('brandingchange', handler);
     return () => window.removeEventListener('brandingchange', handler);
   }, [isDark]);
