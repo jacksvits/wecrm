@@ -196,6 +196,30 @@ export class EmailWorker {
           },
         });
 
+        // Применение правил парсинга тела письма (шаблон → поле задачи)
+        if (decision.parsed) {
+          const updateData: any = {};
+          if (decision.parsed.title) updateData.title = decision.parsed.title;
+          if (decision.parsed.description) {
+            const current = task.description || '';
+            updateData.description = current
+              ? `${current}\n\n${decision.parsed.description}`
+              : decision.parsed.description;
+          }
+          if (decision.parsed.priority) updateData.priority = decision.parsed.priority;
+          if (decision.parsed.status) {
+            const status = await prisma.status.findUnique({
+              where: { entityType_name: { entityType: 'task', name: decision.parsed.status.toLowerCase() } },
+            });
+            if (status) updateData.status = status.name;
+            else console.warn(`[EmailWorker] Parsed status "${decision.parsed.status}" not found, keeping default`);
+          }
+          if (Object.keys(updateData).length) {
+            await prisma.task.update({ where: { id: task.id }, data: updateData });
+            console.log(`[EmailWorker] Applied parsed fields to task ${task.id}: ${Object.keys(updateData).join(', ')}`);
+          }
+        }
+
         postHandlerGreeting(task.id); // Обработчик: «Приветствие» в обсуждение новой задачи
 
         // Отправляем уведомления о новой задаче из письма (аналогично ручному созданию)
