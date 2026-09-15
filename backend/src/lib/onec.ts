@@ -268,7 +268,7 @@ export class OneCClient {
     const folders = await this.loadFolders();
     let parentKey: string | undefined;
     for (const name of path) {
-      const found = [...folders.entries()].find(([, f]) => f.name === name && f.parent === parentKey);
+      const found = [...folders.entries()].find(([, f]) => f.name.trim() === name.trim() && f.parent === parentKey);
       if (found) {
         parentKey = found[0];
         continue;
