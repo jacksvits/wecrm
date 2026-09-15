@@ -1,0 +1,1 @@
+[{"relation": ["delegate_permission/common.handle_all_urls"], "target": {"namespace": "android_app", "package_name": "cc.welans.wecrm", "sha256_cert_fingerprints": ["73:69:6A:6A:87:D8:A0:83:D1:5A:ED:AB:F1:1E:E0:BF:AC:27:27:DF:EC:BC:60:B1:D3:70:E4:C0:81:DC:AE:C8"]}}]
