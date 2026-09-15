@@ -128,12 +128,12 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
       try {
         const kindTree = await client.getKindTree();
         if (kindTree.length) {
-          // Фильтр по настроенной папке: синхронизируем только эту ветку (регистр и пробелы не важны)
-          const kindFolder = (s.kindFolder || '').trim();
+          // Фильтр по настроенным папкам: список через запятую, синхронизируем только эти ветки (регистр и пробелы не важны)
+          const kindFolders = (s.kindFolder || '').split(',').map((x) => x.trim()).filter(Boolean);
           let tree = kindTree;
-          if (kindFolder) {
-            const lower = kindFolder.toLowerCase();
-            const folderIds = new Set(kindTree.filter((n) => n.isGroup && n.name.trim().toLowerCase() === lower).map((n) => n.onecId));
+          if (kindFolders.length) {
+            const lowers = kindFolders.map((x) => x.toLowerCase());
+            const folderIds = new Set(kindTree.filter((n) => n.isGroup && lowers.includes(n.name.trim().toLowerCase())).map((n) => n.onecId));
             if (folderIds.size) {
               kindScope = new Set<string>();
               const walk = (id: string) => {
@@ -144,7 +144,7 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
               for (const id of folderIds) walk(id);
               tree = kindTree.filter((n) => kindScope!.has(n.onecId));
             } else {
-              console.error(`[1c] папка видов номенклатуры «${kindFolder}» не найдена в 1С — категории не синхронизируются (ничего не удалено)`);
+              console.error(`[1c] папки видов номенклатуры «${kindFolders.join('», «')}» не найдены в 1С — категории не синхронизируются (ничего не удалено)`);
               tree = [];
             }
           }

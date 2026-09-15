@@ -226,7 +226,7 @@ export default function OneCSettings() {
           <div style={{ marginTop: 10 }}>
             <button
               onClick={async () => {
-                if (!confirm(`Удалить категории CRM, чьи виды 1С находятся ВНЕ папки «${form.kindFolder.trim()}»?\n\nТовары не удаляются — у них просто снимется категория.`)) return;
+                if (!confirm(`Удалить категории CRM, чьи виды 1С находятся ВНЕ папок «${form.kindFolder.trim()}»?\n\nТовары не удаляются — у них просто снимется категория.`)) return;
                 try {
                   const r: any = await api.oneCPlugin.pruneCategories();
                   flash(`Удалено категорий вне папки: ${r.deleted}`);
@@ -236,7 +236,7 @@ export default function OneCSettings() {
               }}
               style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid #dc2626', background: 'transparent', color: '#dc2626', fontSize: 14, cursor: 'pointer' }}
             >
-              Удалить категории вне выбранной папки
+              Удалить категории вне выбранных папок
             </button>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
               Однократная чистка: удаляются категории CRM из других веток 1С, товары сохраняются без категории

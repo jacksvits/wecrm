@@ -120,7 +120,7 @@ export function Settings() {
     if (activeTab !== "integrations") return;
     const token = localStorage.getItem("token");
     fetch("/api/integrations/status", {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers: token ? { 'X-Auth-Token': token } : undefined,
     })
       .then((r) => (r.ok ? r.json() : null))
       .then((s) => s && setPluginStatus((prev) => ({ ...prev, ...s })))
@@ -163,7 +163,7 @@ export function Settings() {
     setSelectedPlugin(null);
     const token = localStorage.getItem("token");
     fetch("/api/integrations/status", {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers: token ? { 'X-Auth-Token': token } : undefined,
     })
       .then((r) => (r.ok ? r.json() : null))
       .then((s) => s && setPluginStatus((prev) => ({ ...prev, ...s })))

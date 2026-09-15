@@ -57,7 +57,7 @@ export function NewsDetail() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'X-Auth-Token': localStorage.getItem('token'),
         },
       });
       await loadNews();

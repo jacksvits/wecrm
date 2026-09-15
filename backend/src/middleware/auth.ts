@@ -25,6 +25,9 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
     token = authHeader.split(' ')[1];
+  } else if (typeof req.headers['x-auth-token'] === 'string') {
+    // кастомный заголовок: обход ложных блокировок WAF на Authorization (Bearer JWT)
+    token = req.headers['x-auth-token'] as string;
   } else if (typeof req.query.token === 'string') {
     token = req.query.token;
   }

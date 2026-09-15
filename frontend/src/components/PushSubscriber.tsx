@@ -25,7 +25,7 @@ async function saveSubscription(sub: PushSubscription) {
   const token = localStorage.getItem('token')
   await fetch('/api/push/subscribe', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Auth-Token': token } : {}) },
     body: JSON.stringify({ endpoint: sub.endpoint, keys: { p256dh, auth } }),
   })
 }

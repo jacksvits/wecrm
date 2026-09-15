@@ -123,15 +123,15 @@ router.post('/prune-categories', authMiddleware, async (req: AuthRequest, res) =
   try {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
     const s = await prisma.oneCPluginSettings.findUnique({ where: { id: 1 } });
-    const kindFolder = (s?.kindFolder || '').trim();
-    if (!kindFolder) return res.status(400).json({ error: 'Сначала укажите «Папку видов номенклатуры» в настройках' });
+    const kindFolders = (s?.kindFolder || '').split(',').map((x) => x.trim()).filter(Boolean);
+    if (!kindFolders.length) return res.status(400).json({ error: 'Сначала укажите «Папку видов номенклатуры» в настройках' });
     if (!s?.serviceUrl || !s?.login || !s?.password) return res.status(400).json({ error: 'Заполните подключение к 1С (ссылка, логин, пароль)' });
 
     const client = new OneCClient(s.serviceUrl, s.login, s.password);
     const kindTree = await client.getKindTree();
-    const lower = kindFolder.toLowerCase();
-    const folderIds = new Set(kindTree.filter((n) => n.isGroup && n.name.trim().toLowerCase() === lower).map((n) => n.onecId));
-    if (!folderIds.size) return res.status(404).json({ error: `Папка «${kindFolder}» не найдена в справочнике видов номенклатуры 1С` });
+    const lowers = kindFolders.map((x) => x.toLowerCase());
+    const folderIds = new Set(kindTree.filter((n) => n.isGroup && lowers.includes(n.name.trim().toLowerCase())).map((n) => n.onecId));
+    if (!folderIds.size) return res.status(404).json({ error: `Папки «${kindFolders.join('», «')}» не найдены в справочнике видов номенклатуры 1С` });
 
     // onecId узлов выбранной папки и всех её потомков
     const scope = new Set<string>();

@@ -196,7 +196,7 @@ export function SystemSettings() {
       const token = localStorage.getItem("token");
       const res = await fetch(`/api/branding/${kind}`, {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        headers: token ? { 'X-Auth-Token': token } : undefined,
         body: fd,
       });
       const data = await res.json();
@@ -224,7 +224,7 @@ export function SystemSettings() {
       const token = localStorage.getItem("token");
       const res = await fetch("/api/branding/news-cover", {
         method: "DELETE",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        headers: token ? { 'X-Auth-Token': token } : undefined,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Ошибка сброса");
@@ -245,7 +245,7 @@ export function SystemSettings() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(token ? { 'X-Auth-Token': token } : {}),
         },
         body: JSON.stringify({ enabled: !branding.splashEnabled }),
       });
@@ -267,7 +267,7 @@ export function SystemSettings() {
       const token = localStorage.getItem("token");
       const res = await fetch("/api/branding/splash", {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        headers: token ? { 'X-Auth-Token': token } : undefined,
         body: fd,
       });
       const data = await res.json();
@@ -288,7 +288,7 @@ export function SystemSettings() {
       const token = localStorage.getItem("token");
       const res = await fetch("/api/branding/splash", {
         method: "DELETE",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        headers: token ? { 'X-Auth-Token': token } : undefined,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Ошибка сброса");
@@ -308,7 +308,7 @@ export function SystemSettings() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(token ? { 'X-Auth-Token': token } : {}),
         },
         body: JSON.stringify({ color }),
       });

@@ -16,7 +16,7 @@ export function PskovlineWidget() {
       try {
         const token = localStorage.getItem('token');
         const res = await fetch('/api/pskovline', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          headers: token ? { 'X-Auth-Token': token } : {},
         });
         if (res.ok) {
           setData(await res.json());
