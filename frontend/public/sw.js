@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wecrm-v5';
+const CACHE_NAME = 'wecrm-v6';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/favicon.ico',

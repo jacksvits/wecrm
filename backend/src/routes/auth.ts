@@ -116,11 +116,20 @@ router.post('/login', async (req, res) => {
 });
 
 router.get('/me', async (req, res) => {
+  // приём токена как в authMiddleware: Authorization / X-Auth-Token / ?token=
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let token: string | undefined;
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (typeof req.headers['x-auth-token'] === 'string') {
+    token = req.headers['x-auth-token'] as string;
+  } else if (typeof req.query.token === 'string') {
+    token = req.query.token;
+  }
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
-    const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
