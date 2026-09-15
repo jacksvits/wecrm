@@ -527,8 +527,8 @@ export function Products() {
                 </tr>
               </thead>
               <tbody>
-                {stockProducts.flatMap(p =>
-                  (p.stocks || [])
+                {stockProducts.flatMap(p => {
+                  const rows = (p.stocks || [])
                     .filter(s => whFilter === 'all' || s.warehouseId === whFilter)
                     .map(s => {
                       const wh = warehouses.find(w => w.id === s.warehouseId);
@@ -558,8 +558,39 @@ export function Products() {
                           </td>
                         </tr>
                       );
-                    })
-                )}
+                    });
+                  // товары без остатков тоже показываем с нулями — иначе часть каталога невидима в складской вкладке
+                  if (rows.length === 0) {
+                    rows.push(
+                      <tr key={`${p.id}-empty`}>
+                        <td style={tdStyle}>
+                          <div style={{ fontWeight: 500 }}>{p.name}</div>
+                          {p.sku && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.sku}</div>}
+                        </td>
+                        <td style={tdStyle}>{whFilter === 'all' ? '—' : (warehouses.find(w => w.id === whFilter)?.name || '—')}</td>
+                        <td style={tdStyle}>0 {p.unit}</td>
+                        <td style={tdStyle}>0 {p.unit}</td>
+                        <td style={{ ...tdStyle, fontWeight: 600 }}>0 {p.unit}</td>
+                        <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                          <button
+                            style={{ ...btnGhost, marginRight: 8, color: '#059669' }}
+                            onClick={() => setMovementModal({ product: p, type: 'income' })}
+                          >
+                            Приход
+                          </button>
+                          <button
+                            style={{ ...btnGhost, color: '#dc2626', opacity: 0.5, cursor: 'not-allowed' }}
+                            disabled
+                            title="Нет остатка для списания"
+                          >
+                            Расход
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return rows;
+                })}
                 {stockProducts.every(p => !(p.stocks || []).some(s => whFilter === 'all' || s.warehouseId === whFilter)) && (
                   <tr>
                     <td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
