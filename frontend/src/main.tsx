@@ -5,6 +5,7 @@ import { AuthProvider } from './context/AuthContext';
 import App from './App';
 import './index.css';
 import { loadBranding } from './lib/branding';
+import { initNativePush } from './lib/nativePush';
 
 // Загружаем кастомный брендинг (иконка PWA/favicon, логотип) до первого рендера
 loadBranding();
@@ -53,6 +54,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </React.StrictMode>,
 );
+
+initNativePush();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

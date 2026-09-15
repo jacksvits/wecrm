@@ -40,6 +40,7 @@ import filesRoutes from './routes/files.js';
 import notesRouter from './routes/notes.js';
 import productsRoutes from './routes/products.js';
 import reminderRoutes from './routes/reminders.js';
+import { setupPushWs } from './routes/push-ws.js';
 import { startReminderScheduler } from './lib/reminder-scheduler.js';
 import brandingRoutes from './routes/branding.js';
 import integrationsRoutes from './routes/integrations.js';
