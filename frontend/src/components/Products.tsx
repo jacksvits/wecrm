@@ -199,8 +199,7 @@ export function Products() {
           borderLeft: selected ? '2px solid #007AFF' : '2px solid transparent',
         }}>
           {c.isGroup ? (
-            <span onClick={(e) => { e.stopPropagation(); toggleGroup(key); }}
-              style={{ width: 14, fontSize: 10, color: 'var(--text-muted)', transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
+            <span style={{ width: 14, fontSize: 10, color: 'var(--text-muted)' }}>▾</span>
           ) : <span style={{ width: 14 }} />}
           <span>{c.name}</span>
           <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 12 }}>{count || ''}</span>
