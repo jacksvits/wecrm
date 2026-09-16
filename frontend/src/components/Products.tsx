@@ -385,6 +385,9 @@ export function Products() {
         ))}
       </div>
 
+      {/* ===== Резервы ===== */}
+      {tab === 'reserves' && <ReservesTab />}
+
       {/* ===== Номенклатура ===== */}
       {tab === 'nomenclature' && (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
