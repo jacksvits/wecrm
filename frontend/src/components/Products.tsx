@@ -119,6 +119,15 @@ export function Products() {
   };
   useEffect(() => { load(); }, []);
 
+  // мобильная версия (паттерн как в Layout/ContactList): вкладки на всю ширину экрана
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   // Фильтр по виду: все / товары / услуги
   const [kindFilter, setKindFilter] = useState<'all' | 'product' | 'service'>('all');
   // Фильтр «В наличии»: только позиции с суммарным остатком >= 1
@@ -391,7 +400,12 @@ export function Products() {
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border-color)', marginBottom: 16 }}>
+      <div style={{
+        display: 'flex', gap: 8,
+        borderBottom: '1px solid var(--border-color)',
+        marginBottom: 16,
+        ...(isMobile ? { margin: '0 -8px 16px' } : {}),
+      }}>
         {visibleTabs.map(t => (
           <button
             key={t.key}
@@ -402,6 +416,7 @@ export function Products() {
               color: tab === t.key ? '#007AFF' : 'var(--text-primary)',
               borderBottom: tab === t.key ? '2px solid #007AFF' : '2px solid transparent',
               cursor: 'pointer', fontSize: 14, fontWeight: 500, borderRadius: '8px 8px 0 0',
+              ...(isMobile ? { flex: 1, padding: '10px 4px', textAlign: 'center', whiteSpace: 'nowrap' } : {}),
             }}
           >
             {t.label}
@@ -637,7 +652,7 @@ export function Products() {
 
       {/* ===== Статистика ===== */}
       {tab === 'stats' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(520px, 1fr))', gap: 16, alignItems: 'start' }}>
+        <div className='mobile-grid-1' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(520px, 1fr))', gap: 16, alignItems: 'start' }}>
           {/* Виджет среднего размера — первая ячейка сетки статистики; рядом в будущем — виджет «Самые продаваемые» */}
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '12px 12px 8px' }}>
