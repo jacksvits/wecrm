@@ -184,8 +184,8 @@ export function Products() {
 
   // Рендер узла дерева категорий (как в «Виды и свойства» 1С: папки + виды)
   const renderCatNode = (c: ProductCategory, depth: number): ReactNode => {
-    const key = `cat:${c.id}`;
-    const collapsed = isCollapsed(key);
+    // Каталог во вкладке «Номенклатура» всегда развёрнут
+    const collapsed = false;
     const count = countByCat.get(c.id) ?? 0;
     const selected = selCat === c.id;
     return (
