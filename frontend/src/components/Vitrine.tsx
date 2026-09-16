@@ -188,7 +188,7 @@ export function Vitrine() {
           .vitrine-catalog { display: none !important; }
           .vitrine-catalog.open { display: flex !important; flex-wrap: wrap; gap: 8px; align-content: flex-start; position: fixed; top: 0; left: 0; right: 0; width: auto !important; max-height: 65vh; overflow-y: auto; background: var(--bg-card); border-bottom: 1px solid var(--border-color); border-radius: 0 0 16px 16px; box-shadow: 0 10px 28px rgba(0,0,0,.18); z-index: 60; padding: 12px; animation: vitrineDrop .18s ease-out; -webkit-overflow-scrolling: touch; }
           .vitrine-catalog.open .vitrine-catalog-head { display: flex; width: 100%; }
-          .vitrine-catalog-toggle { display: flex !important; align-items: center; gap: 6px; position: fixed; left: 50%; transform: translateX(-50%); bottom: 76px; z-index: 61; padding: 9px 18px; border-radius: 22px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 14px; font-weight: 500; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+          .vitrine-catalog-toggle { display: flex !important; align-items: center; justify-content: center; position: fixed; top: calc(56px + env(safe-area-inset-top, 0px) - 13px); left: 50%; transform: translateX(-50%); z-index: 61; width: 58px; height: 27px; padding: 0; border-radius: 0 0 13px 13px; border: 1px solid var(--border-color); border-top: none; background: var(--bg-card); color: var(--text-primary); cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,.14); }
           @keyframes vitrineDrop { from { transform: translateY(-100%); } to { transform: translateY(0); } }
           .vitrine-catalog ul { display: contents; }
           .vitrine-catalog li { display: contents; }
@@ -254,8 +254,11 @@ export function Vitrine() {
         </div>
       </div>
 
-      <button type="button" className="vitrine-catalog-toggle" onClick={() => setCatalogOpen(o => !o)}>
-        Каталог {catalogOpen ? '▴' : '▾'}
+      <button type="button" className="vitrine-catalog-toggle" onClick={() => setCatalogOpen(o => !o)} aria-label={catalogOpen ? 'Скрыть каталог' : 'Показать каталог'}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ transform: catalogOpen ? 'rotate(180deg)' : 'none', transition: 'transform .18s ease' }}>
+          <polyline points="5 10 12 16 19 10" />
+          <polyline points="5 5 12 11 19 5" />
+        </svg>
       </button>
 
       {reserveItems.length > 0 && (
