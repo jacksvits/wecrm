@@ -46,7 +46,8 @@ async function vkApi(method: string, params: Record<string, string | number> = {
 
 /** Розничная цена позиции (для ВК) */
 async function getRetailPrice(productId: string): Promise<number | null> {
-  let retail = await prisma.priceType.findFirst({ where: { forVk: true, isActive: true } });
+  const flaggedVk = await prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vk = true AND is_active = true LIMIT 1`) as any[];
+  let retail = flaggedVk[0] ? { id: flaggedVk[0].id } : null;
   if (!retail) retail = await prisma.priceType.findFirst({ where: { name: 'retail', isActive: true } });
   if (!retail) {
     retail = await prisma.priceType.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'desc' } });
@@ -139,7 +140,8 @@ export async function importMarketItems(): Promise<ImportSummary> {
   }
 
   // Розничный вид цен (создаём, если ни одного нет)
-  let retailType = await prisma.priceType.findFirst({ where: { forVk: true, isActive: true } });
+  const flaggedVkRows = await prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vk = true AND is_active = true LIMIT 1`) as any[];
+  let retailType = flaggedVkRows[0] ? { id: flaggedVkRows[0].id } : null;
   if (!retailType) retailType = await prisma.priceType.findFirst({ where: { name: 'retail', isActive: true } });
   if (!retailType) {
     retailType = await prisma.priceType.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'desc' } });
