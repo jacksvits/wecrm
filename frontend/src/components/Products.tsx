@@ -3,6 +3,8 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { format } from 'date-fns';
 import { api } from '../api/client';
+import { useAuth } from '../hooks/useAuth';
+import { Vitrine } from './Vitrine';
 import { Product, ProductCategory, Warehouse, PriceType, StockMovement, PriceHistory } from '../types';
 
 const quillModules = {
@@ -16,6 +18,7 @@ const quillModules = {
 const quillFormats = ['bold', 'italic', 'underline', 'strike', 'list', 'bullet', 'link'];
 
 const TABS = [
+  { key: 'vitrine', label: 'Витрина' },
   { key: 'nomenclature', label: 'Номенклатура' },
   { key: 'stock', label: 'Склад' },
   { key: 'prices', label: 'Цены' },
@@ -36,7 +39,11 @@ const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, backgro
 interface CategoryNode { key: string; name: string; children: CategoryNode[]; products: Product[]; }
 
 export function Products() {
-  const [tab, setTab] = useState('nomenclature');
+  const [tab, setTab] = useState('vitrine');
+  const { user } = useAuth();
+  const isAdmin = (user as any)?.role === 'admin';
+  const canStock = isAdmin || (user as any)?.stockAccess !== false;
+  const visibleTabs = canStock ? TABS : TABS.filter((t) => t.key === 'vitrine');
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);
@@ -368,7 +375,7 @@ export function Products() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border-color)', marginBottom: 16 }}>
-        {TABS.map(t => (
+        {visibleTabs.map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
@@ -384,6 +391,9 @@ export function Products() {
           </button>
         ))}
       </div>
+
+      {/* ===== Витрина ===== */}
+      {tab === 'vitrine' && <Vitrine />}
 
       {/* ===== Резервы ===== */}
       {tab === 'reserves' && <ReservesTab />}

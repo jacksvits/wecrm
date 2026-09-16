@@ -1,14 +1,12 @@
 import { useState } from "react";
-import { Vitrine } from "./Vitrine";
 
 const TABS = [
-  { key: "vitrine", label: "Витрина" },
   { key: "services", label: "Услуги", url: "https://welans.tochkaplace.com" },
   { key: "cartridges", label: "Картриджи", url: "https://wetoner.tochkaplace.com" },
 ];
 
 export function Shop() {
-  const [activeTab, setActiveTab] = useState("vitrine");
+  const [activeTab, setActiveTab] = useState("services");
   const current = TABS.find((t) => t.key === activeTab) || TABS[0];
 
   return (
@@ -46,11 +44,7 @@ export function Shop() {
           ))}
         </div>
       </div>
-      {current.key === "vitrine" ? (
-        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-          <Vitrine />
-        </div>
-      ) : (
+      {
         <iframe
           key={current.key}
           src={current.url}
@@ -63,7 +57,7 @@ export function Shop() {
             background: "var(--bg-card)",
           }}
         />
-      )}
+      }
     </div>
   );
 }

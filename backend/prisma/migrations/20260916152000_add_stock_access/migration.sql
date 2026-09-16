@@ -1,0 +1,1 @@
+ALTER TABLE "roles" ADD COLUMN "stock_access" BOOLEAN NOT NULL DEFAULT true;

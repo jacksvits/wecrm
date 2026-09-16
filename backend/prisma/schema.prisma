@@ -18,6 +18,7 @@ model Role {
   isAssignable  Boolean  @default(true) @map("isassignable")
   canAccessChat Boolean  @default(true) @map("can_access_chat")
   showFinancesTab    Boolean @default(false) @map("show_finances_tab")
+  stockAccess          Boolean @default(true) @map("stock_access")
   // Разрешение смены статуса у задач + список статусов, которые роль может назначать
   // (пустой массив allowedTaskStatuses = доступны все статусы)
   canChangeTaskStatus Boolean @default(true) @map("can_change_task_status")
