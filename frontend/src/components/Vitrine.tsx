@@ -201,11 +201,11 @@ export function Vitrine() {
             <span>Все товары</span>
             <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{cards.length}</span>
           </button>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border-color)', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none', marginBottom: 4 }}>
+          {renderTree(null, 0)}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border-color)', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none', marginTop: 4 }}>
             <input type="checkbox" checked={inStockOnly} onChange={e => setInStockOnly(e.target.checked)} />
             В наличии
           </label>
-          {renderTree(null, 0)}
         </aside>
         <div className="vitrine-grid">
           {filteredCards.map(({ product: p, price, inStock, image }) => (
