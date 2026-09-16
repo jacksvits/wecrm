@@ -186,15 +186,10 @@ export function Vitrine() {
         @media (max-width: 640px) {
           .vitrine-layout { flex-direction: column !important; gap: 10px !important; }
           .vitrine-catalog { display: none !important; }
-          .vitrine-catalog.open { display: flex !important; flex-wrap: wrap; gap: 8px; align-content: flex-start; position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); left: 0; right: 0; width: auto !important; max-height: 65vh; overflow-y: auto; background: var(--bg-card); border-bottom: 1px solid var(--border-color); border-radius: 0 0 16px 16px; box-shadow: 0 10px 28px rgba(0,0,0,.18); z-index: 60; padding: 12px; animation: vitrineDrop .18s ease-out; -webkit-overflow-scrolling: touch; }
+          .vitrine-catalog.open { display: block; position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); left: 0; right: 0; width: auto !important; max-height: 65vh; overflow-y: auto; background: var(--bg-card); border-bottom: 1px solid var(--border-color); border-radius: 0 0 16px 16px; box-shadow: 0 10px 28px rgba(0,0,0,.18); z-index: 60; padding: 12px; animation: vitrineDrop .18s ease-out; -webkit-overflow-scrolling: touch; }
           .vitrine-catalog.open .vitrine-catalog-head { display: flex; width: 100%; }
           .vitrine-catalog-toggle { display: flex !important; align-items: center; justify-content: center; position: fixed; top: calc(56px + env(safe-area-inset-top, 0px) - 13px); left: 50%; transform: translateX(-50%); z-index: 61; width: 58px; height: 27px; padding: 0; border-radius: 0 0 13px 13px; border: 1px solid var(--border-color); border-top: none; background: var(--bg-card); color: var(--text-primary); cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,.14); }
           @keyframes vitrineDrop { from { transform: translateY(-100%); } to { transform: translateY(0); } }
-          .vitrine-catalog ul { display: contents; }
-          .vitrine-catalog li { display: contents; }
-          .vitrine-catalog li > div { padding-left: 0 !important; display: contents !important; }
-          .vitrine-cat-btn { flex: 0 0 auto !important; width: auto !important; border: 1px solid var(--border-color) !important; }
-          .vitrine-cat-toggle { display: none !important; }
         }
         @media (max-width: 640px) {
           .reserve-overlay { align-items: flex-end !important; padding: 0 !important; }
