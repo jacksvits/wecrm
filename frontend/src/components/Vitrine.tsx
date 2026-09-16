@@ -94,7 +94,7 @@ export function Vitrine() {
   return (
     <>
       <style>{`
-        .vitrine-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; padding: 4px 2px; overflow-y: auto; }
+        .vitrine-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; padding: 4px 2px; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         @media (max-width: 640px) {
           .vitrine-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
           .vitrine-card-body { padding: 10px !important; gap: 4px !important; }
