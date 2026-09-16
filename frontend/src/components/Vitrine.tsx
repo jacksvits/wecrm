@@ -303,8 +303,8 @@ export function Vitrine() {
 
             <select defaultValue="" onChange={(e) => { const p = products.find((x) => x.id === e.target.value); if (p) addPosition(p); e.target.value = ''; }}
               style={{ width: '100%', padding: '8px 12px', marginBottom: 12, borderRadius: 8, border: '1px dashed var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-muted)' }}>
-              <option value="">+ Добавить позицию из витрины</option>
-              {products.filter((p) => !reserveItems.some((i) => i.product.id === p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <option value="">{products.filter((p) => freeQty(p) > 0 && !reserveItems.some((i) => i.product.id === p.id)).length ? '+ Добавить позицию из витрины' : 'Нет позиций в наличии'}</option>
+              {products.filter((p) => freeQty(p) > 0 && !reserveItems.some((i) => i.product.id === p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
 
             {saveError && <div style={{ color: '#ef4444', fontSize: 13, marginBottom: 10 }}>{saveError}</div>}
