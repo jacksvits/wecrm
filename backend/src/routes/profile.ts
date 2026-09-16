@@ -7,6 +7,9 @@ import { authMiddleware } from '../middleware/auth.js';
 const router = Router();
 router.use(authMiddleware);
 
+// Пункты нижней мобильной панели — должны совпадать с frontend/src/lib/navItems.ts
+const MOBILE_NAV_PATHS = ['/', '/tasks', '/deals', '/projects', '/contacts', '/products', '/news', '/notes', '/reminders', '/calls', '/files', '/shop', '/chat'];
+
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
   email: z.string().email().optional(),
@@ -22,6 +25,7 @@ const updateSchema = z.object({
   notifyDeal: z.boolean().optional(),
   notifyNews: z.boolean().optional(),
   soundEnabled: z.boolean().optional(),
+  mobileNav: z.array(z.string()).optional(),
 });
 
 const passwordSchema = z.object({
@@ -32,7 +36,7 @@ const passwordSchema = z.object({
 router.get('/', async (req: any, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.id },
-    include: { role: { select: { name: true } } },
+    include: { role: { select: { name: true, allowedPages: true } } },
   });
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({
@@ -43,6 +47,8 @@ router.get('/', async (req: any, res) => {
     avatar: user.avatar,
     emails: user.emails,
     role: user.role?.name || 'user',
+    allowedPages: user.role?.allowedPages || [],
+    mobileNav: user.mobileNav || [],
     hideCompletedTasks: user.hideCompletedTasks,
     darkTheme: user.darkTheme,
     pushEnabled: user.pushEnabled,
@@ -62,6 +68,14 @@ router.patch('/', async (req: any, res) => {
   try {
     const data = updateSchema.parse(req.body);
 
+    // Мобильная панель: только страницы, доступные пользователю по роли
+    if (data.mobileNav !== undefined) {
+      const allowed = req.user?.role === 'admin'
+        ? MOBILE_NAV_PATHS
+        : [...(req.user?.allowedPages || []), '/news', '/chat'];
+      data.mobileNav = [...new Set(data.mobileNav.filter(p => allowed.includes(p) && MOBILE_NAV_PATHS.includes(p)))];
+    }
+
     // Check username uniqueness if changing
     if (data.username !== undefined && data.username !== null) {
       const existing = await prisma.user.findFirst({
@@ -73,7 +87,7 @@ router.patch('/', async (req: any, res) => {
     const user = await prisma.user.update({
       where: { id: req.user!.id },
       data,
-      include: { role: { select: { name: true } } },
+      include: { role: { select: { name: true, allowedPages: true } } },
     });
     res.json({
       id: user.id,
@@ -83,6 +97,8 @@ router.patch('/', async (req: any, res) => {
       avatar: user.avatar,
       emails: user.emails,
       role: user.role?.name || 'user',
+      allowedPages: user.role?.allowedPages || [],
+      mobileNav: user.mobileNav || [],
       hideCompletedTasks: user.hideCompletedTasks,
       darkTheme: user.darkTheme,
       pushEnabled: user.pushEnabled,

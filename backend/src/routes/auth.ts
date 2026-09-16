@@ -61,6 +61,7 @@ router.post('/register', async (req, res) => {
         role: roleName,
         roleId: user.roleId,
         allowedPages,
+        mobileNav: user.mobileNav || [],
         stockAccess,
       },
       token,
@@ -110,6 +111,7 @@ router.post('/login', async (req, res) => {
         role: roleName,
         roleId: user.roleId,
         allowedPages,
+        mobileNav: user.mobileNav || [],
         stockAccess,
       },
       token,
@@ -156,6 +158,7 @@ router.get('/me', async (req, res) => {
       avatar: user.avatar,
       emails: user.emails,
       allowedPages: user.role?.allowedPages || [],
+      mobileNav: user.mobileNav || [],
       showFinancesTab: user.role?.showFinancesTab ?? false,
       stockAccess: user.role?.stockAccess ?? true,
       canChangeTaskStatus: user.role?.canChangeTaskStatus ?? true,
@@ -199,6 +202,7 @@ const publicUser = (user: any, roleName: string, allowedPages: string[]) => ({
   roleId: user.roleId,
   avatar: user.avatar,
   allowedPages,
+  mobileNav: user.mobileNav ?? [],
 });
 
 // Мультиаккаунтность: администратор быстро переходит под аккаунт другого пользователя

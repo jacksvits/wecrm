@@ -56,6 +56,7 @@ model User {
   defaultTaskCurator  Boolean @default(false) @map("default_task_curator")
   lastActiveAt DateTime? @map("last_active_at")
   allowedPages String[] @default([]) @map("allowed_pages")
+  mobileNav     String[] @default([]) @map("mobile_nav")
 
   // Notification settings
   pushEnabled       Boolean @default(true) @map("push_enabled")
