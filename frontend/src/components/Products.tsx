@@ -23,6 +23,7 @@ const TABS = [
   { key: 'stock', label: 'Склад' },
   { key: 'prices', label: 'Цены' },
   { key: 'reserves', label: 'Резервы' },
+  { key: 'stats', label: 'Статистика' },
 ];
 
 const KIND_LABELS: Record<string, string> = { product: 'Товар', service: 'Услуга' };
@@ -50,6 +51,8 @@ export function Products() {
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [q, setQ] = useState('');
   const [whFilter, setWhFilter] = useState('all');
+  // фильтр склада для виджета «История движений» на вкладке «Статистика»
+  const [statsWhFilter, setStatsWhFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   // свёрнутые группы: ключ "cat:<id категории>"
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -341,8 +344,8 @@ export function Products() {
   };
 
   const visibleMovements = useMemo(() =>
-    movements.filter(m => whFilter === 'all' || m.warehouseId === whFilter).slice(0, 50),
-    [movements, whFilter]);
+    movements.filter(m => statsWhFilter === 'all' || m.warehouseId === statsWhFilter).slice(0, 50),
+    [movements, statsWhFilter]);
 
   // товары (не услуги) для складского учёта
   const stockProducts = useMemo(() => visible.filter(p => p.kind !== 'service'), [visible]);
@@ -614,50 +617,75 @@ export function Products() {
               </tbody>
             </table>
           </div>
-
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>История движений</h3>
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Дата</th>
-                  <th style={thStyle}>Товар</th>
-                  <th style={thStyle}>Склад</th>
-                  <th style={thStyle}>Операция</th>
-                  <th style={thStyle}>Кол-во</th>
-                  <th style={thStyle}>Цена</th>
-                  <th style={thStyle}>Комментарий</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleMovements.map(m => (
-                  <tr key={m.id}>
-                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{format(new Date(m.date), 'dd.MM.yyyy HH:mm')}</td>
-                    <td style={tdStyle}>{m.product?.name}</td>
-                    <td style={tdStyle}>{m.warehouse?.name}</td>
-                    <td style={{
-                      ...tdStyle,
-                      color: m.type === 'income' ? '#059669' : m.type === 'outcome' ? '#dc2626' : '#d97706',
-                      fontWeight: 500,
-                    }}>
-                      {m.type === 'income' ? 'Приход' : m.type === 'outcome' ? 'Расход' : 'Установка'}
-                    </td>
-                    <td style={tdStyle}>{m.type === 'outcome' ? '−' : '+'}{fmtMoney(m.quantity)}</td>
-                    <td style={tdStyle}>{m.price != null ? fmtMoney(m.price) : '—'}</td>
-                    <td style={tdStyle}>{m.comment || '—'}</td>
-                  </tr>
-                ))}
-                {visibleMovements.length === 0 && (
-                  <tr>
-                    <td colSpan={7} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
-                      Движений нет
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
         </div>
+        </div>
+      )}
+
+      {/* ===== Статистика ===== */}
+      {tab === 'stats' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(520px, 1fr))', gap: 16, alignItems: 'start' }}>
+          {/* Виджет среднего размера — первая ячейка сетки статистики; рядом в будущем — виджет «Самые продаваемые» */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '12px 12px 8px' }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, marginRight: 8 }}>История движений</h3>
+              <button
+                onClick={() => setStatsWhFilter('all')}
+                style={{ ...btnGhost, background: statsWhFilter === 'all' ? 'var(--bg-hover)' : 'var(--bg-card)', fontWeight: statsWhFilter === 'all' ? 600 : 400 }}
+              >
+                Все склады
+              </button>
+              {warehouses.map(w => (
+                <button
+                  key={w.id}
+                  onClick={() => setStatsWhFilter(w.id)}
+                  style={{ ...btnGhost, background: statsWhFilter === w.id ? 'var(--bg-hover)' : 'var(--bg-card)', fontWeight: statsWhFilter === w.id ? 600 : 400 }}
+                >
+                  {w.name}
+                </button>
+              ))}
+            </div>
+            <div style={{ overflow: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Дата</th>
+                    <th style={thStyle}>Товар</th>
+                    <th style={thStyle}>Склад</th>
+                    <th style={thStyle}>Операция</th>
+                    <th style={thStyle}>Кол-во</th>
+                    <th style={thStyle}>Цена</th>
+                    <th style={thStyle}>Комментарий</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleMovements.map(m => (
+                    <tr key={m.id}>
+                      <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{format(new Date(m.date), 'dd.MM.yyyy HH:mm')}</td>
+                      <td style={tdStyle}>{m.product?.name}</td>
+                      <td style={tdStyle}>{m.warehouse?.name}</td>
+                      <td style={{
+                        ...tdStyle,
+                        color: m.type === 'income' ? '#059669' : m.type === 'outcome' ? '#dc2626' : '#d97706',
+                        fontWeight: 500,
+                      }}>
+                        {m.type === 'income' ? 'Приход' : m.type === 'outcome' ? 'Расход' : 'Установка'}
+                      </td>
+                      <td style={tdStyle}>{m.type === 'outcome' ? '−' : '+'}{fmtMoney(m.quantity)}</td>
+                      <td style={tdStyle}>{m.price != null ? fmtMoney(m.price) : '—'}</td>
+                      <td style={tdStyle}>{m.comment || '—'}</td>
+                    </tr>
+                  ))}
+                  {visibleMovements.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
+                        Движений нет
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
