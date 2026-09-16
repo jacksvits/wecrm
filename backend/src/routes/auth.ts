@@ -157,6 +157,7 @@ router.get('/me', async (req, res) => {
       emails: user.emails,
       allowedPages: user.role?.allowedPages || [],
       showFinancesTab: user.role?.showFinancesTab ?? false,
+      stockAccess: user.role?.stockAccess ?? true,
       canChangeTaskStatus: user.role?.canChangeTaskStatus ?? true,
       allowedTaskStatuses: user.role?.allowedTaskStatuses ?? [],
       canCreateNews: user.role?.canCreateNews ?? true,
