@@ -532,3 +532,8 @@ body {
 }
 .news-slide-l { animation: newsSlideInL 0.45s ease both; }
 .news-slide-r { animation: newsSlideInR 0.45s ease both; }
+
+html, body { overflow-x: hidden; }
+@media (max-width: 640px) {
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}

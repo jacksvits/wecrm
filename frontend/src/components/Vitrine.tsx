@@ -103,6 +103,10 @@ export function Vitrine() {
           .vitrine-btn { padding: 9px 10px !important; font-size: 13px !important; width: 100%; }
         }
         @media (max-width: 400px) { .vitrine-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 640px) {
+          .reserve-overlay { align-items: flex-end !important; padding: 0 !important; }
+          .reserve-modal { max-width: 100% !important; border-radius: 16px 16px 0 0 !important; max-height: 92vh !important; }
+        }
       `}</style>
       <div className="vitrine-grid">
         {cards.map(({ product: p, price, inStock, image }) => (
@@ -137,9 +141,9 @@ export function Vitrine() {
       </div>
 
       {reserveItems.length > 0 && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        <div className="reserve-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
           onClick={() => setReserveItems([])}>
-          <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--border-color)' }}
+          <div className="reserve-modal" style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--border-color)' }}
             onClick={(e) => e.stopPropagation()}>
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: 'var(--text-primary)' }}>Резервирование</div>
             <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>На чьё имя</label>

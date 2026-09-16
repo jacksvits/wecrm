@@ -12,10 +12,19 @@ export function Shop() {
   const current = TABS.find((t) => t.key === activeTab) || TABS[0];
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: "0 0 12px", fontSize: 22, fontWeight: 600 }}>Магазин</h2>
-        <div style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border-color)" }}>
+    <div className="shop-root" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <style>{`
+        @media (max-width: 640px) {
+          .shop-root { padding: 10px; }
+          .shop-header { flex-wrap: wrap; gap: 8px !important; margin-bottom: 10px !important; }
+          .shop-title { font-size: 18px !important; margin-bottom: 8px !important; }
+          .shop-tabs { width: 100%; }
+          .shop-tabs button { flex: 1; padding: 12px 4px !important; font-size: 13px !important; white-space: nowrap; }
+        }
+      `}</style>
+      <div className="shop-header" style={{ marginBottom: 16 }}>
+        <h2 className="shop-title" style={{ margin: "0 0 12px", fontSize: 22, fontWeight: 600 }}>Магазин</h2>
+        <div className="shop-tabs" style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border-color)" }}>
           {TABS.map((tab) => (
             <button
               key={tab.key}
