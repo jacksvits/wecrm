@@ -180,7 +180,7 @@ export function Vitrine() {
           .vitrine-catalog ul { display: contents; }
           .vitrine-catalog li { display: contents; }
           .vitrine-catalog li > div { padding-left: 0 !important; display: contents !important; }
-          .vitrine-cat-btn { flex: 0 0 auto !important; border: 1px solid var(--border-color) !important; }
+          .vitrine-cat-btn { flex: 0 0 auto !important; width: auto !important; border: 1px solid var(--border-color) !important; }
           .vitrine-cat-toggle { display: none !important; }
         }
         @media (max-width: 640px) {
@@ -201,11 +201,11 @@ export function Vitrine() {
           {filteredCards.map(({ product: p, price, inStock, image }) => (
           <div key={p.id}
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ aspectRatio: '1 / 1', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ position: 'relative', width: '100%', paddingTop: '100%', background: 'var(--bg-hover)' }}>
               {image ? (
-                <img src={`${origin}${image.url}`} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={`${origin}${image.url}`} alt={p.name} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <span style={{ fontSize: 40, color: 'var(--text-muted)' }}>📦</span>
+                <span style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, color: 'var(--text-muted)' }}>📦</span>
               )}
             </div>
             <div className="vitrine-card-body" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
