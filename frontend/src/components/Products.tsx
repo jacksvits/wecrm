@@ -362,7 +362,6 @@ export function Products() {
         {tab === 'stock' && (
           <button onClick={() => setWhModal('new')} style={btnPrimary}>+ Склад</button>
         )}
-        {tab === 'reserves' && <ReservesTab />}
         {tab === 'prices' && (
           <button onClick={() => setPtModal('new')} style={btnPrimary}>+ Вид цены</button>
         )}
@@ -1159,15 +1158,48 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
 function ReservesTab() {
   const [reserves, setReserves] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [editRes, setEditRes] = useState<any | null>(null);
+  const [editContactId, setEditContactId] = useState('');
+  const [editComment, setEditComment] = useState('');
+  const [editItems, setEditItems] = useState<any[]>([]);
+  const [editBusy, setEditBusy] = useState(false);
+  const [delFor, setDelFor] = useState<string | null>(null);
+
+  const load = () => api.reservations.list().then(setReserves).catch(() => {});
   useEffect(() => {
-    api.reservations.list()
-      .then(setReserves)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    load().finally(() => setLoading(false));
+    api.contacts.list().then(setContacts).catch(() => {});
+    api.products.list().then(setProducts).catch(() => {});
   }, []);
-  const issue = async (id: string) => {
-    try { await api.reservations.issue(id); setReserves(await api.reservations.list()); }
-    catch (e: any) { alert(e.message || 'Ошибка выдачи'); }
+
+  const setStatus = async (r: any, status: string) => {
+    try { await api.reservations.update(r.id, { status }); load(); }
+    catch (e: any) { alert(e.message || e.error || 'Ошибка'); }
+  };
+  const doDelete = async (r: any) => {
+    try { await api.reservations.delete(r.id); setDelFor(null); load(); }
+    catch (e: any) { alert(e.message || e.error || 'Ошибка'); }
+  };
+  const openEdit = (r: any) => {
+    setEditRes(r);
+    setEditContactId(r.contactId || '');
+    setEditComment(r.comment || '');
+    setEditItems(r.items.map((i: any) => ({ productId: i.productId, name: i.product.name, quantity: i.quantity, price: i.price })));
+  };
+  const saveEdit = async () => {
+    setEditBusy(true);
+    try {
+      await api.reservations.update(editRes.id, {
+        contactId: editContactId,
+        comment: editComment,
+        items: editItems.map((i) => ({ productId: i.productId, quantity: Number(i.quantity) || 0, price: Number(i.price) || 0 })),
+      });
+      setEditRes(null);
+      load();
+    } catch (e: any) { alert(e.message || e.error || 'Ошибка'); }
+    setEditBusy(false);
   };
   const share = async (id: string) => {
     const taskId = prompt('ID задачи для отправки в обсуждение:');
@@ -1175,6 +1207,8 @@ function ReservesTab() {
     try { await api.reservations.share(id, taskId); alert('Отправлено в обсуждение задачи'); }
     catch (e: any) { alert(e.message || 'Ошибка отправки'); }
   };
+  const statusLabel = (s: string) => s === 'held' ? 'Отложено' : s === 'issued' ? 'Выдано' : s === 'canceled' ? 'Отменено' : s;
+
   if (loading) return <div style={{ padding: 16, color: 'var(--text-muted)' }}>Загрузка...</div>;
   return (
     <div>
@@ -1191,17 +1225,63 @@ function ReservesTab() {
               <td style={tdStyle}>{r.contact?.name}</td>
               <td style={tdStyle}>{r.items.map((i: any) => `${i.product.name} × ${i.quantity}`).join('; ')}</td>
               <td style={tdStyle}>{r.total.toFixed(2)} ₽</td>
-              <td style={tdStyle}>{r.status === 'held' ? 'Отложено' : 'Выдано'}</td>
+              <td style={tdStyle}>{statusLabel(r.status)}</td>
               <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
-                {r.status === 'held' && <button style={btnGhost} onClick={() => issue(r.id)}>Выдать</button>}
+                {r.status === 'held' && <button style={btnGhost} onClick={() => setStatus(r, 'issued')}>Выдать</button>}
+                {r.status === 'held' && <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => openEdit(r)}>Изменить</button>}
+                {r.status === 'held' && <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => setStatus(r, 'canceled')}>Отменить</button>}
+                {r.status === 'canceled' && <button style={btnGhost} onClick={() => setStatus(r, 'held')}>Вернуть в резерв</button>}
                 <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => api.reservations.downloadPdf(r.id, r.number)}>PDF</button>
                 <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => share(r.id)}>В задачу</button>
+                {r.status !== 'issued' && (delFor === r.id ? (
+                  <>
+                    <button style={{ ...btnGhost, marginLeft: 8, borderColor: '#FF3B30', color: '#FF3B30' }} onClick={() => doDelete(r)}>Удалить?</button>
+                    <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => setDelFor(null)}>Нет</button>
+                  </>
+                ) : (
+                  <button style={{ ...btnGhost, marginLeft: 8, borderColor: '#FF3B30', color: '#FF3B30' }} onClick={() => setDelFor(r.id)}>Удалить</button>
+                ))}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
       {!reserves.length && <div style={{ padding: 16, color: 'var(--text-muted)' }}>Резервов пока нет.</div>}
+
+      {/* Модал редактирования резерва */}
+      {editRes && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 20, width: 560, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ margin: '0 0 14px' }}>Резерв РЗ-{String(editRes.number).padStart(6, '0')}</h3>
+            <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>На чьё имя</label>
+            <select value={editContactId} onChange={e => setEditContactId(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 10 }}>
+              {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Комментарий</label>
+            <input value={editComment} onChange={e => setEditComment(e.target.value)} placeholder="Комментарий" style={{ ...inputStyle, marginTop: 4, marginBottom: 12 }} />
+            {editItems.map((it, idx) => (
+              <div key={it.productId} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{it.name}</span>
+                <input type="number" min={1} value={it.quantity} onChange={e => setEditItems(editItems.map((x, i) => i === idx ? { ...x, quantity: e.target.value } : x))} style={{ ...inputStyle, width: 72, flex: 'none' }} />
+                <input type="number" min={0} value={it.price} onChange={e => setEditItems(editItems.map((x, i) => i === idx ? { ...x, price: e.target.value } : x))} style={{ ...inputStyle, width: 96, flex: 'none' }} />
+                <button onClick={() => setEditItems(editItems.filter((_, i) => i !== idx))} style={{ ...btnGhost, flex: 'none', borderColor: '#FF3B30', color: '#FF3B30' }}>✕</button>
+              </div>
+            ))}
+            <select defaultValue="" onChange={e => {
+              const p = products.find((x: any) => x.id === e.target.value);
+              if (p && !editItems.some((i) => i.productId === p.id)) setEditItems([...editItems, { productId: p.id, name: p.name, quantity: 1, price: p.price ?? 0 }]);
+              e.target.value = '';
+            }} style={{ ...inputStyle, marginBottom: 14 }}>
+              <option value="">+ Добавить позицию</option>
+              {products.filter((p: any) => !editItems.some((i) => i.productId === p.id)).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setEditRes(null)} style={btnGhost}>Отмена</button>
+              <button onClick={saveEdit} disabled={editBusy} style={btnPrimary}>{editBusy ? 'Сохранение...' : 'Сохранить'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
