@@ -169,7 +169,12 @@ router.delete('/meta/warehouses/:id', async (req, res) => {
 router.get('/meta/price-types', async (_req, res) => {
   try {
     const priceTypes = await prisma.priceType.findMany({ orderBy: { sortOrder: 'asc' } });
-    res.json(priceTypes);
+    const flagRows = await prisma.$queryRawUnsafe(`SELECT id, for_vitrine, for_vk FROM price_types`) as any[];
+    const flagMap = new Map(flagRows.map((r: any) => [r.id, r]));
+    res.json(priceTypes.map((pt: any) => {
+      const f = flagMap.get(pt.id);
+      return { ...pt, forVitrine: !!f?.for_vitrine, forVk: !!f?.for_vk };
+    }));
   } catch (err: any) {
     console.error('[products:price-types:list]', err);
     res.status(500).json({ error: err.message });
