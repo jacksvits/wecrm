@@ -1127,12 +1127,14 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
   const [name, setName] = useState(isNew ? '' : priceType.name);
   const [label, setLabel] = useState(isNew ? '' : priceType.label);
   const [color, setColor] = useState(isNew ? '#f0f0f0' : priceType.color);
+  const [forVitrine, setForVitrine] = useState(isNew ? false : !!priceType.forVitrine);
+  const [forVk, setForVk] = useState(isNew ? false : !!priceType.forVk);
   const [error, setError] = useState('');
 
   const save = async () => {
     try {
-      if (isNew) await api.products.priceTypes.create({ name, label, color });
-      else await api.products.priceTypes.update(priceType.id, { label, color });
+      if (isNew) await api.products.priceTypes.create({ name, label, color, forVitrine, forVk });
+      else await api.products.priceTypes.update(priceType.id, { label, color, forVitrine, forVk });
       onSaved();
     } catch (e: any) { setError(e.message || 'Ошибка'); }
   };
@@ -1157,6 +1159,14 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
           <input value={label} onChange={e => setLabel(e.target.value)} style={inputStyle} placeholder="Дилерская, VIP..." />
           <label style={{ fontSize: 14, fontWeight: 500 }}>Цвет</label>
           <input type="color" value={color} onChange={e => setColor(e.target.value)} style={{ width: '100%', height: 40 }} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+            <input type="checkbox" checked={forVitrine} onChange={e => setForVitrine(e.target.checked)} />
+            Для витрины
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+            <input type="checkbox" checked={forVk} onChange={e => setForVk(e.target.checked)} />
+            Для ВК
+          </label>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={save} style={btnPrimary}>Сохранить</button>
             {!isNew && <button onClick={remove} style={{ ...btnPrimary, background: '#dc2626' }}>Удалить</button>}

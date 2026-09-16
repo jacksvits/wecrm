@@ -53,7 +53,8 @@ export function Vitrine() {
   const origin = window.location.origin;
 
   const cards = useMemo<VitrineCard[]>(() => products.map((p) => {
-    const price = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0))[0] as any;
+    const sortedPrices = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
+    const price = (sortedPrices.find((x: any) => x.priceType?.forVitrine) ?? sortedPrices[0]) as any;
     const inStock = (p.stocks || []).reduce((s, x) => s + Math.max(x.quantity - (x.reserved || 0), 0), 0);
     return { product: p, price, inStock, image: (p.images || [])[0] as any };
   }), [products]);

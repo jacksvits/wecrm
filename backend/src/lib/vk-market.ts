@@ -46,7 +46,8 @@ async function vkApi(method: string, params: Record<string, string | number> = {
 
 /** Розничная цена позиции (для ВК) */
 async function getRetailPrice(productId: string): Promise<number | null> {
-  let retail = await prisma.priceType.findFirst({ where: { name: 'retail', isActive: true } });
+  let retail = await prisma.priceType.findFirst({ where: { forVk: true, isActive: true } });
+  if (!retail) retail = await prisma.priceType.findFirst({ where: { name: 'retail', isActive: true } });
   if (!retail) {
     retail = await prisma.priceType.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'desc' } });
   }
@@ -138,7 +139,8 @@ export async function importMarketItems(): Promise<ImportSummary> {
   }
 
   // Розничный вид цен (создаём, если ни одного нет)
-  let retailType = await prisma.priceType.findFirst({ where: { name: 'retail', isActive: true } });
+  let retailType = await prisma.priceType.findFirst({ where: { forVk: true, isActive: true } });
+  if (!retailType) retailType = await prisma.priceType.findFirst({ where: { name: 'retail', isActive: true } });
   if (!retailType) {
     retailType = await prisma.priceType.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'desc' } });
   }

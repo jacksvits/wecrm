@@ -18,7 +18,7 @@ router.get('/vitrine', async (_req, res) => {
       where: { onVitrine: true, isActive: true },
       include: {
         stocks: { include: { warehouse: { select: { name: true } } } },
-        prices: { include: { priceType: { select: { label: true, sortOrder: true } } } },
+        prices: { include: { priceType: { select: { label: true, sortOrder: true, forVitrine: true } } } },
         images: { orderBy: { sortOrder: 'asc' } },
       },
       orderBy: { name: 'asc' },
@@ -176,11 +176,13 @@ router.get('/meta/price-types', async (_req, res) => {
  */
 router.post('/meta/price-types', async (req, res) => {
   try {
-    const { name, label, color, sortOrder } = req.body;
+    const { name, label, color, sortOrder, forVitrine, forVk } = req.body;
+    if (forVitrine) await prisma.priceType.updateMany({ where: { forVitrine: true }, data: { forVitrine: false } });
+    if (forVk) await prisma.priceType.updateMany({ where: { forVk: true }, data: { forVk: false } });
     if (!name?.trim() || !label?.trim()) return res.status(400).json({ error: 'Название и метка обязательны' });
     const count = await prisma.priceType.count();
     const priceType = await prisma.priceType.create({
-      data: { name: name.trim(), label: label.trim(), color: color || '#f0f0f0', sortOrder: sortOrder ?? count + 1 },
+      data: { name: name.trim(), label: label.trim(), color: color || '#f0f0f0', sortOrder: sortOrder ?? count + 1, forVitrine: !!forVitrine, forVk: !!forVk },
     });
     res.status(201).json(priceType);
   } catch (err: any) {
@@ -204,6 +206,8 @@ router.patch('/meta/price-types/:id', async (req, res) => {
     if (color !== undefined) data.color = color;
     if (isActive !== undefined) data.isActive = !!isActive;
     if (sortOrder !== undefined) data.sortOrder = Number(sortOrder);
+    if (req.body.forVitrine !== undefined) { if (req.body.forVitrine) await prisma.priceType.updateMany({ where: { forVitrine: true, id: { not: req.params.id } }, data: { forVitrine: false } }); data.forVitrine = !!req.body.forVitrine; }
+    if (req.body.forVk !== undefined) { if (req.body.forVk) await prisma.priceType.updateMany({ where: { forVk: true, id: { not: req.params.id } }, data: { forVk: false } }); data.forVk = !!req.body.forVk; }
     const priceType = await prisma.priceType.update({ where: { id: req.params.id }, data });
     res.json(priceType);
   } catch (err: any) {
