@@ -19,6 +19,7 @@ const TABS = [
   { key: 'nomenclature', label: 'Номенклатура' },
   { key: 'stock', label: 'Склад' },
   { key: 'prices', label: 'Цены' },
+  { key: 'reserves', label: 'Резервы' },
 ];
 
 const KIND_LABELS: Record<string, string> = { product: 'Товар', service: 'Услуга' };
@@ -362,6 +363,7 @@ export function Products() {
         {tab === 'stock' && (
           <button onClick={() => setWhModal('new')} style={btnPrimary}>+ Склад</button>
         )}
+        {tab === 'reserves' && <ReservesTab />}
         {tab === 'prices' && (
           <button onClick={() => setPtModal('new')} style={btnPrimary}>+ Вид цены</button>
         )}
@@ -1151,6 +1153,56 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ReservesTab() {
+  const [reserves, setReserves] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    api.reservations.list()
+      .then(setReserves)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+  const issue = async (id: string) => {
+    try { await api.reservations.issue(id); setReserves(await api.reservations.list()); }
+    catch (e: any) { alert(e.message || 'Ошибка выдачи'); }
+  };
+  const share = async (id: string) => {
+    const taskId = prompt('ID задачи для отправки в обсуждение:');
+    if (!taskId) return;
+    try { await api.reservations.share(id, taskId); alert('Отправлено в обсуждение задачи'); }
+    catch (e: any) { alert(e.message || 'Ошибка отправки'); }
+  };
+  if (loading) return <div style={{ padding: 16, color: 'var(--text-muted)' }}>Загрузка...</div>;
+  return (
+    <div>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr>
+          <th style={thStyle}>№</th><th style={thStyle}>Дата</th><th style={thStyle}>На чьё имя</th>
+          <th style={thStyle}>Товары</th><th style={thStyle}>Сумма</th><th style={thStyle}>Статус</th><th style={thStyle}></th>
+        </tr></thead>
+        <tbody>
+          {reserves.map((r: any) => (
+            <tr key={r.id}>
+              <td style={tdStyle}>РЗ-{String(r.number).padStart(6, '0')}</td>
+              <td style={tdStyle}>{new Date(r.createdAt).toLocaleString('ru-RU')}</td>
+              <td style={tdStyle}>{r.contact?.name}</td>
+              <td style={tdStyle}>{r.items.map((i: any) => `${i.product.name} × ${i.quantity}`).join('; ')}</td>
+              <td style={tdStyle}>{r.total.toFixed(2)} ₽</td>
+              <td style={tdStyle}>{r.status === 'held' ? 'Отложено' : 'Выдано'}</td>
+              <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                {r.status === 'held' && <button style={btnGhost} onClick={() => issue(r.id)}>Выдать</button>}
+                <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => api.reservations.downloadPdf(r.id, r.number)}>PDF</button>
+                <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => share(r.id)}>В задачу</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!reserves.length && <div style={{ padding: 16, color: 'var(--text-muted)' }}>Резервов пока нет.</div>}
     </div>
   );
 }

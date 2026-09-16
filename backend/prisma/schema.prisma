@@ -105,6 +105,7 @@ model User {
   reminders     Reminder[]
   webCallsMade     WebCall[] @relation("WebCallCaller")
   webCallsReceived WebCall[] @relation("WebCallCallee")
+  reservations Reservation[]
 }
 
 model ContactType {
@@ -166,6 +167,7 @@ model Contact {
   @@index([onecId])
 
   @@map("contacts")
+  reservations Reservation[]
 }
 
 model Project {
@@ -1011,6 +1013,7 @@ model Product {
   @@index([category])
   @@index([categoryId])
   @@map("products")
+  reservationItems ReservationItem[]
 }
 
 // Дерево категорий товаров из 1С: группы (папки) и виды номенклатуры,
@@ -1044,6 +1047,7 @@ model Warehouse {
   movements StockMovement[]
 
   @@map("warehouses")
+  reservations Reservation[]
 }
 
 model StockBalance {
@@ -1259,4 +1263,34 @@ model OneCPluginSettings {
   updatedAt           DateTime  @default(now()) @map("updated_at")
 
   @@map("onec_plugin_settings")
+}
+
+model Reservation {
+  id          String      @id @default(cuid())
+  number      Int         @unique
+  contactId   String      @map("contact_id")
+  contact     Contact     @relation(fields: [contactId], references: [id])
+  status      String      @default("held")
+  total       Float       @default(0)
+  warehouseId String      @map("warehouse_id")
+  warehouse   Warehouse   @relation(fields: [warehouseId], references: [id])
+  userId      String?     @map("user_id")
+  user        User?       @relation(fields: [userId], references: [id])
+  comment     String?
+  createdAt   DateTime    @default(now())
+  issuedAt    DateTime?   @map("issued_at")
+  items       ReservationItem[]
+  @@map("reservations")
+}
+
+model ReservationItem {
+  id            String      @id @default(cuid())
+  reservationId String      @map("reservation_id")
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  productId     String      @map("product_id")
+  product       Product     @relation(fields: [productId], references: [id])
+  quantity      Float
+  price         Float
+  sum           Float
+  @@map("reservation_items")
 }
