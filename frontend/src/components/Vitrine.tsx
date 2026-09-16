@@ -81,11 +81,15 @@ export function Vitrine() {
   };
 
   const filteredCards = useMemo(() => {
-    if (!activeCategoryId) return cards;
-    const ids = collectSubtree(activeCategoryId);
-    return cards.filter((c) => c.product.categoryId && ids.has(c.product.categoryId));
+    let list = cards;
+    if (activeCategoryId) {
+      const ids = collectSubtree(activeCategoryId);
+      list = list.filter((c) => c.product.categoryId && ids.has(c.product.categoryId));
+    }
+    if (inStockOnly) list = list.filter((c) => c.inStock);
+    return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, activeCategoryId, categories]);
+  }, [cards, activeCategoryId, inStockOnly, categories]);
 
   const toggleExpand = (id: string) => {
     const next = new Set(expanded);
@@ -196,6 +200,10 @@ export function Vitrine() {
             <span>Все товары</span>
             <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{cards.length}</span>
           </button>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border-color)', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none', marginBottom: 4 }}>
+            <input type="checkbox" checked={inStockOnly} onChange={e => setInStockOnly(e.target.checked)} />
+            В наличии
+          </label>
           {renderTree(null, 0)}
         </aside>
         <div className="vitrine-grid">
