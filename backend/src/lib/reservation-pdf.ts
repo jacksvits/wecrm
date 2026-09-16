@@ -1,5 +1,23 @@
 import PDFDocument from 'pdfkit';
-import path from 'path';
+import fs from 'fs';
+
+const FONT_CANDIDATES = [
+  {
+    regular: '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    bold: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+  },
+  {
+    regular: '/usr/share/fonts/dejavu/DejaVuSans.ttf',
+    bold: '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
+  },
+];
+
+function resolveFonts(): { regular: string; bold: string } | null {
+  for (const c of FONT_CANDIDATES) {
+    if (fs.existsSync(c.regular) && fs.existsSync(c.bold)) return c;
+  }
+  return null;
+}
 
 export function buildReservationPdf(r: {
   number: number; createdAt: Date; status: string; total: number; comment: string | null;
@@ -7,9 +25,11 @@ export function buildReservationPdf(r: {
   items: Array<{ quantity: number; price: number; sum: number; product: { name: string; unit: string } }>;
 }) {
   const doc = new PDFDocument({ size: 'A4', margin: 50 });
-  const F = (n: string) => path.join(__dirname, 'fonts', n);
-  doc.registerFont('reg', F('DejaVuSans.ttf'));
-  doc.registerFont('bold', F('DejaVuSans-Bold.ttf'));
+  const fonts = resolveFonts();
+  if (fonts) {
+    doc.registerFont('reg', fonts.regular);
+    doc.registerFont('bold', fonts.bold);
+  }
   const BRAND = '#2563eb';
 
   doc.font('bold').fontSize(18).fillColor(BRAND).text('WeLANS');
