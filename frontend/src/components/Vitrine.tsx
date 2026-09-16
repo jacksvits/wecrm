@@ -166,6 +166,7 @@ export function Vitrine() {
     <>
       <style>{`
         .vitrine-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; padding: 4px 2px; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .vitrine-grid > div { height: max-content; }
         @media (max-width: 640px) {
           .vitrine-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
           .vitrine-card-body { padding: 10px !important; gap: 4px !important; }
@@ -176,7 +177,6 @@ export function Vitrine() {
         @media (max-width: 400px) { .vitrine-grid { grid-template-columns: 1fr; } }
         @media (max-width: 640px) {
           .vitrine-layout { flex-direction: column !important; gap: 10px !important; }
-          .vitrine-grid > div { height: max-content; }
           .vitrine-catalog { width: 100% !important; display: flex !important; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 0 0 4px; }
           .vitrine-catalog ul { display: contents; }
           .vitrine-catalog li { display: contents; }
