@@ -176,6 +176,7 @@ export function Vitrine() {
         @media (max-width: 400px) { .vitrine-grid { grid-template-columns: 1fr; } }
         @media (max-width: 640px) {
           .vitrine-layout { flex-direction: column !important; gap: 10px !important; }
+          .vitrine-grid > div { height: max-content; }
           .vitrine-catalog { width: 100% !important; display: flex !important; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 0 0 4px; }
           .vitrine-catalog ul { display: contents; }
           .vitrine-catalog li { display: contents; }
