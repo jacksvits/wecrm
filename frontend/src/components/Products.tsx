@@ -347,6 +347,20 @@ export function Products() {
     movements.filter(m => statsWhFilter === 'all' || m.warehouseId === statsWhFilter).slice(0, 50),
     [movements, statsWhFilter]);
 
+  // Топ продаваемых товаров по расходным движениям (для виджета «Самые продаваемые»)
+  const topProducts = useMemo(() => {
+    const agg = new Map<string, { name: string; unit: string; qty: number; ops: number }>();
+    for (const m of movements) {
+      if (m.type !== 'outcome' || !m.product) continue;
+      const cur = agg.get(m.product.name) || { name: m.product.name, unit: m.product.unit || '', qty: 0, ops: 0 };
+      cur.qty += m.quantity;
+      cur.ops += 1;
+      agg.set(m.product.name, cur);
+    }
+    return [...agg.values()].sort((a, b) => b.qty - a.qty).slice(0, 10);
+  }, [movements]);
+  const topMaxQty = topProducts[0]?.qty || 1;
+
   // товары (не услуги) для складского учёта
   const stockProducts = useMemo(() => visible.filter(p => p.kind !== 'service'), [visible]);
 
@@ -684,6 +698,31 @@ export function Products() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+          {/* Виджет среднего размера — топ продаваемых товаров по истории движений (расход) */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 12px 8px' }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Самые продаваемые</h3>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Топ-10 по расходу за всё время</div>
+            </div>
+            <div style={{ padding: '4px 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {topProducts.map((t, i) => (
+                <div key={t.name} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
+                    <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i + 1}. {t.name}</span>
+                    <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtMoney(t.qty)} {t.unit}</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-hover)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.round((t.qty / topMaxQty) * 100)}%`, borderRadius: 4, background: i === 0 ? '#059669' : '#3b82f6' }} />
+                  </div>
+                </div>
+              ))}
+              {topProducts.length === 0 && (
+                <div style={{ fontSize: 14, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
+                  Расходных движений пока нет
+                </div>
+              )}
             </div>
           </div>
         </div>
