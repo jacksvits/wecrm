@@ -404,7 +404,7 @@ export function Products() {
         display: 'flex', gap: 8,
         borderBottom: '1px solid var(--border-color)',
         marginBottom: 16,
-        ...(isMobile ? { margin: '0 -8px 16px' } : {}),
+        ...(isMobile ? { margin: '0 -8px 16px', overflowX: 'auto', scrollbarWidth: 'none' } : {}),
       }}>
         {visibleTabs.map(t => (
           <button
@@ -416,7 +416,7 @@ export function Products() {
               color: tab === t.key ? '#007AFF' : 'var(--text-primary)',
               borderBottom: tab === t.key ? '2px solid #007AFF' : '2px solid transparent',
               cursor: 'pointer', fontSize: 14, fontWeight: 500, borderRadius: '8px 8px 0 0',
-              ...(isMobile ? { flex: 1, padding: '10px 4px', textAlign: 'center', whiteSpace: 'nowrap' } : {}),
+              ...(isMobile ? { flexShrink: 0, padding: '10px 12px', whiteSpace: 'nowrap' } : {}),
             }}
           >
             {t.label}
