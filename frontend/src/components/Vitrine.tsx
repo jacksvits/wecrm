@@ -25,6 +25,7 @@ export function Vitrine() {
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [inStockOnly, setInStockOnly] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -113,7 +114,7 @@ export function Vitrine() {
                   {open ? '▾' : '▸'}
                 </button>
               ) : <span style={{ width: 20, flexShrink: 0 }} />}
-              <button className="vitrine-cat-btn" onClick={() => setActiveCategoryId(active ? null : c.id)}
+              <button className="vitrine-cat-btn" onClick={() => { setActiveCategoryId(active ? null : c.id); setCatalogOpen(false); }}
                 style={{ flex: 1, textAlign: 'left', border: 'none', background: active ? 'var(--bg-hover)' : 'transparent', color: active ? '#007AFF' : 'var(--text-primary)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 13, fontWeight: active ? 600 : 400, display: 'flex', justifyContent: 'space-between', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden' }}>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
                 <span style={{ color: 'var(--text-muted)', fontSize: 12, flexShrink: 0 }}>{countInCategory(c.id)}</span>
@@ -180,9 +181,15 @@ export function Vitrine() {
           .vitrine-btn { padding: 9px 10px !important; font-size: 13px !important; width: 100%; }
         }
         @media (max-width: 400px) { .vitrine-grid { grid-template-columns: 1fr; } }
+        .vitrine-catalog-head { display: none; }
+        .vitrine-catalog-toggle { display: none; }
         @media (max-width: 640px) {
           .vitrine-layout { flex-direction: column !important; gap: 10px !important; }
-          .vitrine-catalog { width: 100% !important; display: flex !important; flex-wrap: wrap; gap: 8px; padding: 0 0 4px; min-width: 0; }
+          .vitrine-catalog { display: none !important; }
+          .vitrine-catalog.open { display: flex !important; flex-wrap: wrap; gap: 8px; align-content: flex-start; position: fixed; top: 0; left: 0; right: 0; width: auto !important; max-height: 65vh; overflow-y: auto; background: var(--bg-card); border-bottom: 1px solid var(--border-color); border-radius: 0 0 16px 16px; box-shadow: 0 10px 28px rgba(0,0,0,.18); z-index: 60; padding: 12px; animation: vitrineDrop .18s ease-out; -webkit-overflow-scrolling: touch; }
+          .vitrine-catalog.open .vitrine-catalog-head { display: flex; width: 100%; }
+          .vitrine-catalog-toggle { display: flex !important; align-items: center; gap: 6px; position: fixed; left: 50%; transform: translateX(-50%); bottom: 76px; z-index: 61; padding: 9px 18px; border-radius: 22px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 14px; font-weight: 500; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+          @keyframes vitrineDrop { from { transform: translateY(-100%); } to { transform: translateY(0); } }
           .vitrine-catalog ul { display: contents; }
           .vitrine-catalog li { display: contents; }
           .vitrine-catalog li > div { padding-left: 0 !important; display: contents !important; }
@@ -195,8 +202,12 @@ export function Vitrine() {
         }
       `}</style>
       <div className="vitrine-layout" style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
-        <aside className="vitrine-catalog" style={{ width: 240, flexShrink: 0, overflowY: 'auto', paddingRight: 4 }}>
-          <button className="vitrine-cat-btn" onClick={() => setActiveCategoryId(null)}
+        <aside className={'vitrine-catalog' + (catalogOpen ? ' open' : '')} style={{ width: 240, flexShrink: 0, overflowY: 'auto', paddingRight: 4 }}>
+          <div className="vitrine-catalog-head" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '2px 2px 8px' }}>
+            <strong style={{ fontSize: 14 }}>Каталог</strong>
+            <button type="button" onClick={() => setCatalogOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: 15, cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>✕</button>
+          </div>
+          <button className="vitrine-cat-btn" onClick={() => { setActiveCategoryId(null); setCatalogOpen(false); }}
             style={{ width: '100%', textAlign: 'left', border: 'none', background: !activeCategoryId ? 'var(--bg-hover)' : 'transparent', color: !activeCategoryId ? '#007AFF' : 'var(--text-primary)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 13, fontWeight: !activeCategoryId ? 600 : 400, display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}>
             <span>Все товары</span>
             <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{cards.length}</span>
@@ -242,6 +253,10 @@ export function Vitrine() {
           )}
         </div>
       </div>
+
+      <button type="button" className="vitrine-catalog-toggle" onClick={() => setCatalogOpen(o => !o)}>
+        Каталог {catalogOpen ? '▴' : '▾'}
+      </button>
 
       {reserveItems.length > 0 && (
         <div className="reserve-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
