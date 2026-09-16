@@ -175,6 +175,7 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
       list: (): Promise<ProductCategory[]> => fetchApi('/api/products/meta/categories'),
     },
     vitrine: (): Promise<Product[]> => fetchApi('/api/products/vitrine'),
+    vitrineCategories: (): Promise<ProductCategory[]> => fetchApi('/api/products/vitrine/categories'),
     get: (id: string): Promise<Product> => fetchApi(`/api/products/${id}`),
     create: (data: Partial<Product>) => fetchApi('/api/products', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Product>) => fetchApi(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),

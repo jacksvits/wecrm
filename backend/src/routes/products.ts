@@ -30,6 +30,42 @@ router.get('/vitrine', async (_req, res) => {
   }
 });
 
+/**
+ * GET /api/products/vitrine/categories
+ * Каталог витрины: категории, в которых есть товары на витрине, вместе с родительскими группами.
+ * Плоский список — дерево строит фронтенд. Публичный роут, как и сама витрина.
+ */
+router.get('/vitrine/categories', async (_req, res) => {
+  try {
+    const vitrineProducts = await prisma.product.findMany({
+      where: { onVitrine: true, isActive: true, categoryId: { not: null } },
+      select: { categoryId: true },
+    });
+    const usedIds = [...new Set(vitrineProducts.map((p) => p.categoryId as string))];
+    if (!usedIds.length) return res.json([]);
+    const all = await prisma.productCategory.findMany({
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, isGroup: true, parentId: true },
+    });
+    const byId = new Map(all.map((c) => [c.id, c]));
+    // поднимаемся от каждой используемой категории к корню, собирая все предки
+    const include = new Set<string>();
+    for (const id of usedIds) {
+      let cur = byId.get(id);
+      const guard = new Set<string>();
+      while (cur && !guard.has(cur.id)) {
+        guard.add(cur.id);
+        include.add(cur.id);
+        cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+      }
+    }
+    res.json(all.filter((c) => include.has(c.id)));
+  } catch (err: any) {
+    console.error('[products:vitrine:categories]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.use(authMiddleware);
 
 // Полный путь категории «Группа / ... / Вид» — для выгрузки позиции в группу 1С

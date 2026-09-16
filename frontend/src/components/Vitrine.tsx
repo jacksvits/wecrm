@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
-import { Product } from '../types';
+import { Product, ProductCategory } from '../types';
 
 const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
 const fmtQty = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
@@ -22,6 +22,9 @@ interface ReserveItem {
 
 export function Vitrine() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [contacts, setContacts] = useState<any[]>([]);
@@ -37,6 +40,12 @@ export function Vitrine() {
       .catch((e: any) => setError(e.message || 'Ошибка загрузки витрины'))
       .finally(() => setLoading(false));
     api.contacts.list().then(setContacts).catch(() => {});
+    api.products.vitrineCategories()
+      .then((cats) => {
+        setCategories(cats);
+        setExpanded(new Set(cats.map((c) => c.id))); // дерево раскрыто по умолчанию
+      })
+      .catch(() => {});
   }, []);
 
   const origin = window.location.origin;
@@ -49,6 +58,68 @@ export function Vitrine() {
 
   const freeQty = (p: Product) =>
     (p.stocks || []).reduce((s, x) => s + Math.max(x.quantity - (x.reserved || 0), 0), 0);
+
+  // ===== Каталог: дерево категорий и фильтрация витрины =====
+  const childrenOf = (parentId: string | null) =>
+    categories.filter((c) => (c.parentId ?? null) === parentId);
+
+  const collectSubtree = (id: string): Set<string> => {
+    const ids = new Set<string>([id]);
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const ch of categories) {
+        if (ch.parentId === cur && !ids.has(ch.id)) { ids.add(ch.id); stack.push(ch.id); }
+      }
+    }
+    return ids;
+  };
+
+  const countInCategory = (id: string) => {
+    const ids = collectSubtree(id);
+    return cards.filter((c) => c.product.categoryId && ids.has(c.product.categoryId)).length;
+  };
+
+  const filteredCards = useMemo(() => {
+    if (!activeCategoryId) return cards;
+    const ids = collectSubtree(activeCategoryId);
+    return cards.filter((c) => c.product.categoryId && ids.has(c.product.categoryId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards, activeCategoryId, categories]);
+
+  const toggleExpand = (id: string) => {
+    const next = new Set(expanded);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setExpanded(next);
+  };
+
+  const renderTree = (parentId: string | null, depth: number): any => (
+    <ul className="vitrine-cat-list" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      {childrenOf(parentId).map((c) => {
+        const kids = childrenOf(c.id);
+        const open = expanded.has(c.id);
+        const active = activeCategoryId === c.id;
+        return (
+          <li key={c.id}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, paddingLeft: depth * 14 }}>
+              {kids.length > 0 ? (
+                <button className="vitrine-cat-toggle" onClick={() => toggleExpand(c.id)}
+                  style={{ width: 20, flexShrink: 0, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, padding: '6px 0' }}>
+                  {open ? '▾' : '▸'}
+                </button>
+              ) : <span style={{ width: 20, flexShrink: 0 }} />}
+              <button className="vitrine-cat-btn" onClick={() => setActiveCategoryId(active ? null : c.id)}
+                style={{ flex: 1, textAlign: 'left', border: 'none', background: active ? 'var(--bg-hover)' : 'transparent', color: active ? '#007AFF' : 'var(--text-primary)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 13, fontWeight: active ? 600 : 400, display: 'flex', justifyContent: 'space-between', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 12, flexShrink: 0 }}>{countInCategory(c.id)}</span>
+              </button>
+            </div>
+            {open && kids.length > 0 && renderTree(c.id, depth + 1)}
+          </li>
+        );
+      })}
+    </ul>
+  );
 
   const openReserve = (p: Product) => {
     const first = (p.prices || [])[0] as any;
@@ -104,12 +175,30 @@ export function Vitrine() {
         }
         @media (max-width: 400px) { .vitrine-grid { grid-template-columns: 1fr; } }
         @media (max-width: 640px) {
+          .vitrine-layout { flex-direction: column !important; gap: 10px !important; }
+          .vitrine-catalog { width: 100% !important; display: flex !important; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 0 0 4px; }
+          .vitrine-catalog ul { display: contents; }
+          .vitrine-catalog li { display: contents; }
+          .vitrine-catalog li > div { padding-left: 0 !important; display: contents !important; }
+          .vitrine-cat-btn { flex: 0 0 auto !important; border: 1px solid var(--border-color) !important; }
+          .vitrine-cat-toggle { display: none !important; }
+        }
+        @media (max-width: 640px) {
           .reserve-overlay { align-items: flex-end !important; padding: 0 !important; }
           .reserve-modal { max-width: 100% !important; border-radius: 16px 16px 0 0 !important; max-height: 92vh !important; }
         }
       `}</style>
-      <div className="vitrine-grid">
-        {cards.map(({ product: p, price, inStock, image }) => (
+      <div className="vitrine-layout" style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
+        <aside className="vitrine-catalog" style={{ width: 240, flexShrink: 0, overflowY: 'auto', paddingRight: 4 }}>
+          <button className="vitrine-cat-btn" onClick={() => setActiveCategoryId(null)}
+            style={{ width: '100%', textAlign: 'left', border: 'none', background: !activeCategoryId ? 'var(--bg-hover)' : 'transparent', color: !activeCategoryId ? '#007AFF' : 'var(--text-primary)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 13, fontWeight: !activeCategoryId ? 600 : 400, display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}>
+            <span>Все товары</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{cards.length}</span>
+          </button>
+          {renderTree(null, 0)}
+        </aside>
+        <div className="vitrine-grid">
+          {filteredCards.map(({ product: p, price, inStock, image }) => (
           <div key={p.id}
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <div style={{ aspectRatio: '1 / 1', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -137,7 +226,11 @@ export function Vitrine() {
               </button>
             </div>
           </div>
-        ))}
+          ))}
+          {!filteredCards.length && (
+            <div style={{ gridColumn: '1 / -1', padding: 24, color: 'var(--text-muted)' }}>В этой категории пока нет товаров на витрине.</div>
+          )}
+        </div>
       </div>
 
       {reserveItems.length > 0 && (
