@@ -194,6 +194,9 @@ body {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+.rich-text img { max-width: 100%; height: auto; border-radius: 4px; }
+.rich-text table { max-width: 100%; border-collapse: collapse; }
+.rich-text td, .rich-text th { padding: 4px 8px; border: 1px solid var(--border-color); }
 .rich-text blockquote {
   margin: 0 0 10px;
   padding: 8px 14px;

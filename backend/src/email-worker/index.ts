@@ -2,7 +2,7 @@ import { ImapFlow, ImapFlowOptions, FetchMessageObject } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { prisma } from '../lib/prisma.js';
 import { postHandlerGreeting } from '../lib/handler-messages.js';
-import { normalizeEmailDescription } from '../lib/email-description.js';
+import { normalizeEmailDescription, normalizeEmailDescriptionHtml } from '../lib/email-description.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
 import { sendPushToRoleUsers, sendPushToTaskAssignees, sendPushToTaskCurators } from '../lib/push.js';
 import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js';
@@ -188,10 +188,44 @@ export class EmailWorker {
           if (statusRow) filterStatus = statusRow.name;
           else console.warn(`[EmailWorker] Filter status "${decision.status}" not found, keeping default`);
         }
+        // Инлайн-картинки письма (contentId/cid): сохраняем на диск до создания
+        // задачи, чтобы описание могло ссылаться на них по URL вместо cid:
+        const inlineImages = (allAttachments as any[]).filter(
+          (a: any) => a.contentId && a.content && a.content.length > 0
+        );
+        const inlineImagePaths = new Map<string, string>();
+        let inlineImageRecords: { filename: string; originalName: string; mimeType: string; size: number; path: string }[] = [];
+        if (inlineImages.length > 0) {
+          const UPLOAD_DIR_IMAGES = '/app/uploads';
+          const IMAGES_DIR = path.join(UPLOAD_DIR_IMAGES, 'comments');
+          if (!fs.existsSync(IMAGES_DIR)) {
+            fs.mkdirSync(IMAGES_DIR, { recursive: true });
+          }
+          for (const img of inlineImages) {
+            const ext = path.extname(img.filename || '') || `.${(img.contentType || 'png').split('/')[1] || 'png'}`;
+            const filename = `${randomUUID()}${ext}`;
+            fs.writeFileSync(path.join(IMAGES_DIR, filename), img.content);
+            const dbPath = `/uploads/comments/${filename}`;
+            inlineImagePaths.set(String(img.contentId).replace(/^<|>$/g, ''), dbPath);
+            inlineImageRecords.push({
+              filename,
+              originalName: img.filename || `inline-image${ext}`,
+              mimeType: img.contentType || 'image/png',
+              size: img.content.length,
+              path: dbPath,
+            });
+          }
+        }
+
+        const htmlSource = typeof parsed.html === 'string' ? parsed.html : undefined;
+        const description = htmlSource
+          ? normalizeEmailDescriptionHtml(htmlSource, (cid) => inlineImagePaths.get(cid) || null)
+          : normalizeEmailDescription(parsed.text, htmlSource);
+
         const task = await prisma.task.create({
           data: {
             title: cleanTitle,
-            description: normalizeEmailDescription(parsed.text, typeof parsed.html === 'string' ? parsed.html : undefined),
+            description,
             priority,
             status: filterStatus || 'open',
             projectId: decision.projectId,
@@ -207,6 +241,13 @@ export class EmailWorker {
               : undefined,
           },
         });
+
+        // Регистрируем инлайн-картинки как вложения задачи
+        for (const rec of inlineImageRecords) {
+          await prisma.fileAttachment.create({
+            data: { ...rec, entityType: 'task', entityId: task.id, authorId: creatorId },
+          });
+        }
 
         // Применение правил парсинга тела письма (шаблон → поле задачи)
         if (decision.parsed) {
