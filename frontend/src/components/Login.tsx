@@ -190,9 +190,6 @@ export function Login() {
         <div className="login-orb login-orb-1" />
         <div className="login-orb login-orb-2" />
         <div className="login-orb login-orb-3" />
-        <div className="login-wave login-wave-1" />
-        <div className="login-wave login-wave-2" />
-
         <img src={brandLogo} alt="Welans" className="login-brand-logo" />
         <h2 className="login-brand-title">
           Управляйте бизнесом<br />

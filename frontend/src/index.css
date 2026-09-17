@@ -290,22 +290,6 @@ body {
   to   { transform: translateX(0); opacity: 1; }
 }
 
-/* Волны на фоне панели */
-.login-wave {
-  position: absolute;
-  left: 0;
-  width: 200%;
-  height: 200px;
-  opacity: 0.12;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200' preserveAspectRatio='none'%3E%3Cpath d='M0,100 C300,20 600,180 1200,80 L1200,200 L0,200 Z' fill='white'/%3E%3C/svg%3E") repeat-x;
-  background-size: 1200px 200px;
-  animation: loginWaveMove 14s linear infinite;
-  pointer-events: none;
-}
-.login-wave-1 { bottom: 8%; animation-duration: 18s; }
-.login-wave-2 { bottom: 0; opacity: 0.08; animation-duration: 26s; animation-direction: reverse; }
-@keyframes loginWaveMove { to { transform: translateX(-1200px); } }
-
 /* Плавающие кольца */
 .login-orb {
   position: absolute;
