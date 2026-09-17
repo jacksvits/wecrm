@@ -1,3 +1,5 @@
+import { htmlToText } from './html-to-text.js';
+
 // Нормализует текст/HTML входящего письма в читаемое HTML-описание задачи.
 // mailparser для HTML-писем с картинками генерирует мусор вида:
 //   [{ Image: alt - Контур.Диадокsource - https://... }](https://diadoc.ru)   (старый формат)
@@ -20,7 +22,6 @@ function toRawText(text: string | null | undefined, html: string | null | undefi
   s = s.replace(/^\s*<p[^>]*>/i, '').replace(/<\/p>\s*$/i, '').trim();
   if (!s && html) {
     // Фолбэк на htmlToText: он удаляет img целиком, ссылки оставляет «текст (url)»
-    const { htmlToText } = require('./html-to-text.js');
     s = htmlToText(html).trim();
   }
   return s;
