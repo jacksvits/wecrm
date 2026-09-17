@@ -189,21 +189,31 @@ router.post("/webhook", async (req, res) => {
         .status(200)
         .json({ success: true, warning: "missing pbx_call_id" });
     }
-    if (event === "NOTIFY_START" || event === "NOTIFY_INTERNAL") {
-      const isOutgoing = event === "NOTIFY_INTERNAL";
+    if (
+      event === "NOTIFY_START" ||
+      event === "NOTIFY_INTERNAL" ||
+      event === "NOTIFY_OUT_START"
+    ) {
+      const isOutgoing = event !== "NOTIFY_START";
       const existing = await prisma.call.findUnique({
         where: { pbxCallId: body.pbx_call_id },
       });
       if (!existing) {
         const settings = await prisma.telephonySettings.findFirst();
+        // Для исходящих звонков caller_id — внутренний номер сотрудника,
+        // а номер клиента приходит в поле destination
+        const clientPhone = isOutgoing
+          ? normalizePhone(body.destination || "") || calledDid
+          : callerId;
+        const employeePhone = isOutgoing ? callerId : "";
         let contactId: string | null = null;
-        if (callerId) {
+        if (clientPhone) {
           if (settings?.autoCreateContact) {
             const resolved = await resolveContactAuto(
-              { phone: callerId, name: callerId },
+              { phone: clientPhone, name: clientPhone },
               {
-                name: callerId,
-                phone: callerId,
+                name: clientPhone,
+                phone: clientPhone,
                 type: "lead",
                 tags: ["novofon", "auto"],
               },
@@ -211,7 +221,7 @@ router.post("/webhook", async (req, res) => {
             contactId = resolved.contactId;
           } else {
             const contact = await prisma.contact.findFirst({
-              where: { phone: { contains: callerId.replace("+", "") } },
+              where: { phone: { contains: clientPhone.replace("+", "") } },
             });
             if (contact) {
               contactId = contact.id;
@@ -222,9 +232,9 @@ router.post("/webhook", async (req, res) => {
           data: {
             pbxCallId: body.pbx_call_id || "",
             direction: isOutgoing ? "outgoing" : "incoming",
-            callerId: callerId || "unknown",
+            callerId: clientPhone || callerId || "unknown",
             calledDid: calledDid || "unknown",
-            internal: body.internal || null,
+            internal: body.internal || employeePhone || null,
             callStart: body.call_start ? new Date(body.call_start) : new Date(),
             contactId,
             disposition: "in_progress",
@@ -235,26 +245,26 @@ router.post("/webhook", async (req, res) => {
           : settings?.autoCreateTaskOnIncoming;
         if (shouldCreateTask && settings?.defaultUserId) {
           const directionLabel = isOutgoing ? "Исходящий" : "Входящий";
-          // Повторный входящий звонок: если у контакта уже есть незакрытая задача —
-          // новая задача не создаётся, звонок привязывается к существующей задаче
-          // и на NOTIFY_END в её обсуждение добавляется запись с информацией о звонке
-          const existingTask =
-            !isOutgoing && contactId
-              ? await findActiveContactTask(contactId)
-              : null;
+          // Повторный звонок (входящий или исходящий): если у контакта уже есть
+          // незакрытая задача — новая задача не создаётся, звонок привязывается
+          // к существующей задаче и на NOTIFY_END в её обсуждение добавляется
+          // запись с информацией о звонке
+          const existingTask = contactId
+            ? await findActiveContactTask(contactId)
+            : null;
           if (existingTask) {
             await prisma.call.update({
               where: { id: call.id },
               data: { taskId: existingTask.id, notes: REPEAT_CALL_MARKER },
             });
             console.log(
-              `[Novofon] Повторный звонок от ${callerId} — привязан к задаче ${existingTask.id}, новая задача не создана`,
+              `[Novofon] Повторный звонок ${isOutgoing ? "на" : "от"} ${clientPhone} — привязан к задаче ${existingTask.id}, новая задача не создана`,
             );
           } else {
             const task = await prisma.task.create({
               data: {
-                title: `${directionLabel} звонок ${isOutgoing ? "на" : "от"} ${callerId || calledDid}`,
-                description: `<p><strong>Направление:</strong> ${directionLabel}</p><p><strong>${isOutgoing ? "Кому:" : "От кого:"}</strong> ${callerId}</p><p><strong>На номер:</strong> ${calledDid}</p><p><strong>Время (МСК):</strong> ${mskDateTime(new Date())}</p>`,
+                title: `${directionLabel} звонок ${isOutgoing ? "на" : "от"} ${clientPhone || callerId || calledDid}`,
+                description: `<p><strong>Направление:</strong> ${directionLabel}</p><p><strong>${isOutgoing ? "Кому:" : "От кого:"}</strong> ${clientPhone || callerId}</p><p><strong>На номер:</strong> ${calledDid}</p>${employeePhone ? `<p><strong>Сотрудник (внутр.):</strong> ${employeePhone}</p>` : ""}<p><strong>Время (МСК):</strong> ${mskDateTime(new Date())}</p>`,
                 status: "open",
                 priority: "medium",
                 contactId,
@@ -279,7 +289,7 @@ router.post("/webhook", async (req, res) => {
               task.id,
               {
                 title: `Новый звонок — задача`,
-                body: `${directionLabel} звонок ${isOutgoing ? "на" : "от"} ${callerId || calledDid}`,
+                body: `${directionLabel} звонок ${isOutgoing ? "на" : "от"} ${clientPhone || callerId || calledDid}`,
                 url: `/tasks/${task.id}`,
               },
               settings.defaultUserId,
@@ -288,7 +298,7 @@ router.post("/webhook", async (req, res) => {
               task.id,
               {
                 title: `Новый звонок — задача`,
-                body: `${directionLabel} звонок ${isOutgoing ? "на" : "от"} ${callerId || calledDid}`,
+                body: `${directionLabel} звонок ${isOutgoing ? "на" : "от"} ${clientPhone || callerId || calledDid}`,
                 url: `/tasks/${task.id}`,
               },
               settings.defaultUserId,
@@ -302,29 +312,44 @@ router.post("/webhook", async (req, res) => {
           ? parseInt(body.duration, 10)
           : body.duration || 0;
       const isRecorded = body.is_recorded === "1" || body.is_recorded === 1;
-      const call = await prisma.call.update({
-        where: { pbxCallId: body.pbx_call_id },
-        data: {
-          duration,
-          disposition: mapDisposition(body.disposition || ""),
-          statusCode: body.status_code || null,
-          isRecorded: !!isRecorded,
-          callIdWithRec: body.call_id_with_rec || null,
-          callEnd: new Date(),
-          internal: body.last_internal || body.internal || undefined,
-        },
-        include: { task: true, contact: true },
-      });
+      let call: any = null;
+      try {
+        call = await prisma.call.update({
+          where: { pbxCallId: body.pbx_call_id },
+          data: {
+            duration,
+            disposition: mapDisposition(body.disposition || ""),
+            statusCode: body.status_code || null,
+            isRecorded: !!isRecorded,
+            callIdWithRec: body.call_id_with_rec || null,
+            callEnd: new Date(),
+            internal: body.last_internal || body.internal || undefined,
+          },
+          include: { task: true, contact: true },
+        });
+      } catch (err: any) {
+        // Стартовое событие не обработалось (например, звонок начался до деплоя) —
+        // фиксируем факт конца звонка без задачи, чтобы не падать на каждом повторе
+        console.warn(
+          "[Novofon] NOTIFY_END для неизвестного звонка:",
+          body.pbx_call_id,
+        );
+        return res.status(200).json({ success: true });
+      }
+      const isOutgoingCall = call.direction === "outgoing";
       // Повторный звонок, привязанный на NOTIFY_START к существующей незакрытой задаче контакта
       const isRepeatCall = call.notes === REPEAT_CALL_MARKER;
       if (call.disposition === "missed") {
         const settings = await prisma.telephonySettings.findFirst();
         if (settings?.autoCreateTask && settings.defaultUserId) {
+          const missedTitle = isOutgoingCall
+            ? `Исходящий звонок на ${call.callerId} — не ответил`
+            : `Пропущенный звонок от ${call.callerId}`;
           if (call.taskId && !isRepeatCall) {
             await prisma.task.update({
               where: { id: call.taskId },
               data: {
-                title: `Пропущенный звонок от ${call.callerId}`,
+                title: missedTitle,
                 priority: "high",
               },
             });
@@ -348,6 +373,7 @@ router.post("/webhook", async (req, res) => {
                     callStart: call.callStart,
                     durationSec: call.duration,
                     missed: true,
+                    direction: isOutgoingCall ? "outgoing" : "incoming",
                   },
                 );
                 linkedTaskId = activeTask.id;
@@ -356,8 +382,8 @@ router.post("/webhook", async (req, res) => {
             if (!linkedTaskId) {
               const task = await prisma.task.create({
                 data: {
-                  title: `Пропущенный звонок от ${call.callerId}`,
-                  description: `<p><strong>Пропущенный звонок</strong></p><p><strong>От:</strong> ${call.callerId}</p><p><strong>На номер:</strong> ${call.calledDid}</p><p><strong>Длительность ожидания:</strong> ${call.duration} сек</p><p><strong>Время (МСК):</strong> ${mskDateTime(new Date())}</p>`,
+                  title: missedTitle,
+                  description: `<p><strong>${isOutgoingCall ? "Исходящий звонок не состоялся" : "Пропущенный звонок"}</strong></p><p><strong>${isOutgoingCall ? "Кому:" : "От:"}</strong> ${call.callerId}</p><p><strong>На номер:</strong> ${call.calledDid}</p><p><strong>Длительность ожидания:</strong> ${call.duration} сек</p><p><strong>Время (МСК):</strong> ${mskDateTime(new Date())}</p>`,
                   status: "open",
                   priority: "high",
                   contactId: call.contactId,
@@ -383,8 +409,8 @@ router.post("/webhook", async (req, res) => {
               sendPushToTaskAssignees(
                 task.id,
                 {
-                  title: `Пропущенный звонок — задача`,
-                  body: `Пропущенный звонок от ${call.callerId}`,
+                  title: `${isOutgoingCall ? "Исходящий звонок" : "Пропущенный звонок"} — задача`,
+                  body: missedTitle,
                   url: `/tasks/${task.id}`,
                 },
                 settings.defaultUserId,
@@ -392,8 +418,8 @@ router.post("/webhook", async (req, res) => {
               sendPushToTaskCurators(
                 task.id,
                 {
-                  title: `Пропущенный звонок — задача`,
-                  body: `Пропущенный звонок от ${call.callerId}`,
+                  title: `${isOutgoingCall ? "Исходящий звонок" : "Пропущенный звонок"} — задача`,
+                  body: missedTitle,
                   url: `/tasks/${task.id}`,
                 },
                 settings.defaultUserId,
@@ -442,6 +468,7 @@ router.post("/webhook", async (req, res) => {
             durationSec: call.duration,
             recordUrl: repeatCallRecordUrl,
             missed: call.disposition === "missed",
+            direction: isOutgoingCall ? "outgoing" : "incoming",
           });
           await prisma.call.update({
             where: { id: call.id },
@@ -761,13 +788,22 @@ function buildCallInfoHtml(opts: {
   durationSec: number;
   recordUrl?: string | null;
   missed?: boolean;
+  direction?: "incoming" | "outgoing";
 }): string {
+  const isOutgoing = opts.direction === "outgoing";
   const durationLabel = opts.missed
     ? "Длительность ожидания"
     : "Длительность разговора";
+  const callLabel = opts.missed
+    ? isOutgoing
+      ? "Исходящий звонок не состоялся"
+      : "Пропущенный звонок"
+    : isOutgoing
+      ? "Повторный исходящий звонок"
+      : "Повторный входящий звонок";
   const parts = [
-    `<p><strong>${opts.missed ? "Пропущенный звонок" : "Повторный входящий звонок"}</strong></p>`,
-    `<p><strong>От:</strong> ${opts.callerId}</p>`,
+    `<p><strong>${callLabel}</strong></p>`,
+    `<p><strong>${isOutgoing ? "Кому:" : "От:"}</strong> ${opts.callerId}</p>`,
     `<p><strong>На номер:</strong> ${opts.calledDid}</p>`,
     `<p><strong>${durationLabel}:</strong> ${formatDuration(opts.durationSec)}</p>`,
     `<p><strong>Время (МСК):</strong> ${mskDateTime(opts.callStart)}</p>`,
@@ -791,6 +827,7 @@ async function addCallDiscussionEntry(
     durationSec: number;
     recordUrl?: string | null;
     missed?: boolean;
+    direction?: "incoming" | "outgoing";
   },
 ): Promise<void> {
   await prisma.comment.create({
