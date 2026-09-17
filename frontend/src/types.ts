@@ -141,3 +141,4 @@ export interface WebCall {
   caller?: { id: string; name: string; avatar?: string | null };
   callee?: { id: string; name: string; avatar?: string | null };
 }
+export interface DashboardMetricSetting { metricKey: string; sortOrder: number; visible: boolean; }

@@ -225,4 +225,31 @@ router.get('/task-finances/month-tasks', async (req, res) => {
   res.json({ month: `${year}-${String(month).padStart(2, '0')}`, tasks: items });
 });
 
+// Персональные настройки метрик дашборда: порядок и видимость для текущего пользователя
+router.get('/layout', async (req: AuthRequest, res) => {
+  const settings = await prisma.dashboardMetricSetting.findMany({
+    where: { userId: req.user!.id },
+    orderBy: { sortOrder: 'asc' },
+  });
+  res.json(settings.map((s) => ({ metricKey: s.metricKey, sortOrder: s.sortOrder, visible: s.visible })));
+});
+
+router.put('/layout', async (req: AuthRequest, res) => {
+  const items = req.body?.items;
+  if (!Array.isArray(items) || items.length > 200) {
+    return res.status(400).json({ error: 'Ожидается массив items (не более 200)' });
+  }
+  const userId = req.user!.id;
+  await prisma.$transaction(
+    items.map((item: any, index: number) =>
+      prisma.dashboardMetricSetting.upsert({
+        where: { userId_metricKey: { userId, metricKey: String(item.metricKey) } },
+        create: { userId, metricKey: String(item.metricKey), sortOrder: index, visible: item.visible !== false },
+        update: { sortOrder: index, visible: item.visible !== false },
+      })
+    )
+  );
+  res.json({ ok: true });
+});
+
 export default router;
