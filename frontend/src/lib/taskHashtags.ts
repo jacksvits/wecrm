@@ -8,14 +8,25 @@ import { useNavigate } from 'react-router-dom';
 // # и цифры задачи; не захватывает #fff (цвета), ##309, #309abc
 export const TASK_TAG_REGEX = /(^|[^#\w])#(\d{1,7})(?![\w])/g;
 
-// Оборачивает #ID в ссылку внутри текстового фрагмента
+// Голые URL в текстовом фрагменте; не захватывает < и кавычки (атрибуты тегов)
+export const PLAIN_URL_REGEX = /(https?:\/\/[^\s<>"']+)/g;
+
+// Оборачивает голый URL в ссылку, открывающуюся в новой вкладке
+function linkifyUrlSegment(text: string): string {
+  return text.replace(PLAIN_URL_REGEX, (url) =>
+    `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`
+  );
+}
+
+// Оборачивает #ID и голые URL в ссылку внутри текстового фрагмента
 function linkifyTagSegment(text: string): string {
-  return text.replace(TASK_TAG_REGEX, (m, prefix: string, id: string) =>
+  const withUrls = linkifyUrlSegment(text);
+  return withUrls.replace(TASK_TAG_REGEX, (m, prefix: string, id: string) =>
     `${prefix}<a href="/tasks/${id}" class="task-hashtag">#${id}</a>`
   );
 }
 
-// Парсит HTML из WYSIWYG: заменяет #ID только в текстовых узлах,
+// Парсит HTML из WYSIWYG: заменяет #ID и голые URL только в текстовых узлах,
 // не трогает теги, атрибуты (style с цветами #fff) и существующие <a>
 export function linkifyTaskTagsHtml(html: string): string {
   let result = '';
