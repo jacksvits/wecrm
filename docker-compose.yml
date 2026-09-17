@@ -102,7 +102,7 @@ services:
   # перезаписывается бэкендом (плагин «Прокси через VPN»), run.sh следит за
   # изменением файла и перезапускает sing-box.
   vpn:
-    image: docker.io/sagernet/sing-box:1.10.7
+    image: ghcr.io/sagernet/sing-box:v1.10.7
     container_name: wecrm-vpn-1
     command: sh /etc/sing-box/run.sh
     restart: unless-stopped
