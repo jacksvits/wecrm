@@ -177,18 +177,30 @@ export class EmailWorker {
         // Исполнители/кураторы по умолчанию из настроек пользователей (как при ручном создании задачи)
         const defaultAssignees = await getDefaultTaskAssigneeIds();
         const defaultCurators = await getDefaultTaskCuratorIds();
+        // Действия фильтра: исполнители из фильтра имеют приоритет над дефолтными
+        const assigneeIds = decision.assigneeIds.length ? decision.assigneeIds : defaultAssignees;
+        // Статус из фильтра резолвим по справочнику статусов (как у parsed.status)
+        let filterStatus: string | undefined;
+        if (decision.status) {
+          const statusRow = await prisma.status.findUnique({
+            where: { entityType_name: { entityType: 'task', name: decision.status.toLowerCase() } },
+          });
+          if (statusRow) filterStatus = statusRow.name;
+          else console.warn(`[EmailWorker] Filter status "${decision.status}" not found, keeping default`);
+        }
         const task = await prisma.task.create({
           data: {
             title: cleanTitle,
             description: normalizeEmailDescription(parsed.text, typeof parsed.html === 'string' ? parsed.html : undefined),
             priority,
-            status: 'open',
+            status: filterStatus || 'open',
+            projectId: decision.projectId,
             creatorId,
             contactId,
             emailMessageId: messageId,
             sourceEmail: senderEmail,
-            assignees: defaultAssignees.length
-              ? { create: defaultAssignees.map((uid) => ({ userId: uid })) }
+            assignees: assigneeIds.length
+              ? { create: assigneeIds.map((uid) => ({ userId: uid })) }
               : undefined,
             curators: defaultCurators.length
               ? { create: defaultCurators.map((uid) => ({ userId: uid })) }

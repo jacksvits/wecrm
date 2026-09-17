@@ -147,6 +147,8 @@ export async function applyEmailFilters(ctx: EmailContext): Promise<FilterDecisi
     decision.matched = true;
     decision.filterId = filter.id;
     decision.filterName = filter.name;
+    // Правила парсинга тела письма: адрес, тема, описание и т.д. из шаблонов фильтра
+    applyParseRules(filter, ctx.body, decision);
     decision.createTask = filter.createTask;
     if (filter.projectId) decision.projectId = filter.projectId;
     if (filter.assigneeIds.length) decision.assigneeIds = filter.assigneeIds;
