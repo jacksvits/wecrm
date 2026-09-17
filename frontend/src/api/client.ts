@@ -41,6 +41,11 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     getMyChat: () => fetchApi('/api/telegram/my-chat'),
     linkChat: (chatId: string) => fetchApi('/api/telegram/link-chat', { method: 'POST', body: JSON.stringify({ chatId }) }),
   },
+  vpn: {
+    getSettings: () => fetchApi('/api/vpn/settings'),
+    saveSettings: (data: { isActive: boolean; subscriptionUrl?: string }) => fetchApi('/api/vpn/settings', { method: 'POST', body: JSON.stringify(data) }),
+    test: (): Promise<{ ok: boolean; servers: number; telegramReachable: boolean }> => fetchApi('/api/vpn/test', { method: 'POST' }),
+  },
   beget: {
     account: () => fetchApi('/api/beget/account'),
     domains: () => fetchApi('/api/beget/domains'),

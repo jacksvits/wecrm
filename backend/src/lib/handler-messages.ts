@@ -1,6 +1,7 @@
 import { prisma } from './prisma.js';
 import { broadcast, CHANNELS } from './events.js';
 import { htmlToText } from './html-to-text.js';
+import { telegramFetch } from './telegram-api.js';
 
 // === Обработчик: автоматические сообщения в обсуждение задачи ===
 // Условие срабатывания: задача пришла из канала (Telegram/MAX/VK), у которого
@@ -81,7 +82,7 @@ export async function sendToChannel(task: any, text: string): Promise<void> {
     try {
       const tgSettings = await prisma.telegramSettings.findFirst();
       if (tgSettings?.isActive && tgSettings?.botToken) {
-        const response = await fetch(`https://api.telegram.org/bot${tgSettings.botToken}/sendMessage`, {
+        const response = await telegramFetch(`https://api.telegram.org/bot${tgSettings.botToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ chat_id: task.telegramChatId, text }),

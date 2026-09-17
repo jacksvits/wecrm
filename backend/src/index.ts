@@ -29,6 +29,7 @@ import vkRoutes from './routes/vk.js';
 import vkGroupSettingsRoutes from './routes/vk-group-settings.js';
 import maxRoutes from './routes/max.js';
 import telegramRoutes from './routes/telegram.js';
+import vpnRoutes, { syncVpnConfigOnStartup } from './routes/vpn.js';
 import yandexRoutes from './routes/yandex.js';
 import begetRoutes from './routes/beget.js';
 import tochkaRoutes from './routes/tochka.js';
@@ -122,6 +123,9 @@ app.use('/api/vk', vkRoutes);
 app.use('/api/vk-group-settings', vkGroupSettingsRoutes);
 app.use('/api/max', maxRoutes);
 app.use('/api/telegram', telegramRoutes);
+app.use('/api/vpn', vpnRoutes);
+// Если плагин «Прокси через VPN» активен — синхронизируем конфиг sing-box
+syncVpnConfigOnStartup();
 app.use('/api/beget', begetRoutes);
 app.use('/api/tochka', tochkaRoutes);
 app.use('/api/pskovline', pskovlineRoutes);

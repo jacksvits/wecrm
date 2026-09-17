@@ -38,6 +38,9 @@ services:
       TOCHKA_REDIRECT_URI: "https://welans.cc/api/tochka/auth-url"
       TOCHKA_ACCESS_TOKEN: ""
       FRONTEND_URL: "https://welans.cc"
+      # Прокси для обращений бэкенда к Telegram API (контейнер vpn, sing-box).
+      # Нужен, если прямой доступ к api.telegram.org с сервера заблокирован.
+      TELEGRAM_PROXY_URL: "http://vpn:2080"
     depends_on:
       db:
         condition: service_healthy
@@ -49,6 +52,8 @@ services:
       - /mnt/nfs/GAME:/app/files/games:ro
       - /mnt/nfs/GAME:/app/games:ro
       - ./backend/data:/app/data
+      # Общий том с конфигом sing-box: бэкенд перезаписывает его из плагина «Прокси через VPN»
+      - ./vpn/sing-box:/app/vpn-config
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4000/api/health || exit 1"]
@@ -91,6 +96,18 @@ services:
       - /mnt/nfs/GAME:/app/games:ro
       - ./backend/prisma:/app/prisma:ro
     restart: unless-stopped
+
+  # Локальный прокси с VPN-подпиской — для трафика Telegram API, когда прямой
+  # доступ к api.telegram.org с сервера заблокирован. Конфиг config.json
+  # перезаписывается бэкендом (плагин «Прокси через VPN»), run.sh следит за
+  # изменением файла и перезапускает sing-box.
+  vpn:
+    image: docker.io/sagernet/sing-box:1.10.7
+    container_name: wecrm-vpn-1
+    command: sh /etc/sing-box/run.sh
+    restart: unless-stopped
+    volumes:
+      - ./vpn/sing-box:/etc/sing-box:ro
 
 volumes:
   pgdata:

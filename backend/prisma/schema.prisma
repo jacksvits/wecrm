@@ -884,6 +884,17 @@ model TelegramSettings {
   @@map("telegram_settings")
 }
 
+model VpnSettings {
+  id              String    @id @default(cuid())
+  isActive        Boolean   @default(false) @map("is_active")
+  subscriptionUrl String    @map("subscription_url")
+  lastConfigAt    DateTime? @map("last_config_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("vpn_settings")
+}
+
 model PskovlineBalance {
   id        String   @id @default(cuid())
   balance   Float?
