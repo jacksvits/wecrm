@@ -39,6 +39,7 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Role, Sta
     saveSettings: (data: any) => fetchApi('/api/telegram/settings', { method: 'POST', body: JSON.stringify(data) }),
     sendMessage: (chatId: string, text: string) => fetchApi('/api/telegram/send', { method: 'POST', body: JSON.stringify({ chatId, text }) }),
     getMyChat: () => fetchApi('/api/telegram/my-chat'),
+    getChats: () => fetchApi('/api/telegram/chats'),
     linkChat: (chatId: string) => fetchApi('/api/telegram/link-chat', { method: 'POST', body: JSON.stringify({ chatId }) }),
   },
   vpn: {
