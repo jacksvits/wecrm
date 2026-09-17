@@ -104,7 +104,8 @@ services:
   vpn:
     image: ghcr.io/sagernet/sing-box:v1.10.7
     container_name: wecrm-vpn-1
-    command: sh /etc/sing-box/run.sh
+    # в образе ENTRYPOINT=sing-box, поэтому обёртку запускаем через entrypoint
+    entrypoint: ["/bin/sh", "/etc/sing-box/run.sh"]
     restart: unless-stopped
     volumes:
       - ./vpn/sing-box:/etc/sing-box:ro
