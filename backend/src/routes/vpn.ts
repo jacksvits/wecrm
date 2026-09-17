@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import fs from 'fs';
+import net from 'net';
 import path from 'path';
 import { ProxyAgent } from 'undici';
 import { prisma } from '../lib/prisma.js';
@@ -65,13 +66,29 @@ async function fetchSubscriptionServers(subscriptionUrl: string): Promise<string
   return decoded.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('vless://'));
 }
 
-// Генерация config.json для sing-box и запись в общий том
+// Быстрая TCP-проверка доступности сервера подписки
+function probeTcp(host: string, port: number, timeoutMs = 4000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const sock = new net.Socket();
+    sock.setTimeout(timeoutMs);
+    sock.once('connect', () => { sock.destroy(); resolve(true); });
+    sock.once('timeout', () => { sock.destroy(); resolve(false); });
+    sock.once('error', () => { sock.destroy(); resolve(false); });
+    sock.connect(port, host);
+  });
+}
+
+// Генерация config.json для sing-box и запись в общий том.
+// Перебирает серверы подписки, пока не найдёт доступный по TCP.
 async function writeSingBoxConfig(subscriptionUrl: string): Promise<string> {
   const servers = await fetchSubscriptionServers(subscriptionUrl);
   if (servers.length === 0) throw new Error('В подписке нет vless-серверов');
+  let parsed = 0;
   for (const link of servers) {
     const outbound = parseVless(link);
     if (!outbound) continue;
+    parsed++;
+    if (!(await probeTcp(outbound.server, outbound.server_port))) continue;
     const config = {
       log: { level: 'warn' },
       inbounds: [{ type: 'mixed', tag: 'in', listen: '::', listen_port: 2080 }],
@@ -79,9 +96,10 @@ async function writeSingBoxConfig(subscriptionUrl: string): Promise<string> {
     };
     fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
-    return outbound.server;
+    return `${outbound.server}:${outbound.server_port}`;
   }
-  throw new Error('Ни один сервер подписки не распознан (ожидается vless + reality)');
+  if (parsed === 0) throw new Error('Ни один сервер подписки не распознан (ожидается vless + reality)');
+  throw new Error('Все серверы подписки недоступны по TCP — проверьте подписку или сеть');
 }
 
 router.get('/settings', authMiddleware, async (_req: AuthRequest, res) => {
