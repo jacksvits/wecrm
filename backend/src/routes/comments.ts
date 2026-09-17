@@ -7,6 +7,8 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { sendPushToUser } from '../lib/push.js';
 import { processAutoReply } from '../lib/auto-reply.js';
+import { telegramFetch, TELEGRAM_API_BASE } from '../lib/telegram-api.js';
+import { htmlToText } from '../lib/html-to-text.js';
 
 const router = Router();
 const MAX_API_BASE = 'https://platform-api2.max.ru';
@@ -345,6 +347,51 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
         }
       } catch (vkErr: any) {
         console.error('[VK Comment Send] Error:', vkErr.message || vkErr);
+      }
+    }
+    // ======================================================
+
+    // ===== Telegram integration: send reply back to the client's chat =====
+    // Отправляем только если задача создана из Telegram и комментарий не внутренний
+    if (task.telegramChatId && !isInternal) {
+      try {
+        const tgSettings = await prisma.telegramSettings.findFirst();
+        if (tgSettings?.isActive && tgSettings.botToken) {
+          const authorName = req.user!.name || 'Сотрудник';
+          // content приходит в HTML из WYSIWYG — приводим к читаемому тексту
+          let tgMessageText = `${authorName}:\n${htmlToText(content)}`;
+
+          const fileAttachments = await prisma.fileAttachment.findMany({
+            where: { entityType: 'comment', entityId: comment.id },
+          });
+
+          if (fileAttachments.length > 0) {
+            tgMessageText += '\n\n📎 Вложения:';
+            for (const file of fileAttachments) {
+              tgMessageText += `\n${file.originalName}: https://welans.cc${file.path}`;
+            }
+          }
+
+          console.log('[Telegram Comment Send] Sending to chat_id:', task.telegramChatId, 'text:', tgMessageText.substring(0, 100));
+
+          const tgResponse = await telegramFetch(`${TELEGRAM_API_BASE}${tgSettings.botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: task.telegramChatId,
+              text: tgMessageText,
+            }),
+          });
+
+          const tgData: any = await tgResponse.json();
+          if (!tgData.ok) {
+            console.error('[Telegram Comment Send] Failed:', tgData.description);
+          } else {
+            console.log('[Telegram Comment Send] Sent to chat', task.telegramChatId);
+          }
+        }
+      } catch (tgErr: any) {
+        console.error('[Telegram Comment Send] Error:', tgErr.message || tgErr);
       }
     }
     // ======================================================
