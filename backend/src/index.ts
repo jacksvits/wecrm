@@ -60,7 +60,9 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(compression());
-app.use(cors());
+// CORS: только основной домен и локальные адреса для разработки
+const allowedOrigins = ['https://welans.cc', 'http://localhost:3000', 'http://localhost:5173'];
+app.use(cors({ origin: allowedOrigins }));
 // Отключить кэширование для всех API-ответов
 app.use('/api', (_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');

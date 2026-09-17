@@ -7,8 +7,6 @@ services:
       POSTGRES_DB: wecrm
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U crm -d wecrm"]
       interval: 5s
@@ -17,8 +15,10 @@ services:
 
   backend:
     build: ./backend
+    # Порт слушается только на localhost: nginx проксирует API с хоста,
+    # внешний доступ (туннель) идёт напрямую по docker-сети (--local-host backend)
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     environment:
       DATABASE_URL: postgresql://crm:crm_secret_2026@db:5432/wecrm?schema=public
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
@@ -64,8 +64,9 @@ services:
 
   frontend:
     build: ./frontend
+    # Только localhost: отдачу наружу делает nginx на хосте
     ports:
-      - "3000:80"
+      - "127.0.0.1:3000:80"
     depends_on:
       backend:
         condition: service_healthy
