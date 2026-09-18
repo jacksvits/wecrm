@@ -71,19 +71,27 @@ export function ProjectList() {
       startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
       endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
     };
-    if (editingId) {
-      await api.projects.update(editingId, data);
-    } else {
-      await api.projects.create(data);
+    try {
+      if (editingId) {
+        await api.projects.update(editingId, data);
+      } else {
+        await api.projects.create(data);
+      }
+      setShowModal(false);
+      loadProjects();
+    } catch (err: any) {
+      alert('Ошибка: ' + (err.message || 'Не удалось сохранить проект'));
     }
-    setShowModal(false);
-    loadProjects();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Удалить проект?')) return;
-    await api.projects.delete(id);
-    loadProjects();
+    try {
+      await api.projects.delete(id);
+      loadProjects();
+    } catch (err: any) {
+      alert('Ошибка: ' + (err.message || 'Не удалось удалить проект'));
+    }
   };
 
   const toggleExpand = (id: string) => {

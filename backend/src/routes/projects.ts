@@ -15,6 +15,7 @@ const createSchema = z.object({
   parentId: z.string().optional(),
   isLocked: z.boolean().optional(),
   contactIds: z.array(z.string()).optional().default([]),
+  userIds: z.array(z.string()).optional().default([]),
 });
 
 const updateSchema = z.object({
@@ -134,7 +135,7 @@ router.post('/', async (req: AuthRequest, res) => {
   }
 });
 
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', async (req: AuthRequest, res) => {
   try {
     const data = updateSchema.parse(req.body);
     if (data.parentId) {
