@@ -13,6 +13,29 @@ import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
+/**
+ * Вставляет URL ссылок из HTML-части письма сразу после текста якоря в plain text.
+ * Отправители часто кладут адрес только в href (<a href="URL">текст</a>), а текстовая
+ * часть содержит лишь текст ссылки — без этого правила парсинга (toEol/toWord) не видят URL.
+ */
+function inlineLinkUrls(text: string, html?: string): string {
+  if (!html) return text;
+  let result = text;
+  const anchorRe = /<a\b[^>]*?href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = anchorRe.exec(html)) !== null) {
+    const url = m[1].trim();
+    const anchorText = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!url || /^mailto:/i.test(url) || !anchorText) continue;
+    if (result.includes(url)) continue; // URL уже присутствует в тексте
+    const idx = result.indexOf(anchorText);
+    if (idx !== -1) {
+      result = result.slice(0, idx + anchorText.length) + ' ' + url + result.slice(idx + anchorText.length);
+    }
+  }
+  return result;
+}
+
 interface EmailWorkerConfig {
   imapHost: string;
   imapPort: number;
@@ -111,11 +134,14 @@ export class EmailWorker {
           const toAddresses = ((toField ? toField.value : []) as any[])
             .map((v: any) => (v.address || '').toLowerCase())
             .filter(Boolean);
+          // HTML-часть нужна до фильтров: URL ссылок встраиваем в текст для правил парсинга
+          const htmlSource = typeof parsed.html === 'string' ? parsed.html : undefined;
           const decision = await applyEmailFilters({
             from: senderEmail || '',
             to: toAddresses,
             subject,
-            body: parsed.text || '', // оригинальный регистр: сравнение и парсинг — внутри applyEmailFilters
+            // URL из href вставляются после текста якоря — правила toEol/toWord видят ссылки
+            body: inlineLinkUrls(parsed.text || '', htmlSource),
             hasAttachments: allAttachments.some((a: any) => a.filename && a.content && a.content.length > 0),
           });
 
@@ -224,7 +250,6 @@ export class EmailWorker {
             }
           }
 
-          const htmlSource = typeof parsed.html === 'string' ? parsed.html : undefined;
           const description = htmlSource
             ? normalizeEmailDescriptionHtml(htmlSource, (cid) => inlineImagePaths.get(cid) || null)
             : normalizeEmailDescription(parsed.text, htmlSource);
