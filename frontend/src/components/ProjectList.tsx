@@ -98,6 +98,12 @@ export function ProjectList() {
   const getChildren = (parentId: string) => projects.filter(p => p.parentId === parentId);
   const rootProjects = projects.filter(p => !p.parentId);
 
+  // В списке участников проекта — только пользователи ролей с опцией «Доступ к проектам» (админ — всегда)
+  const projectUsers = users.filter(u => {
+    const r = typeof u.role === 'string' ? null : u.role;
+    return r?.name === 'admin' || r?.canAccessProjects === true;
+  });
+
   function ProjectTreeItem({ project, depth = 0 }: { project: Project; depth?: number }) {
     const children = getChildren(project.id);
     const isExpanded = expanded.has(project.id);
@@ -182,8 +188,8 @@ export function ProjectList() {
                   }}
                   style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', fontSize: 14, width: '100%', minHeight: 80 }}
                 >
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
+                  {projectUsers.map(u => (
+                    <option key={u.id} value={u.id}>{u.name} / {typeof u.role === 'string' ? u.role : (u.role?.label || '—')}</option>
                   ))}
                 </select>
               </div>
