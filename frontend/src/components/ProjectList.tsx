@@ -132,7 +132,10 @@ export function ProjectList() {
               {project.name}
               {project.isLocked && <span title="Не доступен для выбора" style={{ fontSize: 12, opacity: 0.7 }}>🔒</span>}
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.description?.slice(0, 60) || '—'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stripHtml(project.description || '').slice(0, 60) || '—'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              👥 {project.users?.length ? project.users.map(u => `${u.user.name}${u.user.role?.label ? ` / ${u.user.role.label}` : ''}`).join(', ') : '—'}
+            </div>
           </div>
           <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, background: st.bg, color: st.text, whiteSpace: 'nowrap', marginLeft: 8 }}>{getStatusLabel(project.status)}</span>
           <div style={{ display: 'flex', gap: 6, marginLeft: 8, flexShrink: 0 }}>
