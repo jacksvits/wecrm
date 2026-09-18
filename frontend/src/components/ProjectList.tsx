@@ -23,6 +23,7 @@ export function ProjectList() {
     api.projects.list('flat=true').then(setFlatProjects);
     api.statuses.list('project').then(setStatuses);
     api.contacts.list().then(setContacts);
+    api.users.list().then(setUsers);
   }, []);
 
   const loadProjects = () => api.projects.list().then(setProjects);
