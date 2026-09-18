@@ -29,7 +29,8 @@ async function main() {
         imapPort: emailSettings.imapPort,
         imapUser: emailSettings.imapUser,
         imapPass: emailSettings.imapPass,
-        checkIntervalMs: emailSettings.checkIntervalMs,
+        // Интервал валидируем: 0/отсутствие значения привело бы к busy-loop в setInterval
+        checkIntervalMs: Math.max(10_000, emailSettings.checkIntervalMs || 60_000),
         processedFolder: emailSettings.processedFolder || undefined,
         defaultCreatorId: emailSettings.defaultCreatorId || undefined,
         secure: emailSettings.secure,
