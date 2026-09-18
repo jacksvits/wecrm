@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
-import { Project, Status, Contact } from '../types';
+import { Project, Status, Contact, User } from '../types';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -14,8 +14,9 @@ export function ProjectList() {
   const [preselectedParentId, setPreselectedParentId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const defaultStatus = statuses.find(s => s.isDefault)?.name || statuses[0]?.name || 'active';
-  const [form, setForm] = useState({ name: '', description: '', status: defaultStatus, startDate: '', endDate: '', parentId: '', isLocked: false, contactIds: [] as string[] });
+  const [form, setForm] = useState({ name: '', description: '', status: defaultStatus, startDate: '', endDate: '', parentId: '', isLocked: false, contactIds: [] as string[], userIds: [] as string[] });
 
   useEffect(() => {
     loadProjects();
@@ -39,7 +40,7 @@ export function ProjectList() {
   const openCreate = (parentId?: string) => {
     setEditingId(null);
     setPreselectedParentId(parentId || null);
-    setForm({ name: '', description: '', status: defaultStatus, startDate: '', endDate: '', parentId: parentId || '', isLocked: false, contactIds: [] });
+    setForm({ name: '', description: '', status: defaultStatus, startDate: '', endDate: '', parentId: parentId || '', isLocked: false, contactIds: [], userIds: [] });
     setShowModal(true);
   };
 
@@ -55,6 +56,7 @@ export function ProjectList() {
       parentId: project.parentId || '',
       isLocked: project.isLocked || false,
       contactIds: project.contacts?.map(c => c.contact.id) || [],
+      userIds: project.users?.map(u => u.userId) || [],
     });
     setShowModal(true);
   };
@@ -64,6 +66,7 @@ export function ProjectList() {
     const data = {
       ...form,
       contactIds: form.contactIds,
+      userIds: form.userIds,
       startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
       endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
     };
@@ -164,6 +167,22 @@ export function ProjectList() {
                 >
                   {contacts.map(c => (
                     <option key={c.id} value={c.id}>{c.name} {c.company ? `(${c.company})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>Пользователи (видят и создают задачи проекта)</label>
+                <select
+                  multiple
+                  value={form.userIds}
+                  onChange={e => {
+                    const options = Array.from(e.target.selectedOptions).map(o => o.value);
+                    setForm({ ...form, userIds: options });
+                  }}
+                  style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', fontSize: 14, width: '100%', minHeight: 80 }}
+                >
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>
               </div>

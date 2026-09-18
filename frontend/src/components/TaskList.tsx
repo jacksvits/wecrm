@@ -614,7 +614,7 @@ export function TaskList() {
             fontSize: 14,
           }}
         >
-          Задачи не найдены
+          {!isAdmin && projects.length === 0 ? "Вы не привязаны ни к одному проекту. Обратитесь к своему менеджеру" : "Задачи не найдены"}
         </div>
       )}{" "}
     </div>
@@ -815,12 +815,20 @@ export function TaskList() {
             fontSize: 14,
           }}
         >
-          Задачи не найдены
+          {!isAdmin && projects.length === 0 ? "Вы не привязаны ни к одному проекту. Обратитесь к своему менеджеру" : "Задачи не найдены"}
         </div>
       )}{" "}
     </div>
   );
   const renderKanban = () => {
+    // Пользователь без привязанных проектов не видит задачи ни в одном режиме
+    if (!isAdmin && projects.length === 0) {
+      return (
+        <div style={{ textAlign: "center", padding: 40, color: "var(--text-muted)", fontSize: 14 }}>
+          Вы не привязаны ни к одному проекту. Обратитесь к своему менеджеру
+        </div>
+      );
+    }
     const taskStatuses = statuses
       .filter((s) => s.entityType === "task")
       .sort((a, b) => a.sortOrder - b.sortOrder);

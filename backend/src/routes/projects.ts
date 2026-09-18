@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -26,12 +26,18 @@ const updateSchema = z.object({
   parentId: z.string().optional().nullable(),
   isLocked: z.boolean().optional(),
   contactIds: z.array(z.string()).optional(),
+  userIds: z.array(z.string()).optional(),
 });
 
-router.get('/', async (req, res) => {
+router.get('/', async (req: AuthRequest, res) => {
   const { status, flat } = req.query;
   const where: any = {};
   if (status) where.status = status;
+
+  // Не-админ видит только проекты, к которым привязан
+  if (req.user?.role !== 'admin') {
+    where.users = { some: { userId: req.user!.id } };
+  }
 
   if (flat === 'true') {
     const projects = await prisma.project.findMany({
@@ -49,6 +55,7 @@ router.get('/', async (req, res) => {
       _count: { select: { tasks: true, deals: true } },
       tasks: { select: { status: true } },
       contacts: { include: { contact: { select: { id: true, name: true, kind: true } } } },
+      users: { include: { user: { select: { id: true, name: true, avatar: true } } } },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -67,13 +74,14 @@ router.get('/', async (req, res) => {
   res.json(enriched);
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req: AuthRequest, res) => {
   const project = await prisma.project.findUnique({
     where: { id: req.params.id },
     include: {
       tasks: { select: { id: true, title: true, status: true, priority: true } },
       deals: { select: { id: true, title: true, value: true, stage: true } },
       contacts: { include: { contact: { select: { id: true, name: true, kind: true, company: true } } } },
+      users: { include: { user: { select: { id: true, name: true, avatar: true } } } },
       children: {
         include: {
           _count: { select: { tasks: true, deals: true } },
@@ -84,16 +92,20 @@ router.get('/:id', async (req, res) => {
     },
   });
   if (!project) return res.status(404).json({ error: 'Project not found' });
+  // Не-админ может открыть только свой проект
+  if (req.user?.role !== 'admin' && !project.users.some((u: any) => u.userId === req.user!.id)) {
+    return res.status(403).json({ error: 'Доступ запрещен' });
+  }
   const total = (project.tasks?.length || 0) + (project.children || []).reduce((sum, c) => sum + (c.tasks?.length || 0), 0);
   const done = (project.tasks?.filter(t => t.status === 'win').length || 0) + (project.children || []).reduce((sum, c) => sum + (c.tasks?.filter(t => t.status === 'win').length || 0), 0);
   const progress = total > 0 ? Math.round((done / total) * 100) : 0;
   res.json({ ...project, progress, tasks: undefined });
 });
 
-router.post('/', async (req, res) => {
+router.post('/', async (req: AuthRequest, res) => {
   try {
     const data = createSchema.parse(req.body);
-    const { contactIds, ...rest } = data;
+    const { contactIds, userIds, ...rest } = data;
     const project = await prisma.project.create({
       data: {
         ...rest,
@@ -103,9 +115,17 @@ router.post('/', async (req, res) => {
         contacts: contactIds?.length ? {
           create: contactIds.map(cid => ({ contact: { connect: { id: cid } } })),
         } : undefined,
+        // Создатель автоматически становится участником своего проекта
+        users: {
+          create: [
+            { userId: req.user!.id },
+            ...userIds.filter(uid => uid !== req.user!.id).map(uid => ({ userId: uid })),
+          ],
+        },
       },
       include: {
         contacts: { include: { contact: { select: { id: true, name: true, kind: true } } } },
+        users: { include: { user: { select: { id: true, name: true, avatar: true } } } },
       },
     });
     res.status(201).json(project);
@@ -133,7 +153,7 @@ router.patch('/:id', async (req, res) => {
         return res.status(400).json({ error: 'Cannot set a descendant as parent' });
       }
     }
-    const { contactIds, ...restData } = data;
+    const { contactIds, userIds, ...restData } = data;
     const updateData: any = {
       ...restData,
       startDate: data.startDate ? new Date(data.startDate) : undefined,
@@ -151,11 +171,27 @@ router.patch('/:id', async (req, res) => {
       }
     }
 
+    if (userIds !== undefined) {
+      // Создатель проекта не может быть отвязан — иначе потеряет к нему доступ
+      const protectedIds = new Set([req.user!.id]);
+      await prisma.projectUser.deleteMany({
+        where: { projectId: req.params.id, userId: { notIn: [...protectedIds] } },
+      });
+      const newUserIds = userIds.filter(uid => uid !== req.user!.id);
+      if (newUserIds.length > 0) {
+        await prisma.projectUser.createMany({
+          data: newUserIds.map((uid: string) => ({ userId: uid, projectId: req.params.id })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
     const project = await prisma.project.update({
       where: { id: req.params.id },
       data: updateData,
       include: {
         contacts: { include: { contact: { select: { id: true, name: true, kind: true } } } },
+        users: { include: { user: { select: { id: true, name: true, avatar: true } } } },
       },
     });
     res.json(project);
