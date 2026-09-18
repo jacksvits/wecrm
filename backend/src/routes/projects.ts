@@ -55,7 +55,7 @@ router.get('/', async (req: AuthRequest, res) => {
       _count: { select: { tasks: true, deals: true } },
       tasks: { select: { status: true } },
       contacts: { include: { contact: { select: { id: true, name: true, kind: true } } } },
-      users: { include: { user: { select: { id: true, name: true, avatar: true } } } },
+      users: { include: { user: { select: { id: true, name: true, avatar: true, role: { select: { label: true } } } } } },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -81,7 +81,7 @@ router.get('/:id', async (req: AuthRequest, res) => {
       tasks: { select: { id: true, title: true, status: true, priority: true } },
       deals: { select: { id: true, title: true, value: true, stage: true } },
       contacts: { include: { contact: { select: { id: true, name: true, kind: true, company: true } } } },
-      users: { include: { user: { select: { id: true, name: true, avatar: true } } } },
+      users: { include: { user: { select: { id: true, name: true, avatar: true, role: { select: { label: true } } } } } },
       children: {
         include: {
           _count: { select: { tasks: true, deals: true } },
@@ -125,7 +125,7 @@ router.post('/', async (req: AuthRequest, res) => {
       },
       include: {
         contacts: { include: { contact: { select: { id: true, name: true, kind: true } } } },
-        users: { include: { user: { select: { id: true, name: true, avatar: true } } } },
+        users: { include: { user: { select: { id: true, name: true, avatar: true, role: { select: { label: true } } } } } },
       },
     });
     res.status(201).json(project);
@@ -191,7 +191,7 @@ router.patch('/:id', async (req, res) => {
       data: updateData,
       include: {
         contacts: { include: { contact: { select: { id: true, name: true, kind: true } } } },
-        users: { include: { user: { select: { id: true, name: true, avatar: true } } } },
+        users: { include: { user: { select: { id: true, name: true, avatar: true, role: { select: { label: true } } } } } },
       },
     });
     res.json(project);

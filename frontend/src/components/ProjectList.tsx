@@ -104,6 +104,13 @@ export function ProjectList() {
     return r?.name === 'admin' || r?.canAccessProjects === true;
   });
 
+  // Описание хранится как HTML (Quill) — в списке показываем чистый текст без тегов
+  const stripHtml = (html: string) => {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return (div.textContent || '').trim();
+  };
+
   function ProjectTreeItem({ project, depth = 0 }: { project: Project; depth?: number }) {
     const children = getChildren(project.id);
     const isExpanded = expanded.has(project.id);
