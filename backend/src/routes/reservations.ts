@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { buildReservationPdf } from '../lib/reservation-pdf.js';
+import { createNotification } from '../lib/notifications.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -59,6 +60,31 @@ router.post('/', async (req: any, res) => {
         include: { items: { include: { product: true } }, contact: true },
       });
     });
+    // Уведомляем пользователей с доступом к складскому учёту о новом резерве (push + in-app)
+    try {
+      const recipients = await prisma.user.findMany({
+        where: { role: { stockAccess: true } },
+        select: { id: true },
+      });
+      const authorName = req.user?.name || 'Пользователь';
+      await Promise.all(
+        recipients
+          .filter((u) => u.id !== req.user?.id)
+          .map((u) =>
+            createNotification({
+              userId: u.id,
+              type: 'system',
+              title: 'Новый резерв',
+              body: `${authorName} создал резерв №${result.number} — ${result.contact?.name} на сумму ${result.total.toFixed(2)} ₽`,
+              entityType: 'reservation',
+              entityId: result.id,
+              url: '/products',
+            })
+          )
+      );
+    } catch (e: any) {
+      console.error('[Reservation] Notify failed:', e.message || e);
+    }
     res.json(result);
   } catch (e: any) {
     res.status(400).json({ error: e.message });
