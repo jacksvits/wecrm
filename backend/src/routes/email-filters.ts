@@ -28,6 +28,7 @@ const filterSchema = z.object({
     mode: z.enum(['regex', 'toEol', 'toWord']).optional().default('regex'),
     field: z.enum(['title', 'description', 'address', 'priority', 'status', 'discussion']),
     group: z.number().int().min(0).max(9).default(1),
+    prefix: z.string().max(500).optional().nullable(), // «свой текст» перед найденным значением в обсуждении
   })).optional().nullable(),
   isSpam: z.boolean().default(false),
   stopProcessing: z.boolean().default(true),

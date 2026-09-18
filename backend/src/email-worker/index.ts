@@ -273,23 +273,28 @@ export class EmailWorker {
             console.log(`[EmailWorker] Applied parsed fields to task ${task.id}: ${Object.keys(updateData).join(', ')}`);
           }
 
-          // Распарсенные данные — отдельным сообщением в обсуждение задачи
-          const parsedLines: string[] = [];
-          if (decision.parsed.title) parsedLines.push(`Тема: ${decision.parsed.title}`);
-          if (decision.parsed.address) parsedLines.push(`Адрес: ${decision.parsed.address}`);
-          if (decision.parsed.priority) parsedLines.push(`Приоритет: ${decision.parsed.priority}`);
-          if (decision.parsed.status) parsedLines.push(`Статус: ${decision.parsed.status}`);
-          if (decision.parsed.description) parsedLines.push(decision.parsed.description);
-          if (decision.parsed.discussion) parsedLines.push(decision.parsed.discussion);
-          if (parsedLines.length) {
+          // Распарсенные данные — каждое найденное значение отдельным сообщением
+          // в обсуждении; перед значением — «свой текст» правила (если задан)
+          const PARSED_FIELD_LABELS: Record<string, string> = {
+            title: 'Тема', description: 'Описание', address: 'Адрес',
+            priority: 'Приоритет', status: 'Статус', discussion: 'Обсуждение',
+          };
+          const parsedComments = decision.parsed.comments || [];
+          for (const item of parsedComments) {
+            const label = PARSED_FIELD_LABELS[item.field] || item.field;
+            const content = item.prefix
+              ? `${item.prefix}\n${item.value}`
+              : `📋 ${label}: ${item.value}`;
             await prisma.comment.create({
               data: {
-                content: `📋 Данные из письма:\n${parsedLines.join('\n')}`,
+                content,
                 authorId: creatorId,
                 taskId: task.id,
               },
             });
-            console.log(`[EmailWorker] Posted parsed data to discussion of task ${task.id}`);
+          }
+          if (parsedComments.length) {
+            console.log(`[EmailWorker] Posted ${parsedComments.length} parsed message(s) to discussion of task ${task.id}`);
           }
         }
 

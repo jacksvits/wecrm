@@ -108,6 +108,7 @@ export interface EmailParseRule {
   mode?: EmailParseMode;
   field: 'title' | 'description' | 'address' | 'priority' | 'status' | 'discussion';
   group?: number;
+  prefix?: string | null; // «свой текст», выводится перед найденным значением в обсуждении
 }
 export interface EmailFilter {
   id: string; name: string; isActive: boolean; sortOrder: number;

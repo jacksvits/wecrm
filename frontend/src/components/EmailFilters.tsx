@@ -371,6 +371,13 @@ export function EmailFilters() {
                     <option key={f} value={f}>{PARSE_FIELD_LABELS[f]}</option>
                   ))}
                 </select>
+                <input
+                  value={rule.prefix || ''}
+                  onChange={e => setForm({ ...form, parseRules: form.parseRules.map((r, i) => i === idx ? { ...r, prefix: e.target.value } : r) })}
+                  placeholder="Свой текст перед найденным (необязательно)"
+                  title="Этот текст будет добавлен перед найденным значением в отдельном сообщении обсуждения задачи"
+                  style={{ ...inputStyle, flex: 1, minWidth: 170 }}
+                />
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, parseRules: form.parseRules.filter((_, i) => i !== idx) })}

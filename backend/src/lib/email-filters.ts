@@ -26,6 +26,9 @@ export interface FilterDecision {
     priority?: string;
     status?: string;
     discussion?: string; // значения, направленные в обсуждение задачи
+    // каждое найденное правилом значение — отдельное сообщение в обсуждении;
+    // prefix — «свой текст» правила, выводится перед значением
+    comments?: { field: string; value: string; prefix?: string | null }[];
   };
   stopProcessing: boolean;
 }
@@ -80,29 +83,49 @@ function extractByMode(rule: any, bodyText: string): string | null {
 
 function applyParseRules(filter: any, bodyText: string, decision: FilterDecision) {
   const rules = Array.isArray(filter.parseRules) ? filter.parseRules : [];
+  // Каждое найденное правилом значение — отдельное сообщение обсуждения
+  const pushComment = (field: string, value: string, rule: any) => {
+    const prev = decision.parsed?.comments || [];
+    decision.parsed = {
+      ...decision.parsed,
+      comments: [...prev, { field, value, prefix: rule.prefix ?? null }],
+    };
+  };
   for (const rule of rules) {
     if (!rule?.pattern || !rule?.field) continue;
     const value = extractByMode(rule, bodyText);
     if (!value) continue;
-    if (rule.field === 'title') decision.parsed = { ...decision.parsed, title: value.slice(0, 200) };
+    if (rule.field === 'title') {
+      decision.parsed = { ...decision.parsed, title: value.slice(0, 200) };
+      pushComment('title', value.slice(0, 200), rule);
+    }
     else if (rule.field === 'description') {
       const prev = decision.parsed?.description;
       const next = value.slice(0, 4000);
       decision.parsed = { ...decision.parsed, description: prev ? `${prev}\n${next}` : next };
+      pushComment('description', next, rule);
     } else if (rule.field === 'address') {
       // Отрезаем служебную метку вида «Адрес:» / «Адрес объекта:» / «Address:» — в поле задачи только сам адрес
       const cleanAddress = value.replace(/^\s*(адрес|address)((\s+[а-яёa-z]+){0,2})?\s*[:：]\s*/i, '').trim();
-      if (cleanAddress) decision.parsed = { ...decision.parsed, address: cleanAddress.slice(0, 500) };
+      if (cleanAddress) {
+        decision.parsed = { ...decision.parsed, address: cleanAddress.slice(0, 500) };
+        pushComment('address', cleanAddress.slice(0, 500), rule);
+      }
     }
     else if (rule.field === 'priority') {
       const v = value.toLowerCase();
-      if (PRIORITIES.includes(v)) decision.parsed = { ...decision.parsed, priority: v };
+      if (PRIORITIES.includes(v)) {
+        decision.parsed = { ...decision.parsed, priority: v };
+        pushComment('priority', v, rule);
+      }
     } else if (rule.field === 'status') {
       decision.parsed = { ...decision.parsed, status: value.slice(0, 50) };
+      pushComment('status', value.slice(0, 50), rule);
     } else if (rule.field === 'discussion') {
       const prev = decision.parsed?.discussion;
       const next = value.slice(0, 4000);
       decision.parsed = { ...decision.parsed, discussion: prev ? `${prev}\n${next}` : next };
+      pushComment('discussion', next, rule);
     }
   }
 }

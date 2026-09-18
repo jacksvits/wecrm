@@ -236,7 +236,7 @@ model EmailFilter {
   markRead        Boolean? @map("mark_read")
   moveToFolder    String?  @map("move_to_folder")
   isSpam          Boolean  @default(false) @map("is_spam") // правило спам-листа (вкладка «СПАМ»)
-  parseRules      Json?    @map("parse_rules") // правила парсинга тела письма: [{pattern, field, group}]
+  parseRules      Json?    @map("parse_rules") // правила парсинга тела письма: [{pattern, field, group, prefix}]
   stopProcessing  Boolean  @default(true) @map("stop_processing")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
