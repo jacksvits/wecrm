@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { api } from "../api/client";
 import { useRealtime } from "../hooks/useRealtime";
 import { Task, User, Project, Status } from "../types";
+import { userOptionLabel } from "../lib/userOptionLabel";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 const priorityLabels: Record<string, string> = {
@@ -1522,7 +1523,7 @@ export function TaskList() {
                 {" "}
                 {au.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.name}
+                    {userOptionLabel(u)}
                   </option>
                 ))}{" "}
               </select>{" "}

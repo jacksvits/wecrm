@@ -17,6 +17,7 @@ import {
 import { AttachmentList, FileUpload } from "./FileUpload";
 import { LinkifyText } from "./LinkifyText";
 import { linkifyTaskTagsHtml, useTaskHashtagClick } from "../lib/taskHashtags";
+import { userOptionLabel } from "../lib/userOptionLabel";
 import { Avatar } from "./Avatar";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
@@ -919,7 +920,7 @@ export function TaskDetail() {
                 })
                 .map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.name}
+                    {userOptionLabel(u)}
                   </option>
                 ))}{" "}
             </select>{" "}
