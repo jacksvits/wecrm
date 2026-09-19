@@ -36,6 +36,7 @@ import tochkaRoutes from './routes/tochka.js';
 import pskovlineRoutes from './routes/pskovline.js';
 import cameraRoutes from './routes/camera.js';
 import taskFinanceRoutes from './routes/task-finances.js';
+import accountingRoutes from './routes/accounting.js';
 import contactTypeRoutes from './routes/contact-types.js';
 import filesRoutes from './routes/files.js';
 import notesRouter from './routes/notes.js';

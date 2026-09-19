@@ -455,4 +455,135 @@ router.get('/customer', authMiddleware, async (_req, res) => {
   }
 });
 
+// ---------- Операции по счёту (Open Banking РФ) ----------
+
+// Нормализованная банковская операция для кэша BankPayment и сверки
+export interface TochkaTransaction {
+  paymentId?: string;
+  date: string; // ISO
+  amount: number;
+  direction: 'credit' | 'debit';
+  counterpartyName?: string;
+  counterpartyInn?: string;
+  purpose?: string;
+  raw: any;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Защитный парсинг Data.Transaction[] — поля у банков могут отличаться, проверяем несколько путей
+function parseOpenBankingTransactions(body: any): TochkaTransaction[] {
+  const list = body?.Data?.Transaction || body?.Data?.Transactions || body?.Transaction || [];
+  if (!Array.isArray(list)) return [];
+  const result: TochkaTransaction[] = [];
+  for (const t of list) {
+    const amountRaw = t?.Amount?.Amount ?? t?.Amount?.amount ?? t?.amount?.Amount ?? t?.amount?.amount ?? t?.amount;
+    const dateRaw = t?.BookingDateTime || t?.bookingDateTime || t?.ValueDateTime || t?.valueDateTime || t?.date;
+    const amount = parseFloat(String(amountRaw ?? ''));
+    const date = dateRaw ? new Date(dateRaw) : null;
+    if (!isFinite(amount) || !date || isNaN(date.getTime())) {
+      // Нераспознанный формат — логируем сырой элемент, чтобы дописать парсер
+      console.log('[Tochka] Нераспознанная операция, сырой элемент:', JSON.stringify(t).slice(0, 500));
+      continue;
+    }
+    const indicator = String(t?.CreditDebitIndicator || t?.creditDebitIndicator || '').toLowerCase();
+    const remittance = t?.RemittanceInformation;
+    result.push({
+      paymentId: t?.TransactionId || t?.transactionId || t?.PaymentId || undefined,
+      date: date.toISOString(),
+      amount,
+      direction: indicator === 'credit' ? 'credit' : 'debit',
+      counterpartyName:
+        t?.Counterparty?.Name || t?.Counterparty?.name || t?.CounterpartyName || t?.counterpartyName ||
+        t?.CreditorAccount?.Name || t?.DebtorAccount?.Name || t?.MerchantName || undefined,
+      counterpartyInn: t?.Counterparty?.Inn || t?.Counterparty?.inn || t?.CounterpartyInn || t?.counterpartyInn || undefined,
+      purpose:
+        (typeof remittance === 'string' ? remittance : remittance?.Unstructured || remittance?.unstructured) ||
+        t?.Description || t?.description || t?.purpose || undefined,
+      raw: t,
+    });
+  }
+  return result;
+}
+
+// Fallback: операции через выписку (POST statements → poll до ready → GET statements/{id}/transactions)
+async function fetchTransactionsViaStatement(accountId: string, fromISO: string, toISO: string): Promise<TochkaTransaction[]> {
+  const { response: createRes } = await authHeadersWithRetry((h) =>
+    tochkaRequest('/open-banking/v1.0/statements', {
+      method: 'POST',
+      headers: h,
+      body: JSON.stringify({ accountId, fromDateTime: fromISO, toDateTime: toISO }),
+    })
+  );
+  if (createRes.status !== 200 && createRes.status !== 201 && createRes.status !== 202) {
+    throw new Error(`Банк не принял запрос выписки (код ${createRes.status})`);
+  }
+  const statementId =
+    createRes.body?.Data?.StatementId || createRes.body?.Data?.statementId ||
+    createRes.body?.statementId || createRes.body?.StatementId;
+  if (!statementId) throw new Error('Банк не вернул идентификатор выписки');
+
+  // Ждём готовности выписки (до ~30 секунд)
+  let ready = false;
+  for (let attempt = 0; attempt < 15; attempt++) {
+    await sleep(2000);
+    const { response: stRes } = await authHeadersWithRetry((h) =>
+      tochkaRequest(`/open-banking/v1.0/statements/${encodeURIComponent(statementId)}`, { headers: h })
+    );
+    const status = String(
+      stRes.body?.Data?.Statement?.[0]?.status || stRes.body?.Data?.status || stRes.body?.status || ''
+    ).toLowerCase();
+    if (status === 'ready' || status === 'completed') { ready = true; break; }
+    if (status === 'failed' || status === 'rejected' || status === 'error') {
+      throw new Error('Банк не смог сформировать выписку');
+    }
+  }
+  if (!ready) throw new Error('Выписка не сформировалась за отведённое время');
+
+  const { response: txRes } = await authHeadersWithRetry((h) =>
+    tochkaRequest(`/open-banking/v1.0/statements/${encodeURIComponent(statementId)}/transactions`, { headers: h })
+  );
+  if (txRes.status !== 200) throw new Error(`Не удалось получить операции выписки (код ${txRes.status})`);
+  return parseOpenBankingTransactions(txRes.body);
+}
+
+// Операции по счёту за период: прямой эндпоинт transactions, при 404/405/501 — fallback через выписку
+export async function fetchAccountTransactions(accountId: string, fromISO: string, toISO: string): Promise<TochkaTransaction[]> {
+  const tokens = loadTokens();
+  if (!tokens?.access_token) throw new Error('Точка Банк не подключена: нет токена доступа');
+
+  const qs = `fromBookingDateTime=${encodeURIComponent(fromISO)}&toBookingDateTime=${encodeURIComponent(toISO)}`;
+  const { response } = await authHeadersWithRetry((h) =>
+    tochkaRequest(`/open-banking/v1.0/accounts/${encodeURIComponent(accountId)}/transactions?${qs}`, { headers: h })
+  );
+
+  if (response.status === 200) {
+    return parseOpenBankingTransactions(response.body);
+  }
+  if (response.status === 404 || response.status === 405 || response.status === 501) {
+    // Прямой эндпоинт не поддерживается — идём через выписку
+    console.log(`[Tochka] transactions недоступен (${response.status}), fallback на statements`);
+    try {
+      return await fetchTransactionsViaStatement(accountId, fromISO, toISO);
+    } catch (e: any) {
+      throw new Error(`Не удалось получить операции по счёту: ${e.message}`);
+    }
+  }
+  throw new Error(`Банк вернул ошибку при получении операций (код ${response.status})`);
+}
+
+// GET /api/tochka/transactions?accountId&from&to — отладочный эндпоинт: сырые распарсенные операции
+router.get('/transactions', authMiddleware, async (req, res) => {
+  const { accountId, from, to } = req.query;
+  if (typeof accountId !== 'string' || !accountId) return res.status(400).json({ error: 'Укажите accountId' });
+  if (typeof from !== 'string' || !from) return res.status(400).json({ error: 'Укажите from (ISO-дата)' });
+  if (typeof to !== 'string' || !to) return res.status(400).json({ error: 'Укажите to (ISO-дата)' });
+  try {
+    const items = await fetchAccountTransactions(accountId, from, to);
+    res.json({ items, total: items.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
