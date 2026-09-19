@@ -143,3 +143,114 @@ export interface WebCall {
   callee?: { id: string; name: string; avatar?: string | null };
 }
 export interface DashboardMetricSetting { metricKey: string; sortOrder: number; visible: boolean; }
+
+// === Модуль «Бухгалтерия по почте» ===
+export type FinanceDocType = 'receipt' | 'invoice' | 'act' | 'upd' | 'bank_notice' | 'other';
+export type FinanceDocDirection = 'incoming' | 'outgoing';
+export type FinanceDocStatus = 'new' | 'confirmed' | 'archived';
+export type FinanceMatchStatus = 'unmatched' | 'auto' | 'manual' | 'ignored';
+
+export interface BankPayment {
+  id: string;
+  accountId: string;
+  paymentId?: string | null;
+  date: string;
+  amount: number;
+  direction: 'credit' | 'debit';
+  counterpartyName?: string | null;
+  counterpartyInn?: string | null;
+  purpose?: string | null;
+  raw?: any;
+  matchedDocumentId?: string | null;
+  matchedDocument?: { id: string; number?: string | null; amount: number } | null;
+  createdAt: string;
+}
+
+export interface FinanceDocument {
+  id: string;
+  type: FinanceDocType | string;
+  direction: FinanceDocDirection | string;
+  number?: string | null;
+  date: string;
+  amount: number;
+  vat?: number | null;
+  currency: string;
+  counterpartyName?: string | null;
+  counterpartyInn?: string | null;
+  contactId?: string | null;
+  contact?: { id: string; name: string } | null;
+  taskId?: string | null;
+  task?: { id: string; title: string; ticketNumber?: number } | null;
+  dealId?: string | null;
+  deal?: { id: string; title: string } | null;
+  status: FinanceDocStatus | string;
+  source: 'email' | 'manual' | string;
+  emailMessageId?: string | null;
+  emailFrom?: string | null;
+  emailSubject?: string | null;
+  notes?: string | null;
+  matchStatus: FinanceMatchStatus | string;
+  matchedPaymentId?: string | null;
+  matchedPayment?: BankPayment | null;
+  fiscalFn?: string | null;
+  fiscalFd?: string | null;
+  fiscalFp?: string | null;
+  attachments?: FileAttachment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccountingRule {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+  fromContains?: string | null;
+  subjectContains?: string | null;
+  bodyContains?: string | null;
+  hasAttachments?: boolean | null;
+  docType: string;
+  direction: string;
+  contactId?: string | null;
+  contact?: { id: string; name: string } | null;
+  stopProcessing: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccountingEmailSettings {
+  id: string;
+  imapHost: string;
+  imapPort: number;
+  imapUser: string;
+  imapPass: string;
+  checkIntervalMs: number;
+  processedFolder?: string | null;
+  isActive: boolean;
+  secure: boolean;
+  rejectUnauthorized: boolean;
+  requireTLS: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccountingAnalytics {
+  totals: {
+    incoming: number;
+    outgoing: number;
+    byType: { type: string; direction: string; sum: number; count: number }[];
+    byMonth: { month: string; incoming: number; outgoing: number }[];
+    byCounterparty: { name: string; sum: number; count: number }[];
+    unmatchedCount: number;
+    unmatchedSum: number;
+  };
+}
+
+export interface ReconciliationDocument extends FinanceDocument {
+  suggestions?: BankPayment[];
+}
+
+export interface ReconciliationResponse {
+  unmatchedDocuments: ReconciliationDocument[];
+  unmatchedPayments: BankPayment[];
+}

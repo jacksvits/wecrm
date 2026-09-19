@@ -15,6 +15,7 @@ import {
   TaskTransaction,
 } from "../types";
 import { AttachmentList, FileUpload } from "./FileUpload";
+import { TaskFinanceDocuments } from "./accounting/TaskFinanceDocuments";
 import { LinkifyText } from "./LinkifyText";
 import { linkifyTaskTagsHtml, useTaskHashtagClick } from "../lib/taskHashtags";
 import { userOptionLabel } from "../lib/userOptionLabel";
@@ -2579,6 +2580,8 @@ export function TaskDetail() {
                   ))}
                 </div>
               </div>
+              {/* Секция «Документы» бухгалтерии (документы, привязанные к задаче) */}
+              <TaskFinanceDocuments taskId={id!} />
             </div>
           )}{" "}
           {activeTab === "files" && (

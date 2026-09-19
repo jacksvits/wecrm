@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { EmailSettings } from "./EmailSettings";
 import { EmailFilters } from "./EmailFilters";
+import { AccountingSettings } from "./AccountingSettings";
 import { RoleManager } from "./RoleManager";
 import { TelephonySettings } from "./TelephonySettings";
 import { StatusManager } from "./StatusManager";
@@ -69,6 +70,7 @@ function renderPluginSettings(pluginKey: PluginKey) {
         <>
           <EmailSettings />
           <EmailFilters />
+          <AccountingSettings />
         </>
       );
     case "telephony":
