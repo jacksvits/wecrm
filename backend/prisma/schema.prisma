@@ -170,6 +170,8 @@ model Contact {
   calls       Call[]
   smsMessages SmsMessage[]
   projects    ContactProject[]
+  financeDocuments FinanceDocument[]
+  accountingRules  AccountingRule[]
 
   @@index([onecId])
 
@@ -261,6 +263,107 @@ model EmailFilterLog {
   @@map("email_filter_logs")
 }
 
+// Настройки второго IMAP-ящика бухгалтерии (отдельно от EmailSettings)
+model AccountingEmailSettings {
+  id                 String   @id @default(cuid())
+  imapHost           String   @map("imap_host")
+  imapPort           Int      @default(993) @map("imap_port")
+  imapUser           String   @map("imap_user")
+  imapPass           String   @map("imap_pass")
+  checkIntervalMs    Int      @default(60000) @map("check_interval_ms")
+  processedFolder    String?  @map("processed_folder")
+  isActive           Boolean  @default(true) @map("is_active")
+  secure             Boolean  @default(true)
+  rejectUnauthorized Boolean  @default(false) @map("reject_unauthorized")
+  requireTLS         Boolean  @default(true) @map("require_tls")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("accounting_email_settings")
+}
+
+// Правила классификации писем бухгалтерии (по образу EmailFilter, но с docType/direction)
+model AccountingRule {
+  id              String   @id @default(cuid())
+  name            String
+  isActive        Boolean  @default(true) @map("is_active")
+  sortOrder       Int      @default(0) @map("sort_order")
+  fromContains    String?  @map("from_contains")
+  subjectContains String?  @map("subject_contains")
+  bodyContains    String?  @map("body_contains")
+  hasAttachments  Boolean? @map("has_attachments")
+  docType         String   @default("other") @map("doc_type")
+  direction       String   @default("incoming")
+  contactId       String?  @map("contact_id")
+  contact         Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  stopProcessing  Boolean  @default(true) @map("stop_processing")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([sortOrder])
+  @@map("accounting_rules")
+}
+
+// Финансовый документ бухгалтерии (чек, счёт, акт, УПД, банковское уведомление)
+model FinanceDocument {
+  id               String   @id @default(cuid())
+  type             String   @default("other")
+  direction        String   @default("incoming")
+  number           String?
+  date             DateTime @default(now())
+  amount           Float    @default(0)
+  vat              Float?
+  currency         String   @default("RUB")
+  counterpartyName String?  @map("counterparty_name")
+  counterpartyInn  String?  @map("counterparty_inn")
+  contactId        String?  @map("contact_id")
+  contact          Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  taskId           String?  @map("task_id")
+  task             Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  dealId           String?  @map("deal_id")
+  deal             Deal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  status           String   @default("new")
+  source           String   @default("email")
+  emailMessageId   String?  @unique @map("email_message_id")
+  emailFrom        String?  @map("email_from")
+  emailSubject     String?  @map("email_subject")
+  notes            String?
+  matchStatus      String   @default("unmatched") @map("match_status")
+  matchedPaymentId String?  @map("matched_payment_id")
+  fiscalFn         String?  @map("fiscal_fn")
+  fiscalFd         String?  @map("fiscal_fd")
+  fiscalFp         String?  @map("fiscal_fp")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@index([type])
+  @@index([contactId])
+  @@index([taskId])
+  @@index([matchStatus])
+  @@map("finance_documents")
+}
+
+// Кэш банковских операций Точки для сверки с документами
+model BankPayment {
+  id                String   @id @default(cuid())
+  accountId         String   @map("account_id")
+  paymentId         String?  @map("payment_id")
+  date              DateTime
+  amount            Float
+  direction         String   @default("debit") // credit|debit
+  counterpartyName  String?  @map("counterparty_name")
+  counterpartyInn   String?  @map("counterparty_inn")
+  purpose           String?
+  raw               Json?
+  matchedDocumentId String?  @map("matched_document_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@unique([accountId, paymentId])
+  @@index([date])
+  @@map("bank_payments")
+}
+
 model ContactProject {
   id        String   @id @default(cuid())
   contactId String   @map("contact_id")
@@ -334,6 +437,7 @@ model Task {
   ticketNumber Int      @unique @default(autoincrement()) @map("ticket_number")
 
   transactions TaskTransaction[]
+  financeDocuments FinanceDocument[]
 
   @@index([status])
   @@index([status, dueDate])
@@ -407,6 +511,7 @@ model Deal {
   projectId   String?
   project     Project? @relation(fields: [projectId], references: [id])
   tasks       Task[]
+  financeDocuments FinanceDocument[]
 
   @@map("deals")
 }
