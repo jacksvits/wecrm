@@ -22,9 +22,12 @@ export interface FiscalQrData {
  */
 export function extractAmounts(text: string): number[] {
   const amounts: number[] = [];
-  // Ключевая фраза, затем необязательные служебные символы, затем число
+  // Ключевая фраза, затем необязательные служебные символы, затем число.
+  // «сумма(?!\s+ндс)» — исключаем строку «СУММА НДС 22%», иначе ставка НДС
+  // захватывалась как сумма документа; (?!\s*%) после числа — защита от любых
+  // процентов рядом с ключевыми словами.
   // Число: либо с разделителями тысяч («1 234 567,89»), либо простое («1234.56»)
-  const re = /(?:итого|всего\s+к\s+оплате|на\s+сумму|сумма)[^\d\n]{0,30}?(\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/gi;
+  const re = /(?:итого|всего\s+к\s+оплате|к\s+оплате|на\s+сумму|сумма(?!\s+ндс))[^\d\n]{0,30}?(\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)(?!\s*%)/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     const value = parseAmount(m[1]);
@@ -59,10 +62,10 @@ export function extractInn(text: string): string | null {
  */
 export function extractDocNumber(text: string): string | null {
   // Сначала ищем номер с явным типом документа
-  const typed = text.match(/(?:сч[её]т(?:-фактура)?|акт|упд|универсальный\s+передаточный\s+документ|накладная)\s*(?:на\s+оплату)?\s*[№#]\s*([A-Za-zА-Яа-яЁё0-9][\w\/\\-]*)/i);
+  const typed = text.match(/(?:сч[её]т(?:-фактура)?|акт|упд|универсальный\s+передаточный\s+документ|накладная|чек)\s*(?:на\s+оплату)?\s*[№#]\s*:?\s*([A-Za-zА-Яа-яЁё0-9][\w\/\\-]*)/i);
   if (typed) return typed[1];
-  // Затем — обобщённый «№ … [от …]»
-  const generic = text.match(/[№#]\s*([A-Za-zА-Яа-яЁё0-9][\w\/\\-]*)/);
+  // Затем — обобщённый «№ … [от …]» (двоеточие после № допустимо: «Чек №: 8470»)
+  const generic = text.match(/[№#]\s*:?\s*([A-Za-zА-Яа-яЁё0-9][\w\/\\-]*)/);
   return generic ? generic[1] : null;
 }
 
@@ -135,6 +138,30 @@ export function parseFiscalQr(qr: string): FiscalQrData | null {
   // Хотя бы fn и fp обязаны распознаться — иначе это не фискальный QR
   if (!result.fn && !result.fp) return null;
   return result;
+}
+
+/**
+ * Ищет в тексте письма фискальную ссылку/строку формата ФНС
+ * («t=20260806T120800&s=1500.00&fn=...&i=...&fp=...&n=1») — такие ссылки
+ * ОФД вставляют в письма с электронными чеками (1-ОФД, Такском и др.).
+ * Надёжнее QR-картинки: сумма и реквизиты заданы в тексте явно.
+ */
+export function extractFiscalFromText(text: string): FiscalQrData | null {
+  const m = text.match(/t=\d{8}T\d{4,6}&s=[\d.,]+&fn=\d+&i=\d+&fp=\d+(?:&n=\d+)?/);
+  if (!m) return null;
+  return parseFiscalQr(m[0]);
+}
+
+/**
+ * Извлекает название контрагента-организации из текста:
+ * «ООО "Ромашка"», «АО «Газпром»», «ИП Иванов И.И.»
+ */
+export function extractCounterparty(text: string): string | null {
+  const m = text.match(/(ООО|АО|ПАО|ЗАО|ОАО|НКО|ФОНД)\s*[«"„]([^»"“\n]{2,60}?)[»"“]/);
+  if (m) return `${m[1]} «${m[2].trim()}»`;
+  const ip = text.match(/(ИП)\s+([А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ]\.){1,2})/);
+  if (ip) return `${ip[1]} ${ip[2].trim()}`;
+  return null;
 }
 
 /**

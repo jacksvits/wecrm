@@ -10,6 +10,8 @@ import {
   extractDocDate,
   parseFiscalQr,
   decodeQrFromImage,
+  extractFiscalFromText,
+  extractCounterparty,
 } from '../lib/accounting-parse.js';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
@@ -211,10 +213,24 @@ export class AccountingWorker {
           const number = extractDocNumber(fullText);
           let docDate = extractDocDate(fullText) || parsed.date || new Date();
 
-          // Фискальные данные: QR-коды с image-вложений (чеки)
+          // Фискальные данные чека. Приоритет №1 — фискальная ссылка в тексте письма
+          // (ОФД вставляют «t=...&s=...&fn=...&i=...&fp=...»): сумма задана явно,
+          // надёжнее эвристики и QR-картинки. NB: amount=0 — валидная сумма чека,
+          // поэтому сравниваем с undefined, а не на истинность.
           let fiscalFn: string | undefined;
           let fiscalFd: string | undefined;
           let fiscalFp: string | undefined;
+          const fiscalFromText = extractFiscalFromText(fullText);
+          if (fiscalFromText) {
+            fiscalFn = fiscalFromText.fn;
+            fiscalFd = fiscalFromText.fd;
+            fiscalFp = fiscalFromText.fp;
+            if (fiscalFromText.amount !== undefined) amount = fiscalFromText.amount;
+            if (fiscalFromText.date) docDate = fiscalFromText.date;
+            console.log(`[AccountingWorker] Fiscal link from text: fn=${fiscalFn}, fd=${fiscalFd}, fp=${fiscalFp}, amount=${fiscalFromText.amount}`);
+          }
+
+          // Приоритет №2 — QR-коды с image-вложений (дополняют то, чего нет в тексте)
           for (const att of realAttachments) {
             if (!(att.contentType || '').toLowerCase().startsWith('image/')) continue;
             const qrText = await decodeQrFromImage(att.content);
@@ -226,7 +242,7 @@ export class AccountingWorker {
             fiscalFp = fiscalFp || fiscal.fp;
             // Сумма и дата из QR дополняют текст, только если там не найдены
             if (!amount && fiscal.amount) amount = fiscal.amount;
-            if (!extractDocDate(fullText) && fiscal.date) docDate = fiscal.date;
+            if (!extractDocDate(fullText) && !fiscalFromText?.date && fiscal.date) docDate = fiscal.date;
             console.log(`[AccountingWorker] Fiscal QR decoded from "${att.filename}": fn=${fiscal.fn}, fd=${fiscal.fd}, fp=${fiscal.fp}, amount=${fiscal.amount}`);
           }
 
@@ -243,7 +259,8 @@ export class AccountingWorker {
               number,
               date: docDate,
               amount,
-              counterpartyName: contactId ? undefined : senderName,
+              // Контрагент: название организации из текста документа, иначе имя отправителя
+              counterpartyName: contactId ? undefined : (extractCounterparty(fullText) || senderName),
               counterpartyInn: inn,
               contactId,
               status: 'new',
