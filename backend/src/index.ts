@@ -104,6 +104,8 @@ app.get('/api/events', authMiddleware, (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/contact-types', contactTypeRoutes);
+// Бухгалтерия по почте: документы, правила, сверка с банком
+app.use('/api/accounting', accountingRoutes);
 app.use('/api/tasks', taskFinanceRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/contacts', contactRoutes);

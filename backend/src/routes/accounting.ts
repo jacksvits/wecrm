@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import fs from 'fs';
+import path from 'path';
 import * as XLSX from 'xlsx';
 import { ImapFlow, ImapFlowOptions } from 'imapflow';
 import { prisma } from '../lib/prisma.js';
@@ -316,11 +317,30 @@ router.patch('/documents/:id', async (req: AuthRequest, res) => {
     const existing = await prisma.financeDocument.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Документ не найден' });
     const { date, ...rest } = data;
-    const doc = await prisma.financeDocument.update({
-      where: { id: req.params.id },
-      data: { ...rest, ...(date ? { date: new Date(date) } : {}) },
-      include: DOC_INCLUDE,
-    });
+    const updateData = { ...rest, ...(date ? { date: new Date(date) } : {}) };
+    let doc;
+    // Ручной сброс сверки на 'unmatched': разрываем связь с платежом с обеих сторон
+    // (атомарно, как в /reconciliation/unmatch)
+    if (data.matchStatus === 'unmatched' && existing.matchedPaymentId) {
+      const [, updated] = await prisma.$transaction([
+        prisma.bankPayment.updateMany({
+          where: { id: existing.matchedPaymentId },
+          data: { matchedDocumentId: null },
+        }),
+        prisma.financeDocument.update({
+          where: { id: req.params.id },
+          data: { ...updateData, matchedPaymentId: null },
+          include: DOC_INCLUDE,
+        }),
+      ]);
+      doc = updated;
+    } else {
+      doc = await prisma.financeDocument.update({
+        where: { id: req.params.id },
+        data: updateData,
+        include: DOC_INCLUDE,
+      });
+    }
     const attachments = await prisma.fileAttachment.findMany({
       where: { entityType: 'finance_document', entityId: doc.id },
       orderBy: { createdAt: 'asc' },
@@ -350,12 +370,14 @@ router.delete('/documents/:id', async (req: AuthRequest, res) => {
       });
     }
     await prisma.financeDocument.delete({ where: { id: doc.id } });
-    // Файлы с диска удаляем по возможности, ошибки не роняют запрос
+    // Файлы с диска удаляем по возможности, ошибки не роняют запрос.
+    // f.path — URL-путь (/uploads/accounting/<uuid>), на диске файлы лежат в /app/uploads/accounting
     for (const f of files) {
+      const diskPath = path.join('/app/uploads/accounting', f.filename);
       try {
-        if (f.path && fs.existsSync(f.path)) fs.unlinkSync(f.path);
+        if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
       } catch (e) {
-        console.error('[Accounting] Не удалось удалить файл', f.path, e);
+        console.error('[Accounting] Не удалось удалить файл', diskPath, e);
       }
     }
     res.json({ success: true });
@@ -628,11 +650,31 @@ router.get('/reconciliation', async (_req: AuthRequest, res) => {
       orderBy: { date: 'desc' },
       take: 200,
     });
-    const unmatchedDocuments = [];
-    for (const doc of unmatchedDocs) {
-      const suggestions = doc.amount > 0 ? await findPaymentSuggestions(doc) : [];
-      unmatchedDocuments.push({ ...doc, suggestions });
+    // Подсказки грузим пакетно (без N+1): один запрос несвязанных платежей
+    // за диапазон дат документов ±7 дней, дальше сопоставление в памяти
+    const docsWithAmount = unmatchedDocs.filter((d) => d.amount > 0);
+    let candidatePayments: Awaited<ReturnType<typeof findPaymentSuggestions>> = [];
+    if (docsWithAmount.length) {
+      const times = docsWithAmount.map((d) => d.date.getTime());
+      const rangeFrom = new Date(Math.min(...times) - MATCH_DATE_DAYS * 24 * 60 * 60 * 1000);
+      const rangeTo = new Date(Math.max(...times) + MATCH_DATE_DAYS * 24 * 60 * 60 * 1000);
+      candidatePayments = await prisma.bankPayment.findMany({
+        where: { matchedDocumentId: null, date: { gte: rangeFrom, lte: rangeTo } },
+        orderBy: { date: 'asc' },
+      });
     }
+    const unmatchedDocuments = unmatchedDocs.map((doc) => {
+      const suggestions = doc.amount > 0
+        ? candidatePayments
+            .filter((p) =>
+              p.direction === expectedPaymentDirection(doc.direction) &&
+              Math.abs(p.amount - doc.amount) <= MATCH_AMOUNT_EPS &&
+              Math.abs(p.date.getTime() - doc.date.getTime()) <= MATCH_DATE_DAYS * 24 * 60 * 60 * 1000
+            )
+            .slice(0, 20)
+        : [];
+      return { ...doc, suggestions };
+    });
     const unmatchedPayments = await prisma.bankPayment.findMany({
       where: { matchedDocumentId: null },
       orderBy: { date: 'desc' },
@@ -657,17 +699,21 @@ router.post('/reconciliation/auto', async (_req: AuthRequest, res) => {
       // Связываем только однозначное совпадение — неоднозначность оставляем на ручную сверку
       if (candidates.length !== 1) continue;
       const payment = candidates[0];
-      await prisma.$transaction([
-        prisma.financeDocument.update({
+      // Связь занимаем атомарно: updateMany с условием matchedDocumentId: null —
+      // если платёж успели связать параллельно, count будет 0 и документ пропускаем
+      const linked = await prisma.$transaction(async (tx) => {
+        const claim = await tx.bankPayment.updateMany({
+          where: { id: payment.id, matchedDocumentId: null },
+          data: { matchedDocumentId: doc.id },
+        });
+        if (claim.count !== 1) return false;
+        await tx.financeDocument.update({
           where: { id: doc.id },
           data: { matchStatus: 'auto', matchedPaymentId: payment.id },
-        }),
-        prisma.bankPayment.update({
-          where: { id: payment.id },
-          data: { matchedDocumentId: doc.id },
-        }),
-      ]);
-      matched += 1;
+        });
+        return true;
+      });
+      if (linked) matched += 1;
     }
     res.json({ matched });
   } catch (err: any) {
@@ -685,25 +731,39 @@ router.post('/reconciliation/match', async (req: AuthRequest, res) => {
     const payment = await prisma.bankPayment.findUnique({ where: { id: paymentId } });
     if (!payment) return res.status(404).json({ error: 'Платёж не найден' });
     if (payment.matchedDocumentId && payment.matchedDocumentId !== documentId) {
-      return res.status(400).json({ error: 'Платёж уже связан с другим документом' });
+      return res.status(409).json({ error: 'Платёж уже связан с другим документом' });
     }
-    // Если документ был связан с другим платежом — старую связь разрываем
-    if (doc.matchedPaymentId && doc.matchedPaymentId !== paymentId) {
-      await prisma.bankPayment.updateMany({
-        where: { id: doc.matchedPaymentId },
-        data: { matchedDocumentId: null },
+    // Связь занимаем атомарно: updateMany с условием matchedDocumentId: null —
+    // защита от гонки, когда платёж связывают параллельно (автосверка/другой запрос)
+    let conflict = false;
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Если документ был связан с другим платежом — старую связь разрываем
+        if (doc.matchedPaymentId && doc.matchedPaymentId !== paymentId) {
+          await tx.bankPayment.updateMany({
+            where: { id: doc.matchedPaymentId },
+            data: { matchedDocumentId: null },
+          });
+        }
+        const claim = await tx.bankPayment.updateMany({
+          where: { id: paymentId, matchedDocumentId: null },
+          data: { matchedDocumentId: documentId },
+        });
+        if (claim.count !== 1) {
+          conflict = true;
+          throw new Error('PAYMENT_ALREADY_MATCHED');
+        }
+        await tx.financeDocument.update({
+          where: { id: documentId },
+          data: { matchStatus: 'manual', matchedPaymentId: paymentId },
+        });
       });
+    } catch (e: any) {
+      if (conflict) {
+        return res.status(409).json({ error: 'Платёж уже связан с другим документом' });
+      }
+      throw e;
     }
-    await prisma.$transaction([
-      prisma.financeDocument.update({
-        where: { id: documentId },
-        data: { matchStatus: 'manual', matchedPaymentId: paymentId },
-      }),
-      prisma.bankPayment.update({
-        where: { id: paymentId },
-        data: { matchedDocumentId: documentId },
-      }),
-    ]);
     res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ error: err.message });

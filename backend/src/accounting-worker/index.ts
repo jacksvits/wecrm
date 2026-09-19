@@ -133,10 +133,12 @@ export class AccountingWorker {
 
   private async processInbox() {
     const client = this.createClient();
-    await client.connect();
-    const lock = await client.getMailboxLock('INBOX');
 
     try {
+      await client.connect();
+      const lock = await client.getMailboxLock('INBOX');
+
+      try {
       const uids = (await client.search({ unseen: true } as Parameters<ImapFlow['search']>[0], { uid: true })) as number[] | false;
 
       if (!uids || uids.length === 0) {
@@ -293,9 +295,16 @@ export class AccountingWorker {
           console.error(`[AccountingWorker] Failed to process UID ${uid}:`, err);
         }
       }
+      } finally {
+        lock.release();
+      }
     } finally {
-      lock.release();
-      await client.logout();
+      // Закрываем соединение всегда, включая сбой connect/getMailboxLock, иначе утечка сокета
+      try {
+        await client.logout();
+      } catch (e) {
+        console.error('[AccountingWorker] Logout failed:', e);
+      }
     }
   }
 

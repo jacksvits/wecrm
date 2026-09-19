@@ -201,6 +201,9 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
     } else if (attachment.entityType === 'chat') {
       const notesPath = path.join(CHAT_DIR, 'video_notes', attachment.filename);
       filePath = fs.existsSync(notesPath) ? notesPath : path.join(CHAT_DIR, attachment.filename);
+    } else if (attachment.entityType === 'finance_document') {
+      // Вложения бухгалтерии складываются воркером в /app/uploads/accounting
+      filePath = path.join(UPLOAD_DIR, 'accounting', attachment.filename);
     } else {
       filePath = path.join(UPLOAD_DIR, attachment.filename);
     }
