@@ -66,6 +66,21 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Dashboard
     get: () => fetchApi('/api/pskovline-plugin'),
     save: (data: any) => fetchApi('/api/pskovline-plugin', { method: 'POST', body: JSON.stringify(data) }),
   },
+  diadocPlugin: {
+    get: (): Promise<any> => fetchApi('/api/diadoc-plugin'),
+    save: (data: any) => fetchApi('/api/diadoc-plugin', { method: 'POST', body: JSON.stringify(data) }),
+    test: (data?: any) => fetchApi('/api/diadoc-plugin/test', { method: 'POST', body: JSON.stringify(data ?? {}) }),
+    selectBox: (boxId: string) => fetchApi('/api/diadoc-plugin/box', { method: 'POST', body: JSON.stringify({ boxId }) }),
+    documents: (type: 'inbound' | 'outbound' | 'requireSignature'): Promise<{ items: any[] }> =>
+      fetchApi(`/api/diadoc-plugin/documents?type=${type}`),
+    downloadDocument: (messageId: string, entityId: string, fileName: string) =>
+      downloadBlob(`/api/diadoc-plugin/documents/${messageId}/${entityId}/content`, fileName || 'document'),
+    counteragents: (): Promise<{ items: any[] }> => fetchApi('/api/diadoc-plugin/counteragents'),
+    send: (data: { toBoxId?: string; inn?: string; kpp?: string; fileName: string; contentBase64: string }) =>
+      fetchApi('/api/diadoc-plugin/send', { method: 'POST', body: JSON.stringify(data) }),
+    sign: (data: { messageId: string; entityId: string; confirmCode?: string }): Promise<any> =>
+      fetchApi('/api/diadoc-plugin/sign', { method: 'POST', body: JSON.stringify(data) }),
+  },
   begetSettings: {
     get: () => fetchApi('/api/beget-settings'),
     save: (data: { login?: string; password?: string; isActive: boolean; isPartner?: boolean; updateTime?: string }) =>

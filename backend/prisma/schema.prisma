@@ -1299,6 +1299,21 @@ model OneCPluginSettings {
   @@map("onec_plugin_settings")
 }
 
+// Настройки плагина «Контур.Диадок» (ЭДО): подключение по API-ключу разработчика + логин/пароль
+model DiadocPluginSettings {
+  id                    Int      @id @default(1)
+  login                 String   @default("")
+  password              String   @default("")
+  apiKey                String   @default("") @map("api_key")
+  boxId                 String   @default("") @map("box_id")
+  boxName               String   @default("") @map("box_name")
+  isActive              Boolean  @default(false) @map("is_active")
+  updateIntervalMinutes Int      @default(15) @map("update_interval_minutes")
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("diadoc_plugin_settings")
+}
+
 model Reservation {
   id          String      @id @default(cuid())
   number      Int         @unique

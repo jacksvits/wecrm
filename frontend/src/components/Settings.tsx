@@ -16,10 +16,11 @@ import BegetSettings from "./BegetSettings";
 import PskovlineSettings from "./PskovlineSettings";
 import TochkaSettings from "./TochkaSettings";
 import OneCSettings from "./OneCSettings";
+import DiadocSettings from "./DiadocSettings";
 import { SystemSettings } from "./SystemSettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "integrations" | "system";
-type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "beget" | "pskovline" | "tochka" | "onec" | "vpn";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "beget" | "pskovline" | "tochka" | "onec" | "diadoc" | "vpn";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
 const PLUGINS: { key: PluginKey; label: string; group: string; description: string }[] = [
@@ -34,6 +35,7 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "pskovline", label: "Псковлайн", group: "Провайдер", description: "Баланс лицевых счетов провайдера" },
   { key: "tochka", label: "Точка Банк", group: "Финансы", description: "Счета и балансы банка (OAuth)" },
   { key: "onec", label: "1С УТ 8.3", group: "Учётные системы", description: "Двусторонняя синхронизация номенклатуры и контрагентов" },
+  { key: "diadoc", label: "Контур.Диадок", group: "Учётные системы", description: "ЭДО: получение, отправка и подписание документов" },
   { key: "vpn", label: "Прокси через VPN", group: "Сервисы", description: "Локальный VPN-прокси для Telegram API (sing-box)" },
 ];
 
@@ -50,6 +52,7 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
     pskovline: "M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20",
     tochka: "M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3",
     onec: "M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 006.5 22H20V2H6.5A2.5 2.5 0 004 4.5v15z",
+    diadoc: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM14 2v6h6M8.5 17l3-3 1.5 1.5 3.5-3.5",
     vpn: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
   };
   return (
@@ -88,6 +91,8 @@ function renderPluginSettings(pluginKey: PluginKey) {
       return <TochkaSettings />;
     case "onec":
       return <OneCSettings />;
+    case "diadoc":
+      return <DiadocSettings />;
     case "vpn":
       return <VpnSettings />;
     default:
@@ -111,6 +116,7 @@ export function Settings() {
     pskovline: false,
     tochka: false,
     onec: false,
+    diadoc: false,
     vpn: false,
   });
 
