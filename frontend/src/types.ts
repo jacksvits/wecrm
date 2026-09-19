@@ -244,6 +244,15 @@ export interface AccountingAnalytics {
     unmatchedCount: number;
     unmatchedSum: number;
   };
+  // Финансы задач (транзакции TaskTransaction) за тот же период; может отсутствовать в старых ответах API
+  taskFinances?: {
+    totalIncome: number;
+    totalExpense: number;
+    profit: number;
+    count: number;
+    byMonth: { month: string; income: number; expense: number }[];
+    topTasks: { taskId: string; title: string; ticketNumber: number; income: number; expense: number; profit: number }[];
+  };
 }
 
 export interface ReconciliationDocument extends FinanceDocument {

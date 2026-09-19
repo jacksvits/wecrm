@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { AccountingAnalytics } from '../../types';
 import { DOC_TYPE_LABELS, fmtMoney, btnSmall, inputStyle } from './shared';
@@ -25,6 +26,7 @@ function periodRange(p: Period): { from?: string; to?: string } {
 
 // Виджет «Аналитика бухгалтерии» для страницы Директора (div-бары, без chart-библиотек)
 export function FinanceAnalyticsWidget() {
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<Period>('quarter');
   const [data, setData] = useState<AccountingAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,6 +61,10 @@ export function FinanceAnalyticsWidget() {
   const t = data?.totals;
   const diff = (t?.incoming || 0) - (t?.outgoing || 0);
   const maxMonth = Math.max(1, ...(t?.byMonth || []).map((m) => Math.max(m.incoming, m.outgoing)));
+
+  // Финансы задач (может отсутствовать в ответе старого API)
+  const tf = data?.taskFinances;
+  const maxTaskMonth = Math.max(1, ...(tf?.byMonth || []).map((m) => Math.max(m.income, m.expense)));
 
   const statCard = (label: string, value: string, color: string) => (
     <div style={{ padding: 12, borderRadius: 10, background: 'var(--bg-input)' }}>
@@ -152,6 +158,74 @@ export function FinanceAnalyticsWidget() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Финансы задач */}
+          {tf && (
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>Финансы задач</div>
+              {tf.count === 0 ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Нет финансовых операций по задачам за период</div>
+              ) : (
+                <>
+                  {/* Stat-карточки по задачам */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+                    {statCard('Доходы по задачам', fmtMoney(tf.totalIncome), '#166534')}
+                    {statCard('Расходы по задачам', fmtMoney(tf.totalExpense), '#991b1b')}
+                    {statCard('Прибыль', fmtMoney(tf.profit), tf.profit >= 0 ? '#10b981' : '#dc2626')}
+                  </div>
+
+                  {/* Горизонтальные div-бары по месяцам (доход/расход по задачам) */}
+                  {tf.byMonth.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>По месяцам</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflow: 'auto' }}>
+                        {tf.byMonth.map((m) => (
+                          <div key={m.month} style={{ display: 'grid', gridTemplateColumns: '64px 1fr', gap: 8, alignItems: 'center' }}>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.month}</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <div style={{ height: 8, borderRadius: 4, background: '#166534', width: `${Math.max(2, (m.income / maxTaskMonth) * 100)}%`, minWidth: 2 }} />
+                                <span style={{ fontSize: 10, color: '#166534', whiteSpace: 'nowrap' }}>{fmtMoney(m.income)}</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <div style={{ height: 8, borderRadius: 4, background: '#991b1b', width: `${Math.max(2, (m.expense / maxTaskMonth) * 100)}%`, minWidth: 2 }} />
+                                <span style={{ fontSize: 10, color: '#991b1b', whiteSpace: 'nowrap' }}>{fmtMoney(m.expense)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Топ задач по обороту */}
+                  {tf.topTasks.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Топ задач</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflow: 'auto' }}>
+                        {tf.topTasks.map((task) => (
+                          <div
+                            key={task.taskId}
+                            onClick={() => navigate(`/tasks/${task.taskId}`)}
+                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'var(--bg-input)', cursor: 'pointer' }}
+                          >
+                            <span style={{ fontSize: 12, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {task.title} <span style={{ color: 'var(--text-muted)' }}>#{task.ticketNumber}</span>
+                            </span>
+                            <span style={{ display: 'flex', gap: 10, fontSize: 11, whiteSpace: 'nowrap' }}>
+                              <span style={{ color: '#166534' }}>+{fmtMoney(task.income)}</span>
+                              <span style={{ color: '#991b1b' }}>−{fmtMoney(task.expense)}</span>
+                              <span style={{ fontWeight: 600, color: task.profit >= 0 ? '#10b981' : '#dc2626' }}>{fmtMoney(task.profit)}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>

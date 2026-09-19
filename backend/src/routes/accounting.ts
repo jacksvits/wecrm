@@ -461,20 +461,82 @@ function buildAnalytics(docs: Awaited<ReturnType<typeof loadAnalyticsDocs>>) {
   };
 }
 
-// GET /api/accounting/analytics?from&to — агрегаты по документам
+// Выборка финансовых транзакций задач за период (фильтр по полю date транзакции, как у документов)
+async function loadTaskTransactions(fromQ: any, toQ: any) {
+  const period = parsePeriod(fromQ, toQ);
+  const where: any = {};
+  if (period.gte || period.lte) where.date = period;
+  return prisma.taskTransaction.findMany({
+    where,
+    select: {
+      id: true, taskId: true, type: true, amount: true, description: true, date: true,
+      task: { select: { title: true, ticketNumber: true } },
+    },
+    orderBy: { date: 'asc' },
+  });
+}
+
+// Агрегаты по транзакциям задач: суммы, по месяцам, топ задач по обороту
+function buildTaskFinances(txs: Awaited<ReturnType<typeof loadTaskTransactions>>) {
+  let totalIncome = 0;
+  let totalExpense = 0;
+  const byMonthMap = new Map<string, { month: string; income: number; expense: number }>();
+  const byTaskMap = new Map<string, { taskId: string; title: string; ticketNumber: number; income: number; expense: number }>();
+
+  for (const tx of txs) {
+    const isIncome = tx.type === 'income';
+    if (isIncome) totalIncome += tx.amount; else totalExpense += tx.amount;
+
+    const month = tx.date.toISOString().slice(0, 7); // '2026-01'
+    const m = byMonthMap.get(month) || { month, income: 0, expense: 0 };
+    if (isIncome) m.income += tx.amount; else m.expense += tx.amount;
+    byMonthMap.set(month, m);
+
+    const t = byTaskMap.get(tx.taskId) || {
+      taskId: tx.taskId,
+      title: tx.task?.title || 'Без названия',
+      ticketNumber: tx.task?.ticketNumber ?? 0,
+      income: 0,
+      expense: 0,
+    };
+    if (isIncome) t.income += tx.amount; else t.expense += tx.amount;
+    byTaskMap.set(tx.taskId, t);
+  }
+
+  return {
+    totalIncome,
+    totalExpense,
+    profit: totalIncome - totalExpense,
+    count: txs.length,
+    byMonth: [...byMonthMap.values()].sort((a, b) => a.month.localeCompare(b.month)),
+    // Топ-20 задач по обороту (доход + расход) по убыванию, включая задачи только с расходами
+    topTasks: [...byTaskMap.values()]
+      .map((t) => ({ ...t, profit: t.income - t.expense }))
+      .sort((a, b) => (b.income + b.expense) - (a.income + a.expense))
+      .slice(0, 20),
+  };
+}
+
+// GET /api/accounting/analytics?from&to — агрегаты по документам и финансам задач
 router.get('/analytics', async (req: AuthRequest, res) => {
   try {
-    const docs = await loadAnalyticsDocs(req.query.from, req.query.to);
-    res.json({ totals: buildAnalytics(docs) });
+    const [docs, taskTxs] = await Promise.all([
+      loadAnalyticsDocs(req.query.from, req.query.to),
+      loadTaskTransactions(req.query.from, req.query.to),
+    ]);
+    res.json({ totals: buildAnalytics(docs), taskFinances: buildTaskFinances(taskTxs) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/accounting/analytics/export?from&to — выгрузка xlsx (документы + сводка по месяцам)
+// GET /api/accounting/analytics/export?from&to — выгрузка xlsx (документы + сводка по месяцам + финансы задач)
 router.get('/analytics/export', async (req: AuthRequest, res) => {
   try {
-    const docs = await loadAnalyticsDocs(req.query.from, req.query.to);
+    const [docs, taskTxs] = await Promise.all([
+      loadAnalyticsDocs(req.query.from, req.query.to),
+      loadTaskTransactions(req.query.from, req.query.to),
+    ]);
     const analytics = buildAnalytics(docs);
 
     const docRows = docs.map((d) => ({
@@ -495,9 +557,19 @@ router.get('/analytics/export', async (req: AuthRequest, res) => {
       'Разница': m.incoming - m.outgoing,
     }));
 
+    // Транзакции задач за тот же период (уже отсортированы по дате в loadTaskTransactions)
+    const taskRows = taskTxs.map((tx) => ({
+      'Дата': tx.date.toLocaleDateString('ru-RU'),
+      'Задача': tx.task ? `#${tx.task.ticketNumber} ${tx.task.title}` : '',
+      'Тип': tx.type === 'income' ? 'Доход' : 'Расход',
+      'Сумма': tx.amount,
+      'Описание': tx.description || '',
+    }));
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(docRows), 'Документы');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthRows), 'Сводка по месяцам');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskRows), 'Финансы задач');
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
     const today = new Date().toISOString().slice(0, 10);
