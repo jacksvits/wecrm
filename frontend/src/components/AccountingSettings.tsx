@@ -102,9 +102,10 @@ export function AccountingSettings() {
       // Перед проверкой сохраняем текущие значения, чтобы тест шёл по актуальным данным
       await api.accounting.saveSettings({ ...form, processedFolder: form.processedFolder || null });
       const res = await api.accounting.testSettings();
-      setMessage(res.ok ? 'Подключение успешно' : 'Ошибка подключения: ' + (res.error || 'неизвестная ошибка'));
+      // Текст ошибки уже приходит с префиксом от backend — не дублируем его
+      setMessage(res.ok ? 'Подключение успешно' : (res.error || 'Ошибка подключения: неизвестная ошибка'));
     } catch (err: any) {
-      setMessage('Ошибка подключения: ' + err.message);
+      setMessage(err.message || 'Ошибка подключения');
     } finally {
       setTesting(false);
     }

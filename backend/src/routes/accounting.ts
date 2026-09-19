@@ -108,7 +108,18 @@ router.post('/settings/test', adminGuard, async (req: AuthRequest, res) => {
     await client.logout();
     res.json({ ok: true });
   } catch (err: any) {
-    res.status(400).json({ error: `Ошибка подключения: ${err.message}` });
+    // ImapFlow прячет детали ответа сервера в responseText/serverResponseCode,
+    // а в message отдаёт только «Command failed» — вытаскиваем реальную причину
+    const detail = err.responseText || err.response || err.message;
+    let hint = '';
+    if (err.authenticationFailed || err.serverResponseCode === 'AUTHENTICATIONFAILED') {
+      hint = ' — проверьте логин и пароль ящика (и что IMAP для него включён)';
+    } else if (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN') {
+      hint = ' — проверьте имя хоста';
+    } else if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT') {
+      hint = ' — проверьте порт и тип шифрования (SSL/STARTTLS)';
+    }
+    res.status(400).json({ error: `Ошибка подключения: ${detail}${hint}` });
   }
 });
 
