@@ -20,6 +20,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { api } from "../api/client";
 import { Task, Deal, User, Activity, DashboardStats, EmailFilterLog } from "../types";
 import { useAuth } from "../hooks/useAuth";
+import { FinanceAnalyticsWidget } from "./accounting/FinanceAnalyticsWidget";
+import { FinanceDocumentsWidget } from "./accounting/FinanceDocumentsWidget";
+import { FinanceReconciliationWidget } from "./accounting/FinanceReconciliationWidget";
 
 type WidgetSize = "small" | "medium" | "large";
 type WidgetId = string;
@@ -58,6 +61,10 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "widget-beget", size: "medium", label: "Beget детали", tab: "Бухгалтерия" },
   { id: "stat-task-profit", size: "small", label: "Прибыль по задачам", tab: "Бухгалтерия" },
   { id: "widget-task-finances", size: "medium", label: "Помесячный отчёт по задачам", tab: "Бухгалтерия" },
+  // === Модуль «Бухгалтерия по почте» ===
+  { id: "widget-finance-analytics", size: "large", label: "Аналитика бухгалтерии", tab: "Бухгалтерия" },
+  { id: "widget-finance-documents", size: "medium", label: "Финансовые документы", tab: "Бухгалтерия" },
+  { id: "widget-finance-reconciliation", size: "medium", label: "Сверка с банком", tab: "Бухгалтерия" },
 ];
 
 const TABS: WidgetTab[] = ["Основное", "Камеры", "Бухгалтерия"];
@@ -1056,6 +1063,12 @@ export function Director() {
             )}
           </>
         );
+      case "widget-finance-analytics":
+        return <FinanceAnalyticsWidget />;
+      case "widget-finance-documents":
+        return <FinanceDocumentsWidget />;
+      case "widget-finance-reconciliation":
+        return <FinanceReconciliationWidget />;
       default:
         return null;
     }
