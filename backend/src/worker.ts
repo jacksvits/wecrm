@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { EmailWorker } from './email-worker/index.js';
+import { AccountingWorker } from './accounting-worker/index.js';
 import { VkGroupWorker } from './vk-worker/index.js';
 import { prisma } from './lib/prisma.js';
 import { runOneCSync } from './lib/onec-sync.js';
@@ -42,6 +43,28 @@ async function main() {
       console.log('[Worker] Email worker started');
     } else {
       console.log('[Worker] Email worker disabled (no active settings)');
+    }
+
+    // --- Accounting Worker (ящик бухгалтерии) ---
+    const accountingSettings = await prisma.accountingEmailSettings.findFirst();
+    if (accountingSettings && accountingSettings.isActive) {
+      const accountingWorker = new AccountingWorker({
+        imapHost: accountingSettings.imapHost,
+        imapPort: accountingSettings.imapPort,
+        imapUser: accountingSettings.imapUser,
+        imapPass: accountingSettings.imapPass,
+        // Интервал валидируем: 0/отсутствие значения привело бы к busy-loop в setInterval
+        checkIntervalMs: Math.max(10_000, accountingSettings.checkIntervalMs || 60_000),
+        processedFolder: accountingSettings.processedFolder || undefined,
+        secure: accountingSettings.secure,
+        rejectUnauthorized: accountingSettings.rejectUnauthorized,
+        requireTLS: accountingSettings.requireTLS,
+      });
+      workers.push(accountingWorker);
+      await accountingWorker.start();
+      console.log('[Worker] Accounting worker started');
+    } else {
+      console.log('[Worker] Accounting worker disabled (no active settings)');
     }
 
     // --- VK Group Worker ---
