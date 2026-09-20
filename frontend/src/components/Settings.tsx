@@ -13,6 +13,7 @@ import { VkGroupSettings } from "./VkGroupSettings";
 import { ContactTypeManager } from "./ContactTypeManager";
 import { SmsJournal } from "./SmsJournal";
 import { YandexSettings } from "./YandexSettings";
+import { DgisSettings } from "./DgisSettings";
 import BegetSettings from "./BegetSettings";
 import PskovlineSettings from "./PskovlineSettings";
 import TochkaSettings from "./TochkaSettings";
@@ -21,7 +22,7 @@ import DiadocSettings from "./DiadocSettings";
 import { SystemSettings } from "./SystemSettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "integrations" | "system";
-type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "beget" | "pskovline" | "tochka" | "onec" | "diadoc" | "vpn";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "onec" | "diadoc" | "vpn";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
 const PLUGINS: { key: PluginKey; label: string; group: string; description: string }[] = [
@@ -32,6 +33,7 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "telegram", label: "Telegram", group: "Мессенджеры", description: "Уведомления и задачи из Telegram" },
   { key: "vk", label: "ВК Группа", group: "Мессенджеры", description: "Комментарии и товары ВКонтакте" },
   { key: "yandex", label: "Яндекс", group: "Сервисы", description: "API-ключ Яндекс.Карт" },
+  { key: "dgis", label: "2GIS", group: "Сервисы", description: "API-ключ 2GIS (карты)" },
   { key: "beget", label: "Beget", group: "Хостинг", description: "Хостинг-аккаунт: тариф, баланс, домены" },
   { key: "pskovline", label: "Псковлайн", group: "Провайдер", description: "Баланс лицевых счетов провайдера" },
   { key: "tochka", label: "Точка Банк", group: "Финансы", description: "Счета и балансы банка (OAuth)" },
@@ -49,6 +51,7 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
     telegram: "M12 19l9 2-9-18-9 18 9-2zm0 0v-8",
     vk: "M18 4h3v3h-3a4 4 0 00-4 4v2h4l-1 4h-3v7h-4v-7H7v-4h4v-3a6 6 0 016-6z",
     yandex: "M9 20l6-16M15 20L9 4",
+    dgis: "M9 20l6-16M15 20L9 4",
     beget: "M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01",
     pskovline: "M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20",
     tochka: "M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3",
@@ -114,6 +117,7 @@ export function Settings() {
     vk: false,
     sms: false,
     yandex: false,
+    dgis: false,
     beget: false,
     pskovline: false,
     tochka: false,

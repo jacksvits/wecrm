@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../api/client";
 import { YandexMap } from "./YandexMap";
+import { DgisMap } from "./DgisMap";
 import { useRealtime } from "../hooks/useRealtime";
 import {
   Task,
@@ -28,6 +29,25 @@ const priorityLabels: Record<string, string> = {
   high: "Высокий",
   urgent: "Срочный",
 };
+
+// Карта в задаче: если в настройках включён 2GIS и задан его API-ключ —
+// показываем 2GIS, иначе Яндекс.Карты (как раньше)
+function TaskMap({ address }: { address: string }) {
+  const [provider, setProvider] = useState<"yandex" | "dgis">("yandex");
+  useEffect(() => {
+    api.dgis
+      .getSettings()
+      .then((s) => {
+        if (s?.isActive && s?.apiKey) setProvider("dgis");
+      })
+      .catch(() => {});
+  }, []);
+  return provider === "dgis" ? (
+    <DgisMap address={address} />
+  ) : (
+    <YandexMap address={address} />
+  );
+}
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i;
 const formatSize = (bytes: number) => {
   if (!bytes) return "0 B";
@@ -1200,7 +1220,7 @@ export function TaskDetail() {
                 </div>{" "}
                 {task.address && (
                   <div style={{ marginTop: 12 }}>
-                    <YandexMap address={task.address} />
+                    <TaskMap address={task.address} />
                   </div>
                 )}{" "}
                 <div style={{ marginTop: 12 }}>

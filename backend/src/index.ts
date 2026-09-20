@@ -31,6 +31,7 @@ import maxRoutes from './routes/max.js';
 import telegramRoutes, { startTelegramPoller } from './routes/telegram.js';
 import vpnRoutes, { syncVpnConfigOnStartup } from './routes/vpn.js';
 import yandexRoutes from './routes/yandex.js';
+import dgisRoutes from './routes/dgis.js';
 import begetRoutes from './routes/beget.js';
 import tochkaRoutes from './routes/tochka.js';
 import pskovlineRoutes from './routes/pskovline.js';
@@ -153,6 +154,7 @@ app.use('/api/diadoc-plugin', diadocPluginRoutes);
 app.use('/api/handler-settings', handlerSettingsRoutes);
 app.use('/api/auto-reply-settings', autoReplySettingsRoutes);
 app.use('/api/yandex', yandexRoutes);
+app.use('/api/dgis', dgisRoutes);
 app.use('/api/calls', callRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', connections: getActiveConnections(), time: new Date().toISOString() }));

@@ -10,13 +10,14 @@ router.use(authMiddleware);
 // GET /api/integrations/status — статус активности интеграций («плагинов»)
 router.get('/status', async (_req, res) => {
   try {
-    const [email, telephony, max, telegram, vk, yandex, beget, pskovline, onec, tochka, vpn, diadoc] = await Promise.all([
+    const [email, telephony, max, telegram, vk, yandex, dgis, beget, pskovline, onec, tochka, vpn, diadoc] = await Promise.all([
       prisma.emailSettings.findFirst({ select: { isActive: true } }),
       prisma.telephonySettings.findFirst({ select: { isActive: true } }),
       prisma.maxSettings.findFirst({ select: { isActive: true } }),
       prisma.telegramSettings.findFirst({ select: { isActive: true } }),
       prisma.vkGroupSettings.findFirst({ select: { isActive: true } }),
       prisma.yandexSettings.findFirst({ select: { apiKey: true } }),
+      prisma.dgisSettings.findFirst({ select: { apiKey: true } }),
       prisma.begetSettings.findFirst({ select: { isActive: true } }),
       prisma.pskovlinePluginSettings.findFirst({ select: { isActive: true } }),
       prisma.oneCPluginSettings.findFirst({ select: { isActive: true } }),
@@ -33,6 +34,7 @@ router.get('/status', async (_req, res) => {
       // SMS через Novofon — зависит от телефонии
       sms: telephony?.isActive ?? false,
       yandex: !!yandex?.apiKey,
+      dgis: !!dgis?.apiKey,
       beget: beget?.isActive ?? false,
       pskovline: pskovline?.isActive ?? false,
       onec: onec?.isActive ?? false,
