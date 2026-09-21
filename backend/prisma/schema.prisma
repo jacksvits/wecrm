@@ -1303,6 +1303,7 @@ model Branding {
   newsCoverPath String? @map("news_cover_path")
   splashEnabled Boolean  @default(true) @map("splash_enabled")
   splashPath    String?  @map("splash_path")
+  defaultTheme  String?  @map("default_theme")
   updatedAt    DateTime @default(now()) @map("updated_at")
 
   @@map("branding")

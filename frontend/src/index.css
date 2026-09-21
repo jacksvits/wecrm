@@ -108,6 +108,165 @@
   --shadow: 0 8px 30px rgba(0,0,0,0.25);
 }
 
+
+/* === Темы оформления (вкладка «Темы» в системных настройках) ===
+   Палитра применяется атрибутом data-palette на <html> (см. lib/branding.ts);
+   тёмный вариант — комбинация с [data-theme="dark"] на корневом div layout'а. */
+[data-palette="ocean"] {
+  --bg-body: #eef4fb;
+  --bg-card: #ffffff;
+  --bg-sidebar: #f3f8fd;
+  --bg-header: #f3f8fd;
+  --bg-hover: #e2ecf7;
+  --bg-input: #f3f8fd;
+  --bg-secondary: #eaf2fa;
+  --text-primary: #16283d;
+  --text-secondary: #4a6076;
+  --text-muted: #8aa0b4;
+  --border-color: #d4e2ef;
+  --accent-color: var(--custom-accent, #1a6fd4);
+  --shadow: 0 8px 30px rgba(26, 111, 212, 0.10);
+}
+[data-palette="ocean"] [data-theme="dark"] {
+  --bg-body: #0e1c2e;
+  --bg-card: #17293f;
+  --bg-sidebar: #142539;
+  --bg-header: #142539;
+  --bg-hover: #223a56;
+  --bg-input: #1d334c;
+  --bg-secondary: #132437;
+  --text-primary: #e6eef7;
+  --text-secondary: #9db4ca;
+  --text-muted: #6d8499;
+  --border-color: #27405c;
+  --accent-color: var(--custom-accent, #5aa2e8);
+  --shadow: 0 8px 30px rgba(0,0,0,0.30);
+}
+
+[data-palette="forest"] {
+  --bg-body: #f1f7f1;
+  --bg-card: #ffffff;
+  --bg-sidebar: #edf6ed;
+  --bg-header: #edf6ed;
+  --bg-hover: #e1efe1;
+  --bg-input: #f2f8f2;
+  --bg-secondary: #ebf4eb;
+  --text-primary: #1c2b1e;
+  --text-secondary: #50684f;
+  --text-muted: #93a892;
+  --border-color: #d3e3d1;
+  --accent-color: var(--custom-accent, #2e8b47);
+  --shadow: 0 8px 30px rgba(46, 139, 71, 0.10);
+}
+[data-palette="forest"] [data-theme="dark"] {
+  --bg-body: #101d13;
+  --bg-card: #182a1c;
+  --bg-sidebar: #152518;
+  --bg-header: #152518;
+  --bg-hover: #213a26;
+  --bg-input: #1d3421;
+  --bg-secondary: #14261a;
+  --text-primary: #e8f2e6;
+  --text-secondary: #a3bda0;
+  --text-muted: #72906e;
+  --border-color: #2c4a30;
+  --accent-color: var(--custom-accent, #62c476);
+  --shadow: 0 8px 30px rgba(0,0,0,0.30);
+}
+
+[data-palette="violet"] {
+  --bg-body: #f6f3fb;
+  --bg-card: #ffffff;
+  --bg-sidebar: #f3effa;
+  --bg-header: #f3effa;
+  --bg-hover: #eae3f6;
+  --bg-input: #f6f2fc;
+  --bg-secondary: #f1ebf9;
+  --text-primary: #251d38;
+  --text-secondary: #5c5470;
+  --text-muted: #9a90ad;
+  --border-color: #ddd4ec;
+  --accent-color: var(--custom-accent, #7c3aed);
+  --shadow: 0 8px 30px rgba(124, 58, 237, 0.10);
+}
+[data-palette="violet"] [data-theme="dark"] {
+  --bg-body: #171221;
+  --bg-card: #221a30;
+  --bg-sidebar: #1e172b;
+  --bg-header: #1e172b;
+  --bg-hover: #2e2440;
+  --bg-input: #281e38;
+  --bg-secondary: #1d1628;
+  --text-primary: #efeaf7;
+  --text-secondary: #b3a8c9;
+  --text-muted: #7e7392;
+  --border-color: #372b4c;
+  --accent-color: var(--custom-accent, #a78bfa);
+  --shadow: 0 8px 30px rgba(0,0,0,0.30);
+}
+
+[data-palette="sunset"] {
+  --bg-body: #fdf6ef;
+  --bg-card: #ffffff;
+  --bg-sidebar: #fbf1e7;
+  --bg-header: #fbf1e7;
+  --bg-hover: #f8e7d5;
+  --bg-input: #fdf4ea;
+  --bg-secondary: #faf0e4;
+  --text-primary: #332216;
+  --text-secondary: #75604e;
+  --text-muted: #b09a86;
+  --border-color: #ecd9c4;
+  --accent-color: var(--custom-accent, #ea7a1f);
+  --shadow: 0 8px 30px rgba(234, 122, 31, 0.10);
+}
+[data-palette="sunset"] [data-theme="dark"] {
+  --bg-body: #211409;
+  --bg-card: #2f1d0f;
+  --bg-sidebar: #2a1a0d;
+  --bg-header: #2a1a0d;
+  --bg-hover: #3d2815;
+  --bg-input: #352112;
+  --bg-secondary: #28180c;
+  --text-primary: #f7ede2;
+  --text-secondary: #c9ae93;
+  --text-muted: #967c62;
+  --border-color: #4c331b;
+  --accent-color: var(--custom-accent, #f59e4b);
+  --shadow: 0 8px 30px rgba(0,0,0,0.30);
+}
+
+[data-palette="graphite"] {
+  --bg-body: #f4f4f5;
+  --bg-card: #ffffff;
+  --bg-sidebar: #fafafa;
+  --bg-header: #fafafa;
+  --bg-hover: #e9e9eb;
+  --bg-input: #f7f7f8;
+  --bg-secondary: #f1f1f2;
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #8e8e99;
+  --border-color: #dcdcdf;
+  --accent-color: var(--custom-accent, #3f3f46);
+  --shadow: 0 8px 30px rgba(0,0,0,0.08);
+}
+[data-palette="graphite"] [data-theme="dark"] {
+  --bg-body: #131316;
+  --bg-card: #1d1d21;
+  --bg-sidebar: #1a1a1e;
+  --bg-header: #1a1a1e;
+  --bg-hover: #2a2a30;
+  --bg-input: #232329;
+  --bg-secondary: #18181c;
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #6e6e78;
+  --border-color: #333338;
+  --accent-color: var(--custom-accent, #d4d4d8);
+  --shadow: 0 8px 30px rgba(0,0,0,0.30);
+}
+
 body {
   background: var(--bg-body);
   color: var(--text-primary);

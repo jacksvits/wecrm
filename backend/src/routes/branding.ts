@@ -43,6 +43,8 @@ router.get('/', async (_req, res) => {
       logoUrl: branding?.logoPath ? fileUrl('logo.png', branding.updatedAt) : null,
       darkLogoUrl: branding?.darkLogoPath ? fileUrl('logo-dark.png', branding.updatedAt) : null,
       accentColor: branding?.accentColor || null,
+      // Тема оформления проекта (null — классическая)
+      defaultTheme: branding?.defaultTheme || null,
       // Обложка новостей по умолчанию: кастомная (с версией для сброса кэша) или внешний URL
       newsCoverUrl: branding?.newsCoverPath
         ? (branding.newsCoverPath.startsWith('/uploads/branding/')
@@ -162,6 +164,30 @@ router.post('/dark-logo', authMiddleware, upload.single('file'), async (req: Aut
     res.json({ darkLogoUrl: fileUrl('logo-dark.png', branding.updatedAt) });
   } catch (err: any) {
     console.error('[branding] dark logo upload error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/branding/theme — тема оформления проекта (null — классическая)
+const ALLOWED_THEMES = ['classic', 'ocean', 'forest', 'violet', 'sunset', 'graphite'];
+router.post('/theme', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Только администратор' });
+    }
+    const theme = req.body?.theme ?? null;
+    const value = theme && ALLOWED_THEMES.includes(String(theme)) ? String(theme) : null;
+
+    const branding = await prisma.branding.upsert({
+      where: { id: 1 },
+      create: { id: 1, defaultTheme: value, updatedAt: new Date() },
+      update: { defaultTheme: value, updatedAt: new Date() },
+    });
+
+    console.log(`[branding] theme updated: ${value || 'classic'}`);
+    res.json({ defaultTheme: branding.defaultTheme });
+  } catch (err: any) {
+    console.error('[branding] theme error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

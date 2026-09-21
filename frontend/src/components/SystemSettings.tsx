@@ -3,6 +3,7 @@ import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import { api } from "../api/client";
 import { loadBranding } from "../lib/branding";
+import { THEMES } from "../lib/themes";
 import { User, AutoReplyTrigger } from "../types";
 
 // WYSIWYG-редактор — та же конфигурация, что и в остальных текстовых полях проекта
@@ -29,7 +30,7 @@ const TAB_CONFIGS = [
   { key: "games", label: "Игры", defaultPath: "/volume3/GAME" },
 ];
 
-type SystemSubTab = "design" | "storage" | "handler" | "autoreply";
+type SystemSubTab = "design" | "themes" | "storage" | "handler" | "autoreply";
 
 export function SystemSettings() {
   // По умолчанию открываем под-вкладку «Дизайн»
@@ -39,7 +40,7 @@ export function SystemSettings() {
   const [saving, setSaving] = useState<string | null>(null);
 
   // === Брендинг: иконка приложения, логотип компании, логотип тёмной темы, цвет акцента ===
-  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null; newsCoverUrl: string | null; splashEnabled: boolean; splashUrl: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null, newsCoverUrl: null, splashEnabled: true, splashUrl: null });
+  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null; defaultTheme: string | null; newsCoverUrl: string | null; splashEnabled: boolean; splashUrl: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null, newsCoverUrl: null, defaultTheme: null, splashEnabled: true, splashUrl: null });
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [newsCoverFile, setNewsCoverFile] = useState<File | null>(null);
   const [splashVideoFile, setSplashVideoFile] = useState<File | null>(null);
@@ -49,6 +50,7 @@ export function SystemSettings() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [accentInput, setAccentInput] = useState("");
   const [accentSaving, setAccentSaving] = useState(false);
+  const [themeSaving, setThemeSaving] = useState(false);
 
   // === Обработчик: авто-сообщения в обсуждение задачи ===
   const [handlerGreeting, setHandlerGreeting] = useState("");
@@ -182,7 +184,7 @@ export function SystemSettings() {
       .then((r) => (r.ok ? r.json() : null))
       .then((b) => {
         if (!b) return;
-        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor, newsCoverUrl: b.newsCoverUrl, splashEnabled: b.splashEnabled ?? true, splashUrl: b.splashUrl || null });
+        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor, defaultTheme: b.defaultTheme || null, newsCoverUrl: b.newsCoverUrl, splashEnabled: b.splashEnabled ?? true, splashUrl: b.splashUrl || null });
         setAccentInput(b.accentColor || "");
       })
       .catch(() => {});
@@ -323,6 +325,85 @@ export function SystemSettings() {
     } finally {
       setAccentSaving(false);
     }
+  };
+
+  // Сохранение темы оформления проекта
+  const saveTheme = async (theme: string) => {
+    setThemeSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/branding/theme", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { 'X-Auth-Token': token as string } : {}),
+        },
+        body: JSON.stringify({ theme }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка сохранения");
+      setBranding((prev) => ({ ...prev, defaultTheme: data.defaultTheme }));
+      await loadBranding(); // применить тему сразу
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    } finally {
+      setThemeSaving(false);
+    }
+  };
+
+  // === Под-вкладка «Темы»: выбор темы оформления проекта ===
+  const renderThemes = () => {
+    const current = branding.defaultTheme || "classic";
+    return (
+      <div>
+        <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 14 }}>
+          Тема применяется для всего проекта. Тёмный режим (профиль → «Тёмная тема») работает
+          поверх темы и окрашивается в её палитру. Цвет акцента из вкладки «Дизайн» имеет приоритет.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+          {THEMES.map((t) => {
+            const selected = current === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => saveTheme(t.key)}
+                disabled={themeSaving}
+                style={{
+                  textAlign: "left",
+                  padding: 0,
+                  borderRadius: 14,
+                  border: selected ? "2px solid var(--accent-color)" : "1px solid var(--border-color)",
+                  background: "var(--bg-card)",
+                  cursor: "pointer",
+                  overflow: "hidden",
+                  transition: "all 0.2s",
+                }}
+              >
+                {/* Превью темы: миниатюра интерфейса в её палитре */}
+                <div style={{ display: "flex", height: 120, background: t.light.body }}>
+                  <div style={{ width: 26, background: t.light.sidebar, borderRight: `1px solid ${t.light.border}` }} />
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: 8, gap: 6 }}>
+                    <div style={{ height: 14, borderRadius: 4, background: t.light.sidebar, border: `1px solid ${t.light.border}` }} />
+                    <div style={{ flex: 1, borderRadius: 6, background: t.light.card, border: `1px solid ${t.light.border}`, padding: 5, display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div style={{ height: 6, width: "70%", borderRadius: 3, background: t.light.textSecondary, opacity: 0.6 }} />
+                      <div style={{ height: 6, width: "45%", borderRadius: 3, background: t.light.border }} />
+                      <div style={{ marginTop: "auto", height: 10, width: 44, borderRadius: 5, background: t.light.accent }} />
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: "12px 14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 15, fontWeight: 600 }}>{t.label}</span>
+                    {selected && <span style={{ fontSize: 12, color: "var(--accent-color)", fontWeight: 600 }}>Выбрана</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{t.description}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   useEffect(() => {
@@ -1211,6 +1292,9 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "design")} onClick={() => setSubTab("design")}>
           Дизайн
         </button>
+        <button style={subTabStyle(subTab === "themes")} onClick={() => setSubTab("themes")}>
+          Темы
+        </button>
         <button style={subTabStyle(subTab === "storage")} onClick={() => setSubTab("storage")}>
           Хранение
         </button>
@@ -1222,7 +1306,7 @@ export function SystemSettings() {
         </button>
       </div>
 
-      {subTab === "design" ? renderDesign() : subTab === "storage" ? renderStorage() : subTab === "handler" ? renderHandler() : renderAutoReply()}
+      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "handler" ? renderHandler() : renderAutoReply()}
     </div>
   );
 }

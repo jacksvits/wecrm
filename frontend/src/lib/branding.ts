@@ -8,6 +8,7 @@ export interface Branding {
   logoUrl: string | null;
   darkLogoUrl: string | null;
   accentColor: string | null;
+  defaultTheme: string | null;
   newsCoverUrl: string | null;
   updatedAt: string | null;
 }
@@ -19,6 +20,7 @@ let current: Branding = {
   logoUrl: null,
   darkLogoUrl: null,
   accentColor: null,
+  defaultTheme: null,
   newsCoverUrl: null,
   updatedAt: null,
 };
@@ -80,6 +82,12 @@ export async function loadBranding(): Promise<Branding> {
         document.documentElement.style.setProperty('--custom-accent', current.accentColor);
       } else {
         document.documentElement.style.removeProperty('--custom-accent');
+      }
+      // Применяем тему оформления: data-palette на <html> каскадирует на весь layout
+      if (current.defaultTheme && current.defaultTheme !== 'classic') {
+        document.documentElement.dataset.palette = current.defaultTheme;
+      } else {
+        delete document.documentElement.dataset.palette;
       }
       window.dispatchEvent(new CustomEvent('brandingchange'));
     }
