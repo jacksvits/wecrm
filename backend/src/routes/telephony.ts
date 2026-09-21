@@ -563,6 +563,75 @@ router.post("/iov", async (req, res) => {
     res.json({});
   }
 });
+// WebRTC-виджет Novofon: временный ключ для звонков из браузера.
+// Внешний API Novofon v1: GET /v1/webrtc/get_key/?sip=<login>, авторизация —
+// заголовок Authorization: <apiKey>:<HMAC-SHA1(params, apiSecret)>, ключ живёт 72 ч.
+// Доступен любому авторизованному пользователю с сопоставленным внутренним номером АТС.
+router.get("/webrtc/key", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const settings = await prisma.telephonySettings.findFirst();
+    if (!settings?.isActive || !settings.webRtcEnabled) {
+      return res
+        .status(400)
+        .json({ error: "WebRTC-звонки не включены в настройках телефонии" });
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { novofonExtension: true },
+    });
+    if (!user?.novofonExtension) {
+      return res.status(400).json({
+        error:
+          "Вам не сопоставлен внутренний номер АТС (раздел Пользователи → колонка «Внутренний номер Novofon»)",
+      });
+    }
+    // SIP-логин сотрудника: ищем по внутреннему номеру среди номеров сотрудников АТС
+    let sipLogin = user.novofonExtension;
+    try {
+      const employees = await novofon.getEmployees({
+        apiKey: settings.apiKey,
+        apiSecret: settings.apiSecret!,
+      });
+      const employee = employees.find((e) =>
+        e.phone_numbers?.some(
+          (p) =>
+            p.number === user.novofonExtension ||
+            p.sip_login === user.novofonExtension,
+        ),
+      );
+      const sip = employee?.phone_numbers?.find(
+        (p) =>
+          p.number === user.novofonExtension ||
+          p.sip_login === user.novofonExtension,
+      )?.sip_login;
+      if (sip) sipLogin = sip;
+    } catch (err: any) {
+      console.warn(
+        "[Novofon WebRTC] get.employees не удался, используем внутренний номер как SIP-логин:",
+        err.message,
+      );
+    }
+    const params = `sip=${encodeURIComponent(sipLogin)}`;
+    const signature = createHmac("sha1", settings.apiSecret!)
+      .update(params)
+      .digest("hex");
+    const response = await fetch(
+      `https://api.novofon.com/v1/webrtc/get_key/?${params}`,
+      { headers: { Authorization: `${settings.apiKey}:${signature}` } },
+    );
+    const data: any = await response.json();
+    if (data.status !== "success" || !data.key) {
+      throw new Error(data.message || "Novofon API вернул ошибку");
+    }
+    console.log(
+      `[Novofon WebRTC] Ключ виджета выдан: пользователь=${req.user!.id}, sip=${sipLogin}`,
+    );
+    res.json({ key: data.key, sip: sipLogin });
+  } catch (err: any) {
+    console.error("[Novofon WebRTC] Ошибка получения ключа:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 router.use(authMiddleware, adminOnly);
 router.get("/settings", async (_req, res) => {
   const settings = await prisma.telephonySettings.findFirst();
