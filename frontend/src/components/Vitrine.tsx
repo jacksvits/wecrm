@@ -256,6 +256,17 @@ export function Vitrine() {
         }
         .vitrine-card { transition: box-shadow .15s ease, transform .15s ease; }
         .vitrine-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,.10); transform: translateY(-2px); }
+        .btn-reserve { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: none; border-radius: 10px; background: #111111; color: #ffffff; font: 500 14px/1.4 system-ui, sans-serif; cursor: pointer; transition: opacity .15s ease-out, transform .15s ease-out; }
+        .btn-reserve:hover { opacity: .85; }
+        .btn-reserve:active { transform: scale(.97); }
+        .btn-reserve:disabled { opacity: .4; cursor: default; }
+        .btn-reserve:focus-visible { outline: 2px solid #111111; outline-offset: 2px; }
+        .btn-cart { display: inline-flex; align-items: center; justify-content: center; padding: 8px; border: none; border-radius: 10px; background: #111111; color: #ffffff; cursor: pointer; transition: opacity .15s ease-out, transform .15s ease-out; }
+        .btn-cart:hover { opacity: .85; }
+        .btn-cart:active { transform: scale(.97); }
+        .btn-cart:disabled { opacity: .4; cursor: default; }
+        .btn-cart:focus-visible { outline: 2px solid #111111; outline-offset: 2px; }
+        @media (max-width: 640px) { .btn-reserve span { display: none; } .btn-reserve { flex: 1; justify-content: center; padding: 8px; } .btn-cart { flex: 1; } }
         .vitrine-cart { width: 380px; }
         @media (max-width: 640px) {
           .vitrine-cart-overlay { align-items: flex-end !important; padding: 0 !important; }
@@ -310,16 +321,23 @@ export function Vitrine() {
                   {inStock > 0 ? `В наличии: ${fmtQty(inStock)} ${p.unit}` : 'Нет в наличии'}
                 </div>
               </div>
-              <button className="vitrine-btn" disabled={inStock <= 0}
-                style={{ marginTop: 6, padding: '8px 12px', borderRadius: 8, border: 'none', cursor: inStock > 0 ? 'pointer' : 'not-allowed', background: inStock > 0 ? '#1a1a1a' : 'var(--bg-hover)', color: inStock > 0 ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: 14 }}
-                onClick={(e) => { e.stopPropagation(); openReserve(p); }}>
-                Зарезервировать
-              </button>
-              <button className="vitrine-btn" disabled={inStock <= 0}
-                style={{ marginTop: 4, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', cursor: inStock > 0 ? 'pointer' : 'not-allowed', background: 'var(--bg-card)', color: inStock > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: 600, fontSize: 14 }}
-                onClick={(e) => { e.stopPropagation(); addToCart(p); }}>
-                В корзину
-              </button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                <button type="button" className="btn-cart" disabled={inStock <= 0} title="В корзину" aria-label="В корзину"
+                  onClick={(e) => { e.stopPropagation(); addToCart(p); }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                  </svg>
+                </button>
+                <button type="button" className="btn-reserve" disabled={inStock <= 0} style={{ flex: 1, justifyContent: 'center' }}
+                  onClick={(e) => { e.stopPropagation(); openReserve(p); }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path fillRule="evenodd" clipRule="evenodd" d="M17 3.8H7C5.78497 3.8 4.8 4.78497 4.8 6V15.7647C4.8 16.574 5.24438 17.318 5.95698 17.7017L10.957 20.394C11.6081 20.7446 12.3919 20.7446 13.043 20.394L18.043 17.7017C18.7556 17.318 19.2 16.574 19.2 15.7647V6C19.2 4.78497 18.215 3.8 17 3.8ZM7 2C4.79086 2 3 3.79086 3 6V15.7647C3 17.2362 3.80796 18.5889 5.1036 19.2866L10.1036 21.9789C11.2875 22.6164 12.7125 22.6164 13.8964 21.9789L18.8964 19.2866C20.192 18.5889 21 17.2362 21 15.7647V6C21 3.79086 19.2091 2 17 2H7Z" fill="currentColor"/>
+                    <path fillRule="evenodd" clipRule="evenodd" d="M16.7248 8.63051C17.0763 8.98198 17.0763 9.55183 16.7248 9.9033L11.7627 14.8654C11.4113 15.2169 10.8414 15.2169 10.4899 14.8654L7.81839 12.1939C7.46692 11.8424 7.46691 11.2726 7.81839 10.9211C8.16986 10.5696 8.7397 10.5696 9.09118 10.9211L11.1263 12.9562L15.4521 8.63051C15.8035 8.27904 16.3734 8.27904 16.7248 8.63051Z" fill="currentColor"/>
+                  </svg>
+                  <span>В резерв</span>
+                </button>
+              </div>
             </div>
           </div>
           ))}
