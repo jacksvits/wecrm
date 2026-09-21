@@ -55,12 +55,12 @@ export function buildSalePdf(s: {
 
   // таблица позиций
   const cols = [
-    { x: 50, w: 32, t: '№ п/п' },
-    { x: 84, w: 168, t: 'Наименование' },
-    { x: 254, w: 68, t: 'Единица измерения' },
-    { x: 324, w: 58, t: 'Количество' },
-    { x: 384, w: 68, t: 'Цена (руб.)' },
-    { x: 454, w: 88, t: 'Сумма (руб.)' },
+    { x: 50, w: 26, t: '№ п/п' },
+    { x: 76, w: 165, t: 'Наименование' },
+    { x: 241, w: 72, t: 'Единица измерения' },
+    { x: 313, w: 66, t: 'Количество' },
+    { x: 379, w: 70, t: 'Цена (руб.)' },
+    { x: 449, w: 96, t: 'Сумма (руб.)' },
   ];
   const rowH = 18;
   const headerH = 26;
@@ -92,14 +92,15 @@ export function buildSalePdf(s: {
   vline(545);
 
   doc.font('bold').fontSize(10);
-  doc.text('Итого:', 384, tableBottom + 8, { width: 68, align: 'right' });
-  doc.text(`${s.total.toFixed(2)}`, 454, tableBottom + 8, { width: 88, align: 'right' });
+  doc.text('Итого:', 379, tableBottom + 8, { width: 70, align: 'right' });
+  doc.text(`${s.total.toFixed(2)}`, 449, tableBottom + 8, { width: 96, align: 'right' });
   doc.font('reg').fontSize(10);
   doc.text('В том числе НДС __________ 0 %', 50, tableBottom + 26, { width: 495, align: 'right' });
 
   const sy = tableBottom + 60;
-  doc.text(`Сдал: ______________ подпись ______________ ${s.user?.name || 'Ф.И.О.'}`, 50, sy, { width: 245 });
-  doc.text('Принял: ____________ подпись ____________ Ф.И.О.', 305, sy, { width: 240 });
+  doc.fontSize(9.5);
+  doc.text(`Сдал: __________ подпись __________ ${s.user?.name || 'Ф.И.О.'}`, 50, sy, { width: 250 });
+  doc.text('Принял: __________ подпись __________ Ф.И.О.', 310, sy, { width: 235 });
 
   return doc;
 }
