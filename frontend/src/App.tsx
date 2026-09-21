@@ -3,12 +3,14 @@ import { Chat } from './components/Chat' ;
 import { CallHistory } from './components/CallHistory' ;
 import { CallProvider, useCall } from './context/CallContext' ;
 import { CallWindow } from './components/CallWindow' ;
+import { WebPhoneWidget } from './components/WebPhoneWidget' ;
 
 function CallOverlay() {
   const { info } = useCall() ;
   return (<>
     {info && <div style={{ position: 'fixed', top: 'calc(16px + env(safe-area-inset-top, 0px))', left: '50%', transform: 'translateX(-50%)', zIndex: 2000, background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow)', borderRadius: 12, padding: '10px 18px', fontSize: 14 }}>{info}</div>}
     <CallWindow />
+    <WebPhoneWidget />
   </>) ;
 }
 function App() { const { user, loading } = useAuth() ; const location = useLocation() ;

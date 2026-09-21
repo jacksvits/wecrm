@@ -19,7 +19,7 @@ import {
 } from "../lib/task-defaults.js";
 import fs from "fs";
 import path from "path";
-import { randomUUID } from "crypto";
+import { randomUUID, createHmac } from "crypto";
 const router = Router();
 const RECORDS_DIR = "/app/uploads/records";
 if (!fs.existsSync(RECORDS_DIR)) {
@@ -572,6 +572,7 @@ router.get("/settings", async (_req, res) => {
 });
 const settingsSchema = z.object({
   isActive: z.boolean(),
+  webRtcEnabled: z.boolean().default(false),
   apiKey: z.string().min(1),
   apiSecret: z.string().optional(),
   virtualNumber: z.string().optional(),

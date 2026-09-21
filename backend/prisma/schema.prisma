@@ -653,6 +653,8 @@ model EmailSettings {
 model TelephonySettings {
   id                String   @id @default(cuid())
   isActive          Boolean  @default(false) @map("is_active")
+  // WebRTC-виджет Novofon: звонки клиентам прямо из браузера CRM
+  webRtcEnabled     Boolean  @default(false) @map("web_rtc_enabled")
   apiKey            String   @map("api_key")
   apiSecret         String   @map("api_secret")
   virtualNumber     String?  @map("virtual_number")

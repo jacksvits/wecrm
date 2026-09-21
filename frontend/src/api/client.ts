@@ -20,6 +20,7 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Dashboard
     getEmployees: (): Promise<NovofonEmployee[]> => fetchApi('/api/telephony/employees'),
     downloadRecord: (callId: string) => `${API_URL}/api/telephony/records/${callId}/download`,
     getSms: (params?: string): Promise<{ items: SmsMessage[]; total: number }> => fetchApi(`/api/telephony/sms${params ? `?${params}` : ''}`),
+    getWebRtcKey: (): Promise<{ key: string; sip: string }> => fetchApi('/api/telephony/webrtc/key'),
   },
   notifications: {
     list: (limit?: number): Promise<{ items: any[]; unreadCount: number }> => fetchApi(`/api/notifications?limit=${limit || 5}`),
