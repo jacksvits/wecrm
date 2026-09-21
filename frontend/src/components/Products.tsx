@@ -1418,6 +1418,13 @@ function SalesTab() {
     load().finally(() => setLoading(false));
   }, []);
 
+  const changeStatus = async (s: any, status: string) => {
+    try {
+      await api.sales.update(s.id, { status });
+      await load();
+    } catch (e: any) { alert(e.message || 'Ошибка смены статуса'); }
+  };
+
   const statusLabel = (s: string) => s === 'new' ? 'Новый' : s === 'paid' ? 'Оплачен' : s === 'cancelled' ? 'Отменён' : s;
   const statusColor = (s: string) => s === 'paid' ? '#16a34a' : s === 'new' ? '#d97706' : 'var(--text-muted)';
 
@@ -1428,19 +1435,26 @@ function SalesTab() {
         <thead><tr>
           <th style={thStyle}>№</th><th style={thStyle}>Дата</th><th style={thStyle}>Контрагент</th>
           <th style={thStyle}>Склад</th><th style={thStyle}>Товары</th><th style={thStyle}>Сумма</th>
-          <th style={thStyle}>Статус</th><th style={thStyle}>Автор</th>
+          <th style={thStyle}>Статус</th><th style={thStyle}>Автор</th><th style={thStyle}>Документ</th>
         </tr></thead>
         <tbody>
           {sales.map((s: any) => (
-            <tr key={s.id}>
+            <tr key={s.id} style={s.status === 'cancelled' ? { opacity: 0.55 } : undefined}>
               <td style={tdStyle}>ПР-{String(s.number).padStart(6, '0')}</td>
               <td style={tdStyle}>{new Date(s.createdAt).toLocaleString('ru-RU')}</td>
               <td style={tdStyle}>{s.contact?.name}</td>
               <td style={tdStyle}>{s.warehouse?.name || '—'}</td>
               <td style={tdStyle}>{s.items.map((i: any) => `${i.product?.name} × ${i.quantity}`).join('; ')}</td>
               <td style={tdStyle}>{Number(s.total).toFixed(2)} ₽</td>
-              <td style={{ ...tdStyle, color: statusColor(s.status), fontWeight: 600 }}>{statusLabel(s.status)}</td>
+              <td style={{ ...tdStyle, color: statusColor(s.status), fontWeight: 600 }}>
+                <select value={s.status} disabled={s.status === 'cancelled'} onChange={e => changeStatus(s, e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'inherit', fontSize: 12 }}>
+                  <option value="new">Новый</option>
+                  <option value="paid">Оплачен</option>
+                  <option value="cancelled">Отменён</option>
+                </select>
+              </td>
               <td style={tdStyle}>{s.user?.name || '—'}</td>
+              <td style={tdStyle}><button style={{ ...btnGhost }} onClick={() => api.sales.downloadPdf(s.id, s.number)}>PDF</button></td>
             </tr>
           ))}
         </tbody>

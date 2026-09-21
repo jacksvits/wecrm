@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { buildSalePdf } from '../lib/sale-pdf.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -65,6 +66,59 @@ router.post('/', async (req: any, res) => {
   } catch (e: any) {
     res.status(400).json({ error: e.message || 'Ошибка создания продажи' });
   }
+});
+
+// Смена статуса: «Отменён» однократно возвращает остатки на склад
+// и замораживает документ (дальнейшие изменения запрещены)
+router.patch('/:id', async (req: any, res) => {
+  const { status } = (req.body || {}) as { status?: string };
+  if (!['new', 'paid', 'cancelled'].includes(status || '')) {
+    return res.status(400).json({ error: 'Недопустимый статус' });
+  }
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const sale = await tx.sale.findUnique({ where: { id: req.params.id }, include: { items: true } });
+      if (!sale) throw new Error('Продажа не найдена');
+      if (sale.status === 'cancelled') throw new Error('Отменённый документ не редактируется');
+      if (status === 'cancelled') {
+        for (const it of sale.items) {
+          await tx.stockBalance.updateMany({
+            where: { productId: it.productId, warehouseId: sale.warehouseId! },
+            data: { quantity: { increment: it.quantity } },
+          });
+        }
+      }
+      return tx.sale.update({
+        where: { id: sale.id },
+        data: { status },
+        include: { items: { include: { product: true } }, contact: true, warehouse: true, user: true },
+      });
+    });
+    res.json(result);
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || 'Ошибка смены статуса' });
+  }
+});
+
+// Накладная по бланку (PDF)
+router.get('/:id/pdf', async (req, res) => {
+  const s = await prisma.sale.findUnique({
+    where: { id: req.params.id },
+    include: { items: { include: { product: true } }, contact: true, warehouse: true, user: true },
+  });
+  if (!s) return res.status(404).json({ error: 'Продажа не найдена' });
+  const doc = buildSalePdf({
+    number: s.number,
+    createdAt: s.createdAt,
+    total: Number(s.total),
+    contact: s.contact,
+    user: s.user,
+    items: s.items.map(it => ({ quantity: Number(it.quantity), price: Number(it.price), sum: Number(it.sum), product: it.product })),
+  });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="nakladnaya-${String(s.number).padStart(6, '0')}.pdf"`);
+  doc.pipe(res);
+  doc.end();
 });
 
 export default router;
