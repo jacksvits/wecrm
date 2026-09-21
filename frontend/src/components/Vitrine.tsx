@@ -46,7 +46,15 @@ export function Vitrine() {
 
   useEffect(() => {
     try { localStorage.setItem('wecrm_vitrine_cart', JSON.stringify(cart)); } catch { /* ignore */ }
+    try { window.dispatchEvent(new CustomEvent('wecrm:cart')); } catch { /* ignore */ }
   }, [cart]);
+
+  // Открытие корзины по событию из шапки страницы «Товары»
+  useEffect(() => {
+    const h = () => { setSaleOk(''); setCartOpen(true); };
+    window.addEventListener('wecrm:open-cart', h);
+    return () => window.removeEventListener('wecrm:open-cart', h);
+  }, []);
   const [contactId, setContactId] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -264,12 +272,6 @@ export function Vitrine() {
           .vitrine-details-modal { max-width: 100% !important; border-radius: 16px 16px 0 0 !important; max-height: 92vh !important; }
         }
       `}</style>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-        <button type="button" onClick={() => { setSaleOk(''); setCartOpen(true); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-          Корзина
-          {cart.length > 0 && <span style={{ background: '#1a1a1a', color: '#fff', borderRadius: 10, fontSize: 11, padding: '1px 7px' }}>{cart.reduce((s, i) => s + i.quantity, 0)}</span>}
-        </button>
-      </div>
       <div className="vitrine-layout" style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
         <aside className={'vitrine-catalog' + (catalogOpen ? ' open' : '')} style={{ width: 240, flexShrink: 0, overflowY: 'auto', paddingRight: 4 }}>
           <div className="vitrine-catalog-head" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '2px 2px 8px' }}>
