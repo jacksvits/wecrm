@@ -110,6 +110,7 @@ model User {
   webCallsMade     WebCall[] @relation("WebCallCaller")
   webCallsReceived WebCall[] @relation("WebCallCallee")
   reservations Reservation[]
+  sales          Sale[]
   dashboardMetricSettings DashboardMetricSetting[]
 }
 
@@ -177,6 +178,7 @@ model Contact {
 
   @@map("contacts")
   reservations Reservation[]
+  sales          Sale[]
 }
 
 model Project {
@@ -1165,6 +1167,7 @@ model Product {
   @@index([categoryId])
   @@map("products")
   reservationItems ReservationItem[]
+  saleItems        SaleItem[]
 }
 
 // Дерево категорий товаров из 1С: группы (папки) и виды номенклатуры,
@@ -1199,6 +1202,7 @@ model Warehouse {
 
   @@map("warehouses")
   reservations Reservation[]
+  sales          Sale[]
 }
 
 model StockBalance {
@@ -1474,4 +1478,35 @@ model DashboardMetricSetting {
 
   @@unique([userId, metricKey])
   @@map("dashboard_metric_settings")
+}
+
+model Sale {
+  id            String    @id @default(cuid())
+  number        Int       @unique
+  contactId     String
+  warehouseId   String?
+  userId        String?
+  comment       String?
+  total         Decimal   @default(0)
+  status        String    @default("new")
+  paymentMethod String?
+  paymentId     String?
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  contact       Contact   @relation(fields: [contactId], references: [id])
+  warehouse     Warehouse? @relation(fields: [warehouseId], references: [id])
+  user          User?     @relation(fields: [userId], references: [id])
+  items         SaleItem[]
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  productId String
+  quantity  Decimal
+  price     Decimal
+  sum       Decimal
+  sale      Sale    @relation(fields: [saleId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
 }

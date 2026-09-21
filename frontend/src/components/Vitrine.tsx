@@ -34,6 +34,19 @@ export function Vitrine() {
   // Подробная информация о товаре (открывается по нажатию на карточку)
   const [details, setDetails] = useState<Product | null>(null);
   const [detailsImage, setDetailsImage] = useState(0);
+  // Корзина (localStorage) — оформление продажи/реализации
+  const [cart, setCart] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem('wecrm_vitrine_cart') || '[]'); } catch { return []; }
+  });
+  const [cartOpen, setCartOpen] = useState(false);
+  const [saleComment, setSaleComment] = useState('');
+  const [savingSale, setSavingSale] = useState(false);
+  const [saleError, setSaleError] = useState('');
+  const [saleOk, setSaleOk] = useState('');
+
+  useEffect(() => {
+    try { localStorage.setItem('wecrm_vitrine_cart', JSON.stringify(cart)); } catch { /* ignore */ }
+  }, [cart]);
   const [contactId, setContactId] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -143,6 +156,39 @@ export function Vitrine() {
     setDetails(p);
   };
 
+  const addToCart = (p: Product) => {
+    const sortedPrices = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
+    const priceObj = (sortedPrices.find((x: any) => x.priceType?.forVitrine) ?? sortedPrices[0]) as any;
+    const maxQty = freeQty(p);
+    setCart(prev => {
+      const ex = prev.find(i => i.productId === p.id);
+      if (ex) return prev.map(i => (i.productId === p.id ? { ...i, quantity: Math.min(i.quantity + 1, i.maxQty) } : i));
+      return [...prev, { productId: p.id, name: p.name, unit: p.unit, imageUrl: p.images?.[0]?.url || '', price: priceObj?.price ?? 0, quantity: 1, maxQty }];
+    });
+  };
+
+  const cartTotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+
+  const checkout = async () => {
+    if (!contactId) { setSaleError('Выберите контрагента'); return; }
+    if (!cart.length) { setSaleError('Корзина пуста'); return; }
+    setSavingSale(true); setSaleError('');
+    try {
+      const s: any = await api.sales.create({
+        contactId,
+        comment: saleComment,
+        items: cart.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+      });
+      setSaleOk(`Заказ №${s.number} создан на сумму ${s.total} ₽`);
+      setCart([]);
+      setSaleComment('');
+    } catch (e: any) {
+      setSaleError(e.message || 'Ошибка создания заказа');
+    } finally {
+      setSavingSale(false);
+    }
+  };
+
   const addPosition = (p: Product) => {
     if (reserveItems.some((i) => i.product.id === p.id)) return;
     const first = (p.prices || [])[0] as any;
@@ -202,6 +248,8 @@ export function Vitrine() {
         }
         .vitrine-card { transition: box-shadow .15s ease, transform .15s ease; }
         .vitrine-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,.10); transform: translateY(-2px); }
+        .vitrine-cart { width: 380px; }
+        @media (max-width: 640px) { .vitrine-cart { width: 100% !important; } }
         .vitrine-details-grid { display: grid; grid-template-columns: minmax(220px, 320px) 1fr; gap: 20px; }
         @media (max-width: 640px) {
           .vitrine-details-grid { grid-template-columns: 1fr; gap: 14px; }
@@ -213,6 +261,12 @@ export function Vitrine() {
           .vitrine-details-modal { max-width: 100% !important; border-radius: 16px 16px 0 0 !important; max-height: 92vh !important; }
         }
       `}</style>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <button type="button" onClick={() => { setSaleOk(''); setCartOpen(true); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          Корзина
+          {cart.length > 0 && <span style={{ background: '#1a1a1a', color: '#fff', borderRadius: 10, fontSize: 11, padding: '1px 7px' }}>{cart.reduce((s, i) => s + i.quantity, 0)}</span>}
+        </button>
+      </div>
       <div className="vitrine-layout" style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
         <aside className={'vitrine-catalog' + (catalogOpen ? ' open' : '')} style={{ width: 240, flexShrink: 0, overflowY: 'auto', paddingRight: 4 }}>
           <div className="vitrine-catalog-head" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '2px 2px 8px' }}>
@@ -255,6 +309,11 @@ export function Vitrine() {
                 style={{ marginTop: 6, padding: '8px 12px', borderRadius: 8, border: 'none', cursor: inStock > 0 ? 'pointer' : 'not-allowed', background: inStock > 0 ? '#1a1a1a' : 'var(--bg-hover)', color: inStock > 0 ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: 14 }}
                 onClick={(e) => { e.stopPropagation(); openReserve(p); }}>
                 Зарезервировать
+              </button>
+              <button className="vitrine-btn" disabled={inStock <= 0}
+                style={{ marginTop: 4, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', cursor: inStock > 0 ? 'pointer' : 'not-allowed', background: 'var(--bg-card)', color: inStock > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: 600, fontSize: 14 }}
+                onClick={(e) => { e.stopPropagation(); addToCart(p); }}>
+                В корзину
               </button>
             </div>
           </div>
@@ -367,6 +426,11 @@ export function Vitrine() {
                       onClick={() => { setDetails(null); openReserve(d); }}>
                       Зарезервировать
                     </button>
+                    <button style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: dInStock > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 14, cursor: dInStock > 0 ? 'pointer' : 'not-allowed' }}
+                      disabled={dInStock <= 0}
+                      onClick={() => { addToCart(d); setDetails(null); setCartOpen(true); }}>
+                      В корзину
+                    </button>
                   </div>
                 </div>
               </div>
@@ -374,6 +438,54 @@ export function Vitrine() {
           </div>
         );
       })()}
+
+      {cartOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 210 }} onClick={() => setCartOpen(false)}>
+          <div className="vitrine-cart" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, background: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 24px rgba(0,0,0,.15)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Корзина</div>
+              <button type="button" onClick={() => setCartOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: 15, cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {!cart.length && !saleOk && <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Корзина пуста. Добавьте товары с витрины.</div>}
+              {cart.map(i => (
+                <div key={i.productId} style={{ display: 'flex', gap: 10, alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: 12, padding: 8 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: 'var(--bg-hover)', flexShrink: 0, position: 'relative' }}>
+                    {i.imageUrl ? <img src={`${origin}${i.imageUrl}`} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>📦</span>}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtMoney(i.price)} ₽ × {fmtQty(i.quantity)} {i.unit} = <b style={{ color: 'var(--text-primary)' }}>{fmtMoney(i.price * i.quantity)} ₽</b></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <button type="button" onClick={() => setCart(prev => prev.map(x => (x.productId === i.productId ? { ...x, quantity: Math.max(1, x.quantity - 1) } : x)))} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}>−</button>
+                      <span style={{ fontSize: 13, minWidth: 24, textAlign: 'center', color: 'var(--text-primary)' }}>{fmtQty(i.quantity)}</span>
+                      <button type="button" onClick={() => setCart(prev => prev.map(x => (x.productId === i.productId ? { ...x, quantity: Math.min(x.maxQty, x.quantity + 1) } : x)))} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}>+</button>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>доступно {fmtQty(i.maxQty)}</span>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setCart(prev => prev.filter(x => x.productId !== i.productId))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, padding: 4 }}>✕</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ borderTop: '1px solid var(--border-color)', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+                <span>Итого</span><span>{fmtMoney(cartTotal)} ₽</span>
+              </div>
+              <select value={contactId} onChange={e => setContactId(e.target.value)} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }}>
+                <option value="">— Контрагент —</option>
+                {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <input value={saleComment} onChange={e => setSaleComment(e.target.value)} placeholder="Комментарий" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }} />
+              {saleError && <div style={{ color: '#ef4444', fontSize: 13 }}>{saleError}</div>}
+              {saleOk && <div style={{ color: '#16a34a', fontSize: 13 }}>{saleOk}</div>}
+              <button disabled={savingSale || !cart.length} onClick={checkout} style={{ padding: '10px 16px', borderRadius: 12, border: 'none', background: savingSale || !cart.length ? 'var(--bg-hover)' : '#1a1a1a', color: savingSale || !cart.length ? 'var(--text-muted)' : '#fff', fontSize: 14, fontWeight: 600, cursor: savingSale || !cart.length ? 'not-allowed' : 'pointer' }}>
+                {savingSale ? 'Оформление...' : 'Оформить заказ'}
+              </button>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Оплата (интернет-эквайринг) будет доступна позже.</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {reserveItems.length > 0 && (
         <div className="reserve-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
