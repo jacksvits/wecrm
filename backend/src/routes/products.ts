@@ -14,8 +14,9 @@ const router = Router();
  */
 router.get('/vitrine', async (_req, res) => {
   try {
-    const flaggedRows = await prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vitrine = true LIMIT 1`) as any[];
-    const flaggedVitrineId = flaggedRows[0]?.id ?? null;
+    // Флаги «на витрине» — мультивыбор: отмеченных видов цены может быть несколько
+    const flaggedRows = await prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vitrine = true`) as any[];
+    const flaggedVitrineIds = new Set((flaggedRows as any[]).map((r: any) => r.id));
     const productsRaw = await prisma.product.findMany({
       where: { onVitrine: true, isActive: true },
       include: {
@@ -27,7 +28,7 @@ router.get('/vitrine', async (_req, res) => {
     });
     const products = (productsRaw as any[]).map((prod) => ({
       ...prod,
-      prices: (prod.prices || []).map((pr: any) => ({ ...pr, priceType: { ...pr.priceType, forVitrine: pr.priceTypeId === flaggedVitrineId } })),
+      prices: (prod.prices || []).map((pr: any) => ({ ...pr, priceType: { ...pr.priceType, forVitrine: flaggedVitrineIds.has(pr.priceTypeId) } })),
     }));
     res.json(products);
   } catch (err: any) {
@@ -193,7 +194,7 @@ router.post('/meta/price-types', async (req, res) => {
     const priceType = await prisma.priceType.create({
       data: { name: name.trim(), label: label.trim(), color: color || '#f0f0f0', sortOrder: sortOrder ?? count + 1 },
     });
-    if (forVitrine) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = true WHERE id = '${priceType.id}'`); }
+    if (forVitrine) await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = true WHERE id = '${priceType.id}'`);
     if (forVk) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = true WHERE id = '${priceType.id}'`); }
     res.status(201).json(priceType);
   } catch (err: any) {
@@ -218,7 +219,7 @@ router.patch('/meta/price-types/:id', async (req, res) => {
     if (isActive !== undefined) data.isActive = !!isActive;
     if (sortOrder !== undefined) data.sortOrder = Number(sortOrder);
     if (req.body.forVitrine !== undefined) {
-      if (req.body.forVitrine) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = true WHERE id = '${req.params.id}'`); }
+      if (req.body.forVitrine) await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = true WHERE id = '${req.params.id}'`);
       else await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = false WHERE id = '${req.params.id}'`);
     }
     if (req.body.forVk !== undefined) {

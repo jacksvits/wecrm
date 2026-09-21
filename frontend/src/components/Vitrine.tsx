@@ -276,8 +276,12 @@ export function Vitrine() {
         const d = details;
         const dImages = d.images || [];
         const dImage = dImages[detailsImage] || dImages[0];
-        const dPrices = [...(d.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
-        const dMainPrice = dPrices.find((x: any) => x.priceType?.forVitrine) ?? dPrices[0];
+        const dPricesAll = [...(d.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
+        // На витрине показываем только цены с включённой опцией «на витрине»;
+        // если ни одна не отмечена — показываем все (обратная совместимость)
+        const dPricesFlagged = dPricesAll.filter((x: any) => x.priceType?.forVitrine);
+        const dPrices = dPricesFlagged.length ? dPricesFlagged : dPricesAll;
+        const dMainPrice = dPrices[0];
         const dInStock = (d.stocks || []).reduce((s, x) => s + Math.max(x.quantity - (x.reserved || 0), 0), 0);
         const dCategory = categories.find((c) => c.id === d.categoryId);
         return (

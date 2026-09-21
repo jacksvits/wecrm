@@ -97,6 +97,14 @@ export function Products() {
     } finally { setVkBusy(null); }
   };
 
+  // Переключение опции «Показывать на витрине» у вида цены
+  const toggleVitrine = async (t: PriceType) => {
+    try {
+      await api.products.priceTypes.update(t.id, { forVitrine: !t.forVitrine });
+      await load();
+    } catch (e: any) { alert(e.message || 'Ошибка'); }
+  };
+
   const load = async () => {
     try {
       const [p, w, t, m, c] = await Promise.all([
@@ -756,6 +764,13 @@ export function Products() {
               >
                 {t.label}
                 <button
+                  title={t.forVitrine ? 'Показывается на витрине (нажмите, чтобы скрыть)' : 'Не показывается на витрине (нажмите, чтобы показать)'}
+                  onClick={() => toggleVitrine(t)}
+                  style={{ border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 8, background: t.forVitrine ? '#16a34a' : 'rgba(0,0,0,0.12)', color: t.forVitrine ? '#fff' : 'inherit' }}
+                >
+                  Витрина
+                </button>
+                <button
                   onClick={() => setPtModal(t)}
                   style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}
                 >
@@ -1243,7 +1258,7 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
           <input type="color" value={color} onChange={e => setColor(e.target.value)} style={{ width: '100%', height: 40 }} />
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
             <input type="checkbox" checked={forVitrine} onChange={e => setForVitrine(e.target.checked)} />
-            Для витрины
+            Показывать на витрине
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
             <input type="checkbox" checked={forVk} onChange={e => setForVk(e.target.checked)} />
