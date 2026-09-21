@@ -62,7 +62,7 @@ async function jsonRpcRequest<T = any>(
     throw new Error(`Novofon API error: ${data.error.message || JSON.stringify(data.error)}`);
   }
 
-  return data.result?.data as T;
+  return (data.result?.data ?? data.result) as T;
 }
 
 export async function getEmployees(credentials: NovofonCredentials): Promise<NovofonEmployee[]> {

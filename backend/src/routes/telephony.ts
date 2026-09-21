@@ -19,7 +19,7 @@ import {
 } from "../lib/task-defaults.js";
 import fs from "fs";
 import path from "path";
-import { randomUUID, createHmac } from "crypto";
+import { randomUUID, createHmac, createHash } from "crypto";
 const router = Router();
 const RECORDS_DIR = "/app/uploads/records";
 if (!fs.existsSync(RECORDS_DIR)) {
@@ -611,12 +611,15 @@ router.get("/webrtc/key", authMiddleware, async (req: AuthRequest, res) => {
         err.message,
       );
     }
-    const params = `sip=${encodeURIComponent(sipLogin)}`;
+    // Подпись по спецификации Novofon API v1 (клиент user-api-v1):
+    // base64(HMAC-SHA1(secret, METHOD + paramsString + md5(paramsString)))
+    const paramsString = `sip=${encodeURIComponent(sipLogin)}`;
+    const paramsMd5 = createHash("md5").update(paramsString).digest("hex");
     const signature = createHmac("sha1", settings.apiSecret!)
-      .update(params)
-      .digest("hex");
+      .update(`GET${paramsString}${paramsMd5}`)
+      .digest("base64");
     const response = await fetch(
-      `https://api.novofon.com/v1/webrtc/get_key/?${params}`,
+      `https://api.novofon.com/v1/webrtc/get_key/?${paramsString}`,
       { headers: { Authorization: `${settings.apiKey}:${signature}` } },
     );
     const data: any = await response.json();
