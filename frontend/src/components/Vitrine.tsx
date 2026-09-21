@@ -232,8 +232,8 @@ export function Vitrine() {
         </aside>
         <div className="vitrine-grid">
           {filteredCards.map(({ product: p, price, inStock, image }) => (
-          <div key={p.id}
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div key={p.id} className="vitrine-card" onClick={() => openDetails(p)}
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
             <div style={{ position: 'relative', width: '100%', paddingTop: '100%', background: 'var(--bg-hover)' }}>
               {image ? (
                 <img src={`${origin}${image.url}`} alt={p.name} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
