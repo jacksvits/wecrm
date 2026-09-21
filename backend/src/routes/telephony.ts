@@ -681,6 +681,25 @@ router.post("/settings", async (req: AuthRequest, res) => {
     res.status(201).json(created);
   }
 });
+// Проверка API-ключей Novofon: лёгкий вызов get.employees с текущими настройками.
+// Позволяет сразу после ввода API Secret в интерфейсе убедиться, что авторизация работает.
+router.post("/test", async (_req, res) => {
+  const settings = await prisma.telephonySettings.findFirst();
+  if (!settings?.apiSecret) {
+    return res
+      .status(400)
+      .json({ ok: false, error: "API Secret не заполнен" });
+  }
+  try {
+    const employees = await novofon.getEmployees({
+      apiKey: settings.apiKey,
+      apiSecret: settings.apiSecret,
+    });
+    res.json({ ok: true, employees: employees.length });
+  } catch (err: any) {
+    res.json({ ok: false, error: err.message });
+  }
+});
 router.get("/calls", async (req, res) => {
   const {
     search,

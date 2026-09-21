@@ -21,6 +21,7 @@ import { User, Task, Contact, Deal, Project, Activity, DashboardStats, Dashboard
     downloadRecord: (callId: string) => `${API_URL}/api/telephony/records/${callId}/download`,
     getSms: (params?: string): Promise<{ items: SmsMessage[]; total: number }> => fetchApi(`/api/telephony/sms${params ? `?${params}` : ''}`),
     getWebRtcKey: (): Promise<{ key: string; sip: string }> => fetchApi('/api/telephony/webrtc/key'),
+    testConnection: (): Promise<{ ok: boolean; employees?: number; error?: string }> => fetchApi('/api/telephony/test', { method: 'POST' }),
   },
   notifications: {
     list: (limit?: number): Promise<{ items: any[]; unreadCount: number }> => fetchApi(`/api/notifications?limit=${limit || 5}`),
