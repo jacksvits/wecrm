@@ -1498,6 +1498,7 @@ model Sale {
   warehouse     Warehouse? @relation(fields: [warehouseId], references: [id])
   user          User?     @relation(fields: [userId], references: [id])
   items         SaleItem[]
+  @@map("sales")
 }
 
 model SaleItem {
@@ -1509,4 +1510,5 @@ model SaleItem {
   sum       Decimal
   sale      Sale    @relation(fields: [saleId], references: [id])
   product   Product @relation(fields: [productId], references: [id])
+  @@map("sale_items")
 }
