@@ -169,7 +169,7 @@ router.post('/dark-logo', authMiddleware, upload.single('file'), async (req: Aut
 });
 
 // POST /api/branding/theme — тема оформления проекта (null — классическая)
-const ALLOWED_THEMES = ['classic', 'ocean', 'forest', 'violet', 'sunset', 'graphite'];
+const ALLOWED_THEMES = ['classic', 'ocean', 'forest', 'violet', 'sunset', 'graphite', 'liquid-glass'];
 router.post('/theme', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (!isAdmin(req)) {

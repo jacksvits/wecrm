@@ -64,4 +64,11 @@ export const THEMES: Theme[] = [
     light: { body: "#f4f4f5", card: "#ffffff", sidebar: "#fafafa", hover: "#e9e9eb", text: "#18181b", textSecondary: "#52525b", border: "#dcdcdf", accent: "#3f3f46" },
     dark: { body: "#131316", card: "#1d1d21", sidebar: "#1a1a1e", hover: "#2a2a30", text: "#f4f4f5", textSecondary: "#a1a1aa", border: "#333338", accent: "#d4d4d8" },
   },
+  {
+    key: "liquid-glass",
+    label: "Liquid Glass",
+    description: "Эффект жидкого стекла из iOS: полупрозрачные панели и мягкий градиент",
+    light: { body: "#dfe8f3", card: "rgba(255,255,255,0.55)", sidebar: "rgba(255,255,255,0.40)", hover: "rgba(255,255,255,0.75)", text: "#1c2b3a", textSecondary: "#55677b", border: "rgba(140,170,200,0.28)", accent: "#0a84ff" },
+    dark: { body: "#0c1524", card: "rgba(36,52,78,0.55)", sidebar: "rgba(22,34,54,0.50)", hover: "rgba(80,110,150,0.35)", text: "#eef4fb", textSecondary: "#a9bed4", border: "rgba(150,190,230,0.22)", accent: "#4da3ff" },
+  },
 ];
