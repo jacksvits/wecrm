@@ -23,6 +23,7 @@ const TABS = [
   { key: 'stock', label: 'Склад' },
   { key: 'prices', label: 'Цены' },
   { key: 'reserves', label: 'Резервы' },
+  { key: 'sales', label: 'Продажи' },
   { key: 'stats', label: 'Статистика' },
 ];
 
@@ -437,6 +438,7 @@ export function Products() {
 
       {/* ===== Резервы ===== */}
       {tab === 'reserves' && <ReservesTab />}
+      {tab === 'sales' && <SalesTab />}
 
       {/* ===== Номенклатура ===== */}
       {tab === 'nomenclature' && (
@@ -1402,6 +1404,48 @@ function ReservesTab() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Продажи (реализация) с корзины витрины; оплата — позже
+function SalesTab() {
+  const [sales, setSales] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = () => api.sales.list().then(setSales).catch(() => {});
+  useEffect(() => {
+    load().finally(() => setLoading(false));
+  }, []);
+
+  const statusLabel = (s: string) => s === 'new' ? 'Новый' : s === 'paid' ? 'Оплачен' : s === 'cancelled' ? 'Отменён' : s;
+  const statusColor = (s: string) => s === 'paid' ? '#16a34a' : s === 'new' ? '#d97706' : 'var(--text-muted)';
+
+  if (loading) return <div style={{ padding: 16, color: 'var(--text-muted)' }}>Загрузка...</div>;
+  return (
+    <div>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr>
+          <th style={thStyle}>№</th><th style={thStyle}>Дата</th><th style={thStyle}>Контрагент</th>
+          <th style={thStyle}>Склад</th><th style={thStyle}>Товары</th><th style={thStyle}>Сумма</th>
+          <th style={thStyle}>Статус</th><th style={thStyle}>Автор</th>
+        </tr></thead>
+        <tbody>
+          {sales.map((s: any) => (
+            <tr key={s.id}>
+              <td style={tdStyle}>ПР-{String(s.number).padStart(6, '0')}</td>
+              <td style={tdStyle}>{new Date(s.createdAt).toLocaleString('ru-RU')}</td>
+              <td style={tdStyle}>{s.contact?.name}</td>
+              <td style={tdStyle}>{s.warehouse?.name || '—'}</td>
+              <td style={tdStyle}>{s.items.map((i: any) => `${i.product?.name} × ${i.quantity}`).join('; ')}</td>
+              <td style={tdStyle}>{Number(s.total).toFixed(2)} ₽</td>
+              <td style={{ ...tdStyle, color: statusColor(s.status), fontWeight: 600 }}>{statusLabel(s.status)}</td>
+              <td style={tdStyle}>{s.user?.name || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!sales.length && <div style={{ padding: 16, color: 'var(--text-muted)' }}>Продаж пока нет.</div>}
     </div>
   );
 }
