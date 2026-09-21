@@ -249,7 +249,10 @@ export function Vitrine() {
         .vitrine-card { transition: box-shadow .15s ease, transform .15s ease; }
         .vitrine-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,.10); transform: translateY(-2px); }
         .vitrine-cart { width: 380px; }
-        @media (max-width: 640px) { .vitrine-cart { width: 100% !important; } }
+        @media (max-width: 640px) {
+          .vitrine-cart-overlay { align-items: flex-end !important; padding: 0 !important; }
+          .vitrine-cart { width: 100% !important; height: auto !important; max-height: 92vh !important; border-radius: 16px 16px 0 0 !important; border-left: none !important; border-top: 1px solid var(--border-color); box-shadow: 0 -8px 24px rgba(0,0,0,.15) !important; }
+        }
         .vitrine-details-grid { display: grid; grid-template-columns: minmax(220px, 320px) 1fr; gap: 20px; }
         @media (max-width: 640px) {
           .vitrine-details-grid { grid-template-columns: 1fr; gap: 14px; }
@@ -440,8 +443,8 @@ export function Vitrine() {
       })()}
 
       {cartOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 210 }} onClick={() => setCartOpen(false)}>
-          <div className="vitrine-cart" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, background: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 24px rgba(0,0,0,.15)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="vitrine-cart-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 210, display: 'flex', justifyContent: 'flex-end' }} onClick={() => setCartOpen(false)}>
+          <div className="vitrine-cart" style={{ height: '100%', background: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 24px rgba(0,0,0,.15)' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-color)' }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Корзина</div>
               <button type="button" onClick={() => setCartOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: 15, cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>✕</button>
