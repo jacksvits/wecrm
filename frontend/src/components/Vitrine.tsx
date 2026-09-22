@@ -256,16 +256,16 @@ export function Vitrine() {
         }
         .vitrine-card { transition: box-shadow .15s ease, transform .15s ease; }
         .vitrine-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,.10); transform: translateY(-2px); }
-        .btn-reserve { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: none; border-radius: 10px; background: #111111; color: #ffffff; font: 500 14px/1.4 system-ui, sans-serif; cursor: pointer; transition: opacity .15s ease-out, transform .15s ease-out; }
-        .btn-reserve:hover { opacity: .85; }
+        .btn-reserve { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 1px solid rgba(120, 255, 122, 0.4); border-radius: 10px; background: linear-gradient(135deg, rgb(10, 136, 0) 0%, rgb(51, 194, 120) 50%, rgb(4, 110, 0) 100%); color: #ffffff; font: 500 14px/1.4 system-ui, sans-serif; cursor: pointer; box-shadow: rgba(8, 255, 0, 0.35) 0 4px 20px, rgba(255, 255, 255, 0.25) 0 1px 0 inset; transition: opacity .15s ease-out, transform .15s ease-out; }
+        .btn-reserve:hover { opacity: .9; }
         .btn-reserve:active { transform: scale(.97); }
-        .btn-reserve:disabled { opacity: .4; cursor: default; }
-        .btn-reserve:focus-visible { outline: 2px solid #111111; outline-offset: 2px; }
-        .btn-cart { display: inline-flex; align-items: center; justify-content: center; padding: 8px; border: none; border-radius: 10px; background: #111111; color: #ffffff; cursor: pointer; transition: opacity .15s ease-out, transform .15s ease-out; }
-        .btn-cart:hover { opacity: .85; }
+        .btn-reserve:disabled { opacity: .4; cursor: default; box-shadow: none; }
+        .btn-reserve:focus-visible { outline: 2px solid rgb(51, 194, 120); outline-offset: 2px; }
+        .btn-cart { display: inline-flex; align-items: center; justify-content: center; padding: 8px; border: 1px solid rgba(120,180,255,0.40); border-radius: 10px; background: linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%); color: #ffffff; cursor: pointer; box-shadow: 0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25); transition: opacity .15s ease-out, transform .15s ease-out; }
+        .btn-cart:hover { opacity: .9; }
         .btn-cart:active { transform: scale(.97); }
-        .btn-cart:disabled { opacity: .4; cursor: default; }
-        .btn-cart:focus-visible { outline: 2px solid #111111; outline-offset: 2px; }
+        .btn-cart:disabled { opacity: .4; cursor: default; box-shadow: none; }
+        .btn-cart:focus-visible { outline: 2px solid #007aff; outline-offset: 2px; }
         @media (max-width: 640px) { .btn-reserve span { display: none; } .btn-reserve { flex: 1; justify-content: center; padding: 8px; } .btn-cart { flex: 1; } }
         .vitrine-cart { width: 380px; }
         @media (max-width: 640px) {

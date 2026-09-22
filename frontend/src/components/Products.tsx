@@ -404,12 +404,12 @@ export function Products() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Товары</h2>
         <button onClick={openCart} title="Корзина"
-          style={{ position: 'relative', marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}>
+          style={{ position: 'relative', marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 12, border: '1px solid rgba(120,180,255,0.40)', background: 'linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%)', color: '#fff', cursor: 'pointer', boxShadow: '0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
           </svg>
-          {cartCount > 0 && <span style={{ position: 'absolute', top: -6, right: -6, background: '#1a1a1a', color: '#fff', borderRadius: 10, fontSize: 11, padding: '1px 6px', fontWeight: 700 }}>{cartCount}</span>}
+          {cartCount > 0 && <span style={{ position: 'absolute', top: -6, right: -6, background: '#fff', color: '#007aff', border: '1px solid rgba(120,180,255,0.40)', borderRadius: 10, fontSize: 11, padding: '1px 6px', fontWeight: 700 }}>{cartCount}</span>}
         </button>
         {tab === 'nomenclature' && (
           <div style={{ display: 'flex', gap: 8 }}>
