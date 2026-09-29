@@ -456,6 +456,12 @@ export function ContactList() {
     </div>
   );
 
+  // Подзаголовок карточки: привязанная организация (или текстовое поле «Компания») + должность
+  const contactSubtitle = (contact: Contact) => {
+    const parts = [contact.organization?.name || contact.company || '', contact.position || ''].filter(Boolean);
+    return parts.join(' · ') || '—';
+  };
+
   const CardView = () => (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
       {sortedContacts.map(contact => {
@@ -504,7 +510,7 @@ export function ContactList() {
                   onClick={() => navigate(`/contacts/${contact.id}`)}
                   style={{ fontSize: 15, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', color: '#1565c0' }}
                 >{contact.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact.company || '—'}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contactSubtitle(contact)}</div>
               </div>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
@@ -613,7 +619,7 @@ export function ContactList() {
                   onClick={() => navigate(`/contacts/${contact.id}`)}
                   style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', color: '#1565c0' }}
                 >{contact.name}</div>
-                <div style={{ fontSize: 12, color: '#bbb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact.company || '—'}</div>
+                <div style={{ fontSize: 12, color: '#bbb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contactSubtitle(contact)}</div>
               </div>
             </div>
             <span style={{ padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 500, background: kc.bg, color: kc.text, justifySelf: 'start' }}>{kindLabels[contact.kind] || contact.kind}</span>
@@ -858,7 +864,7 @@ export function ContactList() {
                   />
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 500 }}>{contact.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{contact.company || '—'} · {getTypeLabel(contact.type)}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{contactSubtitle(contact)} · {getTypeLabel(contact.type)}</div>
                   </div>
                 </label>
               ))}
