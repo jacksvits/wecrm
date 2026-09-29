@@ -1,7 +1,10 @@
 import { prisma } from './prisma.js';
 import { createNotification } from './notifications.js';
+import { sendPushToUser } from './push.js';
 
 const TICK_MS = 30_000;
+// Повторный push для просроченного не выполненного напоминания — каждые 15 минут
+const REPEAT_PUSH_MS = 15 * 60 * 1000;
 
 /**
  * Следующее время срабатывания для повторяющегося напоминания
@@ -37,7 +40,6 @@ async function processTick() {
   const candidates = await prisma.reminder.findMany({
     where: {
       completedAt: null,
-      lastNotifiedAt: null,
       remindAt: { lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) },
     },
     take: 500,
@@ -49,6 +51,31 @@ async function processTick() {
       if (notifyAt > now) continue;
 
       const preview = stripHtml(reminder.content).slice(0, 140);
+
+      // Уже уведомляли ранее
+      if (reminder.lastNotifiedAt) {
+        // Напоминание ещё не наступило (уведомление было заранее через notifyBeforeMin) — ждём
+        if (reminder.remindAt > now) continue;
+        // Повторный push не чаще раза в 15 минут
+        const elapsed = now.getTime() - reminder.lastNotifiedAt.getTime();
+        if (elapsed < REPEAT_PUSH_MS) continue;
+
+        // Просрочено и не выполнено — дублируем push (без in-app уведомления, чтобы не спамить колокольчик)
+        try {
+          await sendPushToUser(reminder.userId, {
+            title: `Просрочено напоминание: ${reminder.title}`,
+            body: preview || `Было назначено на ${reminder.remindAt.toLocaleString('ru-RU')}`,
+            url: '/reminders',
+          });
+        } catch (e: any) {
+          console.error('[Reminders] Повторный push не отправлен:', e.message || e);
+        }
+        await prisma.reminder.update({
+          where: { id: reminder.id },
+          data: { lastNotifiedAt: now },
+        });
+        continue;
+      }
 
       // In-app уведомление (колокольчик) + Browser Push
       await createNotification({
@@ -90,7 +117,7 @@ async function processTick() {
 }
 
 export function startReminderScheduler() {
-  console.log('[Reminders] Планировщик напоминаний запущен (интервал 30с)');
+  console.log('[Reminders] Планировщик напоминаний запущен (интервал 30с, повторный push при просрочке каждые 15 мин)');
   setInterval(() => {
     processTick().catch(err => console.error('[Reminders] Ошибка тика:', err));
   }, TICK_MS);
