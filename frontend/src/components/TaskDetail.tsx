@@ -524,6 +524,18 @@ export function TaskDetail() {
       month: "long",
       year: "numeric",
     });
+  // Дата и время сообщения в обсуждениях: «12 сентября 2026 - 13:32»
+  const formatCommentDateTime = (date: string) => {
+    const d = new Date(date);
+    const datePart = d
+      .toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric" })
+      .replace(/\s*г\.?$/, "");
+    const timePart = d.toLocaleTimeString("ru", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    return `${datePart} - ${timePart}`;
+  };
   if (loading)
     return <div style={{ padding: 40, textAlign: "center" }}>Загрузка...</div>;
   if (error)
@@ -1637,7 +1649,7 @@ export function TaskDetail() {
                                   fontWeight: 500,
                                 }}
                               >
-                                {formatTime(c.createdAt)}
+                                {formatCommentDateTime(c.createdAt)}
                               </span>{" "}
                               {isMe && (
                                 <button
