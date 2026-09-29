@@ -474,7 +474,7 @@ router.get('/:id', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind, syncToVk, onVitrine } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind, syncToVk, onVitrine, categoryId } = req.body;
     const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Товар не найден' });
     const data: any = {};
@@ -489,6 +489,18 @@ router.patch('/:id', async (req, res) => {
     if (isActive !== undefined) data.isActive = !!isActive;
     if (syncToVk !== undefined) data.syncToVk = !!syncToVk;
     if (onVitrine !== undefined) data.onVitrine = !!onVitrine;
+    // Категория из дерева 1С: обновляем привязку и строковый путь (для выгрузки в 1С)
+    if (categoryId !== undefined) {
+      if (categoryId) {
+        const node = await prisma.productCategory.findUnique({ where: { id: categoryId } });
+        if (!node) return res.status(400).json({ error: 'Категория не найдена' });
+        data.categoryId = node.id;
+        data.category = await categoryPathString(node.id);
+      } else {
+        data.categoryId = null;
+        data.category = null;
+      }
+    }
     const product = await prisma.product.update({
       where: { id: req.params.id },
       data,
