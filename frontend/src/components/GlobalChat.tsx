@@ -276,9 +276,7 @@ export function GlobalChat() {
       setText('');
       setPendingAttachments([]);
       setReplyTo(null);
-      // После отправки возвращаем режим "Всем" по умолчанию
-      setRecipientIds([]);
-      setIsAllSelected(true);
+      // Выбранных получателей не сбрасываем: режим держится, пока пользователь сам не выберет "Всем" 
     } catch (e: any) {
       alert(e.message || 'Ошибка отправки');
     } finally {
