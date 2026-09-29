@@ -139,7 +139,6 @@ model Contact {
   phone       String?
   emails      String[] @default([])
   phones      String[] @default([])
-  company     String?
   type        String   @default("client")
   kind        String   @default("contact") // contact | organization
   tags        String[] @default([])

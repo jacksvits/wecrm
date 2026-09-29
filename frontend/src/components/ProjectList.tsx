@@ -208,7 +208,7 @@ export function ProjectList() {
                   style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', fontSize: 14, width: '100%', minHeight: 80 }}
                 >
                   {contacts.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} {c.company ? `(${c.company})` : ''}</option>
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </div>

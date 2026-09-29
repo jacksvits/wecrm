@@ -133,7 +133,6 @@ export async function mergeContacts(targetId: string, sourceIds: string[], extra
       notes: mergedNotes,
       phone: allPhones[0] || null,
       email: allEmails[0] || null,
-      company: pick(target.company, ...sources.map((s) => s.company), extraData.company),
       position: pick(target.position, ...sources.map((s) => s.position), extraData.position),
       inn: pick(target.inn, ...sources.map((s) => s.inn), extraData.inn),
       ogrn: pick(target.ogrn, ...sources.map((s) => s.ogrn), extraData.ogrn),

@@ -26,7 +26,6 @@ const createSchema = z.object({
   phone: z.string().optional().or(z.literal(null)),
   emails: z.array(z.string().email()).optional().default([]),
   phones: z.array(z.string()).optional().default([]),
-  company: z.string().optional(),
   type: z.string().default('client'),
   kind: z.enum(['contact', 'organization']).default('contact'),
   tags: z.array(z.string()).optional(),
@@ -69,7 +68,6 @@ router.get('/', async (req, res) => {
     if (search) {
       where.OR = [
         { name: { contains: search as string, mode: 'insensitive' } },
-        { company: { contains: search as string, mode: 'insensitive' } },
         { email: { contains: search as string, mode: 'insensitive' } },
         { phone: { contains: search as string, mode: 'insensitive' } },
         { inn: { contains: search as string, mode: 'insensitive' } },
@@ -198,7 +196,6 @@ router.post('/check-duplicates', async (req, res) => {
         name: c.name,
         email: c.email,
         phone: c.phone,
-        company: c.company,
         kind: c.kind,
         tasks: countMap.get(c.id)?.tasks ?? 0,
         deals: countMap.get(c.id)?.deals ?? 0,
@@ -439,7 +436,7 @@ router.post('/import', async (req: AuthRequest, res) => {
     const { format, data } = z.object({ format: z.enum(['vcf', 'csv', 'xlsx']), data: z.string().min(1) }).parse(req.body);
 
     const contacts: Array<{
-      name: string; phones: string[]; emails: string[]; company?: string; notes?: string; kind?: string;
+      name: string; phones: string[]; emails: string[]; notes?: string; kind?: string;
       inn?: string; ogrn?: string; legalAddress?: string; position?: string; organizationId?: string;
     }> = [];
 
@@ -447,7 +444,7 @@ router.post('/import', async (req: AuthRequest, res) => {
       const cards = data.split(/BEGIN:VCARD/i).slice(1);
       for (const card of cards) {
         const lines = card.split(/\r?\n/);
-        let name = '', phones: string[] = [], emails: string[] = [], company = '', notes = '';
+        let name = '', phones: string[] = [], emails: string[] = [], notes = '';
         for (const line of lines) {
           const upper = line.toUpperCase();
           if (upper.startsWith('FN:')) name = line.substring(3).trim();
@@ -456,10 +453,9 @@ router.post('/import', async (req: AuthRequest, res) => {
             name = [parts[1], parts[0]].filter(Boolean).join(' ').trim();
           } else if (upper.includes('TEL')) phones.push(normalizePhone(line.split(':').slice(1).join(':').trim()));
           else if (upper.includes('EMAIL')) emails.push(line.split(':').slice(1).join(':').trim());
-          else if (upper.startsWith('ORG:')) company = line.substring(4).trim();
           else if (upper.startsWith('NOTE:')) notes = line.substring(5).trim();
         }
-        if (name) contacts.push({ name, phones, emails, company, notes, kind: 'contact' });
+        if (name) contacts.push({ name, phones, emails, notes, kind: 'contact' });
       }
     } else if (format === 'csv') {
       const lines = data.split(/\r?\n/).filter(l => l.trim());
@@ -493,10 +489,9 @@ router.post('/import', async (req: AuthRequest, res) => {
             emails.push(...values[j].split(':::').filter(Boolean));
           }
         }
-        const company = orgIdx >= 0 ? values[orgIdx] || '' : '';
         const notes = notesIdx >= 0 ? values[notesIdx] || '' : '';
         const kind = kindIdx >= 0 && values[kindIdx]?.toLowerCase() === 'organization' ? 'organization' : 'contact';
-        if (name) contacts.push({ name, phones: [...new Set(phones)], emails: [...new Set(emails)], company, notes, kind });
+        if (name) contacts.push({ name, phones: [...new Set(phones)], emails: [...new Set(emails)], notes, kind });
       }
     } else if (format === 'xlsx') {
       const buffer = Buffer.from(data, 'base64');
@@ -507,7 +502,6 @@ router.post('/import', async (req: AuthRequest, res) => {
       const nameIdx = headers.findIndex(h => h.includes('имя') || h.includes('name') || h.includes('фио'));
       const phoneIdx = headers.findIndex(h => h.includes('телефон') || h.includes('phone') || h.includes('тел'));
       const emailIdx = headers.findIndex(h => h.includes('email') || h.includes('почта') || h.includes('e-mail'));
-      const companyIdx = headers.findIndex(h => h.includes('компания') || h.includes('company') || h.includes('организация'));
       const notesIdx = headers.findIndex(h => h.includes('примечание') || h.includes('notes') || h.includes('комментарий'));
       const kindIdx = headers.findIndex(h => h.includes('вид') || h.includes('kind') || h.includes('тип контакта'));
       const innIdx = headers.findIndex(h => h.includes('инн') || h.includes('inn'));
@@ -519,12 +513,11 @@ router.post('/import', async (req: AuthRequest, res) => {
         if (!name) continue;
         const phones: string[] = phoneIdx >= 0 && row[phoneIdx] ? String(row[phoneIdx]).split(/[,;\/]/).map(p => p.trim()).filter(Boolean) : [];
         const emails: string[] = emailIdx >= 0 && row[emailIdx] ? String(row[emailIdx]).split(/[,;\/]/).map(e => e.trim()).filter(Boolean) : [];
-        const company = companyIdx >= 0 ? String(row[companyIdx] || '').trim() : '';
         const notes = notesIdx >= 0 ? String(row[notesIdx] || '').trim() : '';
         const kind = kindIdx >= 0 && String(row[kindIdx] || '').toLowerCase().includes('орг') ? 'organization' : 'contact';
         const inn = innIdx >= 0 ? String(row[innIdx] || '').trim() : undefined;
         const ogrn = ogrnIdx >= 0 ? String(row[ogrnIdx] || '').trim() : undefined;
-        contacts.push({ name, phones: [...new Set(phones)], emails: [...new Set(emails)], company, notes, kind, inn, ogrn });
+        contacts.push({ name, phones: [...new Set(phones)], emails: [...new Set(emails)], notes, kind, inn, ogrn });
       }
     }
 
@@ -536,7 +529,6 @@ router.post('/import', async (req: AuthRequest, res) => {
         emails: c.emails,
         phone: c.phones[0] || null,
         email: c.emails[0] || null,
-        company: c.company || null,
         notes: c.notes || null,
         type: 'client',
         kind: c.kind || 'contact',

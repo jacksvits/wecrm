@@ -55,7 +55,7 @@ interface PdfTask {
   assignees?: Array<{ user?: { name?: string } | null }>;
   curators?: Array<{ user?: { name?: string } | null }>;
   project?: { name?: string } | null;
-  contact?: { name?: string; company?: string | null } | null;
+  contact?: { name?: string } | null;
   deal?: { title?: string } | null;
   comments: PdfComment[];
 }
@@ -109,7 +109,7 @@ export async function buildTaskPdf(task: PdfTask, user: { name?: string }, res: 
       ['Кураторы', task.curators?.length ? task.curators.map((c) => c.user?.name).filter(Boolean).join(', ') : '—'],
     ];
     if (task.project?.name) meta.push(['Проект', task.project.name]);
-    if (task.contact) meta.push(['Контакт', task.contact.company ? `${task.contact.name} (${task.contact.company})` : (task.contact.name ?? '—')]);
+    if (task.contact) meta.push(['Контакт', task.contact.name ?? '—']);
     if (task.deal?.title) meta.push(['Сделка', task.deal.title]);
 
     meta.forEach(([label, value]) => {

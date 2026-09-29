@@ -335,7 +335,7 @@ export function TaskFinanceDocuments({ taskId }: { taskId: string }) {
                       <select value={form.contactId} onChange={(e) => setForm({ ...form, contactId: e.target.value })} style={{ ...inputStyle, marginTop: 4 }}>
                         <option value="">— не выбран —</option>
                         {contacts.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name}{c.company ? ` (${c.company})` : ''}</option>
+                          <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                       </select>
                     </label>

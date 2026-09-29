@@ -724,7 +724,7 @@ router.get("/calls", async (req, res) => {
     prisma.call.findMany({
       where,
       include: {
-        contact: { select: { id: true, name: true, company: true } },
+        contact: { select: { id: true, name: true } },
         task: { select: { id: true, title: true } },
       },
       orderBy: { callStart: "desc" },

@@ -74,7 +74,7 @@ export function ContactDetail() {
             <h2 style={{ margin: 0, fontSize: 20 }}>{contact.name}</h2>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center' }}>
               <span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 11, fontWeight: 500, background: kc.bg, color: kc.text }}>{kindLabels[contact.kind] || contact.kind}</span>
-              <span>{contact.company || '—'}</span>
+              <span>{[contact.organization?.name, contact.position].filter(Boolean).join(' · ') || '—'}</span>
             </div>
           </div>
         </div>
@@ -134,10 +134,6 @@ export function ContactDetail() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Компания</span>
-            <span style={{ fontSize: 14 }}>{contact.company || '—'}</span>
-          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Телефоны</span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

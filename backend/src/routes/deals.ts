@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
   const deals = await prisma.deal.findMany({
     where,
     include: {
-      contact: { select: { id: true, name: true, company: true } },
+      contact: { select: { id: true, name: true } },
       project: { select: { id: true, name: true } },
       _count: { select: { tasks: true } },
     },

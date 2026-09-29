@@ -110,7 +110,6 @@ export function DealBoard() {
     const q = contactSearch.toLowerCase();
     return (
       c.name.toLowerCase().includes(q) ||
-      (c.company || '').toLowerCase().includes(q) ||
       (c.email || '').toLowerCase().includes(q) ||
       (c.phone || '').toLowerCase().includes(q) ||
       (c.emails || []).some((e: string) => e.toLowerCase().includes(q)) ||

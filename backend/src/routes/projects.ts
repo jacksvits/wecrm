@@ -81,7 +81,7 @@ router.get('/:id', async (req: AuthRequest, res) => {
     include: {
       tasks: { select: { id: true, title: true, status: true, priority: true } },
       deals: { select: { id: true, title: true, value: true, stage: true } },
-      contacts: { include: { contact: { select: { id: true, name: true, kind: true, company: true } } } },
+      contacts: { include: { contact: { select: { id: true, name: true, kind: true } } } },
       users: { include: { user: { select: { id: true, name: true, avatar: true, role: { select: { label: true } } } } } },
       children: {
         include: {

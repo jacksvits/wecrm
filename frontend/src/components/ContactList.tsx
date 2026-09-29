@@ -125,7 +125,6 @@ export function ContactList() {
     name: '',
     emails: [''],
     phones: [''],
-    company: '',
     type: 'client' as const,
     kind: 'contact' as 'contact' | 'organization',
     tags: '',
@@ -191,7 +190,7 @@ export function ContactList() {
   const openCreate = () => {
     setEditingId(null);
     setForm({
-      name: '', emails: [''], phones: [''], company: '', type: 'client', kind: kindFilter === 'organization' ? 'organization' : 'contact',
+      name: '', emails: [''], phones: [''], type: 'client', kind: kindFilter === 'organization' ? 'organization' : 'contact',
       tags: '', notes: '', inn: '', ogrn: '', legalAddress: '', position: '', organizationId: '',
       projectIds: [],
     });
@@ -204,7 +203,6 @@ export function ContactList() {
       name: contact.name,
       emails: contact.emails?.length ? contact.emails : contact.email ? [contact.email] : [''],
       phones: contact.phones?.length ? contact.phones : contact.phone ? [contact.phone] : [''],
-      company: contact.company || '',
       type: contact.type as any,
       kind: contact.kind as 'contact' | 'organization',
       tags: contact.tags.join(', '),
@@ -406,7 +404,6 @@ export function ContactList() {
     .filter(c =>
       !search ||
       c.name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.company || '').toLowerCase().includes(search.toLowerCase()) ||
       (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
       (c.phone || '').toLowerCase().includes(search.toLowerCase()) ||
       (c.inn || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -458,7 +455,7 @@ export function ContactList() {
 
   // Подзаголовок карточки: привязанная организация (или текстовое поле «Компания») + должность
   const contactSubtitle = (contact: Contact) => {
-    const parts = [contact.organization?.name || contact.company || '', contact.position || ''].filter(Boolean);
+    const parts = [contact.organization?.name || '', contact.position || ''].filter(Boolean);
     return parts.join(' · ') || '—';
   };
 
@@ -784,7 +781,6 @@ export function ContactList() {
                 <button type="button" onClick={addEmail} style={{ padding: '6px 12px', borderRadius: 10, border: '1px dashed #ccc', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }}>+ Добавить email</button>
               </div>
 
-              <input placeholder="Компания" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }} />
               <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as any })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }}>
                 {contactTypes.filter(t => t.isActive).sort((a, b) => a.sortOrder - b.sortOrder).map(t => (
                   <option key={t.name} value={t.name}>{t.label}</option>

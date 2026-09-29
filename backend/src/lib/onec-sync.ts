@@ -387,7 +387,6 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
           const data = {
             name: c.name,
             kind: strongMatch ? (c.kind === 'contact' ? 'contact' : 'organization') : (existing?.kind ?? (c.kind === 'contact' ? 'contact' : 'organization')),
-            company: c.kind === 'organization' ? c.name : existing?.company ?? null,
             inn: c.inn ?? existing?.inn ?? null,
             ogrn: c.ogrn ?? existing?.ogrn ?? null,
             legalAddress: c.legalAddress ?? existing?.legalAddress ?? null,
