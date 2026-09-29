@@ -159,7 +159,37 @@ export function ContactList() {
       params.set('kind', kindFilter);
     }
     if (selectedTag) params.set('tag', selectedTag);
-    api.contacts.list(params.toString()).then(setContacts);
+    const searching = search.trim().length > 0;
+    if (searching) {
+      // При поиске загружаем все совпадения целиком (клиентский фильтр ищет по тегам, сервер — нет)
+      params.set('search', search.trim());
+      setLoading(true);
+      try {
+        const data: any = await api.contacts.list(params.toString());
+        setContacts(Array.isArray(data) ? data : data.contacts);
+        setTotalCount(0);
+        setPage(1);
+        setHasMore(false);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+    const nextPage = reset ? 1 : page + 1;
+    params.set('page', String(nextPage));
+    params.set('limit', String(PAGE_SIZE));
+    setLoading(true);
+    try {
+      const data: any = await api.contacts.list(params.toString());
+      const list: Contact[] = Array.isArray(data) ? data : data.contacts;
+      const total: number = Array.isArray(data) ? list.length : data.totalCount;
+      setContacts(prev => reset ? list : [...prev, ...list.filter(c => !prev.some(p => p.id === c.id))]);
+      setTotalCount(total);
+      setPage(nextPage);
+      setHasMore(nextPage * PAGE_SIZE < total);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadOrganizations = () => {
@@ -182,7 +212,7 @@ export function ContactList() {
 
   useRealtime(["contacts"], (data) => {
     if (data.entity === "contact") {
-      loadContacts();
+      loadContacts(true);
       loadOrganizations();
     }
   });
@@ -248,7 +278,7 @@ export function ContactList() {
       await api.contacts.create(data);
     }
     setShowModal(false);
-    loadContacts();
+    loadContacts(true);
   };
 
   const confirmMergeDuplicate = async () => {
@@ -259,7 +289,7 @@ export function ContactList() {
       setShowDuplicateModal(false);
       setShowModal(false);
       setPendingCreateData(null);
-      loadContacts();
+      loadContacts(true);
     } catch (err: any) {
       alert('Ошибка: ' + (err.message || 'Не удалось объединить контакты'));
     } finally {
@@ -275,7 +305,7 @@ export function ContactList() {
       setShowDuplicateModal(false);
       setShowModal(false);
       setPendingCreateData(null);
-      loadContacts();
+      loadContacts(true);
     } catch (err: any) {
       alert('Ошибка: ' + (err.message || 'Не удалось создать контакт'));
     } finally {
@@ -286,7 +316,7 @@ export function ContactList() {
   const handleDelete = async (id: string) => {
     if (!confirm('Удалить контакт?')) return;
     await api.contacts.delete(id);
-    loadContacts();
+    loadContacts(true);
   };
 
   const toggleSelect = (id: string) => {
@@ -326,7 +356,7 @@ export function ContactList() {
       alert(`Тип изменён для ${res.updated} карточек`);
       setShowKindModal(false);
       setSelectedIds(new Set());
-      loadContacts();
+      loadContacts(true);
     } catch (err: any) {
       alert('Ошибка: ' + err.message);
     } finally {
@@ -345,7 +375,7 @@ export function ContactList() {
       const res = await api.contacts.import(importFormat, importData);
       setImportResult(`Импортировано: ${res.imported} контактов`);
       setImportData('');
-      loadContacts();
+      loadContacts(true);
       setTimeout(() => { setShowImportModal(false); setImportResult(''); }, 2000);
     } catch (err: any) {
       setImportResult('Ошибка: ' + (err.message || 'Неизвестная ошибка'));
@@ -384,7 +414,7 @@ export function ContactList() {
       alert('Контакты объединены');
       setShowMergeModal(false);
       setSelectedIds(new Set());
-      loadContacts();
+      loadContacts(true);
     } catch (err: any) {
       alert('Ошибка: ' + err.message);
     }
@@ -694,18 +724,6 @@ export function ContactList() {
       )}
 
       {isMobile || viewMode === 'cards' ? <CardView /> : <ListView />}
-
-      {hasMore && (
-        <div style={{ textAlign: "center", marginTop: 16 }}>
-          <button
-            onClick={() => loadContacts(false)}
-            disabled={loading}
-            style={{ padding: "8px 24px", borderRadius: 12, border: "1px solid var(--border-color)", background: "var(--bg-card)", cursor: "pointer", fontSize: 14 }}
-          >
-            {loading ? "Загрузка..." : `Загрузить еще (${contacts.length} из ${totalCount})`}
-          </button>
-        </div>
-      )}
 
       {hasMore && (
         <div style={{ textAlign: "center", marginTop: 16 }}>
