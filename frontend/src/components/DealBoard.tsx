@@ -16,6 +16,10 @@ export function DealBoard() {
   const [contactSearch, setContactSearch] = useState('');
   const [showContactDropdown, setShowContactDropdown] = useState(false);
   const contactDropdownRef = useRef<HTMLDivElement>(null);
+  // Mobile kanban states — как на странице «Задачи»
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileColumnIndex, setMobileColumnIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const defaultStage = statuses.find(s => s.isDefault)?.name || statuses[0]?.name || 'lead';
   const [form, setForm] = useState({ title: '', value: 0, stage: defaultStage, probability: 10, contactId: '', projectId: '' });
 
@@ -35,6 +39,14 @@ export function DealBoard() {
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   const loadDeals = () => {
@@ -105,6 +117,30 @@ export function DealBoard() {
     return `3px solid ${statusColor}`;
   };
 
+  // Группировка сделок по проектам — как группировка задач на странице «Задачи»
+  const groupDealsByProject = (stageDeals: Deal[]) => {
+    const groups = new Map<string, { name: string; deals: Deal[] }>();
+    const noProjectKey = '__no_project__';
+    groups.set(noProjectKey, { name: 'Без проекта', deals: [] });
+    for (const d of stageDeals) {
+      if (d.projectId) {
+        const p = projects.find(pr => pr.id === d.projectId);
+        const key = d.projectId;
+        if (!groups.has(key)) {
+          groups.set(key, { name: p?.name || 'Проект', deals: [] });
+        }
+        groups.get(key)!.deals.push(d);
+      } else {
+        groups.get(noProjectKey)!.deals.push(d);
+      }
+    }
+    // Пустую группу «Без проекта» не показываем
+    if (groups.get(noProjectKey)?.deals.length === 0) {
+      groups.delete(noProjectKey);
+    }
+    return Array.from(groups.entries()).map(([id, g]) => ({ id, ...g }));
+  };
+
   const filteredContacts = contacts.filter(c => {
     if (!contactSearch.trim()) return true;
     const q = contactSearch.toLowerCase();
@@ -121,44 +157,220 @@ export function DealBoard() {
     ? contacts.find(c => c.id === form.contactId)?.name || '— Контакт —'
     : '— Контакт —';
 
+  // Статусы воронки в порядке сортировки
+  const dealStatuses = [...statuses].sort((a, b) => a.sortOrder - b.sortOrder);
+
+  // Mobile: фильтруем пустые колонки и показываем по одной со свайпом
+  const nonEmptyStatuses = isMobile
+    ? dealStatuses.filter(s => dealsByStage(s.name).length > 0)
+    : dealStatuses;
+
+  // Если текущая мобильная колонка исчезла (сделки изменились) — возвращаемся на первую
+  useEffect(() => {
+    if (mobileColumnIndex >= nonEmptyStatuses.length) {
+      setMobileColumnIndex(Math.max(0, nonEmptyStatuses.length - 1));
+    }
+  }, [nonEmptyStatuses.length]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchMove = (_e: React.TouchEvent) => {
+    // Swipe detection handled in handleTouchEnd
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    const threshold = 50;
+    if (diff > threshold && mobileColumnIndex < nonEmptyStatuses.length - 1) {
+      setMobileColumnIndex((prev) => prev + 1);
+    } else if (diff < -threshold && mobileColumnIndex > 0) {
+      setMobileColumnIndex((prev) => prev - 1);
+    }
+    setTouchStartX(null);
+  };
+
+  // Mobile column indicator dots
+  const renderMobileIndicator = () => (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+        padding: '8px 0',
+        width: '100%',
+        alignSelf: 'center',
+      }}
+    >
+      {nonEmptyStatuses.map((status, idx) => (
+        <button
+          key={status.name}
+          onClick={() => setMobileColumnIndex(idx)}
+          style={{
+            width: idx === mobileColumnIndex ? 24 : 8,
+            height: 8,
+            borderRadius: 4,
+            border: 'none',
+            background:
+              idx === mobileColumnIndex ? status.color : '#d1d5db',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          title={status.label}
+        />
+      ))}
+    </div>
+  );
+
+  // Mobile current status header
+  const renderMobileHeader = () => {
+    const status = nonEmptyStatuses[mobileColumnIndex];
+    if (!status) return null;
+    const count = dealsByStage(status.name).length;
+    return (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '10px 12px',
+          background: status.color,
+          borderRadius: 12,
+          marginBottom: 12,
+        }}
+      >
+        <span style={{ fontSize: 14, fontWeight: 600, color: status.textColor }}>
+          {status.label}
+        </span>
+        <span
+          style={{
+            fontSize: 12,
+            padding: '2px 8px',
+            borderRadius: 10,
+            background: 'rgba(255,255,255,0.25)',
+            color: status.textColor,
+          }}
+        >
+          {count}
+        </span>
+      </div>
+    );
+  };
+
+  // Карточка сделки в едином стиле со страницей «Задачи»
+  const renderDealCard = (deal: Deal) => {
+    const st = getStatusStyle(deal.stage);
+    return (
+      <div key={deal.id} style={{ padding: 14, borderRadius: 14, border: '1px solid var(--border-color)', background: getDealBackground(st.bg), borderLeft: getDealBorderLeft(st.bg), cursor: 'pointer', position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
+        <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4 }}>
+          <button
+            onClick={() => openEdit(deal)}
+            title='Изменить'
+            style={{
+              width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)',
+              color: 'var(--text-color)', cursor: 'pointer',
+            }}
+          >
+            <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
+              <path d='M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z' />
+            </svg>
+          </button>
+          <button
+            onClick={() => handleDelete(deal.id)}
+            title='Удалить'
+            style={{
+              width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)',
+              color: '#dc2626', cursor: 'pointer',
+            }}
+          >
+            <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
+              <path d='M3 6h18' />
+              <path d='M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6' />
+              <path d='M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2' />
+              <line x1='10' y1='11' x2='10' y2='17' />
+              <line x1='14' y1='11' x2='14' y2='17' />
+            </svg>
+          </button>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, paddingRight: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.title}</div>
+        <div style={{ fontSize: 14, fontWeight: 500 }}>₽{deal.value.toLocaleString()}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{deal.project?.name ? `📁 ${deal.project.name} · ` : ''}{deal.contact?.name} · {deal.probability}%</div>
+      </div>
+    );
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>Воронка продаж</h2>
         <button onClick={openCreate} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>+ Создать сделку</button>
       </div>
-      <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch', minHeight: 400, alignItems: 'flex-start' }}>
-        {statuses.map(stage => {
+      <div
+        style={{ display: 'flex', gap: 12, overflowX: isMobile ? 'hidden' : 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch', minHeight: 400, alignItems: 'flex-start', flexDirection: isMobile ? 'column' : 'row' }}
+        onTouchStart={isMobile ? handleTouchStart : undefined}
+        onTouchMove={isMobile ? handleTouchMove : undefined}
+        onTouchEnd={isMobile ? handleTouchEnd : undefined}
+      >
+        {isMobile && renderMobileIndicator()}
+        {isMobile && renderMobileHeader()}
+        {dealStatuses.map(stage => {
           const stageDeals = dealsByStage(stage.name);
           const isEmpty = stageDeals.length === 0;
           const st = getStatusStyle(stage.name);
+
+          // On mobile: skip empty columns entirely
+          if (isMobile && isEmpty) return null;
+
+          // On mobile: show only current column
+          if (isMobile && stage.name !== nonEmptyStatuses[mobileColumnIndex]?.name)
+            return null;
+
           return (
-            <div key={stage.name} style={{ minWidth: isEmpty ? 48 : 280, flex: isEmpty ? '0 0 auto' : 1, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, transition: 'all 0.2s ease' }}>
-              <div style={{ display: 'flex', justifyContent: isEmpty ? 'center' : 'space-between', alignItems: 'center', padding: isEmpty ? '12px 4px' : '8px 0', background: isEmpty ? stage.color : 'transparent', borderRadius: isEmpty ? 12 : 0, writingMode: isEmpty ? 'vertical-rl' : 'horizontal-tb', textOrientation: isEmpty ? 'mixed' : 'initial', minHeight: isEmpty ? 120 : 'auto' }}>
-                <span style={{ fontSize: 13, fontWeight: 500, color: isEmpty ? stage.textColor : 'inherit', letterSpacing: isEmpty ? '0.05em' : 'normal' }}>{stage.label}</span>
-                {!isEmpty && (
-                  <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, background: stage.color, color: stage.textColor }}>{stageDeals.length}</span>
-                )}
-              </div>
-              {!isEmpty && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {stageDeals.map(deal => (
-                    <div key={deal.id} style={{ padding: 14, borderRadius: 14, border: '1px solid var(--border-color)', background: getDealBackground(st.bg), borderLeft: getDealBorderLeft(st.bg), cursor: 'pointer', position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
-                      <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4 }}>
-                        <button onClick={() => openEdit(deal)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>✏️</button>
-                        <button onClick={() => handleDelete(deal.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>🗑</button>
-                      </div>
-                      <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, paddingRight: 40, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.title}</div>
-                      <div style={{ fontSize: 14, fontWeight: 500 }}>₽{deal.value.toLocaleString()}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{deal.project?.name ? `📁 ${deal.project.name} · ` : ''}{deal.contact?.name} · {deal.probability}%</div>
-                    </div>
-                  ))}
+            <div key={stage.name} style={{ minWidth: isMobile ? '100%' : isEmpty ? 48 : 280, flex: isMobile ? 'none' : isEmpty ? '0 0 auto' : 1, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, transition: 'all 0.2s ease' }}>
+              {!isMobile && (
+                <div style={{ display: 'flex', justifyContent: isEmpty ? 'center' : 'space-between', alignItems: 'center', padding: isEmpty ? '12px 4px' : '8px 0', background: isEmpty ? stage.color : 'transparent', borderRadius: isEmpty ? 12 : 0, writingMode: isEmpty ? 'vertical-rl' : 'horizontal-tb', textOrientation: isEmpty ? 'mixed' : 'initial', minHeight: isEmpty ? 120 : 'auto' }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: isEmpty ? stage.textColor : 'inherit', letterSpacing: isEmpty ? '0.05em' : 'normal' }}>{stage.label}</span>
+                  {!isEmpty && (
+                    <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, background: stage.color, color: stage.textColor }}>{stageDeals.length}</span>
+                  )}
                 </div>
+              )}
+              {!isEmpty && (
+                isMobile ? (
+                  // На мобильном сделки группируются по проектам — как задачи
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {groupDealsByProject(stageDeals).map((group) => (
+                      <div key={group.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', padding: '4px 8px', background: 'var(--bg-input)', borderRadius: 8 }}>
+                          {group.name} ({group.deals.length})
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {group.deals.map(renderDealCard)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {stageDeals.map(renderDealCard)}
+                  </div>
+                )
               )}
             </div>
           );
         })}
       </div>
+      {isMobile && deals.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 14 }}>
+          Сделки не найдены
+        </div>
+      )}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(16px, env(safe-area-inset-top, 0)) max(16px, env(safe-area-inset-right, 0)) max(16px, env(safe-area-inset-bottom, 0)) max(16px, env(safe-area-inset-left, 0))' }}>
           <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 480, maxHeight: '90vh', overflow: 'auto' }}>
