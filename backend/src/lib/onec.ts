@@ -487,10 +487,15 @@ export class OneCClient {
         partnerKey = await this.createEntity(encodeURI('Catalog_Партнеры'), { Description: item.name });
       } catch { /* если партнёры недоступны — пробуем создать контрагента без них */ }
     }
+    // Вид контрагента: ИП (ИНН 12 знаков) -> «ИндивидуальныйПредприниматель», организация -> «ЮридическоеЛицо», контакт -> «ФизическоеЛицо»
+    const innDigits = (item.inn || '').replace(/\D/g, '');
+    const legalType = item.kind === 'contact'
+      ? 'ФизическоеЛицо'
+      : (innDigits.length === 12 ? 'ИндивидуальныйПредприниматель' : 'ЮридическоеЛицо');
     const body: Record<string, any> = {
       Description: item.name,
       ИНН: item.inn || '',
-      ЮридическоеФизическоеЛицо: item.kind === 'contact' ? 'ФизическоеЛицо' : 'ЮридическоеЛицо',
+      ЮридическоеФизическоеЛицо: legalType,
     };
     if (partnerKey) body['Партнер_Key'] = partnerKey;
     const id = await this.createEntity(encodeURI('Catalog_Контрагенты'), body);
