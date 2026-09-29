@@ -470,15 +470,25 @@ export function GlobalChat() {
               }}
             >
               {recipientNames.length > 0 && (
-                <div style={{
-                  fontSize: 11,
-                  color: isMe ? 'rgb(10, 136, 0)' : '#007aff',
-                  marginBottom: 2,
-                  marginLeft: isMe ? 0 : 46,
-                  marginRight: isMe ? 14 : 0,
-                  fontWeight: 500,
-                }}>
-                  {isMe ? `→ ${recipientNames.join(', ')}` : `Лично для ${recipientNames.join(', ')}`}
+                <div
+                  title={isMe ? `→ ${recipientNames.join(', ')}` : `Лично для ${recipientNames.join(', ')}`}
+                  style={{
+                    display: 'flex',
+                    gap: 3,
+                    marginBottom: 2,
+                    marginLeft: isMe ? 0 : 46,
+                    marginRight: isMe ? 14 : 0,
+                  }}
+                >
+                  {(msg.recipients || []).map(r => (
+                    <Avatar
+                      key={r.userId}
+                      name={r.user?.name || '??'}
+                      avatar={r.user?.avatar}
+                      size={20}
+                      style={{ border: '1px solid var(--bg-card)', flexShrink: 0 }}
+                    />
+                  ))}
                 </div>
               )}
 

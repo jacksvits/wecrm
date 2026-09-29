@@ -42,7 +42,7 @@ router.get('/', async (req: AuthRequest, res) => {
   const include = {
     author: { select: { id: true, name: true, avatar: true } },
     replyTo: { include: { author: { select: { id: true, name: true } } } },
-    recipients: { include: { user: { select: { id: true, name: true } } } },
+    recipients: { include: { user: { select: { id: true, name: true, avatar: true } } } },
     reactions: { include: { user: { select: { id: true, name: true } } } },
   };
 
@@ -116,7 +116,7 @@ router.post('/', async (req: AuthRequest, res) => {
       include: {
         author: { select: { id: true, name: true, avatar: true } },
         replyTo: { include: { author: { select: { id: true, name: true } } } },
-        recipients: { include: { user: { select: { id: true, name: true } } } },
+        recipients: { include: { user: { select: { id: true, name: true, avatar: true } } } },
         reactions: { include: { user: { select: { id: true, name: true } } } },
       },
     });
@@ -218,7 +218,7 @@ router.post('/:id/react', async (req: AuthRequest, res) => {
     include: {
       author: { select: { id: true, name: true, avatar: true } },
       replyTo: { include: { author: { select: { id: true, name: true } } } },
-      recipients: { include: { user: { select: { id: true, name: true } } } },
+      recipients: { include: { user: { select: { id: true, name: true, avatar: true } } } },
       reactions: { include: { user: { select: { id: true, name: true } } } },
     },
   });
