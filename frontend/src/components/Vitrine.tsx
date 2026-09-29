@@ -13,14 +13,6 @@ interface VitrineCard {
   image: any;
 }
 
-interface ReserveItem {
-  product: Product;
-  priceTypeId: string;
-  price: number;
-  quantity: number;
-  maxQty: number;
-}
-
 export function Vitrine() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
@@ -31,7 +23,6 @@ export function Vitrine() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [contacts, setContacts] = useState<any[]>([]);
-  const [reserveItems, setReserveItems] = useState<ReserveItem[]>([]);
   // Подробная информация о товаре (открывается по нажатию на карточку)
   const [details, setDetails] = useState<Product | null>(null);
   const [detailsImage, setDetailsImage] = useState(0);
@@ -60,6 +51,23 @@ export function Vitrine() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveOk, setSaveOk] = useState('');
+  // Резерв-лист (аналог корзины): позиции для резервирования, хранится в localStorage
+  const [reserveList, setReserveList] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem('wecrm_vitrine_reserve') || '[]'); } catch { return []; }
+  });
+  const [reserveOpen, setReserveOpen] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.setItem('wecrm_vitrine_reserve', JSON.stringify(reserveList)); } catch { /* ignore */ }
+    try { window.dispatchEvent(new CustomEvent('wecrm:reserve')); } catch { /* ignore */ }
+  }, [reserveList]);
+
+  // Открытие резерв-листа по событию из шапки страницы «Товары»
+  useEffect(() => {
+    const h = () => { setSaveError(''); setSaveOk(''); setReserveOpen(true); };
+    window.addEventListener('wecrm:open-reserve', h);
+    return () => window.removeEventListener('wecrm:open-reserve', h);
+  }, []);
 
   const { user } = useAuth();
   // Роль «Пользователь»: резерв оформляется на себя — контакт не выбирается
@@ -157,11 +165,15 @@ export function Vitrine() {
     </ul>
   );
 
-  const openReserve = (p: Product) => {
-    const first = (p.prices || [])[0] as any;
-    setSaveError(''); setSaveOk('');
-    setContactId('');
-    setReserveItems([{ product: p, priceTypeId: first?.priceTypeId || '', price: first?.price ?? 0, quantity: 1, maxQty: freeQty(p) }]);
+  const addToReserve = (p: Product) => {
+    const sortedPrices = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
+    const priceObj = (sortedPrices.find((x: any) => x.priceType?.forVitrine) ?? sortedPrices[0]) as any;
+    const maxQty = freeQty(p);
+    setReserveList(prev => {
+      const ex = prev.find(i => i.productId === p.id);
+      if (ex) return prev.map(i => (i.productId === p.id ? { ...i, quantity: Math.min(i.quantity + 1, i.maxQty) } : i));
+      return [...prev, { productId: p.id, name: p.name, unit: p.unit, imageUrl: p.images?.[0]?.url || '', price: priceObj?.price ?? 0, quantity: 1, maxQty }];
+    });
   };
 
   const openDetails = (p: Product) => {
@@ -202,23 +214,20 @@ export function Vitrine() {
     }
   };
 
-  const addPosition = (p: Product) => {
-    if (reserveItems.some((i) => i.product.id === p.id)) return;
-    const first = (p.prices || [])[0] as any;
-    setReserveItems([...reserveItems, { product: p, priceTypeId: first?.priceTypeId || '', price: first?.price ?? 0, quantity: 1, maxQty: freeQty(p) }]);
-  };
+  const reserveTotal = reserveList.reduce((s, i) => s + i.price * i.quantity, 0);
 
   const saveReserve = async () => {
     if (!isUserRole && !contactId) { setSaveError('Выберите заказчика'); return; }
-    if (!reserveItems.length) { setSaveError('Нет позиций'); return; }
+    if (!reserveList.length) { setSaveError('Нет позиций'); return; }
     setSaving(true); setSaveError('');
     try {
       const r: any = await api.reservations.create({
         ...(isUserRole ? {} : { contactId }),
-        items: reserveItems.map((i) => ({ productId: i.product.id, quantity: i.quantity, price: i.price })),
+        items: reserveList.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
       });
       setSaveOk(`Резерв №${r.number} создан`);
-      setTimeout(() => setReserveItems([]), 1200);
+      setReserveList([]);
+      setTimeout(() => setReserveOpen(false), 1200);
     } catch (e: any) {
       setSaveError(e.message || 'Ошибка создания резерва');
     } finally {
@@ -228,7 +237,7 @@ export function Vitrine() {
 
   if (loading) return <div style={{ padding: 24, color: 'var(--text-muted)' }}>Загрузка витрины...</div>;
   if (error) return <div style={{ padding: 24, color: '#ef4444' }}>{error}</div>;
-  if (!cards.length && !reserveItems.length) {
+  if (!cards.length && !reserveList.length) {
     return (
       <div style={{ padding: 24, color: 'var(--text-muted)' }}>
         На витрине пока нет товаров. Отметьте позиции признаком «На витрине» в разделе «Номенклатура».
@@ -335,7 +344,7 @@ export function Vitrine() {
                   </svg>
                 </button>
                 <button type="button" className="btn-reserve" disabled={inStock <= 0} style={{ flex: 1, justifyContent: 'center' }}
-                  onClick={(e) => { e.stopPropagation(); openReserve(p); }}>
+                  onClick={(e) => { e.stopPropagation(); addToReserve(p); }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <path fillRule="evenodd" clipRule="evenodd" d="M17 3.8H7C5.78497 3.8 4.8 4.78497 4.8 6V15.7647C4.8 16.574 5.24438 17.318 5.95698 17.7017L10.957 20.394C11.6081 20.7446 12.3919 20.7446 13.043 20.394L18.043 17.7017C18.7556 17.318 19.2 16.574 19.2 15.7647V6C19.2 4.78497 18.215 3.8 17 3.8ZM7 2C4.79086 2 3 3.79086 3 6V15.7647C3 17.2362 3.80796 18.5889 5.1036 19.2866L10.1036 21.9789C11.2875 22.6164 12.7125 22.6164 13.8964 21.9789L18.8964 19.2866C20.192 18.5889 21 17.2362 21 15.7647V6C21 3.79086 19.2091 2 17 2H7Z" fill="currentColor"/>
                     <path fillRule="evenodd" clipRule="evenodd" d="M16.7248 8.63051C17.0763 8.98198 17.0763 9.55183 16.7248 9.9033L11.7627 14.8654C11.4113 15.2169 10.8414 15.2169 10.4899 14.8654L7.81839 12.1939C7.46692 11.8424 7.46691 11.2726 7.81839 10.9211C8.16986 10.5696 8.7397 10.5696 9.09118 10.9211L11.1263 12.9562L15.4521 8.63051C15.8035 8.27904 16.3734 8.27904 16.7248 8.63051Z" fill="currentColor"/>
@@ -451,7 +460,7 @@ export function Vitrine() {
                       onClick={() => setDetails(null)}>Закрыть</button>
                     <button style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: dInStock > 0 ? '#1a1a1a' : 'var(--bg-hover)', color: dInStock > 0 ? '#fff' : 'var(--text-muted)', fontSize: 14, fontWeight: 500, cursor: dInStock > 0 ? 'pointer' : 'not-allowed' }}
                       disabled={dInStock <= 0}
-                      onClick={() => { setDetails(null); openReserve(d); }}>
+                      onClick={() => { addToReserve(d); setDetails(null); setReserveOpen(true); }}>
                       Зарезервировать
                     </button>
                     <button style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: dInStock > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 14, cursor: dInStock > 0 ? 'pointer' : 'not-allowed' }}
@@ -515,75 +524,58 @@ export function Vitrine() {
         </div>
       )}
 
-      {reserveItems.length > 0 && (
-        <div className="reserve-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-          onClick={() => setReserveItems([])}>
-          <div className="reserve-modal" style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--border-color)' }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: 'var(--text-primary)' }}>Резервирование</div>
-            <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Заказчик</label>
-            {isUserRole ? (
-              <input value={user?.name || ''} readOnly
-                style={{ width: '100%', padding: '8px 12px', marginBottom: 12, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', boxSizing: 'border-box' }} />
-            ) : (
-              <select value={contactId} onChange={(e) => setContactId(e.target.value)}
-                style={{ width: '100%', padding: '8px 12px', marginBottom: 12, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', boxSizing: 'border-box' }}>
-                <option value="">— выберите контакт или организацию —</option>
-                {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}{c.kind === 'organization' ? ' (организация)' : ''}</option>)}
-              </select>
-            )}
-
-            {reserveItems.map((item, idx) => (
-              <div key={item.product.id} style={{ border: '1px solid var(--border-color)', borderRadius: 10, padding: 12, marginBottom: 10 }}>
-                <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', marginBottom: 8 }}>{item.product.name}</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <select value={item.priceTypeId}
-                    onChange={(e) => {
-                      const pt = (item.product.prices || []).find((x: any) => x.priceTypeId === e.target.value) as any;
-                      const next = [...reserveItems];
-                      next[idx] = { ...item, priceTypeId: e.target.value, price: pt?.price ?? item.price };
-                      setReserveItems(next);
-                    }}
-                    style={{ flex: '1 1 200px', padding: '7px 9px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
-                    {(item.product.prices || []).map((x: any) => (
-                      <option key={x.priceTypeId} value={x.priceTypeId}>{x.priceType?.label || x.priceType?.name} — {fmtMoney(x.price)} ₽</option>
-                    ))}
-                  </select>
-                  <input type="number" min={1} max={item.maxQty} value={item.quantity}
-                    onChange={(e) => {
-                      const next = [...reserveItems];
-                      next[idx] = { ...item, quantity: Math.max(1, Math.min(Number(e.target.value) || 1, item.maxQty)) };
-                      setReserveItems(next);
-                    }}
-                    style={{ width: 90, padding: '7px 9px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)' }} />
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>доступно {fmtQty(item.maxQty)} {item.product.unit}</span>
-                  {reserveItems.length > 1 && (
-                    <button style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontSize: 13 }}
-                      onClick={() => setReserveItems(reserveItems.filter((_, i) => i !== idx))}>Убрать</button>
-                  )}
+      {reserveOpen && (
+        <div className="vitrine-cart-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 210, display: 'flex', justifyContent: 'flex-end' }} onClick={() => setReserveOpen(false)}>
+          <div className="vitrine-cart" style={{ height: '100%', background: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 24px rgba(0,0,0,.15)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>В резерве</div>
+              <button type="button" onClick={() => setReserveOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: 15, cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {!reserveList.length && !saveOk && <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Список резерва пуст. Добавьте товары с витрины кнопкой «В резерв».</div>}
+              {reserveList.map(i => (
+                <div key={i.productId} style={{ display: 'flex', gap: 10, alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: 12, padding: 8 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: 'var(--bg-hover)', flexShrink: 0, position: 'relative' }}>
+                    {i.imageUrl ? <img src={`${origin}${i.imageUrl}`} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>📦</span>}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtMoney(i.price)} ₽ × {fmtQty(i.quantity)} {i.unit} = <b style={{ color: 'var(--text-primary)' }}>{fmtMoney(i.price * i.quantity)} ₽</b></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <button type="button" onClick={() => setReserveList(prev => prev.map(x => (x.productId === i.productId ? { ...x, quantity: Math.max(1, x.quantity - 1) } : x)))} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}>−</button>
+                      <span style={{ fontSize: 13, minWidth: 24, textAlign: 'center', color: 'var(--text-primary)' }}>{fmtQty(i.quantity)}</span>
+                      <button type="button" onClick={() => setReserveList(prev => prev.map(x => (x.productId === i.productId ? { ...x, quantity: Math.min(x.maxQty, x.quantity + 1) } : x)))} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}>+</button>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>доступно {fmtQty(i.maxQty)}</span>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setReserveList(prev => prev.filter(x => x.productId !== i.productId))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, padding: 4 }}>✕</button>
                 </div>
+              ))}
+            </div>
+            <div style={{ borderTop: '1px solid var(--border-color)', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+                <span>Итого</span><span>{fmtMoney(reserveTotal)} ₽</span>
               </div>
-            ))}
-
-            <select defaultValue="" onChange={(e) => { const p = products.find((x) => x.id === e.target.value); if (p) addPosition(p); e.target.value = ''; }}
-              style={{ width: '100%', padding: '8px 12px', marginBottom: 12, borderRadius: 8, border: '1px dashed var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-muted)' }}>
-              <option value="">{products.filter((p) => freeQty(p) > 0 && !reserveItems.some((i) => i.product.id === p.id)).length ? '+ Добавить позицию из витрины' : 'Нет позиций в наличии'}</option>
-              {products.filter((p) => freeQty(p) > 0 && !reserveItems.some((i) => i.product.id === p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-
-            {saveError && <div style={{ color: '#ef4444', fontSize: 13, marginBottom: 10 }}>{saveError}</div>}
-            {saveOk && <div style={{ color: '#16a34a', fontSize: 13, marginBottom: 10 }}>{saveOk}</div>}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 13 }}
-                onClick={() => setReserveItems([])}>Отмена</button>
-              <button style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
-                disabled={saving} onClick={saveReserve}>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Заказчик</label>
+              {isUserRole ? (
+                <input value={user?.name || ''} readOnly style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontSize: 14 }} />
+              ) : (
+                <select value={contactId} onChange={e => setContactId(e.target.value)} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }}>
+                  <option value="">— выберите контакт или организацию —</option>
+                  {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}{c.kind === 'organization' ? ' (организация)' : ''}</option>)}
+                </select>
+              )}
+              {saveError && <div style={{ color: '#ef4444', fontSize: 13 }}>{saveError}</div>}
+              {saveOk && <div style={{ color: '#16a34a', fontSize: 13 }}>{saveOk}</div>}
+              <button type="button" className="btn-reserve" disabled={saving || !reserveList.length} onClick={saveReserve}
+                style={{ justifyContent: 'center', width: '100%', padding: '10px 16px', fontSize: 14, fontWeight: 600 }}>
                 {saving ? 'Сохранение...' : 'Создать резерв'}
               </button>
             </div>
           </div>
         </div>
       )}
+
     </>
   );
 }

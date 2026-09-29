@@ -152,6 +152,21 @@ export function Products() {
     setTimeout(() => window.dispatchEvent(new CustomEvent('wecrm:open-cart')), 60);
   };
 
+  // Резерв-лист витрины: счётчик из localStorage + события от Vitrine
+  const [reserveCount, setReserveCount] = useState(0);
+  useEffect(() => {
+    const read = () => {
+      try { setReserveCount((JSON.parse(localStorage.getItem('wecrm_vitrine_reserve') || '[]') as any[]).reduce((s, i) => s + i.quantity, 0)); } catch { setReserveCount(0); }
+    };
+    read();
+    window.addEventListener('wecrm:reserve', read);
+    return () => window.removeEventListener('wecrm:reserve', read);
+  }, []);
+  const openReserveList = () => {
+    setTab('vitrine');
+    setTimeout(() => window.dispatchEvent(new CustomEvent('wecrm:open-reserve')), 60);
+  };
+
   // Фильтр по виду: все / товары / услуги
   const [kindFilter, setKindFilter] = useState<'all' | 'product' | 'service'>('all');
   // Фильтр «В наличии»: только позиции с суммарным остатком >= 1
@@ -410,6 +425,14 @@ export function Products() {
             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
           </svg>
           {cartCount > 0 && <span style={{ position: 'absolute', top: -6, right: -6, background: '#fff', color: '#007aff', border: '1px solid rgba(120,180,255,0.40)', borderRadius: 10, fontSize: 11, padding: '1px 6px', fontWeight: 700 }}>{cartCount}</span>}
+        </button>
+        <button onClick={openReserveList} title="В резерве"
+          style={{ position: 'relative', marginLeft: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 12, border: '1px solid rgba(120,255,122,0.40)', background: 'linear-gradient(135deg, rgb(10,136,0) 0%, rgb(51,194,120) 50%, rgb(4,110,0) 100%)', color: '#fff', cursor: 'pointer', boxShadow: 'rgba(8,255,0,0.35) 0 4px 20px, inset 0 1px 0 rgba(255,255,255,0.25)' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path fillRule="evenodd" clipRule="evenodd" d="M17 3.8H7C5.78497 3.8 4.8 4.78497 4.8 6V15.7647C4.8 16.574 5.24438 17.318 5.95698 17.7017L10.957 20.394C11.6081 20.7446 12.3919 20.7446 13.043 20.394L18.043 17.7017C18.7556 17.318 19.2 16.574 19.2 15.7647V6C19.2 4.78497 18.215 3.8 17 3.8ZM7 2C4.79086 2 3 3.79086 3 6V15.7647C3 17.2362 3.80796 18.5889 5.1036 19.2866L10.1036 21.9789C11.2875 22.6164 12.7125 22.6164 13.8964 21.9789L18.8964 19.2866C20.192 18.5889 21 17.2362 21 15.7647V6C21 3.79086 19.2091 2 17 2H7Z" fill="currentColor"/>
+            <path fillRule="evenodd" clipRule="evenodd" d="M16.7248 8.63051C17.0763 8.98198 17.0763 9.55183 16.7248 9.9033L11.7627 14.8654C11.4113 15.2169 10.8414 15.2169 10.4899 14.8654L7.81839 12.1939C7.46692 11.8424 7.46691 11.2726 7.81839 10.9211C8.16986 10.5696 8.7397 10.5696 9.09118 10.9211L11.1263 12.9562L15.4521 8.63051C15.8035 8.27904 16.3734 8.27904 16.7248 8.63051Z" fill="currentColor"/>
+          </svg>
+          {reserveCount > 0 && <span style={{ position: 'absolute', top: -6, right: -6, background: '#fff', color: 'rgb(10,136,0)', border: '1px solid rgba(120,255,122,0.40)', borderRadius: 10, fontSize: 11, padding: '1px 6px', fontWeight: 700 }}>{reserveCount}</span>}
         </button>
         {tab === 'nomenclature' && (
           <div style={{ display: 'flex', gap: 8 }}>
