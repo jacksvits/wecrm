@@ -446,7 +446,7 @@ export function TaskDetail() {
       setComments((prev) => [...prev, comment]);
       setNewComment("");
       setPendingAttachments([]);
-      setIsInternalComment(false);
+      // «Инкогнито» не сбрасываем: режим держится, пока пользователь сам его не выключит
     } catch (err: any) {
       alert(err.message);
     }
