@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react' ; import { api } from '../api/client' ; import { Role, Status } from '../types' ; import { useAuth } from '../hooks/useAuth' ; import { navItems } from '../lib/navItems' ; const AVAILABLE_PAGES = [ { path: '/', label: 'Дашборд' }, { path: '/tasks', label: 'Задачи' }, { path: '/deals', label: 'Сделки' }, { path: '/contacts', label: 'Контакты' }, { path: '/products', label: 'Товары' }, { path: '/projects', label: 'Проекты' }, { path: '/users', label: 'Пользователи' }, { path: '/news', label: 'Новости' },
+import { useEffect, useState } from 'react' ; import { api } from '../api/client' ; import { Role, Status } from '../types' ; import { useAuth } from '../hooks/useAuth' ; import { navItems } from '../lib/navItems' ; const AVAILABLE_PAGES = [ { path: '/', label: 'Дашборд' }, { path: '/tasks', label: 'Задачи' }, { path: '/deals', label: 'Сделки' }, { path: '/contacts', label: 'Контакты' }, { path: '/products', label: 'Каталог' }, { path: '/projects', label: 'Проекты' }, { path: '/users', label: 'Пользователи' }, { path: '/news', label: 'Новости' },
   { path: '/notes', label: 'Заметки' },
   { path: '/reminders', label: 'Напоминания' }, { path: '/files', label: 'Файлы' }, { path: '/shop', label: 'Магазин' }, { path: '/chat', label: 'Чат' }, { path: '/director', label: 'Директор' }, ] ; const getMobileNavItems = (allowedPages: string[]) => {
   const filtered = navItems.filter(item => item.path === '/news' || allowedPages.includes(item.path)) ;
@@ -60,7 +60,7 @@ const handleSubmit = async (e: React.FormEvent) => { e.preventDefault() ; setErr
             </label>
 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', padding: '8px 0' }}>
               <input type='checkbox' checked={form.stockAccess} onChange={e => setForm({ ...form, stockAccess: e.target.checked })} />
-              <span><strong>Доступ к складскому учёту</strong> — пользователи с этой ролью видят вкладки «Номенклатура», «Склад», «Цены» и «Резервы» на странице «Товары»</span>
+              <span><strong>Доступ к складскому учёту</strong> — пользователи с этой ролью видят вкладки «Номенклатура», «Склад», «Цены» и «Резервы» на странице «Каталог»</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', padding: '8px 0' }}>
               <input type='checkbox' checked={form.canAccessProjects} onChange={e => setForm({ ...form, canAccessProjects: e.target.checked })} />

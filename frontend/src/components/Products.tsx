@@ -417,7 +417,7 @@ export function Products() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Товары</h2>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Каталог</h2>
         <button onClick={openCart} title="Корзина"
           style={{ position: 'relative', marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 12, border: '1px solid rgba(120,180,255,0.40)', background: 'linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%)', color: '#fff', cursor: 'pointer', boxShadow: '0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
