@@ -382,11 +382,15 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
             }
           }
           const existing = target;
-          // Сильное совпадение (по GUID/ИНН) — вид берём из 1С; слабое (имя/имя+телефон) — вид CRM сохраняем
+          // Сильное совпадение (по GUID/ИНН) — вид берём из 1С; слабое (имя/имя+телефон) — вид CRM сохраняем.
+          // Исключение: юрлица и индивидуальные предприниматели ВСЕГДА организации — даже при слабом совпадии.
           const strongMatch = !!existing && (existing.onecId === c.id || (!!c.inn && existing.inn === c.inn));
+          const onecKind: 'contact' | 'organization' = c.inn && c.inn.replace(/\D/g, '').length === 12 && c.kind === 'contact'
+            ? 'organization' // ИП с ИНН 12 знаков, помеченный в 1С как физлицо
+            : (c.kind === 'contact' ? 'contact' : 'organization');
           const data = {
             name: c.name,
-            kind: strongMatch ? (c.kind === 'contact' ? 'contact' : 'organization') : (existing?.kind ?? (c.kind === 'contact' ? 'contact' : 'organization')),
+            kind: onecKind === 'organization' ? 'organization' : (strongMatch ? 'contact' : (existing?.kind ?? 'contact')),
             inn: c.inn ?? existing?.inn ?? null,
             ogrn: c.ogrn ?? existing?.ogrn ?? null,
             legalAddress: c.legalAddress ?? existing?.legalAddress ?? null,
