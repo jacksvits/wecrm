@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
+import { useAuth } from '../hooks/useAuth';
 import { Product, ProductCategory } from '../types';
 
 const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
@@ -59,6 +60,10 @@ export function Vitrine() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveOk, setSaveOk] = useState('');
+
+  const { user } = useAuth();
+  // Роль «Пользователь»: резерв оформляется на себя — контакт не выбирается
+  const isUserRole = (user as any)?.role === 'user';
 
   useEffect(() => {
     api.products.vitrine()
@@ -204,12 +209,12 @@ export function Vitrine() {
   };
 
   const saveReserve = async () => {
-    if (!contactId) { setSaveError('Выберите, на чьё имя'); return; }
+    if (!isUserRole && !contactId) { setSaveError('Выберите заказчика'); return; }
     if (!reserveItems.length) { setSaveError('Нет позиций'); return; }
     setSaving(true); setSaveError('');
     try {
       const r: any = await api.reservations.create({
-        contactId,
+        ...(isUserRole ? {} : { contactId }),
         items: reserveItems.map((i) => ({ productId: i.product.id, quantity: i.quantity, price: i.price })),
       });
       setSaveOk(`Резерв №${r.number} создан`);
@@ -516,12 +521,17 @@ export function Vitrine() {
           <div className="reserve-modal" style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--border-color)' }}
             onClick={(e) => e.stopPropagation()}>
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: 'var(--text-primary)' }}>Резервирование</div>
-            <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>На чьё имя</label>
-            <select value={contactId} onChange={(e) => setContactId(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', marginBottom: 12, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', boxSizing: 'border-box' }}>
-              <option value="">— выберите контакт или организацию —</option>
-              {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}{c.kind === 'organization' ? ' (организация)' : ''}</option>)}
-            </select>
+            <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Заказчик</label>
+            {isUserRole ? (
+              <input value={user?.name || ''} readOnly
+                style={{ width: '100%', padding: '8px 12px', marginBottom: 12, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', boxSizing: 'border-box' }} />
+            ) : (
+              <select value={contactId} onChange={(e) => setContactId(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', marginBottom: 12, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', boxSizing: 'border-box' }}>
+                <option value="">— выберите контакт или организацию —</option>
+                {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}{c.kind === 'organization' ? ' (организация)' : ''}</option>)}
+              </select>
+            )}
 
             {reserveItems.map((item, idx) => (
               <div key={item.product.id} style={{ border: '1px solid var(--border-color)', borderRadius: 10, padding: 12, marginBottom: 10 }}>

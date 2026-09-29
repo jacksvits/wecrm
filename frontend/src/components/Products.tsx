@@ -1301,6 +1301,9 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
 }
 
 function ReservesTab() {
+  const { user } = useAuth();
+  // Роль «Пользователь»: резерв оформляется на себя — контакт не выбирается
+  const isUserRole = (user as any)?.role === 'user';
   const [reserves, setReserves] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [contacts, setContacts] = useState<any[]>([]);
@@ -1337,7 +1340,7 @@ function ReservesTab() {
     setEditBusy(true);
     try {
       await api.reservations.update(editRes.id, {
-        contactId: editContactId,
+        ...(isUserRole ? {} : { contactId: editContactId }),
         comment: editComment,
         items: editItems.map((i) => ({ productId: i.productId, quantity: Number(i.quantity) || 0, price: Number(i.price) || 0 })),
       });
@@ -1359,7 +1362,7 @@ function ReservesTab() {
     <div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>
-          <th style={thStyle}>№</th><th style={thStyle}>Дата</th><th style={thStyle}>На чьё имя</th>
+          <th style={thStyle}>№</th><th style={thStyle}>Дата</th><th style={thStyle}>Заказчик</th>
           <th style={thStyle}>Товары</th><th style={thStyle}>Сумма</th><th style={thStyle}>Статус</th><th style={thStyle}></th>
         </tr></thead>
         <tbody>
@@ -1398,10 +1401,14 @@ function ReservesTab() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
           <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 20, width: 560, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ margin: '0 0 14px' }}>Резерв РЗ-{String(editRes.number).padStart(6, '0')}</h3>
-            <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>На чьё имя</label>
-            <select value={editContactId} onChange={e => setEditContactId(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 10 }}>
-              {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Заказчик</label>
+            {isUserRole ? (
+              <input value={user?.name || ''} readOnly style={{ ...inputStyle, marginTop: 4, marginBottom: 10, background: 'var(--bg-hover)' }} />
+            ) : (
+              <select value={editContactId} onChange={e => setEditContactId(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 10 }}>
+                {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
             <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Комментарий</label>
             <input value={editComment} onChange={e => setEditComment(e.target.value)} placeholder="Комментарий" style={{ ...inputStyle, marginTop: 4, marginBottom: 12 }} />
             {editItems.map((it, idx) => (

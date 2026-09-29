@@ -19,8 +19,23 @@ router.get('/', async (_req, res) => {
 // Создание: только по наличию (без минуса), номер автоинкремент
 router.post('/', async (req: any, res) => {
   const { contactId, warehouseId, comment, items } = req.body || {};
-  if (!contactId || !Array.isArray(items) || !items.length) {
-    return res.status(400).json({ error: 'Контакт и позиции обязательны' });
+  if (!Array.isArray(items) || !items.length) {
+    return res.status(400).json({ error: 'Позиции обязательны' });
+  }
+  // Резерв «на себя» (роль «Пользователь»): контакт не выбирается —
+  // подставляем личный контакт автора резерва (ищем по e-mail, иначе создаём)
+  let resolvedContactId = contactId;
+  if (!resolvedContactId) {
+    const email = req.user?.email;
+    let personal = email
+      ? await prisma.contact.findFirst({ where: { OR: [{ email }, { emails: { has: email } }] } })
+      : null;
+    if (!personal) {
+      personal = await prisma.contact.create({
+        data: { name: req.user?.name || 'Пользователь', email: email || null, emails: email ? [email] : [] },
+      });
+    }
+    resolvedContactId = personal.id;
   }
   const whId = warehouseId || (await prisma.warehouse.findFirst())?.id;
   if (!whId) return res.status(400).json({ error: 'Склад не найден' });
@@ -41,7 +56,7 @@ router.post('/', async (req: any, res) => {
       const number = (last?.number ?? 0) + 1;
       let total = 0;
       const r = await tx.reservation.create({
-        data: { number, contactId, warehouseId: whId, userId: req.user?.id, comment, total: 0 },
+        data: { number, contactId: resolvedContactId, warehouseId: whId, userId: req.user?.id, comment, total: 0 },
       });
       for (const it of items) {
         const sum = it.quantity * it.price;
