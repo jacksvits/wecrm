@@ -1608,7 +1608,7 @@ export function TaskDetail() {
                               pointerEvents: "none",
                             }}
                           />{" "}
-                          <div style={{ position: "relative", zIndex: 1 }}>
+                          <div className="comment-select" style={{ position: "relative", zIndex: 1 }}>
                             {" "}
                             {c.isInternal && (
                               <div style={{ fontSize: 11, color: "#ffc107", marginBottom: 4, fontWeight: 600 }}>

@@ -756,3 +756,12 @@ html, body { overflow-x: hidden; }
 .btn-action-cart:active { transform: scale(.97); }
 .btn-action-cart:disabled { opacity: .4; cursor: default; box-shadow: none; }
 .btn-action-cart:focus-visible { outline: 2px solid #007aff; outline-offset: 2px; }
+
+/* Текст комментариев в обсуждениях задач доступен для выделения/копирования
+   (контейнер .tab-content-swipeable отключает user-select для свайпа) */
+.tab-content-swipeable .comment-select,
+.tab-content-swipeable .comment-select * {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
