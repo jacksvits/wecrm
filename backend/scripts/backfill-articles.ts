@@ -27,11 +27,11 @@ async function main() {
     console.log(`[backfill] ${article} — ${p.name}`);
   }
 
-  // Переименование изображений (все товары, включая только что получивших артикул)
+  // Переименование изображений (все товары с артикулом)
   const withImages = await prisma.product.findMany({
     where: { article: { not: null } },
     include: {
-      images: { orderBy: { sortOrder: 'asc' }, include: { attachment: true } },
+      images: { orderBy: { sortOrder: 'asc' } },
     },
   });
 
@@ -39,7 +39,8 @@ async function main() {
   for (const p of withImages) {
     for (let i = 0; i < p.images.length; i++) {
       const img = p.images[i];
-      const att = img.attachment;
+      const att = await prisma.fileAttachment.findUnique({ where: { id: img.attachmentId } });
+      if (!att) { skipped++; continue; }
       const ext = path.extname(att.filename) || '';
       const baseName = i === 0 ? p.article! : `${p.article}-${i}`;
       const newFilename = `${baseName}${ext}`;
