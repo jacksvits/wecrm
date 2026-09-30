@@ -1256,7 +1256,7 @@ export function TaskList() {
             className="btn-action"
             onClick={() => openCreate()}
           >
-            + Создать задачу
+            + Новая задача
           </button>{" "}
         </div>{" "}
       </div>{" "}
