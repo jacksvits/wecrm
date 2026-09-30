@@ -736,3 +736,23 @@ html, body { overflow-x: hidden; }
 .btn-action:active { transform: scale(.97); }
 .btn-action:disabled { opacity: .4; cursor: default; box-shadow: none; }
 .btn-action:focus-visible { outline: 2px solid rgb(51, 194, 120); outline-offset: 2px; }
+
+/* Текстовый вариант кнопки корзины (как «В корзину» на карточках товаров) */
+.btn-action-cart {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid rgba(120, 180, 255, 0.40);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%);
+  color: #ffffff;
+  font: 500 14px/1.4 system-ui, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 122, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: opacity .15s ease-out, transform .15s ease-out;
+}
+.btn-action-cart:hover { opacity: .9; }
+.btn-action-cart:active { transform: scale(.97); }
+.btn-action-cart:disabled { opacity: .4; cursor: default; box-shadow: none; }
+.btn-action-cart:focus-visible { outline: 2px solid #007aff; outline-offset: 2px; }

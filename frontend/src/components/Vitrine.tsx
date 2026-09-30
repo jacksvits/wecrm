@@ -458,12 +458,12 @@ export function Vitrine() {
                   <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 4 }}>
                     <button style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 14 }}
                       onClick={() => setDetails(null)}>Закрыть</button>
-                    <button style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: dInStock > 0 ? '#1a1a1a' : 'var(--bg-hover)', color: dInStock > 0 ? '#fff' : 'var(--text-muted)', fontSize: 14, fontWeight: 500, cursor: dInStock > 0 ? 'pointer' : 'not-allowed' }}
+                    <button type="button" className="btn-action" style={{ flex: 1, justifyContent: 'center' }}
                       disabled={dInStock <= 0}
                       onClick={() => { addToReserve(d); setDetails(null); setReserveOpen(true); }}>
                       Зарезервировать
                     </button>
-                    <button style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: dInStock > 0 ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 14, cursor: dInStock > 0 ? 'pointer' : 'not-allowed' }}
+                    <button type="button" className="btn-action-cart" style={{ flex: 1, justifyContent: 'center' }}
                       disabled={dInStock <= 0}
                       onClick={() => { addToCart(d); setDetails(null); setCartOpen(true); }}>
                       В корзину
