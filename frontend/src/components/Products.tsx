@@ -1070,6 +1070,12 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
             <option value="product">Товар</option>
             <option value="service">Услуга</option>
           </select>
+          {!isNew && product.article && (
+            <div>
+              <label style={{ fontSize: 14, fontWeight: 500 }}>Внутренний артикул</label>
+              <div style={{ ...inputStyle, background: 'var(--bg-hover)', color: 'var(--text-muted)', cursor: 'default' }}>{product.article}</div>
+            </div>
+          )}
           <label style={{ fontSize: 14, fontWeight: 500 }}>Артикул</label>
           <input value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })} style={inputStyle} />
           <label style={{ fontSize: 14, fontWeight: 500 }}>Категория (виды номенклатуры 1С)</label>

@@ -4,6 +4,7 @@ import path from 'path';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { importMarketItems, syncProductsToVk, getVkSettings } from '../lib/vk-market.js';
+import { generateUniqueArticle } from '../lib/article.js';
 
 const router = Router();
 
@@ -407,8 +408,10 @@ router.post('/', async (req, res) => {
     // Строковый путь для выгрузки в 1С: наследуем от выбранной категории, если не задан вручную
     let categoryValue = category?.trim() || null;
     if (!categoryValue && categoryIdValue) categoryValue = await categoryPathString(categoryIdValue);
+    const article = await generateUniqueArticle();
     const product = await prisma.product.create({
       data: {
+        article,
         name: name.trim(),
         sku: sku?.trim() || null,
         kind: productKind,
@@ -590,11 +593,31 @@ router.post('/:id/images', async (req, res) => {
       return res.status(400).json({ error: 'Вложение не найдено или не принадлежит товару' });
     }
     const count = await prisma.productImage.count({ where: { productId: product.id } });
+    // Переименовываем файл во внутренний артикул: первое фото — <article>.<ext>,
+    // каждое следующее — <article>-<n>.<ext> (независимо от исходного имени)
+    let url = attachment.path;
+    let newFilename = attachment.filename;
+    if (product.article) {
+      const ext = path.extname(attachment.filename) || '';
+      const baseName = count === 0 ? product.article : `${product.article}-${count}`;
+      newFilename = `${baseName}${ext}`;
+      const oldPath = path.join(UPLOAD_ROOT, attachment.filename);
+      const newPath = path.join(UPLOAD_ROOT, newFilename);
+      if (oldPath !== newPath) {
+        if (fs.existsSync(newPath)) fs.unlinkSync(newPath);
+        if (fs.existsSync(oldPath)) fs.renameSync(oldPath, newPath);
+        await prisma.fileAttachment.update({
+          where: { id: attachment.id },
+          data: { filename: newFilename, path: `/uploads/${newFilename}` },
+        });
+        url = `/uploads/${newFilename}`;
+      }
+    }
     const image = await prisma.productImage.create({
       data: {
         productId: product.id,
         attachmentId: attachment.id,
-        url: attachment.path,
+        url,
         sortOrder: count,
       },
     });

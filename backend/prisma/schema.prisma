@@ -1134,6 +1134,8 @@ model DgisSettings {
 model Product {
   id          String   @id @default(cuid())
   sku         String?  @unique
+  // Внутренний 8-значный артикул (генерируется случайно, уникален)
+  article     String?  @unique
   name        String
   kind        String   @default("product") // product | service
   description String?

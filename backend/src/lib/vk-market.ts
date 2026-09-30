@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { prisma } from './prisma.js';
+import { generateUniqueArticle } from './article.js';
 
 const VK_API = 'https://api.vk.com/method';
 const VK_API_VERSION = '5.199';
@@ -173,6 +174,7 @@ export async function importMarketItems(): Promise<ImportSummary> {
 
       const product = await prisma.product.create({
         data: {
+          article: await generateUniqueArticle(),
           name: title,
           kind: 'product',
           sku: `VK-${vkId}`,

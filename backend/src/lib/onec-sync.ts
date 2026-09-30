@@ -1,5 +1,6 @@
 import { prisma } from './prisma.js';
 import { OneCClient, OneCNomenclature, OneCCounterparty } from './onec.js';
+import { generateUniqueArticle } from './article.js';
 
 export type OneCDirection = 'pull' | 'push' | 'both';
 export interface OneCEntityCfg { enabled: boolean; direction: OneCDirection; }
@@ -231,7 +232,7 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
             if (n.barcode && (await prisma.product.findFirst({ where: { barcode: n.barcode }, select: { id: true } }))) {
               createData = { ...createData, barcode: null };
             }
-            const created = await prisma.product.create({ data: createData });
+            const created = await prisma.product.create({ data: { ...createData, article: await generateUniqueArticle() } });
             claimed.add(created.id);
           }
           stats.products.pulled++;
