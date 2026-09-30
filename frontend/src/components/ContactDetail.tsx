@@ -5,6 +5,7 @@ import { Contact, Task, Deal } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { displayPhone } from '../lib/phone';
 import { linkifyTaskTagsHtml, useTaskHashtagClick } from '../lib/taskHashtags';
+import { ContactAccesses } from './ContactAccesses';
 
 interface ContactType {
   id: string;
@@ -32,7 +33,7 @@ export function ContactDetail() {
   const onTagClick = useTaskHashtagClick();
   const { user } = useAuth();
   const [contact, setContact] = useState<Contact | null>(null);
-  const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'deals' | 'projects'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'deals' | 'projects' | 'accesses'>('info');
   const [loading, setLoading] = useState(true);
   const [contactTypes, setContactTypes] = useState<ContactType[]>([]);
 
@@ -87,7 +88,7 @@ export function ContactDetail() {
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border-color)' }}>
-        {[{ key: 'info' as const, label: 'Основная информация' }, { key: 'tasks' as const, label: `Задачи (${contact._count?.tasks || 0})` }, { key: 'deals' as const, label: `Сделки (${contact._count?.deals || 0})` }, { key: 'projects' as const, label: `Проекты (${contact.projects?.length || 0})` }].map((tab) => (
+        {[{ key: 'info' as const, label: 'Основная информация' }, { key: 'tasks' as const, label: `Задачи (${contact._count?.tasks || 0})` }, { key: 'deals' as const, label: `Сделки (${contact._count?.deals || 0})` }, { key: 'projects' as const, label: `Проекты (${contact.projects?.length || 0})` }, { key: 'accesses' as const, label: `Доступы (${contact._count?.accesses || 0})` }].map((tab) => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{ padding: '10px 20px', border: 'none', borderBottom: activeTab === tab.key ? '2px solid #1565c0' : '2px solid transparent', background: 'transparent', color: activeTab === tab.key ? '#1565c0' : 'var(--text-muted)', fontWeight: activeTab === tab.key ? 600 : 400, cursor: 'pointer', fontSize: 14, transition: 'all 0.15s' }}>{tab.label}</button>
         ))}
       </div>
@@ -241,6 +242,10 @@ export function ContactDetail() {
             </div>
           )) : <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Нет проектов</div>}
         </div>
+      )}
+
+      {activeTab === 'accesses' && (
+        <ContactAccesses contactId={contact.id} canEdit={canEdit} />
       )}
     </div>
   );

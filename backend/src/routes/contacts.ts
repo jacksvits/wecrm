@@ -107,7 +107,7 @@ router.get('/:id', async (req, res) => {
     const contact = await prisma.contact.findUnique({
       where: { id: req.params.id },
       include: {
-        _count: { select: { deals: true, tasks: true, calls: true, employees: true } },
+        _count: { select: { deals: true, tasks: true, calls: true, employees: true, accesses: true } },
         deals: { orderBy: { createdAt: 'desc' } },
         tasks: { orderBy: { createdAt: 'desc' } },
         employees: { orderBy: { name: 'asc' } },

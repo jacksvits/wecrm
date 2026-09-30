@@ -178,6 +178,7 @@ model Contact {
   @@map("contacts")
   reservations Reservation[]
   sales          Sale[]
+  accesses       ContactAccess[]
 }
 
 model Project {
@@ -1512,4 +1513,22 @@ model SaleItem {
   sale      Sale    @relation(fields: [saleId], references: [id])
   product   Product @relation(fields: [productId], references: [id])
   @@map("sale_items")
+}
+
+model ContactAccess {
+  id          String   @id @default(cuid())
+  contactId   String   @map("contact_id")
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  // Направление: videoregistrator | cloud | remote | site_admin | server | account | router
+  direction   String
+  description String?
+  comment     String?
+  url         String?
+  login       String?
+  password    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([contactId])
+  @@map("contact_accesses")
 }
