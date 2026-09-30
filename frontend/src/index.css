@@ -716,3 +716,23 @@ html, body { overflow-x: hidden; }
 @media (max-width: 640px) {
   table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
+
+/* Единый стиль основных кнопок действий (как «В резерв» у карточки товара) */
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid rgba(120, 255, 122, 0.4);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgb(10, 136, 0) 0%, rgb(51, 194, 120) 50%, rgb(4, 110, 0) 100%);
+  color: #ffffff;
+  font: 500 14px/1.4 system-ui, sans-serif;
+  cursor: pointer;
+  box-shadow: rgba(8, 255, 0, 0.35) 0 4px 20px, rgba(255, 255, 255, 0.25) 0 1px 0 inset;
+  transition: opacity .15s ease-out, transform .15s ease-out;
+}
+.btn-action:hover { opacity: .9; }
+.btn-action:active { transform: scale(.97); }
+.btn-action:disabled { opacity: .4; cursor: default; box-shadow: none; }
+.btn-action:focus-visible { outline: 2px solid rgb(51, 194, 120); outline-offset: 2px; }

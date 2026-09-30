@@ -1253,17 +1253,8 @@ export function TaskList() {
             </div>
           )}{" "}
           <button
+            className="btn-action"
             onClick={() => openCreate()}
-            style={{
-              padding: "8px 16px",
-              borderRadius: 12,
-              border: "none",
-              background: "#1a1a1a",
-              color: "#fff",
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: "pointer",
-            }}
           >
             + Создать задачу
           </button>{" "}
