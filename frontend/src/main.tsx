@@ -58,6 +58,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 initNativePush();
 
 if ('serviceWorker' in navigator) {
+  // Новый SW активировался и захватил контроль (skipWaiting + clients.claim в sw.js) —
+  // перезагружаем страницу, чтобы вкладка получила свежий код вместо устаревшего бандла
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then(reg => console.log('[PWA] SW registered:', reg.scope))
