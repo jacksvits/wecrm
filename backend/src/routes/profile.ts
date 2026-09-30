@@ -8,7 +8,7 @@ const router = Router();
 router.use(authMiddleware);
 
 // Пункты нижней мобильной панели — должны совпадать с frontend/src/lib/navItems.ts
-const MOBILE_NAV_PATHS = ['/', '/tasks', '/deals', '/projects', '/contacts', '/products', '/news', '/notes', '/reminders', '/calls', '/files', '/shop', '/chat'];
+const MOBILE_NAV_PATHS = ['/', '/tasks', '/deals', '/projects', '/contacts', '/products', '/news', '/notes', '/reminders', '/calls', '/files', '/chat'];
 
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
