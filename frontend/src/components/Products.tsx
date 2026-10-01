@@ -479,6 +479,27 @@ export function Products() {
         ))}
       </div>
 
+      {/* Поиск по каталогу */}
+      <div style={{ marginBottom: 12 }}>
+        <input
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+          placeholder="Поиск: название, артикул, категория"
+          style={{
+            width: '100%',
+            padding: '8px 14px',
+            borderRadius: 12,
+            border: '1px solid var(--border-color)',
+            background: 'var(--bg-color)',
+            color: 'var(--text-color)',
+            fontSize: 14,
+            outline: 'none',
+            boxSizing: 'border-box',
+          }}
+        />
+      </div>
+
       {/* ===== Витрина ===== */}
       {tab === 'vitrine' && <Vitrine />}
 
@@ -492,12 +513,7 @@ export function Products() {
           {categorySidebar}
           <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
-            <input
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              placeholder="Поиск: название, артикул, категория"
-              style={{ ...inputStyle, maxWidth: 360 }}
-            />
+  
             {/* Фильтр: все / товары / услуги */}
             <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden' }}>
               {([['all', 'Все'], ['product', 'Товары'], ['service', 'Услуги']] as const).map(([val, label]) => (
@@ -827,13 +843,6 @@ export function Products() {
               </div>
             ))}
           </div>
-
-          <input
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            placeholder="Поиск товара"
-            style={{ ...inputStyle, maxWidth: 360 }}
-          />
 
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
