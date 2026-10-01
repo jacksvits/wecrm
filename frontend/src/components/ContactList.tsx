@@ -356,13 +356,16 @@ export function ContactList() {
   }, [kindFilter, selectedTag]);
 
   useEffect(() => {
-    if (location.state?.editingId && contacts.length > 0) {
-      const contact = contacts.find(c => c.id === location.state.editingId);
-      if (contact) {
-        openEdit(contact);
-        navigate(location.pathname, { replace: true });
-      }
+    const editingId = location.state?.editingId;
+    if (!editingId) return;
+    const contact = contacts.find(c => c.id === editingId);
+    if (contact) {
+      openEdit(contact);
+    } else {
+      // контакт может быть не загружен (пагинация/фильтры) — подгружаем напрямую
+      api.contacts.get(editingId).then(openEdit).catch(() => {});
     }
+    navigate(location.pathname, { replace: true });
   }, [contacts, location.state]);
 
   useRealtime(["contacts"], (data) => {
