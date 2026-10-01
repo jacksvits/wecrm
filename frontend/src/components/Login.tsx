@@ -198,16 +198,6 @@ export function Login() {
         <p className="login-brand-sub">
           Клиенты, сделки, задачи и коммуникации — всё под рукой. CRM, которая работает на вас.
         </p>
-        <div className="login-brand-stats">
-          <div className="login-stat">
-            <b>12 000+</b>
-            <span>компаний с нами</span>
-          </div>
-          <div className="login-stat">
-            <b>99.9%</b>
-            <span>время работы</span>
-          </div>
-        </div>
       </section>
 
       {/* Правая панель с формой */}
