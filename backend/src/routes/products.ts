@@ -91,6 +91,53 @@ async function categoryPathString(categoryId: string): Promise<string | null> {
   return path.length ? path.join(' / ') : null;
 }
 
+// id категории и всех её потомков (множество посещённых — защита от циклов)
+async function categorySubtreeIds(rootId: string): Promise<string[]> {
+  const all = await prisma.productCategory.findMany({ select: { id: true, parentId: true } });
+  const childrenOf = new Map<string, string[]>();
+  for (const c of all) {
+    const list = childrenOf.get(c.parentId || '') ?? [];
+    list.push(c.id);
+    childrenOf.set(c.parentId || '', list);
+  }
+  const ids: string[] = [];
+  const stack = [rootId];
+  const seen = new Set<string>();
+  while (stack.length) {
+    const cur = stack.pop()!;
+    if (seen.has(cur)) continue;
+    seen.add(cur);
+    ids.push(cur);
+    for (const ch of childrenOf.get(cur) ?? []) stack.push(ch);
+  }
+  return ids;
+}
+
+// Обновляет строковый путь «Группа / ... / Вид» у товаров поддерева категории
+// (после переименования/переноса категории пути в карточках товаров устаревают)
+async function recalcCategoryPaths(rootId: string): Promise<void> {
+  const ids = await categorySubtreeIds(rootId);
+  const all = await prisma.productCategory.findMany({ select: { id: true, name: true, parentId: true } });
+  const byId = new Map(all.map((c) => [c.id, c]));
+  const pathOf = (categoryId: string): string | null => {
+    const path: string[] = [];
+    let cur = byId.get(categoryId);
+    const guard = new Set<string>();
+    while (cur && !guard.has(cur.id)) {
+      guard.add(cur.id);
+      path.unshift(cur.name);
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    return path.length ? path.join(' / ') : null;
+  };
+  const products = await prisma.product.findMany({ where: { categoryId: { in: ids } }, select: { id: true, categoryId: true } });
+  for (const p of products) {
+    if (!p.categoryId) continue;
+    const path = pathOf(p.categoryId);
+    if (path) await prisma.product.update({ where: { id: p.id }, data: { category: path } });
+  }
+}
+
 /* ============ Справочники (до /:id!) ============ */
 
 /**
@@ -324,7 +371,7 @@ router.post('/meta/vk-sync', async (_req, res) => {
 
 /**
  * GET /api/products/meta/categories
- * Дерево категорий из 1С (группы и виды номенклатуры); плоский список — дерево строит фронтенд
+ * Дерево категорий (группы и виды номенклатуры): из 1С + созданные вручную. Плоский список — дерево строит фронтенд
  */
 router.get('/meta/categories', async (_req, res) => {
   try {
@@ -335,6 +382,112 @@ router.get('/meta/categories', async (_req, res) => {
     res.json(categories);
   } catch (err: any) {
     console.error('[products:categories:list]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/products/meta/categories
+ * Создать категорию вручную (onecId пустой — синхронизация с 1С её не затрагивает)
+ */
+router.post('/meta/categories', async (req, res) => {
+  try {
+    const { name, parentId, isGroup } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
+    if (parentId) {
+      const parent = await prisma.productCategory.findUnique({ where: { id: parentId } });
+      if (!parent) return res.status(400).json({ error: 'Родительская категория не найдена' });
+    }
+    const category = await prisma.productCategory.create({
+      data: { name: name.trim(), parentId: parentId || null, isGroup: !!isGroup },
+    });
+    res.status(201).json(category);
+  } catch (err: any) {
+    console.error('[products:categories:create]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PATCH /api/products/meta/categories/:id
+ * Переименовать категорию, сменить родителя или тип (папка / вид номенклатуры)
+ */
+router.patch('/meta/categories/:id', async (req, res) => {
+  try {
+    const { name, parentId, isGroup } = req.body;
+    const existing = await prisma.productCategory.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Категория не найдена' });
+    const data: any = {};
+    if (name !== undefined) {
+      if (!name.trim()) return res.status(400).json({ error: 'Название не может быть пустым' });
+      data.name = name.trim();
+    }
+    if (isGroup !== undefined) data.isGroup = !!isGroup;
+    if (parentId !== undefined) {
+      if (parentId) {
+        if (parentId === req.params.id) return res.status(400).json({ error: 'Категория не может быть родителем самой себя' });
+        // защита от цикла: новый родитель не должен оказаться внутри самой категории
+        const all = await prisma.productCategory.findMany({ select: { id: true, parentId: true } });
+        const byId = new Map(all.map((c) => [c.id, c]));
+        let cur = byId.get(parentId);
+        const guard = new Set<string>();
+        while (cur && !guard.has(cur.id)) {
+          guard.add(cur.id);
+          if (cur.id === req.params.id) return res.status(400).json({ error: 'Нельзя перенести категорию в её собственную подкатегорию' });
+          cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+        }
+        data.parentId = parentId;
+      } else {
+        data.parentId = null;
+      }
+    }
+    const category = await prisma.productCategory.update({ where: { id: req.params.id }, data });
+    // строковый путь «Группа / ... / Вид» у товаров поддерева мог измениться
+    await recalcCategoryPaths(req.params.id);
+    res.json(category);
+  } catch (err: any) {
+    console.error('[products:categories:update]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/products/meta/categories/:id?moveTo=<id|'none'>
+ * Удалить категорию. Если в ней есть товары или подкатегории, без moveTo вернёт 409
+ * со счётчиками; с moveTo товары и подкатегории переносятся в другую категорию
+ * ('none' — товары без категории, подкатегории — на уровень удаляемой)
+ */
+router.delete('/meta/categories/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const moveTo = (req.query.moveTo as string) || '';
+    const existing = await prisma.productCategory.findUnique({
+      where: { id },
+      include: { _count: { select: { products: true, children: true } } },
+    });
+    if (!existing) return res.status(404).json({ error: 'Категория не найдена' });
+    const { products, children } = (existing as any)._count;
+    if ((products > 0 || children > 0) && !moveTo) {
+      return res.status(409).json({ error: 'В категории есть товары или подкатегории', products, children });
+    }
+    if (moveTo === 'none') {
+      // товары — без категории, подкатегории — на уровень удаляемой
+      const movedChildren = await prisma.productCategory.findMany({ where: { parentId: id }, select: { id: true } });
+      await prisma.product.updateMany({ where: { categoryId: id }, data: { categoryId: null, category: null } });
+      await prisma.productCategory.updateMany({ where: { parentId: id }, data: { parentId: existing.parentId } });
+      for (const ch of movedChildren) await recalcCategoryPaths(ch.id);
+    } else if (moveTo) {
+      if (moveTo === id) return res.status(400).json({ error: 'Нельзя перенести категорию в саму себя' });
+      const target = await prisma.productCategory.findUnique({ where: { id: moveTo } });
+      if (!target) return res.status(400).json({ error: 'Категория для переноса не найдена' });
+      await prisma.product.updateMany({ where: { categoryId: id }, data: { categoryId: moveTo } });
+      await prisma.productCategory.updateMany({ where: { parentId: id }, data: { parentId: moveTo } });
+      await recalcCategoryPaths(moveTo);
+    }
+    await prisma.productCategory.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[products:categories:delete]', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -34,6 +34,8 @@ const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFraction
 const inputStyle: React.CSSProperties = { padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', width: '100%', boxSizing: 'border-box' };
 const btnPrimary: React.CSSProperties = { padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' };
 const btnGhost: React.CSSProperties = { padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 13 };
+// Маленькие кнопки действий категории (✎ / ✕), видны при наведении на строку дерева
+const catActionBtn: React.CSSProperties = { border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)', padding: '0 3px', lineHeight: '18px' };
 const thStyle: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' };
 const tdStyle: React.CSSProperties = { padding: '10px 12px', fontSize: 14, borderBottom: '1px solid var(--border-color)' };
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 };
@@ -66,6 +68,11 @@ export function Products() {
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
   const [whModal, setWhModal] = useState<Warehouse | 'new' | null>(null);
   const [ptModal, setPtModal] = useState<PriceType | 'new' | null>(null);
+  // Управление категориями: модалка создания/редактирования и удаления с переносом
+  const [catModal, setCatModal] = useState<{ category: ProductCategory | 'new'; parentId?: string | null } | null>(null);
+  const [catDelete, setCatDelete] = useState<{ category: ProductCategory; products: number; children: number } | null>(null);
+  // Строка дерева категорий под курсором (показываем кнопки ✎ / ✕)
+  const [hoverCat, setHoverCat] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ productId: string; priceTypeId: string; value: string } | null>(null);
   const [vkBusy, setVkBusy] = useState<'import' | 'sync' | null>(null);
 
@@ -240,6 +247,22 @@ export function Products() {
   const toggleGroup = (key: string) => setExpanded(c => ({ ...c, [key]: !c[key] }));
   const isCollapsed = (key: string) => !searching && !expanded[key];
 
+  // Удаление категории: сразу, если она пустая; иначе бэкенд вернёт 409 —
+  // показываем модалку с выбором категории для переноса товаров
+  const removeCategory = async (c: ProductCategory) => {
+    try {
+      await api.products.categories.delete(c.id);
+      if (selCat === c.id) setSelCat('all');
+      await load();
+    } catch (e: any) {
+      if (e.status === 409) {
+        setCatDelete({ category: c, products: e.data?.products ?? 0, children: e.data?.children ?? 0 });
+      } else {
+        alert(e.message || 'Ошибка удаления');
+      }
+    }
+  };
+
   // Рендер узла дерева категорий (как в «Виды и свойства» 1С: папки + виды)
   const renderCatNode = (c: ProductCategory, depth: number): ReactNode => {
     // Каталог во вкладке «Номенклатура» всегда развёрнут
@@ -247,7 +270,7 @@ export function Products() {
     const count = countByCat.get(c.id) ?? 0;
     const selected = selCat === c.id;
     return (
-      <div key={c.id}>
+      <div key={c.id} onMouseEnter={() => setHoverCat(c.id)} onMouseLeave={() => setHoverCat(h => (h === c.id ? null : h))}>
         <div onClick={() => setSelCat(c.id)} style={{
           display: 'flex', alignItems: 'center', gap: 4,
           padding: `5px 8px 5px ${8 + depth * 18}px`, cursor: 'pointer', fontSize: 13,
@@ -261,6 +284,13 @@ export function Products() {
           ) : <span style={{ width: 14 }} />}
           <span>{c.name}</span>
           <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 12 }}>{count || ''}</span>
+          {hoverCat === c.id && (
+            <span style={{ display: 'flex', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+              <button title="Добавить подкатегорию" onClick={() => setCatModal({ category: 'new', parentId: c.id })} style={catActionBtn}>＋</button>
+              <button title="Переименовать / перенести" onClick={() => setCatModal({ category: c })} style={catActionBtn}>✎</button>
+              <button title="Удалить" onClick={() => removeCategory(c)} style={{ ...catActionBtn, color: '#dc2626' }}>✕</button>
+            </span>
+          )}
         </div>
         {!collapsed && (catChildren.get(c.id) ?? []).map(ch => renderCatNode(ch, depth + 1))}
       </div>
@@ -270,6 +300,10 @@ export function Products() {
   // Сайдбар дерева категорий — общий для вкладок «Номенклатура», «Склад» и «Цены»
   const categorySidebar = (
     <div style={{ width: 280, flexShrink: 0, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: '8px 0', maxHeight: 'calc(100vh - 220px)', overflow: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 8px 8px', margin: '0 0 4px', borderBottom: '1px solid var(--border-color)' }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Категории</span>
+        <button onClick={() => setCatModal({ category: 'new', parentId: null })} style={{ ...btnGhost, padding: '2px 10px', fontSize: 12 }}>+ Категория</button>
+      </div>
       <div onClick={() => setSelCat('all')} style={{ display: 'flex', padding: '6px 8px', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: selCat === 'all' ? 'var(--bg-hover)' : 'transparent', borderLeft: selCat === 'all' ? '2px solid #007AFF' : '2px solid transparent' }}>
         Все позиции
         <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>{filtered.length}</span>
@@ -925,6 +959,14 @@ export function Products() {
         <PriceTypeModal priceType={ptModal}
           onClose={() => setPtModal(null)} onSaved={() => { setPtModal(null); load(); }} />
       )}
+      {catModal && (
+        <CategoryModal modal={catModal} categories={categories}
+          onClose={() => setCatModal(null)} onSaved={() => { setCatModal(null); load(); }} />
+      )}
+      {catDelete && (
+        <CategoryDeleteModal info={catDelete} categories={categories}
+          onClose={() => setCatDelete(null)} onDeleted={(id) => { if (selCat === id) setSelCat('all'); setCatDelete(null); load(); }} />
+      )}
     </div>
   );
 }
@@ -1569,6 +1611,171 @@ function SalesTab() {
         </tbody>
       </table>
       {!sales.length && <div style={{ padding: 16, color: 'var(--text-muted)' }}>Продаж пока нет.</div>}
+    </div>
+  );
+}
+
+
+/* ---------- Модалка категории (создание / редактирование) ---------- */
+function CategoryModal({ modal, categories, onClose, onSaved }: {
+  modal: { category: ProductCategory | 'new'; parentId?: string | null };
+  categories: ProductCategory[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isNew = modal.category === 'new';
+  const editing = isNew ? null : modal.category as ProductCategory;
+  const [name, setName] = useState(isNew ? '' : editing!.name);
+  const [isGroup, setIsGroup] = useState(isNew ? false : editing!.isGroup);
+  const [parentId, setParentId] = useState<string>(isNew ? (modal.parentId || '') : (editing!.parentId || ''));
+  const [error, setError] = useState('');
+
+  // Недопустимые родители при редактировании: сама категория и все её потомки
+  const excluded = useMemo(() => {
+    const set = new Set<string>();
+    if (isNew || !editing) return set;
+    set.add(editing.id);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const c of categories) {
+        if (c.parentId && set.has(c.parentId) && !set.has(c.id)) { set.add(c.id); grew = true; }
+      }
+    }
+    return set;
+  }, [categories, isNew, editing]);
+
+  // Плоский список категорий с отступами по глубине (как в карточке товара)
+  const parentOptions = useMemo(() => {
+    const byParent = new Map<string | null, ProductCategory[]>();
+    for (const c of categories) {
+      const list = byParent.get(c.parentId || null) ?? [];
+      list.push(c);
+      byParent.set(c.parentId || null, list);
+    }
+    const out: { id: string; label: string }[] = [];
+    const walk = (pid: string | null, depth: number) => {
+      for (const c of byParent.get(pid) ?? []) {
+        if (!excluded.has(c.id)) out.push({ id: c.id, label: `${'— '.repeat(depth)}${c.name}` });
+        walk(c.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    return out;
+  }, [categories, excluded]);
+
+  const save = async () => {
+    if (!name.trim()) { setError('Название обязательно'); return; }
+    try {
+      if (isNew) await api.products.categories.create({ name, isGroup, parentId: parentId || null });
+      else await api.products.categories.update(editing!.id, { name, isGroup, parentId: parentId || null });
+      onSaved();
+    } catch (e: any) { setError(e.message || 'Ошибка'); }
+  };
+
+  return (
+    <div style={overlayStyle}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400 }}>
+        <h3 style={{ margin: '0 0 16px' }}>{isNew ? 'Новая категория' : 'Изменить категорию'}</h3>
+        {error && <div style={{ color: '#dc2626', marginBottom: 12, fontSize: 14 }}>{error}</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Название</label>
+          <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} placeholder="Например: Крепёж" autoFocus />
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Родительская категория</label>
+          <select value={parentId} onChange={e => setParentId(e.target.value)} style={inputStyle}>
+            <option value="">Без родительской категории</option>
+            {parentOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Тип</label>
+          <select value={isGroup ? 'group' : 'item'} onChange={e => setIsGroup(e.target.value === 'group')} style={inputStyle}>
+            <option value="item">Вид номенклатуры</option>
+            <option value="group">Папка (группа)</option>
+          </select>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button onClick={save} style={btnPrimary}>Сохранить</button>
+            <button onClick={onClose} style={btnGhost}>Отмена</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Модалка удаления категории с переносом товаров ---------- */
+function CategoryDeleteModal({ info, categories, onClose, onDeleted }: {
+  info: { category: ProductCategory; products: number; children: number };
+  categories: ProductCategory[];
+  onClose: () => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [moveTo, setMoveTo] = useState('none');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  // Варианты переноса: все категории, кроме удаляемой и её потомков
+  const excluded = useMemo(() => {
+    const set = new Set<string>([info.category.id]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const c of categories) {
+        if (c.parentId && set.has(c.parentId) && !set.has(c.id)) { set.add(c.id); grew = true; }
+      }
+    }
+    return set;
+  }, [categories, info.category.id]);
+
+  const options = useMemo(() => {
+    const byParent = new Map<string | null, ProductCategory[]>();
+    for (const c of categories) {
+      const list = byParent.get(c.parentId || null) ?? [];
+      list.push(c);
+      byParent.set(c.parentId || null, list);
+    }
+    const out: { id: string; label: string }[] = [];
+    const walk = (pid: string | null, depth: number) => {
+      for (const c of byParent.get(pid) ?? []) {
+        if (!excluded.has(c.id)) out.push({ id: c.id, label: `${'— '.repeat(depth)}${c.name}` });
+        walk(c.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    return out;
+  }, [categories, excluded]);
+
+  const remove = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.products.categories.delete(info.category.id, moveTo);
+      onDeleted(info.category.id);
+    } catch (e: any) {
+      setError(e.message || 'Ошибка удаления');
+      setBusy(false);
+    }
+  };
+
+  const parts: string[] = [];
+  if (info.products > 0) parts.push(`${info.products} товар(ов)`);
+  if (info.children > 0) parts.push(`${info.children} подкатегорий`);
+
+  return (
+    <div style={overlayStyle}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 420 }}>
+        <h3 style={{ margin: '0 0 12px' }}>Удалить категорию «{info.category.name}»?</h3>
+        <div style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 12 }}>
+          В категории {parts.join(' и ')}. Выберите, куда их перенести:
+        </div>
+        {error && <div style={{ color: '#dc2626', marginBottom: 12, fontSize: 14 }}>{error}</div>}
+        <select value={moveTo} onChange={e => setMoveTo(e.target.value)} style={{ ...inputStyle, marginBottom: 16 }}>
+          <option value="none">Без категории (подкатегории — на уровень выше)</option>
+          {options.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </select>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={remove} disabled={busy} style={{ ...btnPrimary, background: '#dc2626' }}>{busy ? 'Удаление…' : 'Удалить и перенести'}</button>
+          <button onClick={onClose} style={btnGhost}>Отмена</button>
+        </div>
+      </div>
     </div>
   );
 }
