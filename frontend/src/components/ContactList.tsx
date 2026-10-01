@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { formatPhoneInput, displayPhone } from '../lib/phone';
+import { stripHtml } from '../lib/stripHtml';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ReactQuill from 'react-quill';
@@ -49,6 +50,157 @@ export function ContactList() {
     if (saved === 'cards' || saved === 'list') return saved;
     return window.innerWidth <= 768 ? 'cards' : 'list';
   });
+
+  // Колонки списка (десктоп): видимость и ширины сохраняются в localStorage
+  const LIST_COLUMNS = [
+    { key: 'kind', label: 'Вид', defaultVisible: true, defaultWidth: 110 },
+    { key: 'type', label: 'Тип', defaultVisible: true, defaultWidth: 130 },
+    { key: 'position', label: 'Должность', defaultVisible: false, defaultWidth: 170 },
+    { key: 'organization', label: 'Компания', defaultVisible: false, defaultWidth: 190 },
+    { key: 'phones', label: 'Телефоны', defaultVisible: true, defaultWidth: 180 },
+    { key: 'emails', label: 'Email', defaultVisible: true, defaultWidth: 220 },
+    { key: 'telegram', label: 'Telegram', defaultVisible: false, defaultWidth: 150 },
+    { key: 'vk', label: 'ВКонтакте', defaultVisible: false, defaultWidth: 180 },
+    { key: 'tags', label: 'Теги', defaultVisible: true, defaultWidth: 180 },
+    { key: 'address', label: 'Адрес', defaultVisible: false, defaultWidth: 220 },
+    { key: 'birthDate', label: 'Дата рождения', defaultVisible: false, defaultWidth: 140 },
+    { key: 'notes', label: 'Заметки', defaultVisible: false, defaultWidth: 220 },
+    { key: 'tasks', label: 'Задачи', defaultVisible: true, defaultWidth: 80 },
+    { key: 'deals', label: 'Сделки', defaultVisible: true, defaultWidth: 80 },
+  ];
+  const NAME_COLUMN_KEY = '__name';
+  const NAME_COLUMN_WIDTH = 260;
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('contactsHiddenColumns');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return parsed.filter((k: string) => LIST_COLUMNS.some(c => c.key === k));
+      }
+    } catch { }
+    return LIST_COLUMNS.filter(c => !c.defaultVisible).map(c => c.key);
+  });
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    try {
+      const stored = localStorage.getItem('contactsColumnWidths');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch { }
+    return {};
+  });
+  const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
+  const resizeRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
+  const visibleColumns = LIST_COLUMNS.filter(c => !hiddenColumns.includes(c.key));
+  const colWidth = (key: string, def: number) => columnWidths[key] || def;
+  const nameColWidth = colWidth(NAME_COLUMN_KEY, NAME_COLUMN_WIDTH);
+  const gridColsTemplate = ['40px', `${nameColWidth}px`, ...visibleColumns.map(c => `${colWidth(c.key, c.defaultWidth)}px`), '80px'].join(' ');
+  const listMinWidth = 40 + nameColWidth + visibleColumns.reduce((sum, c) => sum + colWidth(c.key, c.defaultWidth), 0) + 80 + (visibleColumns.length + 2) * 12;
+
+  const toggleColumn = (key: string) => {
+    setHiddenColumns(prev => {
+      const next = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key];
+      localStorage.setItem('contactsHiddenColumns', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const startColumnResize = (e: React.PointerEvent, key: string, defWidth: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizeRef.current = { key, startX: e.clientX, startWidth: colWidth(key, defWidth) };
+    const handleMove = (ev: PointerEvent) => {
+      const st = resizeRef.current;
+      if (!st) return;
+      const w = Math.max(60, st.startWidth + ev.clientX - st.startX);
+      setColumnWidths(prev => ({ ...prev, [st.key]: w }));
+    };
+    const handleUp = () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      setColumnWidths(prev => {
+        localStorage.setItem('contactsColumnWidths', JSON.stringify(prev));
+        return prev;
+      });
+      resizeRef.current = null;
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+  };
+
+  const ResizeHandle = ({ colKey, defWidth }: { colKey: string; defWidth: number }) => (
+    <span
+      onPointerDown={(e) => startColumnResize(e, colKey, defWidth)}
+      style={{ position: 'absolute', top: 0, right: -6, width: 10, height: '100%', cursor: 'col-resize', zIndex: 2 }}
+    />
+  );
+
+  const renderListColumn = (contact: Contact, key: string) => {
+    const tc = getTypeColor(contact.type);
+    const ellipsis: React.CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+    switch (key) {
+      case 'kind': {
+        const kc = kindColors[contact.kind] || { bg: '#f5f5f5', text: '#999' };
+        return <span style={{ padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 500, background: kc.bg, color: kc.text, justifySelf: 'start' }}>{kindLabels[contact.kind] || contact.kind}</span>;
+      }
+      case 'type':
+        return <span style={{ padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 500, background: tc.bg, color: tc.text, justifySelf: 'start' }}>{getTypeLabel(contact.type)}</span>;
+      case 'position':
+        return <span style={{ fontSize: 13, color: 'var(--text-secondary)', ...ellipsis }}>{contact.position || '—'}</span>;
+      case 'organization':
+        return <span style={{ fontSize: 13, color: 'var(--text-secondary)', ...ellipsis }}>{contact.organization?.name || '—'}</span>;
+      case 'phones':
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {(contact.phones || []).filter(Boolean).slice(0, 2).map((p, i) => <span key={i} style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{displayPhone(p)}</span>)}
+            {!(contact.phones || []).filter(Boolean).length && contact.phone && <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{displayPhone(contact.phone)}</span>}
+            {(contact.phones || []).filter(Boolean).length > 2 && <span style={{ fontSize: 11, color: '#bbb' }}>+{(contact.phones || []).filter(Boolean).length - 2}</span>}
+          </div>
+        );
+      case 'emails':
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {(contact.emails || []).slice(0, 2).map((em, i) => <span key={i} style={{ fontSize: 13, color: 'var(--text-secondary)', ...ellipsis }}>{em}</span>)}
+            {!contact.emails?.length && contact.email && <span style={{ fontSize: 13, color: 'var(--text-secondary)', ...ellipsis }}>{contact.email}</span>}
+            {(contact.emails || []).length > 2 && <span style={{ fontSize: 11, color: '#bbb' }}>+{contact.emails.length - 2}</span>}
+          </div>
+        );
+      case 'telegram':
+        return contact.telegramUsername
+          ? <a href={`https://t.me/${contact.telegramUsername}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: '#1565c0', textDecoration: 'none', ...ellipsis, display: 'block' }}>@{contact.telegramUsername}</a>
+          : <span style={{ fontSize: 13, color: '#bbb' }}>—</span>;
+      case 'vk': {
+        const vkUrl = contact.vkProfileUrl;
+        const vkLabel = vkUrl ? vkUrl.replace(/^https?:\/\/(www\.)?vk\.com\//, '') : '';
+        return vkUrl
+          ? <a href={vkUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: '#1565c0', textDecoration: 'none', ...ellipsis, display: 'block' }}>{vkLabel || vkUrl}</a>
+          : <span style={{ fontSize: 13, color: '#bbb' }}>—</span>;
+      }
+      case 'tags':
+        return (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {(contact.tags || []).slice(0, 2).map(tag => (
+              <span key={tag} style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, background: '#f0f0f0', color: 'var(--text-secondary)' }}>{tag}</span>
+            ))}
+            {(contact.tags || []).length > 2 && <span style={{ fontSize: 11, color: '#bbb' }}>+{contact.tags.length - 2}</span>}
+          </div>
+        );
+      case 'address':
+        return <span style={{ fontSize: 13, color: 'var(--text-secondary)', ...ellipsis }}>{contact.address || '—'}</span>;
+      case 'birthDate':
+        return <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{contact.birthDate ? new Date(contact.birthDate).toLocaleDateString('ru-RU', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</span>;
+      case 'notes':
+        return <span style={{ fontSize: 13, color: 'var(--text-secondary)', ...ellipsis }} title={contact.notes ? stripHtml(contact.notes) : ''}>{contact.notes ? stripHtml(contact.notes).slice(0, 80) : '—'}</span>;
+      case 'tasks':
+        return <span onClick={() => navigate(`/tasks?contactId=${contact.id}`)} style={{ textAlign: 'center', fontSize: 13, fontWeight: 500, color: '#1565c0', cursor: 'pointer' }}>{contact._count?.tasks || 0}</span>;
+      case 'deals':
+        return <span onClick={() => navigate(`/deals?contactId=${contact.id}`)} style={{ textAlign: 'center', fontSize: 13, fontWeight: 500, color: '#2e7d32', cursor: 'pointer' }}>{contact._count?.deals || 0}</span>;
+      default:
+        return null;
+    }
+  };
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
@@ -135,6 +287,7 @@ export function ContactList() {
     position: '',
     birthDate: '',
     address: '',
+    telegramUsername: '',
     organizationId: '',
     projectIds: [] as string[],
   });
@@ -223,7 +376,7 @@ export function ContactList() {
     setEditingId(null);
     setForm({
       name: '', emails: [''], phones: [''], type: 'client', kind: kindFilter === 'organization' ? 'organization' : 'contact',
-      tags: '', notes: '', inn: '', ogrn: '', legalAddress: '', position: '', birthDate: '', address: '', organizationId: '',
+      tags: '', notes: '', inn: '', ogrn: '', legalAddress: '', position: '', birthDate: '', address: '', telegramUsername: '', organizationId: '',
       projectIds: [],
     });
     setShowModal(true);
@@ -245,6 +398,7 @@ export function ContactList() {
       position: contact.position || '',
       birthDate: contact.birthDate ? contact.birthDate.slice(0, 10) : '',
       address: contact.address || '',
+      telegramUsername: contact.telegramUsername || '',
       organizationId: contact.organizationId || '',
       projectIds: contact.projects?.map(p => p.project.id) || [],
     });
@@ -264,6 +418,7 @@ export function ContactList() {
       data.position = null;
       data.birthDate = null;
       data.address = null;
+      data.telegramUsername = null;
       data.organizationId = null;
     } else {
       data.inn = null;
@@ -271,6 +426,7 @@ export function ContactList() {
       data.legalAddress = null;
       data.birthDate = form.birthDate || null;
       data.address = form.address || null;
+      data.telegramUsername = form.telegramUsername || null;
     }
     if (editingId) {
       await api.contacts.update(editingId, data);
@@ -574,6 +730,7 @@ export function ContactList() {
               {!contact.phones?.filter(Boolean).length && contact.phone && <span>📞 {displayPhone(contact.phone)}</span>}
               {contact.emails?.filter(Boolean).map((e, i) => <span key={i}>✉️ {e}</span>)}
               {!contact.emails?.filter(Boolean).length && contact.email && <span>✉️ {contact.email}</span>}
+              {contact.telegramUsername && <span>✈️ @{contact.telegramUsername}</span>}
               {contact.inn && <span>🆔 ИНН: {contact.inn}</span>}
               {contact.description && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>📝 {contact.description}</span>}
               {contact.lastActivityTime && <span style={{ color: '#999', fontSize: 11 }}>⏱️ {new Date(contact.lastActivityTime).toLocaleString('ru-RU')}</span>}
@@ -597,9 +754,10 @@ export function ContactList() {
 
   const ListView = () => (
     <div style={{ borderRadius: 16, border: '1px solid var(--border-color)', background: 'var(--bg-card)', overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
+      <div style={{ overflowX: 'auto' }}>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '40px 2fr 1fr 1fr 1.5fr 1.5fr 1fr 80px 80px 80px',
+        gridTemplateColumns: gridColsTemplate,
         gap: 12,
         padding: '12px 16px',
         background: 'var(--bg-input)',
@@ -608,32 +766,43 @@ export function ContactList() {
         color: 'var(--text-muted)',
         borderBottom: '1px solid var(--border-color)',
         alignItems: 'center',
+        minWidth: listMinWidth,
       }}>
         <input type="checkbox" checked={selectedIds.size === sortedContacts.length && sortedContacts.length > 0} onChange={selectAll} style={{ width: 18, height: 18 }} />
-        <span>Имя / Компания</span>
-        <span>Вид</span>
-        <span>Тип</span>
-        <span>Телефоны</span>
-        <span>Email</span>
-        <span>Теги</span>
-        <span style={{ textAlign: 'center' }}>Задачи</span>
-        <span style={{ textAlign: 'center' }}>Сделки</span>
+        <span style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          Имя / Компания
+          <ResizeHandle colKey={NAME_COLUMN_KEY} defWidth={NAME_COLUMN_WIDTH} />
+        </span>
+        {visibleColumns.map(c => (
+          <span
+            key={c.key}
+            style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              ...(c.key === 'tasks' || c.key === 'deals' ? { justifyContent: 'center' } : {}),
+            }}
+          >
+            {c.label}
+            <ResizeHandle colKey={c.key} defWidth={c.defaultWidth} />
+          </span>
+        ))}
         <span></span>
       </div>
       {sortedContacts.map((contact, idx) => {
         const tc = getTypeColor(contact.type);
-        const kc = kindColors[contact.kind] || { bg: '#f5f5f5', text: '#999' };
         const isSelected = selectedIds.has(contact.id);
         return (
           <div key={contact.id} style={{
             display: 'grid',
-            gridTemplateColumns: '40px 2fr 1fr 1fr 1.5fr 1.5fr 1fr 80px 80px 80px',
+            gridTemplateColumns: gridColsTemplate,
             gap: 12,
             padding: '12px 16px',
             alignItems: 'center',
             borderBottom: idx < sortedContacts.length - 1 ? '1px solid #f0f0f0' : 'none',
             transition: 'background 0.15s',
             background: isSelected ? '#f0f7ff' : 'transparent',
+            minWidth: listMinWidth,
           }}>
             <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(contact.id)} style={{ width: 18, height: 18, cursor: 'pointer' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -657,32 +826,9 @@ export function ContactList() {
                 <div style={{ fontSize: 12, color: '#bbb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contactSubtitle(contact)}</div>
               </div>
             </div>
-            <span style={{ padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 500, background: kc.bg, color: kc.text, justifySelf: 'start' }}>{kindLabels[contact.kind] || contact.kind}</span>
-            <span style={{ padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 500, background: tc.bg, color: tc.text, justifySelf: 'start' }}>{getTypeLabel(contact.type)}</span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {contact.phones?.filter(Boolean).slice(0, 2).map((p, i) => <span key={i} style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{displayPhone(p)}</span>)}
-              {!contact.phones?.filter(Boolean).length && contact.phone && <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{displayPhone(contact.phone)}</span>}
-              {contact.phones?.filter(Boolean).length > 2 && <span style={{ fontSize: 11, color: '#bbb' }}>+{contact.phones.filter(Boolean).length - 2}</span>}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {contact.emails?.filter(Boolean).slice(0, 2).map((e, i) => <span key={i} style={{ fontSize: 13, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e}</span>)}
-              {!contact.emails?.filter(Boolean).length && contact.email && <span style={{ fontSize: 13, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact.email}</span>}
-              {contact.emails?.filter(Boolean).length > 2 && <span style={{ fontSize: 11, color: '#bbb' }}>+{contact.emails.filter(Boolean).length - 2}</span>}
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {contact.tags.slice(0, 2).map(tag => (
-                <span key={tag} style={{ padding: '2px 6px', borderRadius: 6, fontSize: 10, background: 'var(--bg-body)', color: 'var(--text-muted)' }}>{tag}</span>
-              ))}
-              {contact.tags.length > 2 && <span style={{ fontSize: 10, color: '#bbb' }}>+{contact.tags.length - 2}</span>}
-            </div>
-            <span
-              onClick={() => navigate(`/tasks?contactId=${contact.id}`)}
-              style={{ textAlign: 'center', fontSize: 13, fontWeight: 500, color: '#1565c0', cursor: 'pointer' }}
-            >{contact._count?.tasks || 0}</span>
-            <span
-              onClick={() => navigate(`/deals?contactId=${contact.id}`)}
-              style={{ textAlign: 'center', fontSize: 13, fontWeight: 500, color: '#2e7d32', cursor: 'pointer' }}
-            >{contact._count?.deals || 0}</span>
+            {visibleColumns.map(c => (
+              <div key={c.key} style={{ minWidth: 0 }}>{renderListColumn(contact, c.key)}</div>
+            ))}
             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
               {canEdit && (
                 <button onClick={() => openEdit(contact)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: 2 }}>✏️</button>
@@ -694,6 +840,7 @@ export function ContactList() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 
@@ -716,6 +863,34 @@ export function ContactList() {
             <option value="type">По типу</option>
           </select>
           {!isMobile && <ViewToggle />}
+          {!isMobile && viewMode === 'list' && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setColumnsMenuOpen(o => !o)}
+                title="Настройки колонок"
+                style={{ background: columnsMenuOpen ? 'var(--bg-input)' : 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: '7px 9px', cursor: 'pointer', color: columnsMenuOpen ? 'var(--text-primary)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </button>
+              {columnsMenuOpen && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 5 }} onClick={() => setColumnsMenuOpen(false)} />
+                  <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 6, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, boxShadow: 'var(--shadow)', minWidth: 190, padding: 6 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '6px 8px 4px' }}>Колонки списка</div>
+                    {LIST_COLUMNS.map(c => (
+                      <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 400, color: 'var(--text-primary)' }}>
+                        <input type="checkbox" checked={!hiddenColumns.includes(c.key)} onChange={() => toggleColumn(c.key)} />
+                        {c.label}
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           <button onClick={openCreate} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>+ Создать</button>
         </div>
       </div>
@@ -775,6 +950,7 @@ export function ContactList() {
                     <input type="date" value={form.birthDate} onChange={e => setForm({ ...form, birthDate: e.target.value })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14, width: '100%', boxSizing: 'border-box' }} />
                   </div>
                   <input placeholder="Адрес" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }} />
+                  <input placeholder="Telegram (без @)" value={form.telegramUsername} onChange={e => setForm({ ...form, telegramUsername: e.target.value })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }} />
                 </>
               )}
 

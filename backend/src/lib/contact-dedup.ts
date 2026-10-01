@@ -145,6 +145,7 @@ export async function mergeContacts(targetId: string, sourceIds: string[], extra
       maxUserId: pick(target.maxUserId, ...sources.map((s) => s.maxUserId), extraData.maxUserId),
       vkUserId: pick(target.vkUserId, ...sources.map((s) => s.vkUserId), extraData.vkUserId),
       vkProfileUrl: pick(target.vkProfileUrl, ...sources.map((s) => s.vkProfileUrl), extraData.vkProfileUrl),
+      telegramUsername: pick(target.telegramUsername, ...sources.map((s) => s.telegramUsername), extraData.telegramUsername),
       lastActivityTime: [target.lastActivityTime, ...sources.map((s) => s.lastActivityTime), extraData.lastActivityTime]
         .filter(Boolean)
         .sort((a: any, b: any) => new Date(b).getTime() - new Date(a).getTime())[0] ?? target.lastActivityTime,

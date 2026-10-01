@@ -36,6 +36,7 @@ const createSchema = z.object({
   position: z.string().optional().or(z.literal(null)),
   birthDate: z.string().optional().or(z.literal('')).or(z.literal(null)),
   address: z.string().optional().or(z.literal('')).or(z.literal(null)),
+  telegramUsername: z.string().optional().or(z.literal('')).or(z.literal(null)),
   organizationId: z.string().optional().or(z.literal(null)),
   projectIds: z.array(z.string()).optional().default([]),
 });
@@ -145,6 +146,7 @@ router.post('/', async (req, res) => {
       payload.position = null;
       payload.birthDate = null;
       payload.address = null;
+      payload.telegramUsername = null;
     } else {
       payload.inn = null;
       payload.ogrn = null;
@@ -158,6 +160,11 @@ router.post('/', async (req, res) => {
     }
     if (payload.address === '' || payload.address === undefined) {
       payload.address = null;
+    }
+    if (payload.telegramUsername === '' || payload.telegramUsername === undefined) {
+      payload.telegramUsername = null;
+    } else if (typeof payload.telegramUsername === 'string') {
+      payload.telegramUsername = payload.telegramUsername.replace(/^@/, '').trim() || null;
     }
     const contact = await prisma.contact.create({
       data: {
@@ -317,6 +324,7 @@ router.patch('/:id', async (req: AuthRequest, res) => {
       updateData.position = null;
       updateData.birthDate = null;
       updateData.address = null;
+      updateData.telegramUsername = null;
     } else if (data.kind === 'contact') {
       updateData.inn = null;
       updateData.ogrn = null;
@@ -330,6 +338,11 @@ router.patch('/:id', async (req: AuthRequest, res) => {
     }
     if (updateData.address === '') {
       updateData.address = null;
+    }
+    if (updateData.telegramUsername === '') {
+      updateData.telegramUsername = null;
+    } else if (typeof updateData.telegramUsername === 'string') {
+      updateData.telegramUsername = updateData.telegramUsername.replace(/^@/, '').trim() || null;
     }
 
     if (projectIds !== undefined) {
