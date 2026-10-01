@@ -152,6 +152,9 @@ router.post('/', async (req, res) => {
     }
     if (payload.birthDate === '' || payload.birthDate === undefined) {
       payload.birthDate = null;
+    } else if (typeof payload.birthDate === 'string') {
+      const parsedBirthDate = new Date(payload.birthDate);
+      payload.birthDate = isNaN(parsedBirthDate.getTime()) ? null : parsedBirthDate.toISOString();
     }
     if (payload.address === '' || payload.address === undefined) {
       payload.address = null;
@@ -321,6 +324,9 @@ router.patch('/:id', async (req: AuthRequest, res) => {
     }
     if (updateData.birthDate === '') {
       updateData.birthDate = null;
+    } else if (typeof updateData.birthDate === 'string') {
+      const parsedBirthDate = new Date(updateData.birthDate);
+      updateData.birthDate = isNaN(parsedBirthDate.getTime()) ? null : parsedBirthDate.toISOString();
     }
     if (updateData.address === '') {
       updateData.address = null;
