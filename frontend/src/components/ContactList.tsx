@@ -742,10 +742,22 @@ export function ContactList() {
               <span style={{ fontSize: 11, color: '#bbb' }}>{new Date(contact.createdAt).toLocaleDateString('ru')}</span>
               <div style={{ display: 'flex', gap: 8 }}>
                 {canEdit && (
-                  <button onClick={e => { e.stopPropagation(); openEdit(contact); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: 4 }}>✏️</button>
+                  <button
+                    onClick={e => { e.stopPropagation(); openEdit(contact); }}
+                    title="Изменить"
+                    style={{width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer', color: 'var(--text-color)'}}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
+                  </button>
                 )}
                 {canDelete && (
-                  <button onClick={e => { e.stopPropagation(); handleDelete(contact.id); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: 4 }}>🗑</button>
+                  <button
+                    onClick={e => { e.stopPropagation(); handleDelete(contact.id); }}
+                    title="Удалить"
+                    style={{width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer', color: '#dc2626'}}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
+                  </button>
                 )}
               </div>
             </div>
@@ -834,10 +846,22 @@ export function ContactList() {
             ))}
             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
               {canEdit && (
-                <button onClick={() => openEdit(contact)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: 2 }}>✏️</button>
+                <button
+                  onClick={() => openEdit(contact)}
+                  title="Изменить"
+                  style={{width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer', color: 'var(--text-color)'}}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
+                </button>
               )}
               {canDelete && (
-                <button onClick={() => handleDelete(contact.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: 2 }}>🗑</button>
+                <button
+                  onClick={() => handleDelete(contact.id)}
+                  title="Удалить"
+                  style={{width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer', color: '#dc2626'}}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
+                </button>
               )}
             </div>
           </div>
