@@ -204,6 +204,7 @@ export function Login() {
       {/* Правая панель с формой */}
       <section className="login-form-side">
         <div className="login-form-wrap">
+          <div className="login-form-content">
           <h1>{isRegister ? 'Регистрация' : 'Вход в систему'}</h1>
           <p className="login-subtitle">
             {isRegister ? 'Создайте аккаунт за пару минут' : 'С возвращением! Введите свои данные'}
@@ -286,6 +287,7 @@ export function Login() {
               <>Нет аккаунта? <button type="button" onClick={() => { setIsRegister(true); setError('') }}>Регистрация</button></>
             )}
           </p>
+          </div>
 
           <footer className="login-legal-footer" aria-label="Юридические документы">
             <a href="/offer">Договор публичной оферты</a>
