@@ -144,6 +144,7 @@ router.post('/', async (req, res) => {
     if (data.kind === 'organization') {
       payload.position = null;
       payload.birthDate = null;
+      payload.address = null;
     } else {
       payload.inn = null;
       payload.ogrn = null;
@@ -312,6 +313,7 @@ router.patch('/:id', async (req: AuthRequest, res) => {
     if (data.kind === 'organization') {
       updateData.position = null;
       updateData.birthDate = null;
+      updateData.address = null;
     } else if (data.kind === 'contact') {
       updateData.inn = null;
       updateData.ogrn = null;
