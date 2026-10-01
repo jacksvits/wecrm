@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api/client';
+import { updateAppBadge } from '../lib/appBadge';
 
 export function Notifications() {
   const { user } = useAuth();
@@ -37,6 +38,11 @@ export function Notifications() {
     es.onerror = () => {};
     return () => es.close();
   }, [user]);
+
+  // Бейдж PWA-иконки (наклейка) со счётчиком непрочитанных уведомлений
+  useEffect(() => {
+    updateAppBadge(unreadCount);
+  }, [unreadCount]);
 
   // Close on click outside
   useEffect(() => {
