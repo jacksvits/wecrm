@@ -114,33 +114,8 @@ export function Notes() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             onKeyDown={handleKeyDown}
-            style={{
-              flex: 1,
-              minWidth: 250,
-              padding: '10px 14px',
-              borderRadius: 10,
-              border: '1px solid var(--border-color)',
-              background: 'var(--bg-color)',
-              color: 'var(--text-color)',
-              fontSize: 14,
-              outline: 'none',
-            }}
+            style={{ flex: 1, minWidth: 220, padding: '8px 14px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-color)', fontSize: 14, outline: 'none' }}
           />
-          <button
-            onClick={handleSearch}
-            style={{
-              padding: '10px 20px',
-              borderRadius: 10,
-              background: '#007AFF',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 14,
-              fontWeight: 500,
-            }}
-          >
-            Найти
-          </button>
           {hasActiveFilters && (
             <button
               onClick={clearFilters}

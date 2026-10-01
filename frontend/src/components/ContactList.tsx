@@ -878,7 +878,7 @@ export function ContactList() {
         <button className="btn-action" onClick={openCreate}>+ Создать</button>
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-          <input placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} style={{ padding: '6px 12px', borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14, width: 180 }} />
+          <input placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} style={{ flex: 1, minWidth: 220, padding: '8px 14px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-color)', fontSize: 14, outline: 'none' }} />
           <KindToggle />
           <select value={selectedTag} onChange={e => setSelectedTag(e.target.value)} style={{ padding: '6px 12px', borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }}>
             <option value="">Все теги</option>
