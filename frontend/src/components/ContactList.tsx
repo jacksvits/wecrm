@@ -207,6 +207,9 @@ export function ContactList() {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const PAGE_SIZE = 50;
+  // Сентинел для автоподгрузки: когда он попадает в зону видимости,
+  // подгружается следующая порция контактов (бесконечная прокрутка)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [mergeTargetId, setMergeTargetId] = useState<string>('');
   const [showKindModal, setShowKindModal] = useState(false);
@@ -350,6 +353,22 @@ export function ContactList() {
   const loadOrganizations = () => {
     api.contacts.list('kind=organization').then(setOrganizations);
   };
+
+  // Автоподгрузка следующей порции при прокрутке списка к концу.
+  // Не срабатывает во время загрузки и при активном поиске (при поиске
+  // все совпадения загружаются одним запросом без пагинации).
+  // rootMargin подгружает порцию чуть раньше, чем пользователь долистает до конца.
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el || !hasMore || loading || search.trim()) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) {
+        loadContacts(false);
+      }
+    }, { rootMargin: '400px 0px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loading, search, contacts.length, kindFilter, selectedTag]);
 
   useEffect(() => {
     loadContacts(true);
@@ -935,15 +954,12 @@ export function ContactList() {
 
       {isMobile || viewMode === 'cards' ? <CardView /> : <ListView />}
 
+      {/* Сентинел автоподгрузки: пересечение с видимой областью запускает загрузку следующей порции */}
+      {hasMore && <div ref={loadMoreRef} style={{ height: 1 }} />}
+
       {hasMore && (
-        <div style={{ textAlign: "center", marginTop: 16 }}>
-          <button
-            onClick={() => loadContacts(false)}
-            disabled={loading}
-            style={{ padding: "8px 24px", borderRadius: 12, border: "1px solid var(--border-color)", background: "var(--bg-card)", cursor: "pointer", fontSize: 14 }}
-          >
-            {loading ? "Загрузка..." : `Загрузить еще (${contacts.length} из ${totalCount})`}
-          </button>
+        <div style={{ textAlign: "center", marginTop: 16, color: 'var(--text-muted)', fontSize: 13 }}>
+          {loading ? `Загрузка... (${contacts.length} из ${totalCount})` : `Показано ${contacts.length} из ${totalCount}`}
         </div>
       )}
 
