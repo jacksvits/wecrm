@@ -1378,11 +1378,33 @@ function ReservesTab() {
     } catch (e: any) { alert(e.message || e.error || 'Ошибка'); }
     setEditBusy(false);
   };
-  const share = async (id: string) => {
-    const taskId = prompt('Номер задачи (#) или ID для отправки в обсуждение:');
-    if (!taskId) return;
-    try { await api.reservations.share(id, taskId); alert('Отправлено в обсуждение задачи'); }
-    catch (e: any) { alert(e.message || 'Ошибка отправки'); }
+  // Отправка резерва в обсуждение задачи со статусом «В работе» (выпадающий список вместо prompt)
+  const [shareRes, setShareRes] = useState<string | null>(null);
+  const [shareTasks, setShareTasks] = useState<any[]>([]);
+  const [shareTaskId, setShareTaskId] = useState('');
+  const [shareBusy, setShareBusy] = useState(false);
+
+  const openShare = async (id: string) => {
+    setShareRes(id);
+    setShareTaskId('');
+    setShareTasks([]);
+    try {
+      const statuses = await api.statuses.list('task');
+      const inWork = statuses.find((s: any) => s.name === 'in_progress') || statuses.find((s: any) => s.label === 'В работе');
+      const tasks = await api.tasks.list(inWork ? `status=${encodeURIComponent(inWork.name)}` : '');
+      setShareTasks(Array.isArray(tasks) ? tasks : (tasks as any)?.tasks ?? []);
+    } catch { setShareTasks([]); }
+  };
+
+  const doShare = async () => {
+    if (!shareRes || !shareTaskId) return;
+    setShareBusy(true);
+    try {
+      await api.reservations.share(shareRes, shareTaskId);
+      alert('Отправлено в обсуждение задачи');
+      setShareRes(null);
+    } catch (e: any) { alert(e.message || 'Ошибка отправки'); }
+    finally { setShareBusy(false); }
   };
   const statusLabel = (s: string) => s === 'held' ? 'Отложено' : s === 'issued' ? 'Выдано' : s === 'canceled' ? 'Отменено' : s;
 
@@ -1409,7 +1431,7 @@ function ReservesTab() {
                 {r.status === 'held' && <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => setStatus(r, 'canceled')}>Отменить</button>}
                 {r.status === 'canceled' && <button style={btnGhost} onClick={() => setStatus(r, 'held')}>Вернуть в резерв</button>}
                 <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => api.reservations.downloadPdf(r.id, r.number)}>PDF</button>
-                <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => share(r.id)}>В задачу</button>
+                <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => openShare(r.id)}>В задачу</button>
                 {r.status !== 'issued' && (delFor === r.id ? (
                   <>
                     <button style={{ ...btnGhost, marginLeft: 8, borderColor: '#FF3B30', color: '#FF3B30' }} onClick={() => doDelete(r)}>Удалить?</button>
@@ -1459,6 +1481,25 @@ function ReservesTab() {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setEditRes(null)} style={btnGhost}>Отмена</button>
               <button onClick={saveEdit} disabled={editBusy} style={btnPrimary}>{editBusy ? 'Сохранение...' : 'Сохранить'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модал отправки резерва в обсуждение задачи «В работе» */}
+      {shareRes && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 20, width: 480, maxWidth: '100%' }}>
+            <h3 style={{ margin: '0 0 14px' }}>Отправить в обсуждение задачи</h3>
+            <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Задача в работе</label>
+            <select value={shareTaskId} onChange={e => setShareTaskId(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 14 }}>
+              <option value="">— Выберите задачу —</option>
+              {shareTasks.map((t: any) => <option key={t.id} value={t.id}>{t.ticketNumber ? `#${t.ticketNumber} ` : ''}{t.title}</option>)}
+            </select>
+            {!shareTasks.length && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>Нет задач в статусе «В работе».</div>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShareRes(null)} style={btnGhost}>Отмена</button>
+              <button onClick={doShare} disabled={shareBusy || !shareTaskId} style={btnPrimary}>{shareBusy ? 'Отправка...' : 'Отправить'}</button>
             </div>
           </div>
         </div>
