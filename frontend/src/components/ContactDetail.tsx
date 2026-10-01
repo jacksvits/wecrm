@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { Contact, Task, Deal } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { displayPhone } from '../lib/phone';
+import { stripHtml } from '../lib/stripHtml';
 import { linkifyTaskTagsHtml, useTaskHashtagClick } from '../lib/taskHashtags';
 import { ContactAccesses } from './ContactAccesses';
 
@@ -132,6 +133,13 @@ export function ContactDetail() {
             <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
               <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Дата рождения</span>
               <span style={{ fontSize: 14 }}>{new Date(contact.birthDate).toLocaleDateString('ru-RU', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            </div>
+          )}
+
+          {contact.kind === 'contact' && contact.address && (
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Адрес</span>
+              <span style={{ fontSize: 14 }}>{stripHtml(contact.address)}</span>
             </div>
           )}
 
