@@ -300,4 +300,10 @@ import { User, Task, Contact, ContactAccess, ContactAccessDirection, Deal, Proje
     reconciliationUnmatch: (documentId: string) => fetchApi('/api/accounting/reconciliation/unmatch', { method: 'POST', body: JSON.stringify({ documentId }) }),
   },
 
+  // Публичные юридические документы (доступны до авторизации; запись — только admin)
+  legal: {
+    get: (slug: 'offer' | 'privacy'): Promise<{ slug: string; title: string; content: string; updatedAt: string | null }> => fetchApi(`/api/legal/${slug}`),
+    save: (slug: 'offer' | 'privacy', content: string) => fetchApi(`/api/legal/${slug}`, { method: 'PUT', body: JSON.stringify({ content }) }),
+  },
+
 };

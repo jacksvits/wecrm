@@ -276,6 +276,12 @@ export function Login() {
             </button>
           </form>
 
+          <footer className="login-legal-footer" aria-label="Юридические документы">
+            <a href="/offer">Договор оферты</a>
+            <span aria-hidden="true">·</span>
+            <a href="/privacy">Политика конфиденциальности</a>
+          </footer>
+
           <div className="login-divider"><span>или</span></div>
 
           {vkConfig ? (

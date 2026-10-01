@@ -30,7 +30,7 @@ const TAB_CONFIGS = [
   { key: "games", label: "Игры", defaultPath: "/volume3/GAME" },
 ];
 
-type SystemSubTab = "design" | "themes" | "storage" | "handler" | "autoreply";
+type SystemSubTab = "design" | "themes" | "storage" | "handler" | "autoreply" | "legal";
 
 export function SystemSettings() {
   // По умолчанию открываем под-вкладку «Дизайн»
@@ -71,6 +71,12 @@ export function SystemSettings() {
   // Редактируемый триггер: id → { word, answer }
   const [arEditing, setArEditing] = useState<Record<string, { word: string; answer: string }>>({});
 
+  // === Юридические документы: публичная оферта и политика конфиденциальности ===
+  const [legalOffer, setLegalOffer] = useState("");
+  const [legalPrivacy, setLegalPrivacy] = useState("");
+  const [legalLoading, setLegalLoading] = useState(true);
+  const [legalSaving, setLegalSaving] = useState<"offer" | "privacy" | null>(null);
+
   useEffect(() => {
     Promise.all([api.handlerSettings.get(), api.autoReplySettings.get(), api.users.list()])
       .then(([s, ar, users]) => {
@@ -88,6 +94,16 @@ export function SystemSettings() {
         setArLoading(false);
         setHandlerLoading(false);
       });
+  }, []);
+
+  useEffect(() => {
+    Promise.all([api.legal.get("offer"), api.legal.get("privacy")])
+      .then(([offer, privacy]) => {
+        setLegalOffer(offer.content || "");
+        setLegalPrivacy(privacy.content || "");
+        setLegalLoading(false);
+      })
+      .catch(() => setLegalLoading(false));
   }, []);
 
   const saveHandler = async () => {
@@ -936,6 +952,46 @@ export function SystemSettings() {
     </div>
   );
 
+  // === Под-вкладка «Документы»: публичная оферта и политика конфиденциальности ===
+  const saveLegal = async (slug: "offer" | "privacy") => {
+    setLegalSaving(slug);
+    try { await api.legal.save(slug, slug === "offer" ? legalOffer : legalPrivacy); alert("Сохранено"); }
+    catch (e: any) { alert("Ошибка: " + e.message); }
+    finally { setLegalSaving(null); }
+  };
+  const renderLegal = () => {
+    if (legalLoading) return <div style={{ padding: 20, color: "var(--text-muted)" }}>Загрузка...</div>;
+    const cardStyle = { padding: 18, borderRadius: 12, border: "1px solid var(--border-color)", background: "var(--bg-color)", marginBottom: 18 };
+    const editorStyle = { background: "var(--bg-card)", marginBottom: 12 };
+    const btnLegal: React.CSSProperties = {
+      padding: "8px 16px",
+      borderRadius: 10,
+      background: "#007AFF",
+      color: "#fff",
+      border: "none",
+      cursor: "pointer",
+      fontSize: 14,
+      opacity: legalSaving ? 0.7 : 1,
+    };
+    return (
+      <div>
+        <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 14 }}>
+          Публичные документы для интернет-эквайринга открываются по адресам <a href="/offer" target="_blank" rel="noreferrer">/offer</a> и <a href="/privacy" target="_blank" rel="noreferrer">/privacy</a>. Перед отправкой в банк замените плейсхолдеры [наименование], [ИНН], [ОГРН], [email] и проверьте текст у юриста.
+        </p>
+        <div style={cardStyle}>
+          <h3 style={{ marginTop: 0, marginBottom: 12 }}>Договор публичной оферты</h3>
+          <ReactQuill theme="snow" value={legalOffer} onChange={setLegalOffer} modules={quillModules} formats={quillFormats} style={editorStyle} />
+          <button onClick={() => saveLegal("offer")} disabled={legalSaving === "offer"} style={btnLegal}>{legalSaving === "offer" ? "Сохранение..." : "Сохранить оферту"}</button>
+        </div>
+        <div style={cardStyle}>
+          <h3 style={{ marginTop: 0, marginBottom: 12 }}>Политика конфиденциальности</h3>
+          <ReactQuill theme="snow" value={legalPrivacy} onChange={setLegalPrivacy} modules={quillModules} formats={quillFormats} style={editorStyle} />
+          <button onClick={() => saveLegal("privacy")} disabled={legalSaving === "privacy"} style={btnLegal}>{legalSaving === "privacy" ? "Сохранение..." : "Сохранить политику"}</button>
+        </div>
+      </div>
+    );
+  };
+
   // === Под-вкладка «Обработчик»: авто-сообщения в обсуждение задач ===
   const renderHandler = () => {
     if (handlerLoading) return <div style={{ padding: 20, color: "var(--text-muted)" }}>Загрузка...</div>;
@@ -1304,9 +1360,12 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "autoreply")} onClick={() => setSubTab("autoreply")}>
           Автоответчик
         </button>
+        <button style={subTabStyle(subTab === "legal")} onClick={() => setSubTab("legal")}>
+          Документы
+        </button>
       </div>
 
-      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "handler" ? renderHandler() : renderAutoReply()}
+      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : renderLegal()}
     </div>
   );
 }

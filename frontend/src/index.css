@@ -765,3 +765,23 @@ html, body { overflow-x: hidden; }
   -webkit-user-select: text;
   -webkit-touch-callout: default;
 }
+
+
+/* Публичные юридические документы: футер регистрации + страницы /offer и /privacy */
+.login-legal-footer { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 18px; font-size: 12.5px; color: #8a8a95; }
+.login-legal-footer a { color: #6aa832; text-decoration: none; font-weight: 600; transition: color 0.2s, opacity 0.2s; }
+.login-legal-footer a:hover { color: #3f8f0f; opacity: 0.9; }
+.legal-page { min-height: 100vh; padding: 40px 20px 64px; background: #f5f6fa; color: #1a1a1a; }
+.legal-card { width: 100%; max-width: 900px; margin: 0 auto; padding: 34px; background: #fff; border: 1px solid #e8e8ee; border-radius: 22px; box-shadow: 0 18px 50px rgba(31, 41, 55, 0.08); }
+.legal-back { display: inline-flex; margin-bottom: 18px; color: #5eb21f; font-weight: 700; text-decoration: none; }
+.legal-back:hover { opacity: 0.8; }
+.legal-card h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: -0.5px; }
+.legal-updated { margin-bottom: 24px; color: #8a8a95; font-size: 13px; }
+.legal-loading { padding: 40px 0; text-align: center; color: #8a8a95; }
+.legal-error { margin: 16px 0; padding: 14px 16px; border-radius: 14px; background: #fee2e2; color: #991b1b; }
+.legal-content { line-height: 1.7; font-size: 15px; }
+.legal-content h2 { margin: 26px 0 10px; font-size: 21px; }
+.legal-content p { margin: 0 0 12px; }
+.legal-content ul, .legal-content ol { margin: 0 0 14px 22px; }
+.legal-content a { color: #5eb21f; }
+@media (max-width: 700px) { .legal-page { padding: 22px 12px 40px; } .legal-card { padding: 22px; border-radius: 18px; } .legal-card h1 { font-size: 24px; } }

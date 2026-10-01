@@ -1409,6 +1409,19 @@ model AutoReplyTrigger {
   @@map("auto_reply_triggers")
 }
 
+
+// Публичные юридические документы: договор оферты и политика конфиденциальности
+// Хранятся одной строкой (singleton) и редактируются администратором через WYSIWYG
+model LegalDocument {
+  id        Int      @id @default(1)
+  offer     String   @default("")
+  privacy   String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("legal_documents")
+}
+
 model OneCPluginSettings {
   id                  Int       @id @default(1)
   isActive            Boolean   @default(false) @map("is_active")
