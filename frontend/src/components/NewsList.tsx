@@ -121,19 +121,11 @@ export function NewsList() {
             )}
             {canCreateNews && (
             <button
+              className="btn-action"
               onClick={() => navigate('/news/new')}
-              style={{
-                padding: '8px 16px',
-                borderRadius: 10,
-                background: '#007AFF',
-                color: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: 14,
-                fontWeight: 500,
-              }}
+              title="Создать новость"
             >
-              + Создать новость
+              +
             </button>
             )}
           </div>

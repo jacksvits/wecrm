@@ -95,8 +95,9 @@ export function Reminders() {
         <button
           className="btn-action"
           onClick={() => navigate('/reminders/new')}
+          title="Создать напоминание"
         >
-          + Новое напоминание
+          +
         </button>
       </div>
 

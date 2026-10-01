@@ -309,7 +309,7 @@ export function DealBoard() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>Воронка продаж</h2>
-        <button onClick={openCreate} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>+ Создать сделку</button>
+        <button className="btn-action" onClick={openCreate} title="Создать сделку">+</button>
       </div>
       <div
         style={{ display: 'flex', gap: 12, overflowX: isMobile ? 'hidden' : 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch', minHeight: 400, alignItems: 'flex-start', flexDirection: isMobile ? 'column' : 'row' }}

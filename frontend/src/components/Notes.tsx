@@ -101,8 +101,9 @@ export function Notes() {
           <button
             className="btn-action"
             onClick={() => navigate('/notes/new')}
+            title="Создать заметку"
           >
-            + Новая заметка
+            +
           </button>
         </div>
 
