@@ -13,7 +13,7 @@ interface VitrineCard {
   image: any;
 }
 
-export function Vitrine() {
+export function Vitrine({ search = '' }: { search?: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
@@ -127,9 +127,17 @@ export function Vitrine() {
       list = list.filter((c) => c.product.categoryId && ids.has(c.product.categoryId));
     }
     if (inStockOnly) list = list.filter((c) => c.inStock);
+    const s = search.trim().toLowerCase();
+    if (s) {
+      list = list.filter((c) =>
+        c.product.name.toLowerCase().includes(s) ||
+        (c.product.sku || '').toLowerCase().includes(s) ||
+        (c.product.category || '').toLowerCase().includes(s) ||
+        (c.product.subcategory || '').toLowerCase().includes(s));
+    }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, activeCategoryId, inStockOnly, categories]);
+  }, [cards, activeCategoryId, inStockOnly, categories, search]);
 
   const toggleExpand = (id: string) => {
     const next = new Set(expanded);
@@ -315,6 +323,11 @@ export function Vitrine() {
           </label>
         </aside>
         <div className="vitrine-grid">
+          {filteredCards.length === 0 && (
+            <div style={{ gridColumn: '1 / -1', padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
+              По запросу «{search.trim()}» ничего не найдено
+            </div>
+          )}
           {filteredCards.map(({ product: p, price, inStock, image }) => (
           <div key={p.id} className="vitrine-card" onClick={() => openDetails(p)}
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>

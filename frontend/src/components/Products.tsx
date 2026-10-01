@@ -501,7 +501,7 @@ export function Products() {
       </div>
 
       {/* ===== Витрина ===== */}
-      {tab === 'vitrine' && <Vitrine />}
+      {tab === 'vitrine' && <Vitrine search={q} />}
 
       {/* ===== Резервы ===== */}
       {tab === 'reserves' && <ReservesTab />}
