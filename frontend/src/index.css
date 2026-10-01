@@ -533,7 +533,7 @@ body {
   font-size: 16px;
   line-height: 1.65;
   max-width: none;
-  white-space: nowrap;
+  white-space: normal;
   animation: loginFadeUp 0.8s 0.6s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
 .login-brand-stats {
