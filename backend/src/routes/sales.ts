@@ -99,7 +99,7 @@ router.patch('/:id', async (req: any, res) => {
           if (kinds.get(it.productId) === 'service') continue;
           await tx.stockBalance.updateMany({
             where: { productId: it.productId, warehouseId: sale.warehouseId! },
-            data: { quantity: { increment: it.quantity } },
+            data: { quantity: { increment: Number(it.quantity) } },
           });
         }
       }
