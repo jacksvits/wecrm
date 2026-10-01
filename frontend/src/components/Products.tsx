@@ -1379,7 +1379,7 @@ function ReservesTab() {
     setEditBusy(false);
   };
   const share = async (id: string) => {
-    const taskId = prompt('ID задачи для отправки в обсуждение:');
+    const taskId = prompt('Номер задачи (#) или ID для отправки в обсуждение:');
     if (!taskId) return;
     try { await api.reservations.share(id, taskId); alert('Отправлено в обсуждение задачи'); }
     catch (e: any) { alert(e.message || 'Ошибка отправки'); }

@@ -165,16 +165,26 @@ router.get('/:id/pdf', async (req, res) => {
 
 // Поделиться в обсуждении задачи (модель Comment: content, authorId, taskId)
 router.post('/:id/share', async (req: any, res) => {
-  const { taskId } = req.body || {};
-  if (!taskId) return res.status(400).json({ error: 'taskId обязателен' });
-  const r = await prisma.reservation.findUnique({ where: { id: req.params.id }, include: { contact: true } });
-  if (!r) return res.status(404).json({ error: 'Резерв не найден' });
-  const statusLabel = r.status === 'held' ? 'Отложено' : r.status === 'issued' ? 'Выдано' : 'Отменено';
-  const text = `Резерв №${r.number} — ${r.contact.name} на сумму ${r.total.toFixed(2)} ₽ (${statusLabel}).`;
-  const comment = await prisma.comment.create({
-    data: { taskId, authorId: req.user?.id, content: text },
-  });
-  res.json(comment);
+  try {
+    const { taskId } = req.body || {};
+    if (!taskId) return res.status(400).json({ error: 'taskId обязателен' });
+    // Задачу можно указать по id или по порядковому номеру (ticketNumber), как в GET /api/tasks/:id
+    let task = await prisma.task.findUnique({ where: { id: taskId }, select: { id: true } });
+    if (!task && /^\d+$/.test(String(taskId))) {
+      task = await prisma.task.findFirst({ where: { ticketNumber: parseInt(String(taskId), 10) }, select: { id: true } });
+    }
+    if (!task) return res.status(404).json({ error: `Задача с номером «${taskId}» не найдена` });
+    const r = await prisma.reservation.findUnique({ where: { id: req.params.id }, include: { contact: true } });
+    if (!r) return res.status(404).json({ error: 'Резерв не найден' });
+    const statusLabel = r.status === 'held' ? 'Отложено' : r.status === 'issued' ? 'Выдано' : 'Отменено';
+    const text = `Резерв №${r.number} — ${r.contact.name} на сумму ${r.total.toFixed(2)} ₽ (${statusLabel}).`;
+    const comment = await prisma.comment.create({
+      data: { taskId: task.id, authorId: req.user?.id, content: text },
+    });
+    res.json(comment);
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 // Редактирование резерва: контакт, комментарий, позиции (только в статусе «Отложено») и смена статуса
