@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
@@ -38,6 +38,14 @@ export function NewsList() {
   useEffect(() => {
     loadNews(1);
   }, [selectedCategory, selectedTag, selectedLabel]);
+
+  // Live-поиск при вводе (debounce 400 мс)
+  const firstSearchRender = useRef(true);
+  useEffect(() => {
+    if (firstSearchRender.current) { firstSearchRender.current = false; return; }
+    const t = setTimeout(() => loadNews(1), 400);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const loadNews = useCallback(async (p: number = page) => {
     setLoading(true);
@@ -141,9 +149,9 @@ export function NewsList() {
             onKeyDown={handleKeyDown}
             style={{
               flex: 1,
-              minWidth: 250,
-              padding: '10px 14px',
-              borderRadius: 10,
+              minWidth: 220,
+              padding: '8px 14px',
+              borderRadius: 12,
               border: '1px solid var(--border-color)',
               background: 'var(--bg-color)',
               color: 'var(--text-color)',
@@ -151,21 +159,6 @@ export function NewsList() {
               outline: 'none',
             }}
           />
-          <button
-            onClick={handleSearch}
-            style={{
-              padding: '10px 20px',
-              borderRadius: 10,
-              background: '#007AFF',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 14,
-              fontWeight: 500,
-            }}
-          >
-            Найти
-          </button>
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
