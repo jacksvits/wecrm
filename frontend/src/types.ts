@@ -84,7 +84,7 @@ export interface PriceType { id: string; name: string; label: string; color: str
   forVk?: boolean;
 }
 export interface StockBalance { id: string; productId: string; warehouseId: string; quantity: number; reserved: number; updatedAt: string; }
-export interface ProductPrice { id: string; productId: string; priceTypeId: string; price: number; currency: string; updatedAt: string; }
+export interface ProductPrice { id: string; productId: string; priceTypeId: string; price: number; currency: string; updatedAt: string; priceFrom?: boolean; }
 export interface StockMovement { id: string; productId: string; warehouseId: string; type: 'income' | 'outcome' | 'adjust'; quantity: number; price?: number | null; comment?: string | null; date: string; userId?: string | null; createdAt: string; product?: { name: string; sku?: string | null; unit: string }; warehouse?: { name: string }; user?: { name: string } | null; }
 export interface PriceHistory { id: string; productId: string; priceTypeId: string; oldPrice: number; newPrice: number; createdAt: string; priceType?: { label: string }; user?: { name: string } | null; }
 export interface ProductImage { id: string; productId: string; attachmentId: string; url: string; sortOrder: number; createdAt: string; }

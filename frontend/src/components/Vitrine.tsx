@@ -126,7 +126,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
       const ids = collectSubtree(activeCategoryId);
       list = list.filter((c) => c.product.categoryId && ids.has(c.product.categoryId));
     }
-    if (inStockOnly) list = list.filter((c) => c.inStock);
+    // Услуги не зависят от остатков — фильтр «В наличии» их не скрывает
+    if (inStockOnly) list = list.filter((c) => c.inStock || c.product.kind === 'service');
     const s = search.trim().toLowerCase();
     if (s) {
       list = list.filter((c) =>
@@ -192,7 +193,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const addToCart = (p: Product) => {
     const sortedPrices = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
     const priceObj = (sortedPrices.find((x: any) => x.priceType?.forVitrine) ?? sortedPrices[0]) as any;
-    const maxQty = freeQty(p);
+    // Услуги не ограничены остатком — количество в корзине любое
+    const maxQty = p.kind === 'service' ? Number.MAX_SAFE_INTEGER : freeQty(p);
     setCart(prev => {
       const ex = prev.find(i => i.productId === p.id);
       if (ex) return prev.map(i => (i.productId === p.id ? { ...i, quantity: Math.min(i.quantity + 1, i.maxQty) } : i));
@@ -342,28 +344,32 @@ export function Vitrine({ search = '' }: { search?: string }) {
               <div className="vitrine-name" style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>{p.name}</div>
               <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <div className="vitrine-price" style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {price ? `${fmtMoney(price.price)} ₽` : '—'}
+                  {price ? `${price.priceFrom ? 'от ' : ''}${fmtMoney(price.price)} ₽` : '—'}
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 500, color: inStock > 0 ? '#16a34a' : 'var(--text-muted)' }}>
-                  {inStock > 0 ? `В наличии: ${fmtQty(inStock)} ${p.unit}` : 'Нет в наличии'}
-                </div>
+                {p.kind !== 'service' && (
+                  <div style={{ fontSize: 12, fontWeight: 500, color: inStock > 0 ? '#16a34a' : 'var(--text-muted)' }}>
+                    {inStock > 0 ? `В наличии: ${fmtQty(inStock)} ${p.unit}` : 'Нет в наличии'}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                <button type="button" className="btn-cart" disabled={inStock <= 0} title="В корзину" aria-label="В корзину"
+                <button type="button" className="btn-cart" disabled={p.kind !== 'service' && inStock <= 0} title="В корзину" aria-label="В корзину"
                   onClick={(e) => { e.stopPropagation(); addToCart(p); }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
                   </svg>
                 </button>
-                <button type="button" className="btn-reserve" disabled={inStock <= 0} style={{ flex: 1, justifyContent: 'center' }}
-                  onClick={(e) => { e.stopPropagation(); addToReserve(p); }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path fillRule="evenodd" clipRule="evenodd" d="M17 3.8H7C5.78497 3.8 4.8 4.78497 4.8 6V15.7647C4.8 16.574 5.24438 17.318 5.95698 17.7017L10.957 20.394C11.6081 20.7446 12.3919 20.7446 13.043 20.394L18.043 17.7017C18.7556 17.318 19.2 16.574 19.2 15.7647V6C19.2 4.78497 18.215 3.8 17 3.8ZM7 2C4.79086 2 3 3.79086 3 6V15.7647C3 17.2362 3.80796 18.5889 5.1036 19.2866L10.1036 21.9789C11.2875 22.6164 12.7125 22.6164 13.8964 21.9789L18.8964 19.2866C20.192 18.5889 21 17.2362 21 15.7647V6C21 3.79086 19.2091 2 17 2H7Z" fill="currentColor"/>
-                    <path fillRule="evenodd" clipRule="evenodd" d="M16.7248 8.63051C17.0763 8.98198 17.0763 9.55183 16.7248 9.9033L11.7627 14.8654C11.4113 15.2169 10.8414 15.2169 10.4899 14.8654L7.81839 12.1939C7.46692 11.8424 7.46691 11.2726 7.81839 10.9211C8.16986 10.5696 8.7397 10.5696 9.09118 10.9211L11.1263 12.9562L15.4521 8.63051C15.8035 8.27904 16.3734 8.27904 16.7248 8.63051Z" fill="currentColor"/>
-                  </svg>
-                  <span>В резерв</span>
-                </button>
+                {p.kind !== 'service' && (
+                  <button type="button" className="btn-reserve" disabled={inStock <= 0} style={{ flex: 1, justifyContent: 'center' }}
+                    onClick={(e) => { e.stopPropagation(); addToReserve(p); }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path fillRule="evenodd" clipRule="evenodd" d="M17 3.8H7C5.78497 3.8 4.8 4.78497 4.8 6V15.7647C4.8 16.574 5.24438 17.318 5.95698 17.7017L10.957 20.394C11.6081 20.7446 12.3919 20.7446 13.043 20.394L18.043 17.7017C18.7556 17.318 19.2 16.574 19.2 15.7647V6C19.2 4.78497 18.215 3.8 17 3.8ZM7 2C4.79086 2 3 3.79086 3 6V15.7647C3 17.2362 3.80796 18.5889 5.1036 19.2866L10.1036 21.9789C11.2875 22.6164 12.7125 22.6164 13.8964 21.9789L18.8964 19.2866C20.192 18.5889 21 17.2362 21 15.7647V6C21 3.79086 19.2091 2 17 2H7Z" fill="currentColor"/>
+                      <path fillRule="evenodd" clipRule="evenodd" d="M16.7248 8.63051C17.0763 8.98198 17.0763 9.55183 16.7248 9.9033L11.7627 14.8654C11.4113 15.2169 10.8414 15.2169 10.4899 14.8654L7.81839 12.1939C7.46692 11.8424 7.46691 11.2726 7.81839 10.9211C8.16986 10.5696 8.7397 10.5696 9.09118 10.9211L11.1263 12.9562L15.4521 8.63051C15.8035 8.27904 16.3734 8.27904 16.7248 8.63051Z" fill="currentColor"/>
+                    </svg>
+                    <span>В резерв</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -433,18 +439,20 @@ export function Vitrine({ search = '' }: { search?: string }) {
                   )}
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {dMainPrice ? `${fmtMoney(dMainPrice.price)} ₽` : '—'}
+                      {dMainPrice ? `${dMainPrice.priceFrom ? 'от ' : ''}${fmtMoney(dMainPrice.price)} ₽` : '—'}
                     </span>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: dInStock > 0 ? '#16a34a' : 'var(--text-muted)' }}>
-                      {dInStock > 0 ? `В наличии: ${fmtQty(dInStock)} ${d.unit}` : 'Нет в наличии'}
-                    </span>
+                    {d.kind !== 'service' && (
+                      <span style={{ fontSize: 13, fontWeight: 500, color: dInStock > 0 ? '#16a34a' : 'var(--text-muted)' }}>
+                        {dInStock > 0 ? `В наличии: ${fmtQty(dInStock)} ${d.unit}` : 'Нет в наличии'}
+                      </span>
+                    )}
                   </div>
                   {dPrices.length > 1 && (
                     <div style={{ border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden' }}>
                       {dPrices.map((pr: any) => (
                         <div key={pr.priceTypeId} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '7px 12px', fontSize: 13, borderBottom: '1px solid var(--border-color)' }}>
                           <span style={{ color: 'var(--text-muted)' }}>{pr.priceType?.label || 'Цена'}</span>
-                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{fmtMoney(pr.price)} ₽</span>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{pr.priceFrom ? 'от ' : ''}{fmtMoney(pr.price)} ₽</span>
                         </div>
                       ))}
                     </div>
@@ -471,13 +479,15 @@ export function Vitrine({ search = '' }: { search?: string }) {
                   <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 4 }}>
                     <button style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 14 }}
                       onClick={() => setDetails(null)}>Закрыть</button>
-                    <button type="button" className="btn-action" style={{ flex: 1, justifyContent: 'center' }}
-                      disabled={dInStock <= 0}
-                      onClick={() => { addToReserve(d); setDetails(null); setReserveOpen(true); }}>
-                      Зарезервировать
-                    </button>
+                    {d.kind !== 'service' && (
+                      <button type="button" className="btn-action" style={{ flex: 1, justifyContent: 'center' }}
+                        disabled={dInStock <= 0}
+                        onClick={() => { addToReserve(d); setDetails(null); setReserveOpen(true); }}>
+                        Зарезервировать
+                      </button>
+                    )}
                     <button type="button" className="btn-action-cart" style={{ flex: 1, justifyContent: 'center' }}
-                      disabled={dInStock <= 0}
+                      disabled={d.kind !== 'service' && dInStock <= 0}
                       onClick={() => { addToCart(d); setDetails(null); setCartOpen(true); }}>
                       В корзину
                     </button>
@@ -510,7 +520,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
                       <button type="button" onClick={() => setCart(prev => prev.map(x => (x.productId === i.productId ? { ...x, quantity: Math.max(1, x.quantity - 1) } : x)))} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}>−</button>
                       <span style={{ fontSize: 13, minWidth: 24, textAlign: 'center', color: 'var(--text-primary)' }}>{fmtQty(i.quantity)}</span>
                       <button type="button" onClick={() => setCart(prev => prev.map(x => (x.productId === i.productId ? { ...x, quantity: Math.min(x.maxQty, x.quantity + 1) } : x)))} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}>+</button>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>доступно {fmtQty(i.maxQty)}</span>
+                      {i.maxQty !== Number.MAX_SAFE_INTEGER && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>доступно {fmtQty(i.maxQty)}</span>}
                     </div>
                   </div>
                   <button type="button" onClick={() => setCart(prev => prev.filter(x => x.productId !== i.productId))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, padding: 4 }}>✕</button>

@@ -42,13 +42,22 @@ router.post('/', async (req: any, res) => {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      // Услуги нельзя резервировать — резерв только для товаров
+      const productsById = new Map(
+        (await tx.product.findMany({ where: { id: { in: items.map((i: any) => i.productId) } }, select: { id: true, kind: true, name: true, unit: true } }))
+          .map((p) => [p.id, p]),
+      );
+      for (const it of items) {
+        const p = productsById.get(it.productId);
+        if (p?.kind === 'service') throw new Error(`Услугу «${p.name}» нельзя зарезервировать`);
+      }
       for (const it of items) {
         const stock = await tx.stockBalance.findFirst({
           where: { productId: it.productId, warehouseId: whId },
         });
         const free = (stock?.quantity ?? 0) - (stock?.reserved ?? 0);
         if (it.quantity > free) {
-          const p = await tx.product.findUnique({ where: { id: it.productId } });
+          const p = productsById.get(it.productId);
           throw new Error(`Недостаточно остатка: ${p?.name} (свободно ${free} ${p?.unit || ''})`);
         }
       }
@@ -264,6 +273,14 @@ router.patch('/:id', async (req: any, res) => {
       if (r.status !== 'held') throw new Error('Редактировать можно только отложенный резерв');
 
       if (Array.isArray(items)) {
+        // Услуги нельзя резервировать — проверка справедлива и при редактировании состава
+        const newProducts = await tx.product.findMany({
+          where: { id: { in: (items as any[]).map((i) => i.productId) } },
+          select: { id: true, kind: true, name: true },
+        });
+        for (const p of newProducts) {
+          if (p.kind === 'service') throw new Error(`Услугу «${p.name}» нельзя зарезервировать`);
+        }
         const oldByProduct = new Map(r.items.map((i) => [i.productId, i]));
         const newByProduct = new Map((items as any[]).map((i) => [i.productId, i]));
         // удалённые позиции — вернуть резерв

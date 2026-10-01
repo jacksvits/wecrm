@@ -28,7 +28,13 @@ router.post('/', async (req: any, res) => {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      // Виды позиций: услуги не требуют остатка и не списываются со склада
+      const kinds = new Map(
+        (await tx.product.findMany({ where: { id: { in: items.map((i: any) => i.productId) } }, select: { id: true, kind: true } }))
+          .map((p) => [p.id, p.kind]),
+      );
       for (const it of items) {
+        if (kinds.get(it.productId) === 'service') continue;
         const stock = await tx.stockBalance.findFirst({
           where: { productId: it.productId, warehouseId: whId },
         });
@@ -50,11 +56,14 @@ router.post('/', async (req: any, res) => {
         await tx.saleItem.create({
           data: { saleId: s.id, productId: it.productId, quantity: it.quantity, price: it.price, sum },
         });
-        // Реализация: списываем товар со склада (в отличие от резерва, где инкремент reserved)
-        await tx.stockBalance.updateMany({
-          where: { productId: it.productId, warehouseId: whId },
-          data: { quantity: { decrement: it.quantity } },
-        });
+        // Реализация: списываем товар со склада (в отличие от резерва, где инкремент reserved).
+        // Услуги складского учёта не ведут — списание пропускаем
+        if (kinds.get(it.productId) !== 'service') {
+          await tx.stockBalance.updateMany({
+            where: { productId: it.productId, warehouseId: whId },
+            data: { quantity: { decrement: it.quantity } },
+          });
+        }
       }
       return tx.sale.update({
         where: { id: s.id },
@@ -81,7 +90,13 @@ router.patch('/:id', async (req: any, res) => {
       if (!sale) throw new Error('Продажа не найдена');
       if (sale.status === 'cancelled') throw new Error('Отменённый документ не редактируется');
       if (status === 'cancelled') {
+        // Возврат остатков — только для товаров (услуги не списывались)
+        const kinds = new Map(
+          (await tx.product.findMany({ where: { id: { in: sale.items.map((i) => i.productId) } }, select: { id: true, kind: true } }))
+            .map((p) => [p.id, p.kind]),
+        );
         for (const it of sale.items) {
+          if (kinds.get(it.productId) === 'service') continue;
           await tx.stockBalance.updateMany({
             where: { productId: it.productId, warehouseId: sale.warehouseId! },
             data: { quantity: { increment: it.quantity } },

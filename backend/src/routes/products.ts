@@ -31,7 +31,7 @@ router.get('/vitrine', async (_req, res) => {
       ...prod,
       prices: (prod.prices || []).map((pr: any) => ({ ...pr, priceType: { ...pr.priceType, forVitrine: flaggedVitrineIds.has(pr.priceTypeId) } })),
     }));
-    res.json(products);
+    res.json(await withPriceFrom(products));
   } catch (err: any) {
     console.error('[products:vitrine]', err);
     res.status(500).json({ error: err.message });
@@ -136,6 +136,17 @@ async function recalcCategoryPaths(rootId: string): Promise<void> {
     const path = pathOf(p.categoryId);
     if (path) await prisma.product.update({ where: { id: p.id }, data: { category: path } });
   }
+}
+
+// Подмешивает в цены товаров флаг «от» (колонка price_from вне схемы Prisma — как for_vitrine)
+async function withPriceFrom<T extends { prices?: any[] }>(products: T[]): Promise<T[]> {
+  if (!products.length) return products;
+  const rows = await prisma.$queryRawUnsafe(`SELECT id, price_from FROM product_prices`) as any[];
+  const flags = new Map(rows.map((r) => [r.id as string, !!r.price_from]));
+  for (const p of products) {
+    if (p.prices) p.prices = p.prices.map((pr: any) => ({ ...pr, priceFrom: flags.get(pr.id) ?? false }));
+  }
+  return products;
 }
 
 /* ============ Справочники (до /:id!) ============ */
@@ -535,7 +546,7 @@ router.get('/', async (req, res) => {
       include: { stocks: true, prices: true, images: { orderBy: { sortOrder: 'asc' } } },
       orderBy: { name: 'asc' },
     });
-    res.json(products);
+    res.json(await withPriceFrom(products));
   } catch (err: any) {
     console.error('[products:list]', err);
     res.status(500).json({ error: err.message });
@@ -617,7 +628,7 @@ router.get('/:id', async (req, res) => {
       include: { stocks: true, prices: true, images: { orderBy: { sortOrder: 'asc' } } },
     });
     if (!product) return res.status(404).json({ error: 'Товар не найден' });
-    res.json(product);
+    res.json((await withPriceFrom([product]))[0]);
   } catch (err: any) {
     console.error('[products:get]', err);
     res.status(500).json({ error: err.message });
@@ -882,7 +893,7 @@ router.post('/:id/movements', async (req, res) => {
 router.put('/:id/prices', async (req, res) => {
   try {
     const user = (req as any).user;
-    const { priceTypeId, price } = req.body;
+    const { priceTypeId, price, priceFrom } = req.body;
     const value = Number(price);
     if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'Некорректная цена' });
 
@@ -900,6 +911,10 @@ router.put('/:id/prices', async (req, res) => {
         create: { productId: product.id, priceTypeId, price: value },
         update: { price: value },
       });
+      // Отметка «от» (цена от …) — сырым запросом: колонка price_from вне схемы Prisma
+      if (priceFrom !== undefined) {
+        await tx.$executeRawUnsafe(`UPDATE product_prices SET price_from = ${priceFrom ? 'true' : 'false'} WHERE id = '${p.id}'`);
+      }
       await tx.priceHistory.create({
         data: {
           productId: product.id,
@@ -909,7 +924,7 @@ router.put('/:id/prices', async (req, res) => {
           userId: user.id,
         },
       });
-      return p;
+      return { ...p, priceFrom: priceFrom !== undefined ? !!priceFrom : undefined };
     });
 
     res.json(updated);

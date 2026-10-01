@@ -210,7 +210,7 @@ import { User, Task, Contact, ContactAccess, ContactAccessDirection, Deal, Proje
     bulkDelete: (ids: string[]) => fetchApi('/api/products/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
     bulkCategory: (ids: string[], categoryId: string | null) => fetchApi('/api/products/bulk-category', { method: 'POST', body: JSON.stringify({ ids, categoryId }) }),
     createMovement: (id: string, data: Partial<StockMovement>) => fetchApi(`/api/products/${id}/movements`, { method: 'POST', body: JSON.stringify(data) }),
-    setPrice: (id: string, priceTypeId: string, price: number) => fetchApi(`/api/products/${id}/prices`, { method: 'PUT', body: JSON.stringify({ priceTypeId, price }) }),
+    setPrice: (id: string, priceTypeId: string, price: number, priceFrom?: boolean) => fetchApi(`/api/products/${id}/prices`, { method: 'PUT', body: JSON.stringify({ priceTypeId, price, ...(priceFrom !== undefined ? { priceFrom } : {}) }) }),
     priceHistory: (id: string): Promise<PriceHistory[]> => fetchApi(`/api/products/${id}/history`),
     vkStatus: (): Promise<{ configured: boolean; groupId: number | null; hasMarketToken: boolean }> => fetchApi('/api/products/meta/vk-status'),
     vkImport: (): Promise<{ created: number; linked: number; skipped: number; errors: string[] }> => fetchApi('/api/products/meta/vk-import', { method: 'POST' }),

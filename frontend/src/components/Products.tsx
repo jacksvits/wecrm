@@ -73,7 +73,7 @@ export function Products() {
   const [catDelete, setCatDelete] = useState<{ category: ProductCategory; products: number; children: number } | null>(null);
   // Строка дерева категорий под курсором (показываем кнопки ✎ / ✕)
   const [hoverCat, setHoverCat] = useState<string | null>(null);
-  const [editingCell, setEditingCell] = useState<{ productId: string; priceTypeId: string; value: string } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ productId: string; priceTypeId: string; value: string; priceFrom: boolean } | null>(null);
   const [vkBusy, setVkBusy] = useState<'import' | 'sync' | null>(null);
 
   // Массовый выбор позиций (удаление / перенос в категорию)
@@ -416,7 +416,7 @@ export function Products() {
     const v = Number(editingCell.value.replace(',', '.'));
     if (Number.isFinite(v) && v >= 0) {
       try {
-        await api.products.setPrice(editingCell.productId, editingCell.priceTypeId, v);
+        await api.products.setPrice(editingCell.productId, editingCell.priceTypeId, v, editingCell.priceFrom);
         await load();
       } catch (e: any) {
         alert(e.message || 'Ошибка сохранения цены');
@@ -900,21 +900,37 @@ export function Products() {
                       return (
                         <td key={t.id} style={tdStyle}>
                           {isEditing ? (
-                            <input
-                              autoFocus
-                              value={editingCell!.value}
-                              onChange={e => setEditingCell({ ...editingCell!, value: e.target.value })}
-                              onBlur={saveCell}
-                              onKeyDown={e => { if (e.key === 'Enter') saveCell(); if (e.key === 'Escape') setEditingCell(null); }}
-                              style={{ ...inputStyle, width: 110 }}
-                            />
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              <input
+                                autoFocus
+                                value={editingCell!.value}
+                                onChange={e => setEditingCell({ ...editingCell!, value: e.target.value })}
+                                onBlur={saveCell}
+                                onKeyDown={e => { if (e.key === 'Enter') saveCell(); if (e.key === 'Escape') setEditingCell(null); }}
+                                style={{ ...inputStyle, width: 110 }}
+                              />
+                              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={editingCell!.priceFrom}
+                                  onChange={e => setEditingCell({ ...editingCell!, priceFrom: e.target.checked })}
+                                  onBlur={saveCell}
+                                />
+                                от
+                              </label>
+                            </span>
                           ) : (
                             <span
                               style={{ cursor: 'pointer' }}
                               title="Нажмите для редактирования"
-                              onClick={() => setEditingCell({ productId: p.id, priceTypeId: t.id, value: String(current ?? '') })}
+                              onClick={() => setEditingCell({
+                                productId: p.id,
+                                priceTypeId: t.id,
+                                value: String(current ?? ''),
+                                priceFrom: (p.prices || []).find((pr: any) => pr.priceTypeId === t.id)?.priceFrom ?? false,
+                              })}
                             >
-                              {current !== undefined ? fmtMoney(current) : '—'}
+                              {current !== undefined ? `${(p.prices || []).find((pr: any) => pr.priceTypeId === t.id)?.priceFrom ? 'от ' : ''}${fmtMoney(current)}` : '—'}
                             </span>
                           )}
                         </td>
@@ -1527,7 +1543,7 @@ function ReservesTab() {
               e.target.value = '';
             }} style={{ ...inputStyle, marginBottom: 14 }}>
               <option value="">+ Добавить позицию</option>
-              {products.filter((p: any) => !editItems.some((i) => i.productId === p.id)).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {products.filter((p: any) => p.kind !== 'service' && !editItems.some((i) => i.productId === p.id)).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setEditRes(null)} style={btnGhost}>Отмена</button>
