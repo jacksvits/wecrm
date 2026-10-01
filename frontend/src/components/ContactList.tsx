@@ -875,7 +875,9 @@ export function ContactList() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>Контакты</h2>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="btn-action" onClick={openCreate}>+ Создать</button>
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
           <input placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} style={{ padding: '6px 12px', borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14, width: 180 }} />
           <KindToggle />
           <select value={selectedTag} onChange={e => setSelectedTag(e.target.value)} style={{ padding: '6px 12px', borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }}>
@@ -918,9 +920,7 @@ export function ContactList() {
               )}
             </div>
           )}
-          <button onClick={openCreate} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>+ Создать</button>
         </div>
-      </div>
 
       {selectedIds.size > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', marginBottom: 12, borderRadius: 12, background: '#f0f7ff', border: '1px solid #cce5ff' }}>
