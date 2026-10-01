@@ -161,6 +161,7 @@ model Contact {
 
   // Contact-specific fields
   position    String?
+  birthDate   DateTime? @map("birth_date")
   organizationId String? @map("organization_id")
   organization   Contact? @relation("ContactOrganization", fields: [organizationId], references: [id])
   employees      Contact[] @relation("ContactOrganization")

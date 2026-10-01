@@ -41,12 +41,24 @@ async function api(method: string, params: Record<string, any> = {}, accessToken
 
 async function getUserInfo(userId: number, accessToken: string) {
   try {
-    // Запрашиваем также фото профиля, чтобы сохранить аватарку контакта
-    const res = await api('users.get', { user_ids: userId, fields: 'photo_200' }, accessToken);
+    // Запрашиваем также фото профиля, чтобы сохранить аватарку контакта,
+    // и дату рождения (bdate) — для автоподстановки в карточку контакта
+    const res = await api('users.get', { user_ids: userId, fields: 'photo_200,bdate' }, accessToken);
     return res?.[0] || null;
   } catch {
     return null;
   }
+}
+
+// Парсит дату рождения из ВК (формат "D.M.YYYY", может приходить без года — "D.M").
+// Возвращает Date (полночь UTC) только для полной даты; частичная дата — null
+function parseVkBdate(bdate: string | undefined | null): Date | null {
+  if (!bdate) return null;
+  const parts = bdate.split('.').map((p) => parseInt(p, 10));
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
+  const [day, month, year] = parts;
+  if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900) return null;
+  return new Date(Date.UTC(year, month - 1, day));
 }
 
 // Скачивает аватарку пользователя ВК на локальный сервер (в uploads),
@@ -167,8 +179,8 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
     contactId = contact.id;
     console.log(`[VK Processor] Found contact ${contactId} for VK user ${fromId}`);
 
-    // Дозаполняем аватарку и ссылку на профиль ВК для ранее созданных контактов
-    if (!contact.avatarUrl || !contact.vkProfileUrl) {
+    // Дозаполняем аватарку, ссылку на профиль ВК и дату рождения для ранее созданных контактов
+    if (!contact.avatarUrl || !contact.vkProfileUrl || !contact.birthDate) {
       const userInfo = await getUserInfo(fromId, settings.accessToken);
       let avatarUrl = contact.avatarUrl;
       if (!avatarUrl && userInfo?.photo_200) {
@@ -179,9 +191,10 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
         data: {
           avatarUrl: avatarUrl || contact.avatarUrl,
           vkProfileUrl: contact.vkProfileUrl || vkProfileUrl,
+          birthDate: contact.birthDate || parseVkBdate(userInfo?.bdate),
         },
       });
-      console.log(`[VK Processor] Updated contact ${contactId}: avatar=${updated.avatarUrl || 'none'}, profile=${updated.vkProfileUrl}`);
+      console.log(`[VK Processor] Updated contact ${contactId}: avatar=${updated.avatarUrl || 'none'}, profile=${updated.vkProfileUrl}, birthDate=${updated.birthDate || 'none'}`);
     }
   } else if (settings.autoCreateContact) {
     const userInfo = await getUserInfo(fromId, settings.accessToken);
@@ -197,12 +210,13 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
         vkUserId: fromId,
         vkProfileUrl,
         avatarUrl,
+        birthDate: parseVkBdate(userInfo?.bdate),
         type: 'client',
         notes: 'Автоматически создан из сообщения ВК группы',
       },
     });
     contactId = newContact.id;
-    console.log(`[VK Processor] Created contact ${newContact.id} for VK user ${fromId}, avatar=${avatarUrl || 'none'}`);
+    console.log(`[VK Processor] Created contact ${newContact.id} for VK user ${fromId}, avatar=${avatarUrl || 'none'}, birthDate=${newContact.birthDate || 'none'}`);
   } else {
     console.log(`[VK Processor] No contact found for VK user ${fromId} and autoCreateContact is disabled`);
   }

@@ -134,6 +134,7 @@ export async function mergeContacts(targetId: string, sourceIds: string[], extra
       phone: allPhones[0] || null,
       email: allEmails[0] || null,
       position: pick(target.position, ...sources.map((s) => s.position), extraData.position),
+      birthDate: pick(target.birthDate, ...sources.map((s) => s.birthDate), extraData.birthDate),
       inn: pick(target.inn, ...sources.map((s) => s.inn), extraData.inn),
       ogrn: pick(target.ogrn, ...sources.map((s) => s.ogrn), extraData.ogrn),
       legalAddress: pick(target.legalAddress, ...sources.map((s) => s.legalAddress), extraData.legalAddress),

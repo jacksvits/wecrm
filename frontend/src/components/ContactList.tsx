@@ -133,6 +133,7 @@ export function ContactList() {
     ogrn: '',
     legalAddress: '',
     position: '',
+    birthDate: '',
     organizationId: '',
     projectIds: [] as string[],
   });
@@ -221,7 +222,7 @@ export function ContactList() {
     setEditingId(null);
     setForm({
       name: '', emails: [''], phones: [''], type: 'client', kind: kindFilter === 'organization' ? 'organization' : 'contact',
-      tags: '', notes: '', inn: '', ogrn: '', legalAddress: '', position: '', organizationId: '',
+      tags: '', notes: '', inn: '', ogrn: '', legalAddress: '', position: '', birthDate: '', organizationId: '',
       projectIds: [],
     });
     setShowModal(true);
@@ -241,6 +242,7 @@ export function ContactList() {
       ogrn: contact.ogrn || '',
       legalAddress: contact.legalAddress || '',
       position: contact.position || '',
+      birthDate: contact.birthDate ? contact.birthDate.slice(0, 10) : '',
       organizationId: contact.organizationId || '',
       projectIds: contact.projects?.map(p => p.project.id) || [],
     });
@@ -258,11 +260,13 @@ export function ContactList() {
     };
     if (form.kind === 'organization') {
       data.position = null;
+      data.birthDate = null;
       data.organizationId = null;
     } else {
       data.inn = null;
       data.ogrn = null;
       data.legalAddress = null;
+      data.birthDate = form.birthDate || null;
     }
     if (editingId) {
       await api.contacts.update(editingId, data);
@@ -762,6 +766,10 @@ export function ContactList() {
                       <option key={org.id} value={org.id}>{org.name}</option>
                     ))}
                   </select>
+                  <div>
+                    <label style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>Дата рождения</label>
+                    <input type="date" value={form.birthDate} onChange={e => setForm({ ...form, birthDate: e.target.value })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14, width: '100%', boxSizing: 'border-box' }} />
+                  </div>
                 </>
               )}
 

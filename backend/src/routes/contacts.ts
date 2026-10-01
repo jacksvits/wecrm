@@ -34,6 +34,7 @@ const createSchema = z.object({
   ogrn: z.string().optional().nullable(),
   legalAddress: z.string().optional().nullable(),
   position: z.string().optional().or(z.literal(null)),
+  birthDate: z.string().optional().or(z.literal('')).or(z.literal(null)),
   organizationId: z.string().optional().or(z.literal(null)),
   projectIds: z.array(z.string()).optional().default([]),
 });
@@ -141,10 +142,14 @@ router.post('/', async (req, res) => {
     }
     if (data.kind === 'organization') {
       payload.position = null;
+      payload.birthDate = null;
     } else {
       payload.inn = null;
       payload.ogrn = null;
       payload.legalAddress = null;
+    }
+    if (payload.birthDate === '' || payload.birthDate === undefined) {
+      payload.birthDate = null;
     }
     const contact = await prisma.contact.create({
       data: {
@@ -302,10 +307,14 @@ router.patch('/:id', async (req: AuthRequest, res) => {
 
     if (data.kind === 'organization') {
       updateData.position = null;
+      updateData.birthDate = null;
     } else if (data.kind === 'contact') {
       updateData.inn = null;
       updateData.ogrn = null;
       updateData.legalAddress = null;
+    }
+    if (updateData.birthDate === '') {
+      updateData.birthDate = null;
     }
 
     if (projectIds !== undefined) {

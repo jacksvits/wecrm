@@ -128,6 +128,13 @@ export function ContactDetail() {
             </div>
           )}
 
+          {contact.kind === 'contact' && contact.birthDate && (
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Дата рождения</span>
+              <span style={{ fontSize: 14 }}>{new Date(contact.birthDate).toLocaleDateString('ru-RU', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            </div>
+          )}
+
           {contact.kind === 'contact' && contact.organization && (
             <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
               <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Организация</span>
