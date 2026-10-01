@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { formatPhoneInput, displayPhone } from '../lib/phone';
-import { stripHtml } from '../lib/stripHtml';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ReactQuill from 'react-quill';
@@ -271,7 +270,7 @@ export function ContactList() {
       data.ogrn = null;
       data.legalAddress = null;
       data.birthDate = form.birthDate || null;
-      data.address = stripHtml(form.address) ? form.address : null;
+      data.address = form.address || null;
     }
     if (editingId) {
       await api.contacts.update(editingId, data);
@@ -775,26 +774,7 @@ export function ContactList() {
                     <label style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>Дата рождения</label>
                     <input type="date" value={form.birthDate} onChange={e => setForm({ ...form, birthDate: e.target.value })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14, width: '100%', boxSizing: 'border-box' }} />
                   </div>
-                  <div>
-                    <label style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>Адрес</label>
-                    <ReactQuill
-                      theme="snow"
-                      value={form.address}
-                      onChange={(value) => setForm({ ...form, address: value })}
-                      placeholder="Адрес"
-                      modules={{
-                        toolbar: [
-                          [{ header: [1, 2, 3, false] }],
-                          ["bold", "italic", "underline", "strike"],
-                          [{ list: "ordered" }, { list: "bullet" }],
-                          [{ color: [] }, { background: [] }],
-                          ["link"],
-                          ["clean"],
-                        ],
-                      }}
-                      formats={["header", "bold", "italic", "underline", "strike", "list", "bullet", "color", "background", "link"]}
-                    />
-                  </div>
+                  <input placeholder="Адрес" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }} />
                 </>
               )}
 
