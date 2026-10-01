@@ -53,7 +53,7 @@ export function CallHistory() {
           gap: 8,
         }}
       >
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: "var(--text-primary)" }}>
+        <h2 style={{ margin: 0, fontSize: 18, color: "var(--text-primary)" }}>
           Звонки
         </h2>
         <button

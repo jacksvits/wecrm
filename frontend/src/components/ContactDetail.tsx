@@ -72,7 +72,7 @@ export function ContactDetail() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {contact.avatarUrl ? <img src={contact.avatarUrl} alt={contact.name} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} /> : <div style={{ width: 48, height: 48, borderRadius: '50%', background: tc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 600, color: tc.text }}>{contact.name.charAt(0)}</div>}
           <div>
-            <h2 style={{ margin: 0, fontSize: 20 }}>{contact.name}</h2>
+            <h2 style={{ margin: 0, fontSize: 18 }}>{contact.name}</h2>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center' }}>
               <span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 11, fontWeight: 500, background: kc.bg, color: kc.text }}>{kindLabels[contact.kind] || contact.kind}</span>
               <span>{[contact.organization?.name, contact.position].filter(Boolean).join(' · ') || '—'}</span>

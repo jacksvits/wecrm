@@ -222,7 +222,7 @@ export function NewsEditor() {
         >
           ← Назад к новостям
         </button>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+        <h2 style={{ margin: 0, fontSize: 18 }}>
           {isEdit ? 'Редактировать новость' : 'Создать новость'}
         </h2>
       </div>

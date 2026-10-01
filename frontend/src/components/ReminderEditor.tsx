@@ -160,7 +160,7 @@ export function ReminderEditor() {
         >
           ← Назад к напоминаниям
         </button>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+        <h2 style={{ margin: 0, fontSize: 18 }}>
           {isEdit ? 'Редактировать напоминание' : 'Новое напоминание'}
         </h2>
       </div>

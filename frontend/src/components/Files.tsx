@@ -75,7 +75,7 @@ export function Files() {
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: "0 0 12px", fontSize: 22, fontWeight: 600 }}>Файлы</h2>
+        <h2 style={{ margin: "0 0 12px", fontSize: 18 }}>Файлы</h2>
         <div style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border-color)" }}>
           {TABS.map((tab) => (
             <button

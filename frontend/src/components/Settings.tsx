@@ -368,7 +368,7 @@ export function Settings() {
 
   return (
     <div>
-      <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16 }}>Настройки</h2>
+      <h2 style={{ fontSize: 18, marginBottom: 16 }}>Настройки</h2>
       <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
         <button style={tabStyle(activeTab === "system")} onClick={() => setActiveTab("system")}>
           Системные

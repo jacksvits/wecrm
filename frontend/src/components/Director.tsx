@@ -1081,7 +1081,7 @@ export function Director() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Директор</h2>
+        <h2 style={{ margin: 0, fontSize: 18 }}>Директор</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ display: "flex", gap: 4, background: "var(--bg-input)", borderRadius: 10, padding: 4 }}>
             {TABS.map((tab) => (

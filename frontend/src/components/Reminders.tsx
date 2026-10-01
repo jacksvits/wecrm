@@ -91,7 +91,7 @@ export function Reminders() {
     <div>
       {/* Шапка */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Напоминания</h2>
+        <h2 style={{ margin: 0, fontSize: 18 }}>Напоминания</h2>
         <button
           className="btn-action"
           onClick={() => navigate('/reminders/new')}

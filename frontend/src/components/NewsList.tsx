@@ -100,7 +100,7 @@ export function NewsList() {
       {/* Шапка с поиском */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Новости</h2>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Новости</h2>
           <div style={{ display: 'flex', gap: 8 }}>
             {drafts.length > 0 && (
               <button
