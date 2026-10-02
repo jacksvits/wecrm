@@ -559,7 +559,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, kind, syncToVk, onVitrine, categoryId } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, kind, syncToVk, onVitrine, isSubscription, categoryId } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
     const productKind = kind === 'service' ? 'service' : 'product';
     // Категория из дерева 1С (группы/виды номенклатуры)
@@ -587,6 +587,8 @@ router.post('/', async (req, res) => {
         barcode: barcode?.trim() || null,
         syncToVk: !!syncToVk,
         onVitrine: !!onVitrine,
+        // «Подписка» актуальна только для услуг
+        isSubscription: productKind === 'service' && !!isSubscription,
       },
       include: { stocks: true, prices: true, images: { orderBy: { sortOrder: 'asc' } } },
     });
@@ -641,7 +643,7 @@ router.get('/:id', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind, syncToVk, onVitrine, categoryId } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind, syncToVk, onVitrine, isSubscription, categoryId } = req.body;
     const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Товар не найден' });
     const data: any = {};
@@ -656,6 +658,7 @@ router.patch('/:id', async (req, res) => {
     if (isActive !== undefined) data.isActive = !!isActive;
     if (syncToVk !== undefined) data.syncToVk = !!syncToVk;
     if (onVitrine !== undefined) data.onVitrine = !!onVitrine;
+    if (isSubscription !== undefined) data.isSubscription = (data.kind ?? existing.kind) === 'service' && !!isSubscription;
     // Категория из дерева 1С: обновляем привязку и строковый путь (для выгрузки в 1С)
     if (categoryId !== undefined) {
       if (categoryId) {

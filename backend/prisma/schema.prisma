@@ -82,6 +82,7 @@ model User {
   comments        Comment[]
   activities      Activity[]
   pushSubscriptions PushSubscription[]
+  productSubscriptions ProductSubscription[]
   notifications Notification[]
   chatMessages    ChatMessage[] @relation("AuthoredMessages")
   messageRecipients ChatMessageRecipient[]
@@ -181,6 +182,7 @@ model Contact {
   @@map("contacts")
   reservations Reservation[]
   sales          Sale[]
+  subscriptions  ProductSubscription[]
   accesses       ContactAccess[]
 }
 
@@ -1154,6 +1156,8 @@ model Product {
   isActive    Boolean  @default(true) @map("is_active")
   // «На витрине»: показывать товар во вкладке «Витрина» магазина
   onVitrine   Boolean  @default(false) @map("on_vitrine")
+  // «Подписка»: услуга доступна для оформления подписки (кнопка «Подписаться» на витрине)
+  isSubscription Boolean @default(false) @map("is_subscription")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -1173,6 +1177,7 @@ model Product {
   @@map("products")
   reservationItems ReservationItem[]
   saleItems        SaleItem[]
+  subscriptions    ProductSubscription[]
 }
 
 // Дерево категорий товаров из 1С: группы (папки) и виды номенклатуры,
@@ -1564,4 +1569,26 @@ model ContactAccess {
 
   @@index([contactId])
   @@map("contact_accesses")
+}
+
+// Подписочная заявка на услугу: оформляется кнопкой «Подписаться» на витрине
+model ProductSubscription {
+  id        String   @id @default(cuid())
+  number    Int      @unique
+  productId String   @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  contactId String?  @map("contact_id")
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  price     Decimal  @default(0)
+  period    String   @default("month") // month | quarter | year
+  status    String   @default("new") // new | active | paused | cancelled
+  comment   String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([productId])
+  @@index([contactId])
+  @@map("product_subscriptions")
 }

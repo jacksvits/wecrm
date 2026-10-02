@@ -1051,7 +1051,7 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; syncToVk: boolean; onVitrine: boolean; description: string }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; syncToVk: boolean; onVitrine: boolean; isSubscription: boolean; description: string }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : product.kind,
     sku: isNew ? '' : product.sku || '',
@@ -1059,6 +1059,7 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     barcode: isNew ? '' : product.barcode || '',
     syncToVk: isNew ? false : product.syncToVk,
     onVitrine: isNew ? false : product.onVitrine,
+    isSubscription: isNew ? false : product.isSubscription,
     description: isNew ? '' : product.description || '',
   });
   const [categoryId, setCategoryId] = useState(isNew ? '' : product.categoryId || '');
@@ -1139,6 +1140,12 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
             <option value="product">Товар</option>
             <option value="service">Услуга</option>
           </select>
+          {form.kind === 'service' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.isSubscription} onChange={e => setForm({ ...form, isSubscription: e.target.checked })} style={{ width: 16, height: 16 }} />
+              Подписка
+            </label>
+          )}
           {!isNew && product.article && (
             <div>
               <label style={{ fontSize: 14, fontWeight: 500 }}>Внутренний артикул</label>

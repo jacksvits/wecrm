@@ -32,6 +32,13 @@ export function Vitrine({ search = '' }: { search?: string }) {
   });
   const [cartOpen, setCartOpen] = useState(false);
   const [saleComment, setSaleComment] = useState('');
+  // Подписка на услугу: панель оформления подписочной заявки
+  const [subscribeProduct, setSubscribeProduct] = useState<Product | null>(null);
+  const [subscribePeriod, setSubscribePeriod] = useState<'month' | 'quarter' | 'year'>('month');
+  const [subscribeComment, setSubscribeComment] = useState('');
+  const [savingSubscribe, setSavingSubscribe] = useState(false);
+  const [subscribeError, setSubscribeError] = useState('');
+  const [subscribeOk, setSubscribeOk] = useState('');
   const [savingSale, setSavingSale] = useState(false);
   const [saleError, setSaleError] = useState('');
   const [saleOk, setSaleOk] = useState('');
@@ -230,6 +237,41 @@ export function Vitrine({ search = '' }: { search?: string }) {
     }
   };
 
+  // Цена подписки за период: первая ненулевая цена для витрины, иначе — первая ненулевая
+  const subscribePrice = (p: Product) => {
+    const sortedPrices = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
+    const visiblePrices = sortedPrices.filter((x: any) => Number(x.price) > 0);
+    return Number((visiblePrices.find((x: any) => x.priceType?.forVitrine) ?? visiblePrices[0])?.price ?? 0);
+  };
+
+  const openSubscribe = (p: Product) => {
+    setSubscribeProduct(p);
+    setSubscribePeriod('month');
+    setSubscribeComment('');
+    setSubscribeError('');
+    setSubscribeOk('');
+  };
+
+  const submitSubscribe = async () => {
+    if (!subscribeProduct) return;
+    if (!isUserRole && !contactId) { setSubscribeError('Выберите контрагента'); return; }
+    setSavingSubscribe(true); setSubscribeError('');
+    try {
+      const s: any = await api.subscriptions.create({
+        productId: subscribeProduct.id,
+        ...(isUserRole ? {} : { contactId }),
+        period: subscribePeriod,
+        comment: subscribeComment,
+      });
+      setSubscribeOk(`Заявка на подписку №${s.number} оформлена`);
+      setSubscribeComment('');
+    } catch (e: any) {
+      setSubscribeError(e.message || 'Ошибка оформления подписки');
+    } finally {
+      setSavingSubscribe(false);
+    }
+  };
+
   const reserveTotal = reserveList.reduce((s, i) => s + i.price * i.quantity, 0);
 
   const saveReserve = async () => {
@@ -362,13 +404,21 @@ export function Vitrine({ search = '' }: { search?: string }) {
                 )}
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                <button type="button" className="btn-cart" disabled={p.kind !== 'service' && inStock <= 0} title="В корзину" aria-label="В корзину"
-                  onClick={(e) => { e.stopPropagation(); addToCart(p); }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                  </svg>
-                </button>
+                {p.kind === 'service' && p.isSubscription ? (
+                  <button type="button" className="btn-reserve" style={{ flex: 1, justifyContent: 'center' }}
+                    title="Оформить подписку" aria-label="Подписаться"
+                    onClick={(e) => { e.stopPropagation(); openSubscribe(p); }}>
+                    Подписаться
+                  </button>
+                ) : (
+                  <button type="button" className="btn-cart" disabled={p.kind !== 'service' && inStock <= 0} title="В корзину" aria-label="В корзину"
+                    onClick={(e) => { e.stopPropagation(); addToCart(p); }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                    </svg>
+                  </button>
+                )}
                 {p.kind !== 'service' && (
                   <button type="button" className="btn-reserve" disabled={inStock <= 0} style={{ flex: 1, justifyContent: 'center' }}
                     onClick={(e) => { e.stopPropagation(); addToReserve(p); }}>
@@ -498,11 +548,18 @@ export function Vitrine({ search = '' }: { search?: string }) {
                         Зарезервировать
                       </button>
                     )}
-                    <button type="button" className="btn-action-cart" style={{ flex: 1, justifyContent: 'center' }}
-                      disabled={d.kind !== 'service' && dInStock <= 0}
-                      onClick={() => { addToCart(d); setDetails(null); setCartOpen(true); }}>
-                      В корзину
-                    </button>
+                    {d.kind === 'service' && d.isSubscription ? (
+                      <button type="button" className="btn-action" style={{ flex: 1, justifyContent: 'center' }}
+                        onClick={() => { openSubscribe(d); setDetails(null); }}>
+                        Подписаться
+                      </button>
+                    ) : (
+                      <button type="button" className="btn-action-cart" style={{ flex: 1, justifyContent: 'center' }}
+                        disabled={d.kind !== 'service' && dInStock <= 0}
+                        onClick={() => { addToCart(d); setDetails(null); setCartOpen(true); }}>
+                        В корзину
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -554,6 +611,54 @@ export function Vitrine({ search = '' }: { search?: string }) {
                 {savingSale ? 'Оформление...' : 'Оформить заказ'}
               </button>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Оплата (интернет-эквайринг) будет доступна позже.</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {subscribeProduct && (
+        <div className="vitrine-cart-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 210, display: 'flex', justifyContent: 'flex-end' }} onClick={() => { setSubscribeOk(''); setSubscribeProduct(null); }}>
+          <div className="vitrine-cart" style={{ height: '100%', background: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 24px rgba(0,0,0,.15)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Оформление подписки</div>
+              <button type="button" onClick={() => { setSubscribeOk(''); setSubscribeProduct(null); }} style={{ border: 'none', background: 'transparent', fontSize: 15, cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {subscribeOk ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{ color: '#16a34a', fontSize: 14 }}>{subscribeOk}</div>
+                  <button type="button" onClick={() => { setSubscribeOk(''); setSubscribeProduct(null); }} style={{ padding: '10px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                    Закрыть
+                  </button>
+                </div>
+              ) : (<>
+              <div style={{ border: '1px solid var(--border-color)', borderRadius: 12, padding: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{subscribeProduct.name}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+                  {subscribePrice(subscribeProduct) > 0 ? `${fmtMoney(subscribePrice(subscribeProduct))} ₽ за период` : 'Цена по запросу'}
+                </div>
+              </div>
+              <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                Период оплаты
+                <select value={subscribePeriod} onChange={e => setSubscribePeriod(e.target.value as any)} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }}>
+                  <option value="month">Месяц</option>
+                  <option value="quarter">Квартал</option>
+                  <option value="year">Год</option>
+                </select>
+              </label>
+              {!isUserRole && (
+                <select value={contactId} onChange={e => setContactId(e.target.value)} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }}>
+                  <option value="">— Контрагент —</option>
+                  {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              )}
+              <input value={subscribeComment} onChange={e => setSubscribeComment(e.target.value)} placeholder="Комментарий" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }} />
+              {subscribeError && <div style={{ color: '#ef4444', fontSize: 13 }}>{subscribeError}</div>}
+              {subscribeOk && <div style={{ color: '#16a34a', fontSize: 13 }}>{subscribeOk}</div>}
+              <button disabled={savingSubscribe} onClick={submitSubscribe} style={{ padding: '10px 16px', borderRadius: 12, border: 'none', background: savingSubscribe ? 'var(--bg-hover)' : '#1a1a1a', color: savingSubscribe ? 'var(--text-muted)' : '#fff', fontSize: 14, fontWeight: 600, cursor: savingSubscribe ? 'not-allowed' : 'pointer' }}>
+                {savingSubscribe ? 'Оформление...' : 'Оформить подписку'}
+              </button>
+              </>)}
             </div>
           </div>
         </div>
