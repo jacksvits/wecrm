@@ -344,7 +344,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
               <div className="vitrine-name" style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>{p.name}</div>
               <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <div className="vitrine-price" style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {price ? `${price.priceFrom ? 'от ' : ''}${fmtMoney(price.price)} ₽` : '—'}
+                  {price && Number(price.price) > 0 ? `${price.priceFrom ? 'от ' : ''}${fmtMoney(price.price)} ₽` : null}
                 </div>
                 {p.kind !== 'service' && (
                   <div style={{ fontSize: 12, fontWeight: 500, color: inStock > 0 ? '#16a34a' : 'var(--text-muted)' }}>
@@ -395,7 +395,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
         // На витрине показываем только цены с включённой опцией «на витрине»;
         // если ни одна не отмечена — показываем все (обратная совместимость)
         const dPricesFlagged = dPricesAll.filter((x: any) => x.priceType?.forVitrine);
-        const dPrices = dPricesFlagged.length ? dPricesFlagged : dPricesAll;
+        // Нулевая цена = не выводить её у карточки
+        const dPrices = (dPricesFlagged.length ? dPricesFlagged : dPricesAll).filter((x: any) => Number(x.price) > 0);
         const dMainPrice = dPrices[0];
         const dInStock = (d.stocks || []).reduce((s, x) => s + Math.max(x.quantity - (x.reserved || 0), 0), 0);
         const dCategory = categories.find((c) => c.id === d.categoryId);
@@ -439,7 +440,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
                   )}
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {dMainPrice ? `${dMainPrice.priceFrom ? 'от ' : ''}${fmtMoney(dMainPrice.price)} ₽` : '—'}
+                      {dMainPrice ? `${dMainPrice.priceFrom ? 'от ' : ''}${fmtMoney(dMainPrice.price)} ₽` : null}
                     </span>
                     {d.kind !== 'service' && (
                       <span style={{ fontSize: 13, fontWeight: 500, color: dInStock > 0 ? '#16a34a' : 'var(--text-muted)' }}>
