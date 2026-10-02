@@ -81,6 +81,8 @@ function SortableMetricCard({ metric, onHide, children }: { metric: Metric; onHi
 export function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  // Доступ к разделу «Задачи»: у админа есть всё, у остальных — по allowedPages (см. RequireRole в App.tsx)
+  const canViewTasks = user?.role === 'admin' || ((user as any)?.allowedPages || []).includes('/tasks');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
@@ -96,16 +98,18 @@ export function Dashboard() {
 
   const loadStats = () => api.dashboard.stats().then(setStats);
   const loadMyTasks = () => {
+    if (!canViewTasks) return;
     if (user?.id) {
       api.tasks.list('assigneeId=' + user.id).then(setMyTasks);
     }
   };
   const loadAllTasks = () => {
+    if (!canViewTasks) return;
     api.tasks.list('').then(setAllTasks);
   };
 
   useRealtime(['tasks','deals','contacts','projects'], () => { loadStats(); });
-  useRealtime(['tasks'], () => { loadMyTasks(); loadAllTasks(); });
+  useRealtime(['tasks'], () => { if (!canViewTasks) return; loadMyTasks(); loadAllTasks(); });
 
   useEffect(() => {
     loadStats();
@@ -114,13 +118,15 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
+    if (!canViewTasks) return;
     loadMyTasks();
     loadAllTasks();
-  }, [user?.id]);
+  }, [user?.id, canViewTasks]);
 
   useEffect(() => {
+    if (!canViewTasks) return;
     api.statuses.list("task").then(setStatuses);
-  }, []);
+  }, [canViewTasks]);
 
   // Загрузка персональных настроек метрик текущего пользователя
   useEffect(() => {
@@ -142,7 +148,8 @@ export function Dashboard() {
   }).length;
 
   // У каждой метрики стабильный ключ: скрытие/порядок хранятся персонально для пользователя
-  const metrics: Metric[] = !stats ? [] : [
+  // Без доступа к задачам задачные метрики не показываем (как и сам раздел «Задачи»)
+  const taskMetrics: Metric[] = !canViewTasks || !stats ? [] : [
     {
       key: 'my_tasks',
       label: 'Мои задачи',
@@ -158,6 +165,9 @@ export function Dashboard() {
       path: '/tasks?hideCompleted=true'
     },
     { key: 'overdue', label: 'Просрочено', value: String(stats.metrics?.overdueTasks ?? 0), delta: 'задач', path: `/tasks?filter=overdue&assigneeId=${user?.id ?? ''}&hideCompleted=true` },
+  ];
+  const metrics: Metric[] = !stats ? [] : [
+    ...taskMetrics,
     { key: 'online', label: 'Онлайн', value: String(stats.metrics?.onlineUsers ?? 0), delta: 'сейчас', avatars: stats.onlineUsersList || [], path: '/users' },
     // Балансы счетов Точка Банк, привязанных к текущему пользователю (Настройки → Точка Банк)
     ...(stats.tochkaBalances || []).map((b) => ({
