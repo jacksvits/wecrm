@@ -91,7 +91,9 @@ export function Vitrine({ search = '' }: { search?: string }) {
 
   const cards = useMemo<VitrineCard[]>(() => products.map((p) => {
     const sortedPrices = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
-    const price = (sortedPrices.find((x: any) => x.priceType?.forVitrine) ?? sortedPrices[0]) as any;
+    // Нулевая цена = не выводить: для показа берём первую ненулевую цену
+    const visiblePrices = sortedPrices.filter((x: any) => Number(x.price) > 0);
+    const price = (visiblePrices.find((x: any) => x.priceType?.forVitrine) ?? visiblePrices[0]) as any;
     const inStock = (p.stocks || []).reduce((s, x) => s + Math.max(x.quantity - (x.reserved || 0), 0), 0);
     return { product: p, price, inStock, image: (p.images || [])[0] as any };
   }), [products]);
@@ -176,7 +178,9 @@ export function Vitrine({ search = '' }: { search?: string }) {
 
   const addToReserve = (p: Product) => {
     const sortedPrices = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
-    const priceObj = (sortedPrices.find((x: any) => x.priceType?.forVitrine) ?? sortedPrices[0]) as any;
+    // Нулевая цена не участвует: берём первую ненулевую цену
+    const visiblePrices = sortedPrices.filter((x: any) => Number(x.price) > 0);
+    const priceObj = (visiblePrices.find((x: any) => x.priceType?.forVitrine) ?? visiblePrices[0]) as any;
     const maxQty = freeQty(p);
     setReserveList(prev => {
       const ex = prev.find(i => i.productId === p.id);
@@ -192,7 +196,9 @@ export function Vitrine({ search = '' }: { search?: string }) {
 
   const addToCart = (p: Product) => {
     const sortedPrices = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
-    const priceObj = (sortedPrices.find((x: any) => x.priceType?.forVitrine) ?? sortedPrices[0]) as any;
+    // Нулевая цена не участвует: берём первую ненулевую цену
+    const visiblePrices = sortedPrices.filter((x: any) => Number(x.price) > 0);
+    const priceObj = (visiblePrices.find((x: any) => x.priceType?.forVitrine) ?? visiblePrices[0]) as any;
     // Услуги не ограничены остатком — количество в корзине любое
     const maxQty = p.kind === 'service' ? Number.MAX_SAFE_INTEGER : freeQty(p);
     setCart(prev => {
