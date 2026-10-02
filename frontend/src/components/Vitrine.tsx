@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
-import { Product, ProductCategory } from '../types';
+import { Product, ProductCategory, PromoBlock } from '../types';
 
 const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
 const fmtQty = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
@@ -321,7 +321,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
           </div>
           <button className="vitrine-cat-btn" onClick={() => { setActiveCategoryId(null); setCatalogOpen(false); }}
             style={{ width: '100%', textAlign: 'left', border: 'none', background: !activeCategoryId ? 'var(--bg-hover)' : 'transparent', color: !activeCategoryId ? '#007AFF' : 'var(--text-primary)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 13, fontWeight: !activeCategoryId ? 600 : 400, display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}>
-            <span>Все товары</span>
+            <span>Каталог</span>
             <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{cards.length}</span>
           </button>
           {renderTree(null, 0)}
@@ -330,6 +330,9 @@ export function Vitrine({ search = '' }: { search?: string }) {
             В наличии
           </label>
         </aside>
+        {!activeCategoryId && !search.trim() ? (
+          <PromoMosaic onOpenCategory={(id) => setActiveCategoryId(id)} />
+        ) : (
         <div className="vitrine-grid">
           {filteredCards.length === 0 && (
             <div style={{ gridColumn: '1 / -1', padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -384,6 +387,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
             <div style={{ gridColumn: '1 / -1', padding: 24, color: 'var(--text-muted)' }}>В этой категории пока нет товаров на витрине.</div>
           )}
         </div>
+        )}
+
       </div>
 
       <button type="button" className="vitrine-catalog-toggle" onClick={() => setCatalogOpen(o => !o)} aria-label={catalogOpen ? 'Скрыть каталог' : 'Показать каталог'}>
@@ -607,5 +612,52 @@ export function Vitrine({ search = '' }: { search?: string }) {
       )}
 
     </>
+  );
+}
+
+/* ---------- Промо-мозаика раздела «Каталог» ---------- */
+function PromoMosaic({ onOpenCategory }: { onOpenCategory: (id: string) => void }) {
+  const [blocks, setBlocks] = useState<PromoBlock[]>([]);
+
+  useEffect(() => {
+    api.promoBlocks.list().then(setBlocks).catch(() => setBlocks([]));
+  }, []);
+
+  // Размеры блоков в сетке: big = 2×2, wide = 2×1, square = 1×1
+  const span = (f: string): React.CSSProperties =>
+    f === 'big' ? { gridColumn: 'span 2', gridRow: 'span 2' } : f === 'wide' ? { gridColumn: 'span 2' } : {};
+
+  const open = (b: PromoBlock) => { if (b.categoryId) onOpenCategory(b.categoryId); };
+
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gridAutoRows: '170px', gap: 16, padding: '2px' }}>
+        {blocks.map(b => (
+          <div key={b.id} onClick={() => open(b)} style={{
+            ...span(b.format), position: 'relative', borderRadius: 12, overflow: 'hidden',
+            cursor: b.categoryId ? 'pointer' : 'default',
+            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+          }}>
+            {b.imageUrl
+              ? <img src={b.imageUrl} alt={b.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-hover)' }} />}
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.78) 100%)' }} />
+            <div style={{ position: 'absolute', left: 16, right: 16, bottom: 14, color: '#fff' }}>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>{b.title}</div>
+              {b.subtitle && <div style={{ fontSize: 13, opacity: .85, marginTop: 4 }}>{b.subtitle}</div>}
+              <button type="button" onClick={(e) => { e.stopPropagation(); open(b); }}
+                style={{ marginTop: 10, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#007AFF', color: '#fff', fontSize: 13, cursor: 'pointer' }}>
+                {b.buttonText || 'Подробнее'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {!blocks.length && (
+        <div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 14 }}>
+          Промо-блоки не добавлены — настройте их в разделе «Промо-блоки».
+        </div>
+      )}
+    </div>
   );
 }
