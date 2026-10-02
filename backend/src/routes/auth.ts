@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { ensureGuestUser, resetGuestDemoData, generateGuestDemoData } from '../lib/guest-demo.js';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
@@ -118,6 +119,29 @@ router.post('/login', async (req, res) => {
     });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+
+// Гостевой доступ: вход без регистрации с правами обычного пользователя (роль user).
+// Каждая гостевая сессия начинается с чистых демо-данных: данные предыдущей
+// сессии удаляются и генерируются заново (см. src/lib/guest-demo.ts).
+router.post('/guest', async (req, res) => {
+  try {
+    const guest = await ensureGuestUser();
+    await resetGuestDemoData(guest.id);
+    await generateGuestDemoData(guest.id);
+
+    const user = await prisma.user.findUnique({
+      where: { id: guest.id },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
+    });
+    if (!user) return res.status(500).json({ error: 'Guest user not found' });
+
+    const { token, roleName, allowedPages } = issueToken(user);
+    res.json({ user: publicUser(user, roleName, allowedPages), token });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

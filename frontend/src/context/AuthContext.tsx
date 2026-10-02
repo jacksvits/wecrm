@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (login: string, password: string) => Promise<User>;
+  guestLogin: () => Promise<User>;
   register: (email: string, password: string, name: string, username?: string) => Promise<User>;
   logout: () => void;
   switchUser: (userId: string) => Promise<User>;
@@ -62,6 +63,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.user;
   }, []);
 
+  // Гостевой вход: демо-режим с правами обычного пользователя
+  const guestLogin = useCallback(async () => {
+    const res = await api.auth.guest();
+    localStorage.setItem('token', res.token);
+    setUser(res.user);
+    return res.user;
+  }, []);
+
   const register = useCallback(async (email: string, password: string, name: string, username?: string) => {
     const res = await api.auth.register(email, password, name, username);
     localStorage.setItem('token', res.token);
@@ -101,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, switchUser, switchBack, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, guestLogin, register, logout, switchUser, switchBack, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

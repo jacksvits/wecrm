@@ -28,7 +28,7 @@ const vkIcon = (
 )
 
 export function Login() {
-  const { login, register } = useAuth()
+  const { login, register, guestLogin } = useAuth()
   const [isRegister, setIsRegister] = useState(false)
   const [loginInput, setLoginInput] = useState('')
   const [password, setPassword] = useState('')
@@ -39,6 +39,7 @@ export function Login() {
     redirectUri: string } | null>(null)
   const brandLogo = useBrandLogo(true)
   const [vkLoading, setVkLoading] = useState(false)
+  const [guestLoading, setGuestLoading] = useState(false)
   const [showSoundPrompt, setShowSoundPrompt] = useState(false)
   const [pendingRedirect, setPendingRedirect] = useState(false)
 
@@ -123,6 +124,21 @@ export function Login() {
       setPendingRedirect(true)
     } catch (err: any) {
       setError(err.message || 'Auth error')
+    }
+  }
+
+  // Гостевой вход: демо-режим с правами обычного пользователя
+  const handleGuestLogin = async () => {
+    setGuestLoading(true)
+    setError('')
+    try {
+      await guestLogin()
+      // После успешного входа показываем запрос на разрешение звуков
+      setShowSoundPrompt(true)
+      setPendingRedirect(true)
+    } catch (err: any) {
+      setError(err.message || 'Guest auth error')
+      setGuestLoading(false)
     }
   }
 
@@ -279,6 +295,12 @@ export function Login() {
           ) : (
             <div className="login-vk-hint">VK ID не настроен</div>
           )}
+
+          <button onClick={handleGuestLogin} disabled={guestLoading} className="login-btn-guest">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+            {guestLoading ? 'Вход...' : 'Войти как гость'}
+          </button>
+          <p className="login-guest-hint">Демо-режим: данные сбрасываются при каждом входе</p>
 
           <p className="login-register">
             {isRegister ? (
