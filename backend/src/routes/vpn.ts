@@ -30,6 +30,13 @@ function parseVless(link: string) {
   // отсекаем URI-фрагмент (#название сервера), иначе попадёт в sid
   const params = new URLSearchParams(rawQuery.split('#')[0]);
   if ((params.get('security') || '').toLowerCase() !== 'reality') return null;
+  // sing-box: в поле network outbound'а допустимы только tcp/udp;
+  // grpc/ws и пр. задаются через блок transport
+  const netType = (params.get('type') || 'tcp').toLowerCase();
+  const transport = netType === 'tcp' ? undefined
+    : netType === 'grpc'
+      ? { type: 'grpc', service_name: params.get('serviceName') || '' }
+      : { type: netType, path: params.get('path') || '/', headers: { Host: params.get('host') || params.get('sni') || server } };
   return {
     type: 'vless',
     tag: 'proxy',
@@ -37,7 +44,8 @@ function parseVless(link: string) {
     server_port: Number(port),
     uuid,
     flow: params.get('flow') || undefined,
-    network: params.get('type') || 'tcp',
+    network: 'tcp',
+    ...(transport ? { transport } : {}),
     tls: {
       enabled: true,
       server_name: params.get('sni') || '',
