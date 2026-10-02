@@ -97,10 +97,11 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const origin = window.location.origin;
 
   const cards = useMemo<VitrineCard[]>(() => products.map((p) => {
-    const sortedPrices = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
-    // Нулевая цена = не выводить: для показа берём первую ненулевую цену
-    const visiblePrices = sortedPrices.filter((x: any) => Number(x.price) > 0);
-    const price = (visiblePrices.find((x: any) => x.priceType?.forVitrine) ?? visiblePrices[0]) as any;
+    // Нулевая цена = не выводить: сначала показываем самую минимальную цену
+    const visiblePrices = (p.prices || []).filter((x: any) => Number(x.price) > 0)
+      .sort((a: any, b: any) => Number(a.price) - Number(b.price));
+    const flaggedPrices = visiblePrices.filter((x: any) => x.priceType?.forVitrine);
+    const price = (flaggedPrices.length ? flaggedPrices : visiblePrices)[0] as any;
     const inStock = (p.stocks || []).reduce((s, x) => s + Math.max(x.quantity - (x.reserved || 0), 0), 0);
     return { product: p, price, inStock, image: (p.images || [])[0] as any };
   }), [products]);
@@ -184,10 +185,11 @@ export function Vitrine({ search = '' }: { search?: string }) {
   );
 
   const addToReserve = (p: Product) => {
-    const sortedPrices = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
-    // Нулевая цена не участвует: берём первую ненулевую цену
-    const visiblePrices = sortedPrices.filter((x: any) => Number(x.price) > 0);
-    const priceObj = (visiblePrices.find((x: any) => x.priceType?.forVitrine) ?? visiblePrices[0]) as any;
+    // Нулевая цена не участвует: берём самую минимальную ненулевую цену
+    const visiblePrices = (p.prices || []).filter((x: any) => Number(x.price) > 0)
+      .sort((a: any, b: any) => Number(a.price) - Number(b.price));
+    const flaggedPrices = visiblePrices.filter((x: any) => x.priceType?.forVitrine);
+    const priceObj = (flaggedPrices.length ? flaggedPrices : visiblePrices)[0] as any;
     const maxQty = freeQty(p);
     setReserveList(prev => {
       const ex = prev.find(i => i.productId === p.id);
@@ -202,10 +204,11 @@ export function Vitrine({ search = '' }: { search?: string }) {
   };
 
   const addToCart = (p: Product) => {
-    const sortedPrices = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
-    // Нулевая цена не участвует: берём первую ненулевую цену
-    const visiblePrices = sortedPrices.filter((x: any) => Number(x.price) > 0);
-    const priceObj = (visiblePrices.find((x: any) => x.priceType?.forVitrine) ?? visiblePrices[0]) as any;
+    // Нулевая цена не участвует: берём самую минимальную ненулевую цену
+    const visiblePrices = (p.prices || []).filter((x: any) => Number(x.price) > 0)
+      .sort((a: any, b: any) => Number(a.price) - Number(b.price));
+    const flaggedPrices = visiblePrices.filter((x: any) => x.priceType?.forVitrine);
+    const priceObj = (flaggedPrices.length ? flaggedPrices : visiblePrices)[0] as any;
     // Услуги не ограничены остатком — количество в корзине любое
     const maxQty = p.kind === 'service' ? Number.MAX_SAFE_INTEGER : freeQty(p);
     setCart(prev => {
@@ -237,11 +240,12 @@ export function Vitrine({ search = '' }: { search?: string }) {
     }
   };
 
-  // Цена подписки за период: первая ненулевая цена для витрины, иначе — первая ненулевая
+  // Цена подписки за период: самая минимальная ненулевая цена для витрины, иначе — минимальная ненулевая
   const subscribePrice = (p: Product) => {
-    const sortedPrices = [...(p.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
-    const visiblePrices = sortedPrices.filter((x: any) => Number(x.price) > 0);
-    return Number((visiblePrices.find((x: any) => x.priceType?.forVitrine) ?? visiblePrices[0])?.price ?? 0);
+    const visiblePrices = (p.prices || []).filter((x: any) => Number(x.price) > 0)
+      .sort((a: any, b: any) => Number(a.price) - Number(b.price));
+    const flaggedPrices = visiblePrices.filter((x: any) => x.priceType?.forVitrine);
+    return Number((flaggedPrices.length ? flaggedPrices : visiblePrices)[0]?.price ?? 0);
   };
 
   const openSubscribe = (p: Product) => {
@@ -452,12 +456,13 @@ export function Vitrine({ search = '' }: { search?: string }) {
         const d = details;
         const dImages = d.images || [];
         const dImage = dImages[detailsImage] || dImages[0];
-        const dPricesAll = [...(d.prices || [])].sort((a: any, b: any) => (a.priceType?.sortOrder ?? 0) - (b.priceType?.sortOrder ?? 0));
         // На витрине показываем только цены с включённой опцией «на витрине»;
         // если ни одна не отмечена — показываем все (обратная совместимость)
-        const dPricesFlagged = dPricesAll.filter((x: any) => x.priceType?.forVitrine);
-        // Нулевая цена = не выводить её у карточки
-        const dPrices = (dPricesFlagged.length ? dPricesFlagged : dPricesAll).filter((x: any) => Number(x.price) > 0);
+        const dPricesFlagged = (d.prices || []).filter((x: any) => x.priceType?.forVitrine);
+        // Нулевая цена = не выводить её у карточки; сначала — самая минимальная цена
+        const dPrices = (dPricesFlagged.length ? dPricesFlagged : (d.prices || []))
+          .filter((x: any) => Number(x.price) > 0)
+          .sort((a: any, b: any) => Number(a.price) - Number(b.price));
         const dMainPrice = dPrices[0];
         const dInStock = (d.stocks || []).reduce((s, x) => s + Math.max(x.quantity - (x.reserved || 0), 0), 0);
         const dCategory = categories.find((c) => c.id === d.categoryId);
