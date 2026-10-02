@@ -913,8 +913,10 @@ export function Products() {
                                 <input
                                   type="checkbox"
                                   checked={editingCell!.priceFrom}
+                                  // preventDefault на mousedown: иначе фокус уходит с поля цены,
+                                  // срабатывает blur -> saveCell и редактор закрывается ДО переключения
+                                  onMouseDown={e => e.preventDefault()}
                                   onChange={e => setEditingCell({ ...editingCell!, priceFrom: e.target.checked })}
-                                  onBlur={saveCell}
                                 />
                                 от
                               </label>
