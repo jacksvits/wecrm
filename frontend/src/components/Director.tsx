@@ -239,6 +239,8 @@ export function Director() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [pushStatusUsers, setPushStatusUsers] = useState<any[]>([]);
   const [billingSubs, setBillingSubs] = useState<any[]>([]);
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [editSubForm, setEditSubForm] = useState<{ price: string; period: string; status: string; comment: string }>({ price: '', period: 'month', status: 'new', comment: '' });
   const [emailFilterLogs, setEmailFilterLogs] = useState<EmailFilterLog[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
@@ -1089,6 +1091,16 @@ export function Director() {
             api.get("/api/subscriptions/billing").then((b: any) => setBillingSubs(Array.isArray(b) ? b : [])).catch(() => {});
           }).catch(() => {});
         };
+        const startEditSub = (s: any) => {
+          setEditingSubId(s.id);
+          setEditSubForm({ price: String(s.price ?? ''), period: s.period || 'month', status: s.status || 'new', comment: s.comment || '' });
+        };
+        const saveEditSub = (id: string) => {
+          api.subscriptions.update(id, { price: Number(editSubForm.price), period: editSubForm.period, status: editSubForm.status, comment: editSubForm.comment }).then(() => {
+            setEditingSubId(null);
+            api.get("/api/subscriptions/billing").then((b: any) => setBillingSubs(Array.isArray(b) ? b : [])).catch(() => {});
+          }).catch(() => {});
+        };
         return (
           <div style={{ padding: 10, height: "100%", display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1100,8 +1112,10 @@ export function Director() {
               {total === 0 && <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Нет подписок</span>}
               {billingSubs.map((s: any) => {
                 const st = SUBST[s.status] || { label: s.status, color: "var(--text-secondary)", bg: "var(--bg-hover, #f0f0f0)" };
+                const isEditing = editingSubId === s.id;
                 return (
-                  <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "4px 6px", borderRadius: 6, background: "var(--bg-hover, #f7f7f7)" }}>
+                  <div key={s.id} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "4px 6px", borderRadius: 6, background: "var(--bg-hover, #f7f7f7)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
                     <span style={{ fontWeight: 600, color: "var(--text-primary)", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={s.user?.name}>{s.user?.name || "—"}</span>
                     <span style={{ flex: 1, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={s.product?.name}>{s.product?.name || "Услуга"}</span>
                     {s.status === "active" && s.activeUntil && (
@@ -1115,6 +1129,30 @@ export function Director() {
                     {s.status === "active" && (
                       <button onClick={() => setSubStatus(s.id, "paused")} style={{ padding: "1px 8px", borderRadius: 8, border: "none", background: "#d97706", color: "#fff", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>Приостановить</button>
                     )}
+                    <button onClick={() => startEditSub(s)} style={{ padding: "1px 8px", borderRadius: 8, border: "1px solid var(--border-color, #ddd)", background: "transparent", color: "var(--text-secondary)", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>Изменить</button>
+                  </div>
+                  {isEditing && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", padding: "6px 4px", borderTop: "1px solid var(--border-color, #e5e5e5)" }}>
+                      <label style={{ fontSize: 11, color: "var(--text-muted)" }}>Цена</label>
+                      <input type="number" min="0" step="0.01" value={editSubForm.price} onChange={(e) => setEditSubForm({ ...editSubForm, price: e.target.value })} style={{ width: 90, padding: "3px 6px", borderRadius: 6, border: "1px solid var(--border-color, #ddd)", fontSize: 12, background: "var(--bg-input, #fff)", color: "var(--text-primary)" }} />
+                      <label style={{ fontSize: 11, color: "var(--text-muted)" }}>Период</label>
+                      <select value={editSubForm.period} onChange={(e) => setEditSubForm({ ...editSubForm, period: e.target.value })} style={{ padding: "3px 6px", borderRadius: 6, border: "1px solid var(--border-color, #ddd)", fontSize: 12, background: "var(--bg-input, #fff)", color: "var(--text-primary)" }}>
+                        <option value="month">Месяц</option>
+                        <option value="quarter">Квартал</option>
+                        <option value="year">Год</option>
+                      </select>
+                      <label style={{ fontSize: 11, color: "var(--text-muted)" }}>Статус</label>
+                      <select value={editSubForm.status} onChange={(e) => setEditSubForm({ ...editSubForm, status: e.target.value })} style={{ padding: "3px 6px", borderRadius: 6, border: "1px solid var(--border-color, #ddd)", fontSize: 12, background: "var(--bg-input, #fff)", color: "var(--text-primary)" }}>
+                        <option value="new">Новая</option>
+                        <option value="active">Активна</option>
+                        <option value="paused">Приостановлена</option>
+                        <option value="cancelled">Отменена</option>
+                      </select>
+                      <input placeholder="Комментарий" value={editSubForm.comment} onChange={(e) => setEditSubForm({ ...editSubForm, comment: e.target.value })} style={{ flex: 1, minWidth: 120, padding: "3px 6px", borderRadius: 6, border: "1px solid var(--border-color, #ddd)", fontSize: 12, background: "var(--bg-input, #fff)", color: "var(--text-primary)" }} />
+                      <button onClick={() => saveEditSub(s.id)} style={{ padding: "3px 10px", borderRadius: 6, border: "none", background: "#0077ff", color: "#fff", fontSize: 11, cursor: "pointer" }}>Сохранить</button>
+                      <button onClick={() => setEditingSubId(null)} style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid var(--border-color, #ddd)", background: "transparent", color: "var(--text-secondary)", fontSize: 11, cursor: "pointer" }}>Отмена</button>
+                    </div>
+                  )}
                   </div>
                 );
               })}

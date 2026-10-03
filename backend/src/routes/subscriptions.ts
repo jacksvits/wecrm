@@ -147,7 +147,7 @@ router.post('/:id/cancel', async (req: any, res) => {
 // Смена статуса / комментария заявки (new | active | paused | cancelled)
 router.patch('/:id', async (req: any, res) => {
   if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Доступ только для директора' });
-  const { status, comment } = req.body || {};
+  const { status, comment, price, period } = req.body || {};
   try {
     const existing = await prisma.productSubscription.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Заявка не найдена' });
@@ -159,6 +159,17 @@ router.patch('/:id', async (req: any, res) => {
       data.status = status;
     }
     if (comment !== undefined) data.comment = (comment || '').trim();
+    if (price !== undefined) {
+      const p = Number(price);
+      if (!Number.isFinite(p) || p < 0) return res.status(400).json({ error: 'Некорректная цена' });
+      data.price = p;
+    }
+    if (period !== undefined) {
+      if (!['month', 'quarter', 'year'].includes(period)) {
+        return res.status(400).json({ error: 'Неизвестный период' });
+      }
+      data.period = period;
+    }
     const updated = await prisma.productSubscription.update({ where: { id: req.params.id }, data });
     res.json(updated);
   } catch (err: any) {
