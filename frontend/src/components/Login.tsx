@@ -311,6 +311,10 @@ export function Login() {
           </p>
           </div>
 
+          <p className="login-catalog-hint">
+            Ознакомиться с нашими продуктами вы можете без регистрации по гостевому доступу в разделе <strong>«Каталог»</strong>
+          </p>
+
           <footer className="login-legal-footer" aria-label="Юридические документы">
             <a href="/offer">Договор публичной оферты</a>
             <span aria-hidden="true">·</span>
