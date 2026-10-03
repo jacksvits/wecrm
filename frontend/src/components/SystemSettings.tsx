@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { loadBranding } from "../lib/branding";
 import { THEMES } from "../lib/themes";
 import { User, AutoReplyTrigger } from "../types";
+import PromoBlocks from "./PromoBlocks";
 
 // WYSIWYG-редактор — та же конфигурация, что и в остальных текстовых полях проекта
 const quillModules = {
@@ -30,7 +31,7 @@ const TAB_CONFIGS = [
   { key: "games", label: "Игры", defaultPath: "/volume3/GAME" },
 ];
 
-type SystemSubTab = "design" | "themes" | "storage" | "handler" | "autoreply" | "legal";
+type SystemSubTab = "design" | "themes" | "storage" | "promo" | "handler" | "autoreply" | "legal";
 
 export function SystemSettings() {
   // По умолчанию открываем под-вкладку «Дизайн»
@@ -1354,6 +1355,9 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "storage")} onClick={() => setSubTab("storage")}>
           Хранение
         </button>
+        <button style={subTabStyle(subTab === "promo")} onClick={() => setSubTab("promo")}>
+          Промо-блоки
+        </button>
         <button style={subTabStyle(subTab === "handler")} onClick={() => setSubTab("handler")}>
           Обработчик
         </button>
@@ -1365,7 +1369,7 @@ export function SystemSettings() {
         </button>
       </div>
 
-      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : renderLegal()}
+      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : renderLegal()}
     </div>
   );
 }

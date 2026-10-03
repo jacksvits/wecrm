@@ -765,7 +765,7 @@ function PromoMosaic({ onOpenCategory }: { onOpenCategory: (id: string) => void 
       </div>
       {!blocks.length && (
         <div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 14 }}>
-          Промо-блоки не добавлены — настройте их в разделе «Промо-блоки».
+          Промо-блоки не добавлены — настройте их в «Системных настройках».
         </div>
       )}
     </div>
