@@ -415,12 +415,16 @@ export function Vitrine({ search = '' }: { search?: string }) {
                     Подписаться
                   </button>
                 ) : (
+                  // Единственная кнопка в карточке (услуга без подписки) — с текстом и во всю ширину;
+                  // у товаров рядом есть «В резерв» — оставляем компактной, только с иконкой
                   <button type="button" className="btn-cart" disabled={p.kind !== 'service' && inStock <= 0} title="В корзину" aria-label="В корзину"
+                    style={p.kind === 'service' ? { flex: 1, gap: 8 } : undefined}
                     onClick={(e) => { e.stopPropagation(); addToCart(p); }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
                       <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
                     </svg>
+                    {p.kind === 'service' && <span>В корзину</span>}
                   </button>
                 )}
                 {p.kind !== 'service' && (
