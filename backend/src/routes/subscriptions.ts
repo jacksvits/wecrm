@@ -23,6 +23,24 @@ router.get('/', async (_req, res) => {
   }
 });
 
+// Подписки текущего пользователя (личный кабинет, кнопка «Подписки» в меню аватарки)
+router.get('/my', async (req: any, res) => {
+  try {
+    const list = await prisma.productSubscription.findMany({
+      where: { userId: req.user?.id || undefined },
+      orderBy: { number: 'desc' },
+      include: {
+        product: { select: { id: true, name: true, unit: true } },
+        contact: { select: { id: true, name: true } },
+      },
+    });
+    res.json(list);
+  } catch (err: any) {
+    console.error('[subscriptions:my]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Оформление подписочной заявки кнопкой «Подписаться» на витрине.
 // Подписка доступна только для услуг с включённой опцией «Подписка».
 // Цена подписки за период берётся с сервера (первая ненулевая цена для витрины,

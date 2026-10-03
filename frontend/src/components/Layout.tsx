@@ -10,6 +10,7 @@ import { useEffect, useState, useRef } from 'react' ; import { PushSubscriber } 
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{user?.name}</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{user?.role ? String(user.role) : ''}</div>
             </div>
+            <button onClick={() => { setUserMenuOpen(false) ; navigate('/subscriptions') ; }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}>Подписки</button>
             <button onClick={() => { setUserMenuOpen(false) ; navigate('/profile') ; }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}>Профиль</button>
             <button onClick={logout} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: '#dc2626', fontSize: 13, cursor: 'pointer' }}>Выйти</button>
           </div>
