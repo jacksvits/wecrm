@@ -12,6 +12,7 @@ const CARD_HEIGHT = 150;
  * Последние новости на дашборде — сетка из 3 карточек в стиле промо-блока витрины:
  * обложка + тёмный градиент снизу, заголовок слева, кнопка «Читать» справа.
  * Новости, уже показанные в слайдере закреплённых, не дублируются.
+ * На мобильных (≤640px) сетка превращается в горизонтальный свайп-слайдер.
  */
 export function NewsPromoBlocks() {
   const navigate = useNavigate();
@@ -41,11 +42,32 @@ export function NewsPromoBlocks() {
   if (!items.length) return null;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginTop: 16 }}>
-      {items.map(n => (
-        <NewsPromoCard key={n.id} news={n} defaultCover={defaultCover} onOpen={() => navigate(`/news/${n.id}`)} />
-      ))}
-    </div>
+    /* marginBottom — небольшой отступ до блока метрик */
+    <section style={{ marginTop: 16, marginBottom: 20 }}>
+      <style>{`
+        .news-promo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+        /* Мобильная версия: сетка превращается в горизонтальный свайп-слайдер */
+        @media (max-width: 640px) {
+          .news-promo-grid { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+          .news-promo-grid::-webkit-scrollbar { display: none; }
+          .news-promo-card { flex: 0 0 82%; scroll-snap-align: center; }
+        }
+      `}</style>
+      {/* Кнопка «Все новости» — слева над блоками */}
+      <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}>
+        <button
+          onClick={() => navigate('/news')}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' }}
+        >
+          Все новости →
+        </button>
+      </div>
+      <div className="news-promo-grid">
+        {items.map(n => (
+          <NewsPromoCard key={n.id} news={n} defaultCover={defaultCover} onOpen={() => navigate(`/news/${n.id}`)} />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -57,6 +79,7 @@ function NewsPromoCard({ news: n, defaultCover, onOpen }: { news: News; defaultC
 
   return (
     <div
+      className="news-promo-card"
       onClick={onOpen}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
