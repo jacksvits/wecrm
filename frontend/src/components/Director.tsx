@@ -26,7 +26,7 @@ import { FinanceReconciliationWidget } from "./accounting/FinanceReconciliationW
 
 type WidgetSize = "small" | "medium" | "large";
 type WidgetId = string;
-type WidgetTab = "Основное" | "Камеры" | "Бухгалтерия";
+type WidgetTab = "Основное" | "Камеры" | "Биллинг" | "Бухгалтерия";
 
 interface WidgetDef {
   id: WidgetId;
@@ -54,6 +54,8 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "widget-camera-2", size: "medium", label: "Видеокамера 2", tab: "Камеры" },
   { id: "widget-camera-3", size: "medium", label: "Видеокамера 3", tab: "Камеры" },
   { id: "widget-camera-4", size: "medium", label: "Видеокамера 4", tab: "Камеры" },
+  // === Вкладка: Биллинг ===
+  { id: "widget-billing-subscriptions", size: "medium", label: "Подписки пользователей", tab: "Биллинг" },
   // === Вкладка: Бухгалтерия ===
   { id: "stat-tochka", size: "small", label: "Точка Банк", tab: "Бухгалтерия" },
   { id: "widget-tochka", size: "medium", label: "Точка Банк детали", tab: "Бухгалтерия" },
@@ -67,7 +69,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "widget-finance-reconciliation", size: "medium", label: "Сверка с банком", tab: "Бухгалтерия" },
 ];
 
-const TABS: WidgetTab[] = ["Основное", "Камеры", "Бухгалтерия"];
+const TABS: WidgetTab[] = ["Основное", "Камеры", "Биллинг", "Бухгалтерия"];
 
 const DEFAULT_VISIBLE = ALL_WIDGETS.map((w) => w.id);
 
@@ -236,6 +238,7 @@ export function Director() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [pushStatusUsers, setPushStatusUsers] = useState<any[]>([]);
+  const [billingSubs, setBillingSubs] = useState<any[]>([]);
   const [emailFilterLogs, setEmailFilterLogs] = useState<EmailFilterLog[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
@@ -331,6 +334,7 @@ export function Director() {
       );
       setActiveDeals(d.slice(0, 5));
       setPushStatusUsers(psu || []);
+      api.get("/api/subscriptions/billing").then((b: any) => setBillingSubs(Array.isArray(b) ? b : [])).catch(() => {});
       api.emailFilters.logs().then((l) => setEmailFilterLogs(l || [])).catch(() => {});
       api.beget.account().then(setBegetAccount).catch(() => {});
       api.begetSettings.get().then(setBegetPlugin).catch(() => {});
@@ -1069,6 +1073,44 @@ export function Director() {
         return <FinanceDocumentsWidget />;
       case "widget-finance-reconciliation":
         return <FinanceReconciliationWidget />;
+      case "widget-billing-subscriptions": {
+        const total = billingSubs.length;
+        const activeCount = billingSubs.filter((s: any) => s.status === "active").length;
+        const inactiveCount = total - activeCount;
+        const SUBST: Record<string, { label: string; color: string; bg: string }> = {
+          new: { label: "Новая", color: "#1d4ed8", bg: "#dbeafe" },
+          active: { label: "Активна", color: "#166534", bg: "#dcfce7" },
+          paused: { label: "Пауза", color: "#92400e", bg: "#fef3c7" },
+          cancelled: { label: "Отменена", color: "#991b1b", bg: "#fee2e2" },
+        };
+        const PERIOD_LBL: Record<string, string> = { month: "мес.", quarter: "квартал", year: "год" };
+        return (
+          <div style={{ padding: 10, height: "100%", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 8, background: "var(--bg-hover, #f0f0f0)", color: "var(--text-secondary)" }}>Всего: {total}</span>
+              <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 8, background: "#dcfce7", color: "#166534", fontWeight: 600 }}>Активные: {activeCount}</span>
+              <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 8, background: "#fee2e2", color: "#991b1b" }}>Неактивные: {inactiveCount}</span>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+              {total === 0 && <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Нет подписок</span>}
+              {billingSubs.map((s: any) => {
+                const st = SUBST[s.status] || { label: s.status, color: "var(--text-secondary)", bg: "var(--bg-hover, #f0f0f0)" };
+                return (
+                  <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "4px 6px", borderRadius: 6, background: "var(--bg-hover, #f7f7f7)" }}>
+                    <span style={{ fontWeight: 600, color: "var(--text-primary)", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={s.user?.name}>{s.user?.name || "—"}</span>
+                    <span style={{ flex: 1, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={s.product?.name}>{s.product?.name || "Услуга"}</span>
+                    {s.status === "active" && s.activeUntil && (
+                      <span style={{ fontSize: 11, color: "#166534", whiteSpace: "nowrap" }}>до {new Date(s.activeUntil).toLocaleDateString("ru-RU")}</span>
+                    )}
+                    <span style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{Number(s.price || 0).toLocaleString("ru-RU")} ₽/{PERIOD_LBL[s.period] || s.period}</span>
+                    <span style={{ padding: "1px 8px", borderRadius: 8, fontSize: 11, fontWeight: 600, background: st.bg, color: st.color, whiteSpace: "nowrap" }}>{st.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
       default:
         return null;
     }

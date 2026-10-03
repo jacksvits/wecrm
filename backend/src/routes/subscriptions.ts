@@ -92,6 +92,39 @@ router.post('/', async (req: any, res) => {
   }
 });
 
+// Биллинг (страница директора): все подписки всех пользователей.
+// Для активных подписок вычисляется окончание оплаченного периода
+// (дата последней активации + длительность периода: месяц/квартал/год).
+function addPaidPeriod(date: Date, period: string): Date {
+  const d = new Date(date);
+  if (period === 'year') d.setFullYear(d.getFullYear() + 1);
+  else if (period === 'quarter') d.setMonth(d.getMonth() + 3);
+  else d.setMonth(d.getMonth() + 1);
+  return d;
+}
+
+router.get('/billing', async (req: any, res) => {
+  try {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Доступ только для директора' });
+    const list = await prisma.productSubscription.findMany({
+      orderBy: { number: 'desc' },
+      include: {
+        product: { select: { id: true, name: true, unit: true } },
+        contact: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true } },
+      },
+    });
+    const enriched = list.map((s: any) => ({
+      ...s,
+      activeUntil: s.status === 'active' ? addPaidPeriod(s.updatedAt, s.period).toISOString() : null,
+    }));
+    res.json(enriched);
+  } catch (err: any) {
+    console.error('[subscriptions:billing]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Отказ от подписки текущим пользователем (личный кабинет).
 // Пользователь может отменить только свою подписку; уже отменённую — нельзя.
 router.post('/:id/cancel', async (req: any, res) => {
