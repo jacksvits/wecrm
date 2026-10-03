@@ -145,7 +145,8 @@ router.post('/:id/cancel', async (req: any, res) => {
 });
 
 // Смена статуса / комментария заявки (new | active | paused | cancelled)
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', async (req: any, res) => {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Доступ только для директора' });
   const { status, comment } = req.body || {};
   try {
     const existing = await prisma.productSubscription.findUnique({ where: { id: req.params.id } });

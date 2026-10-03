@@ -1084,6 +1084,11 @@ export function Director() {
           cancelled: { label: "Отменена", color: "#991b1b", bg: "#fee2e2" },
         };
         const PERIOD_LBL: Record<string, string> = { month: "мес.", quarter: "квартал", year: "год" };
+        const setSubStatus = (id: string, status: string) => {
+          api.subscriptions.update(id, { status }).then(() => {
+            api.get("/api/subscriptions/billing").then((b: any) => setBillingSubs(Array.isArray(b) ? b : [])).catch(() => {});
+          }).catch(() => {});
+        };
         return (
           <div style={{ padding: 10, height: "100%", display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1104,6 +1109,12 @@ export function Director() {
                     )}
                     <span style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{Number(s.price || 0).toLocaleString("ru-RU")} ₽/{PERIOD_LBL[s.period] || s.period}</span>
                     <span style={{ padding: "1px 8px", borderRadius: 8, fontSize: 11, fontWeight: 600, background: st.bg, color: st.color, whiteSpace: "nowrap" }}>{st.label}</span>
+                    {s.status !== "active" && s.status !== "cancelled" && (
+                      <button onClick={() => setSubStatus(s.id, "active")} style={{ padding: "1px 8px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>Активировать</button>
+                    )}
+                    {s.status === "active" && (
+                      <button onClick={() => setSubStatus(s.id, "paused")} style={{ padding: "1px 8px", borderRadius: 8, border: "none", background: "#d97706", color: "#fff", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>Приостановить</button>
+                    )}
                   </div>
                 );
               })}
