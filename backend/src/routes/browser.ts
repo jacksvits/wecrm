@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ProxyAgent } from 'undici';
 import { Readable } from 'stream';
+import crypto from 'crypto';
 import { authMiddleware } from '../middleware/auth.js';
 
 // === Прокси-браузер ===
@@ -12,6 +13,11 @@ import { authMiddleware } from '../middleware/auth.js';
 // внутри iframe. Аутентификация — JWT из query (?token=) или из cookie
 // wecrm_browser (ставится эндпоинтом /api/browser/session, т.к. iframe не
 // отправляет кастомные заголовки).
+//
+// Cookie внешних сайтов: сохраняются в браузере пользователя под префиксом
+// wecrm_b_<hash8>_<имя> (hash — от домена целевого сайта), Path ограничен
+// /api/browser/proxy. Так сессии сайтов (авторизации) работают, а имена
+// не пересекаются с cookie CRM и между разными сайтами.
 
 const router = Router();
 
@@ -34,10 +40,53 @@ const DROP_RESPONSE_HEADERS = [
   'connection',
   'content-encoding',
   'strict-transport-security',
-  // чужие cookie не сохраняем: имена могут пересечься с cookie CRM,
-  // а доменная атрибута всё равно ломается через прокси
-  'set-cookie',
 ];
+
+const JAR_PREFIX = 'wecrm_b_';
+
+// Короткий хэш домена — изолирует cookie разных сайтов друг от друга
+function hostHash(hostname: string): string {
+  return crypto.createHash('sha1').update(hostname.toLowerCase()).digest('hex').slice(0, 8);
+}
+
+// Cookie целевого сайта из jar-кук запроса (имена вида wecrm_b_<hash8>_<имя>)
+function jarCookiesFor(req: any, hostname: string): string | undefined {
+  const raw = req.headers.cookie;
+  if (!raw) return undefined;
+  const prefix = JAR_PREFIX + hostHash(hostname) + '_';
+  const pairs: string[] = [];
+  for (const part of raw.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx === -1) continue;
+    const name = part.slice(0, idx).trim();
+    if (name.startsWith(prefix)) {
+      pairs.push(`${name.slice(prefix.length)}=${part.slice(idx + 1).trim()}`);
+    }
+  }
+  return pairs.length ? pairs.join('; ') : undefined;
+}
+
+// Перезапись Set-Cookie от сайта: изолируемое имя + Path только на прокси.
+// Domain убираем (cookie привязывается к домену CRM), Secure сохраняем только
+// если наш origin https (в production NODE_ENV=production и https).
+function rewriteSetCookie(setCookieValue: string, hostname: string): string {
+  const parts = setCookieValue.split(';').map(p => p.trim()).filter(Boolean);
+  if (!parts.length) return setCookieValue;
+  const nv = parts[0];
+  const eq = nv.indexOf('=');
+  const name = eq === -1 ? nv : nv.slice(0, eq);
+  const value = eq === -1 ? '' : nv.slice(eq + 1);
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  const attrs: string[] = [];
+  for (const attr of parts.slice(1)) {
+    const lower = attr.toLowerCase();
+    // Domain/Path от сайта переносить нельзя — они относительны его домена
+    if (lower.startsWith('domain') || lower.startsWith('path') || lower === 'secure') continue;
+    if (lower.startsWith('samesite')) continue; // фиксируем Lax ниже
+    attrs.push(attr);
+  }
+  return `${JAR_PREFIX}${hostHash(hostname)}_${name}=${value}; Path=/api/browser/proxy; HttpOnly; SameSite=Lax${secure}${attrs.length ? '; ' + attrs.join('; ') : ''}`;
+}
 
 // Разбираем cookie-строку вручную (cookie-parser в проекте не подключён)
 function readCookie(req: any, name: string): string | undefined {
@@ -132,21 +181,33 @@ function rewriteCss(css: string, baseUrl: string): string {
     .replace(/@import\s+(["'])(.*?)\1/gi, (m, q, u) => `@import ${q}${proxify(u)}${q}`);
 }
 
-async function pipeUpstream(res: any, upstream: Response) {
-  // Статус и редиректы
+// Общая пересылка заголовков ответа upstream → клиент: снимает запрещённые
+// заголовки, перезаписывает Location и изолирует Set-Cookie
+function sendUpstreamHeaders(res: any, upstream: Response) {
   const location = upstream.headers.get('location');
-  if (location && upstream.status >= 300 && upstream.status < 400) {
-    const target = resolveTarget(location, upstream.url);
-    res.setHeader('Location', target ? proxyUrlFor(target) : location);
-  }
+  const setCookies = (upstream.headers as any).getSetCookie ? (upstream.headers as any).getSetCookie() : [];
+  const hostname = upstream.url ? new URL(upstream.url).hostname : '';
+  const newCookies = setCookies.map((sc: string) => rewriteSetCookie(sc, hostname));
+
   res.status(upstream.status);
-  const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
-  res.setHeader('Content-Type', contentType);
+  const contentType = upstream.headers.get('content-type');
+  if (contentType) res.setHeader('Content-Type', contentType);
   for (const [key, value] of upstream.headers.entries()) {
-    if (DROP_RESPONSE_HEADERS.includes(key.toLowerCase())) continue;
-    if (key.toLowerCase() === 'location') continue;
+    const lower = key.toLowerCase();
+    if (DROP_RESPONSE_HEADERS.includes(lower) || lower === 'location' || lower === 'set-cookie') continue;
     try { res.setHeader(key, value); } catch { /* игнорируем некорректные заголовки */ }
   }
+  if (location && upstream.status >= 300 && upstream.status < 400) {
+    const loc = resolveTarget(location, upstream.url);
+    res.setHeader('Location', loc ? proxyUrlFor(loc) : location);
+  }
+  if (newCookies.length) {
+    res.setHeader('Set-Cookie', newCookies);
+  }
+}
+
+async function pipeUpstream(res: any, upstream: Response) {
+  sendUpstreamHeaders(res, upstream);
   if (!upstream.body) return res.end();
   Readable.fromWeb(upstream.body as any).pipe(res);
 }
@@ -195,6 +256,9 @@ router.all('/proxy', browserAuth, async (req: any, res) => {
     'User-Agent': String(req.headers['user-agent'] || 'Mozilla/5.0 (compatible; WeCRM-Browser/1.0)'),
     'Referer': target.toString(),
   };
+  // Cookie сайта из jar (изолированные wecrm_b_<hash8>_*)
+  const jar = jarCookiesFor(req, target.hostname);
+  if (jar) headers['Cookie'] = jar;
   const upstreamCt = req.headers['content-type'];
   if (body !== undefined && upstreamCt) headers['Content-Type'] = String(upstreamCt);
 
@@ -216,42 +280,20 @@ router.all('/proxy', browserAuth, async (req: any, res) => {
   const contentType = (upstream.headers.get('content-type') || '').toLowerCase();
 
   try {
-    if (contentType.includes('text/html')) {
+    if (contentType.includes('text/html') || contentType.includes('text/css')) {
       const buf = Buffer.from(await upstream.arrayBuffer());
       if (buf.length > MAX_HTML_SIZE) {
-        res.status(502).json({ error: 'Страница слишком большая для отображения' });
+        // слишком большой документ — отдаём без перезаписи
+        await pipeUpstreamWithBuffer(res, upstream, buf);
         return;
       }
-      const html = rewriteHtml(buf.toString('utf-8'), target.toString());
-      res.status(upstream.status);
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      for (const [key, value] of upstream.headers.entries()) {
-        if (DROP_RESPONSE_HEADERS.includes(key.toLowerCase()) || key.toLowerCase() === 'location') continue;
-        try { res.setHeader(key, value); } catch { /* ignore */ }
-      }
-      const location = upstream.headers.get('location');
-      if (location && upstream.status >= 300 && upstream.status < 400) {
-        const loc = resolveTarget(location, upstream.url);
-        res.setHeader('Location', loc ? proxyUrlFor(loc) : location);
-      }
-      res.send(html);
+      const text = contentType.includes('text/html')
+        ? rewriteHtml(buf.toString('utf-8'), target.toString())
+        : rewriteCss(buf.toString('utf-8'), target.toString());
+      sendUpstreamHeaders(res, upstream);
+      res.setHeader('Content-Type', contentType);
+      res.send(text);
       return;
-    }
-
-    if (contentType.includes('text/css')) {
-      const buf = Buffer.from(await upstream.arrayBuffer());
-      if (buf.length <= MAX_HTML_SIZE) {
-        const css = rewriteCss(buf.toString('utf-8'), target.toString());
-        res.status(upstream.status);
-        res.setHeader('Content-Type', contentType);
-        for (const [key, value] of upstream.headers.entries()) {
-          if (DROP_RESPONSE_HEADERS.includes(key.toLowerCase()) || key.toLowerCase() === 'location') continue;
-          try { res.setHeader(key, value); } catch { /* ignore */ }
-        }
-        res.send(css);
-        return;
-      }
-      // слишком большой CSS — отдаём как есть
     }
 
     await pipeUpstream(res, upstream);
@@ -261,5 +303,12 @@ router.all('/proxy', browserAuth, async (req: any, res) => {
     else res.end();
   }
 });
+
+// Отдача уже скачанного буфера, если документ не влез в лимит перезаписи
+async function pipeUpstreamWithBuffer(res: any, upstream: Response, buf: Buffer) {
+  sendUpstreamHeaders(res, upstream);
+  res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/octet-stream');
+  res.send(buf);
+}
 
 export default router;
