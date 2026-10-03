@@ -137,122 +137,14 @@ export async function generateGuestDemoData(guestId: string) {
     }),
   ]);
 
-  const deal1 = await prisma.deal.create({
-    data: {
-      title: 'Поставка оборудования для ООО «Вектор»',
-      value: 1250000,
-      currency: 'RUB',
-      stage: 'proposal',
-      probability: 60,
-      contactId: contact2.id,
-      expectedClose: new Date(now + 14 * day),
-    },
-  });
-  const deal2 = await prisma.deal.create({
-    data: {
-      title: 'Абонемент на сервис для Марины Соколовой',
-      value: 96000,
-      currency: 'RUB',
-      stage: 'lead',
-      probability: 25,
-      contactId: contact1.id,
-      expectedClose: new Date(now + 30 * day),
-    },
-  });
-  const deal3 = await prisma.deal.create({
-    data: {
-      title: 'Партнёрская программа с Алисой Герман',
-      value: 450000,
-      currency: 'RUB',
-      stage: 'won',
-      probability: 100,
-      contactId: contact4.id,
-      expectedClose: new Date(now - 5 * day),
-    },
-  });
-
-  const task1 = await prisma.task.create({
-    data: {
-      title: 'Подготовить коммерческое предложение для ООО «Вектор»',
-      description: 'Сформировать КП по поставке оборудования, указать сроки и условия оплаты.',
-      status: 'in_progress',
-      priority: 'high',
-      dueDate: new Date(now + 2 * day),
-      creatorId: guestId,
-      contactId: contact2.id,
-      dealId: deal1.id,
-      price: 1250000,
-      assignees: { create: [{ userId: guestId }] },
-    },
-  });
-  const task2 = await prisma.task.create({
-    data: {
-      title: 'Перезвонить Денису Кравцову',
-      description: 'Уточнить решение по заявке на подключение, договориться о встрече.',
-      status: 'open',
-      priority: 'medium',
-      dueDate: new Date(now + 1 * day),
-      creatorId: guestId,
-      contactId: contact3.id,
-      assignees: { create: [{ userId: guestId }] },
-    },
-  });
-  const task3 = await prisma.task.create({
-    data: {
-      title: 'Согласовать демонстрацию системы для Марины Соколовой',
-      status: 'load',
-      priority: 'low',
-      dueDate: new Date(now + 5 * day),
-      creatorId: guestId,
-      contactId: contact1.id,
-      dealId: deal2.id,
-      assignees: { create: [{ userId: guestId }] },
-    },
-  });
-  const task4 = await prisma.task.create({
-    data: {
-      title: 'Подписать акт по партнёрской программе',
-      description: 'Акт готов, осталось согласование у контрагента.',
-      status: 'done',
-      priority: 'medium',
-      dueDate: new Date(now - 1 * day),
-      creatorId: guestId,
-      contactId: contact4.id,
-      dealId: deal3.id,
-      assignees: { create: [{ userId: guestId }] },
-    },
-  });
-  await prisma.task.create({
-    data: {
-      title: 'Запросить прайс у ИП Заречного',
-      status: 'done',
-      priority: 'low',
-      dueDate: new Date(now - 6 * day),
-      creatorId: guestId,
-      contactId: org1.id,
-    },
-  });
-  await prisma.task.create({
-    data: {
-      title: 'Перенести архив демо-периода',
-      status: 'load',
-      priority: 'low',
-      creatorId: guestId,
-    },
-  });
-
-  await prisma.comment.createMany({
-    data: [
-      { content: 'КП почти готово, жду согласования сроков поставки.', authorId: guestId, taskId: task1.id },
-      { content: 'Договорились о звонке завтра в 11:00.', authorId: guestId, taskId: task2.id },
-      { content: 'Акт отправлен на подписание.', authorId: guestId, taskId: task4.id },
-    ],
-  });
+  // Задачи и сделки для гостя не создаются: гостевый доступ — просмотр каталога,
+  // контактов и общего чата без демо-задач. Старые демо-задачи/сделки прошлых
+  // сессий по-прежнему удаляются в resetGuestDemoData при следующем входе.
 
   await prisma.chatMessage.createMany({
     data: [
       { content: 'Привет! Это демо-режим wecrm — смотрите, всё можно потрогать руками.', authorId: guestId },
-      { content: 'Задачи, контакты, сделки и чат заполнены примерными данными.', authorId: guestId },
+      { content: 'Контакты и чат заполнены примерными данными.', authorId: guestId },
     ],
   });
 }
