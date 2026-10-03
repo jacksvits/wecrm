@@ -62,6 +62,7 @@ import diadocPluginRoutes from './routes/diadoc-plugin.js';
 import handlerSettingsRoutes from './routes/handler-settings.js';
 import autoReplySettingsRoutes from './routes/auto-reply-settings.js';
 import legalRoutes from './routes/legal.js';
+import browserRoutes from './routes/browser.js';
 dotenv.config();
 
 const app = express();
@@ -163,6 +164,7 @@ app.use('/api/diadoc-plugin', diadocPluginRoutes);
 app.use('/api/handler-settings', handlerSettingsRoutes);
 app.use('/api/auto-reply-settings', autoReplySettingsRoutes);
 app.use('/api/legal', legalRoutes);
+app.use('/api/browser', browserRoutes);
 app.use('/api/yandex', yandexRoutes);
 app.use('/api/dgis', dgisRoutes);
 app.use('/api/calls', callRoutes);
