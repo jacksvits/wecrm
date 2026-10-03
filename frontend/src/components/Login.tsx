@@ -215,6 +215,7 @@ export function Login() {
           Клиенты, сделки, задачи и коммуникации — всё под рукой.<br />
           CRM, которая работает на вас.
         </p>
+        <img src="/mascot/karlsson.png" alt="Карлсон — маскот WeCRM" className="mascot login-brand-mascot" draggable={false} />
       </section>
 
       {/* Правая панель с формой */}

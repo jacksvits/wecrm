@@ -829,3 +829,93 @@ html, body { overflow-x: hidden; }
 .legal-content ul, .legal-content ol { margin: 0 0 14px 22px; }
 .legal-content a { color: #5eb21f; }
 @media (max-width: 700px) { .legal-page { padding: 22px 12px 40px; } .legal-card { padding: 22px; border-radius: 18px; } .legal-card h1 { font-size: 24px; } }
+
+/* === Маскот WeCRM === */
+.mascot {
+  display: block;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 8px 16px rgba(35, 40, 46, 0.18));
+  animation: mascot-float 3.6s ease-in-out infinite;
+  transform-origin: 50% 80%;
+}
+.mascot-bust {
+  object-position: top;
+}
+.mascot-hover:hover {
+  animation-duration: 1.1s;
+}
+@keyframes mascot-float {
+  0%, 100% { transform: translateY(0) rotate(-1.2deg); }
+  50%      { transform: translateY(-9px) rotate(1.2deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mascot { animation: none; }
+}
+
+/* Логин: маскот в бренд-панели */
+.login-brand-mascot {
+  margin: 18px auto 0;
+  width: min(240px, 55%);
+  pointer-events: none;
+}
+
+/* Прелоадер с маскотом */
+.mascot-preloader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  height: 100vh;
+}
+.mascot-preloader-text {
+  color: var(--text-muted, #8a93a0);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
+/* Сайдбар: маскот в подвале */
+.sidebar-mascot-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 2px;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+/* Страница 404 */
+.mascot-404 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 70vh;
+  text-align: center;
+  padding: 24px;
+}
+.mascot-404 h1 { font-size: 28px; margin: 8px 0 0; }
+.mascot-404 p { color: var(--text-muted, #8a93a0); margin: 0 0 18px; }
+.mascot-404 .btn {
+  background: var(--accent, #5eb21f);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 26px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* Пустые состояния списков */
+.mascot-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 34px 16px;
+  color: var(--text-muted, #8a93a0);
+  text-align: center;
+}
+.mascot-empty .mascot { opacity: 0.95; }
