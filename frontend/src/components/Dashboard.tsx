@@ -23,6 +23,7 @@ import { useRealtime } from '../hooks/useRealtime';
 import { DashboardStats, DashboardMetricSetting, Task, Status } from '../types';
 import { Avatar } from './Avatar';
 import { NewsSlider } from './NewsSlider';
+import { NewsPromoBlocks } from './NewsPromoBlocks';
 
 interface Metric {
   key: string;
@@ -248,6 +249,9 @@ export function Dashboard() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Слайдер закреплённых на главной новостей */}
       <NewsSlider />
+
+      {/* Последние 3 новости в стиле промо-блока */}
+      <NewsPromoBlocks />
 
       {/* Кнопка настройки метрик */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8, flexShrink: 0 }}>
