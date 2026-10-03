@@ -220,6 +220,18 @@ export function Vitrine({ search = '' }: { search?: string }) {
     });
   };
 
+
+  // Безналичная цена товара: минимальная ненулевая цена с признаком «Использовать для безнала».
+  // Если такой цены нет — null (остаётся обычная цена).
+  const cashlessPriceOf = (productId: string): number | null => {
+    const p = products.find((x: any) => x.id === productId);
+    const cl = p?.prices?.filter((x: any) => x.priceType?.forCashless && Number(x.price) > 0).sort((a: any, b: any) => Number(a.price) - Number(b.price))[0];
+    return cl ? Number(cl.price) : null;
+  };
+  // Эффективная цена позиции с учётом способа оплаты
+  const effPrice = (it: { productId: string; price: number }): number =>
+    paymentMethod === 'invoice' ? (cashlessPriceOf(it.productId) ?? it.price) : it.price;
+
   const cartTotal = cart.reduce((s, i) => s + effPrice(i) * i.quantity, 0);
 
   const checkout = async () => {
@@ -251,16 +263,6 @@ export function Vitrine({ search = '' }: { search?: string }) {
     return Number((flaggedPrices.length ? flaggedPrices : visiblePrices)[0]?.price ?? 0);
   };
 
-  // Безналичная цена товара: минимальная ненулевая цена с признаком «Использовать для безнала».
-  // Если такой цены нет — null (остаётся обычная цена).
-  const cashlessPriceOf = (productId: string): number | null => {
-    const p = products.find((x: any) => x.id === productId);
-    const cl = p?.prices?.filter((x: any) => x.priceType?.forCashless && Number(x.price) > 0).sort((a: any, b: any) => Number(a.price) - Number(b.price))[0];
-    return cl ? Number(cl.price) : null;
-  };
-  // Эффективная цена позиции с учётом способа оплаты
-  const effPrice = (it: { productId: string; price: number }): number =>
-    paymentMethod === 'invoice' ? (cashlessPriceOf(it.productId) ?? it.price) : it.price;
 
   const openSubscribe = (p: Product) => {
     setSubscribeProduct(p);
