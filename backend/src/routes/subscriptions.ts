@@ -92,6 +92,25 @@ router.post('/', async (req: any, res) => {
   }
 });
 
+// Отказ от подписки текущим пользователем (личный кабинет).
+// Пользователь может отменить только свою подписку; уже отменённую — нельзя.
+router.post('/:id/cancel', async (req: any, res) => {
+  try {
+    const existing = await prisma.productSubscription.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Подписка не найдена' });
+    if (existing.userId !== req.user?.id) return res.status(403).json({ error: 'Нет доступа к этой подписке' });
+    if (existing.status === 'cancelled') return res.status(400).json({ error: 'Подписка уже отменена' });
+    const updated = await prisma.productSubscription.update({
+      where: { id: existing.id },
+      data: { status: 'cancelled' },
+    });
+    res.json(updated);
+  } catch (err: any) {
+    console.error('[subscriptions:cancel]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Смена статуса / комментария заявки (new | active | paused | cancelled)
 router.patch('/:id', async (req, res) => {
   const { status, comment } = req.body || {};

@@ -46,14 +46,28 @@ export function MySubscriptions() {
   const [items, setItems] = useState<MySubscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [cancelError, setCancelError] = useState('');
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () =>
     api.subscriptions
       .my()
       .then((data: any) => setItems(Array.isArray(data) ? data : []))
       .catch((e: any) => setError(e.message || 'Ошибка загрузки подписок'))
       .finally(() => setLoading(false));
-  }, []);
+
+  const handleCancel = (s: MySubscription) => {
+    if (!window.confirm(`Отказаться от подписки «${s.product?.name || 'Услуга'}» (№${s.number})?`)) return;
+    setCancelError('');
+    setCancellingId(s.id);
+    api.subscriptions
+      .cancel(s.id)
+      .then(() => load())
+      .catch((e: any) => setCancelError(e.message || 'Не удалось отменить подписку'))
+      .finally(() => setCancellingId(null));
+  };
+
+  useEffect(() => { load() ; }, []);
 
   if (loading) return <div>Загрузка...</div>;
 
@@ -71,6 +85,10 @@ export function MySubscriptions() {
 
       {error && (
         <div style={{ padding: 14, borderRadius: 12, background: '#fee2e2', color: '#991b1b', marginBottom: 14, fontSize: 14, fontWeight: 500 }}>{error}</div>
+      )}
+
+      {cancelError && (
+        <div style={{ padding: 14, borderRadius: 12, background: '#fee2e2', color: '#991b1b', marginBottom: 14, fontSize: 14, fontWeight: 500 }}>{cancelError}</div>
       )}
 
       {!error && items.length === 0 && (
@@ -122,6 +140,18 @@ export function MySubscriptions() {
               {s.comment && (
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: 8 }}>
                   Комментарий: {s.comment}
+                </div>
+              )}
+
+              {s.status !== 'cancelled' && (
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => handleCancel(s)}
+                    disabled={cancellingId === s.id}
+                    style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: 'transparent', color: '#dc2626', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: cancellingId === s.id ? 0.6 : 1 }}
+                  >
+                    {cancellingId === s.id ? 'Отмена...' : 'Отказаться от подписки'}
+                  </button>
                 </div>
               )}
             </div>

@@ -187,6 +187,19 @@ return (
                     <div key={s.id} style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 10px', borderRadius: 8, background: isDark ? '#353545' : '#f0f0f0' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.product?.name || 'Услуга'}</span>
+                        {s.status !== 'cancelled' && (
+                          <button
+                            type='button'
+                            title='Отказаться от подписки'
+                            onClick={() => {
+                              if (!window.confirm(`Отказаться от подписки «${s.product?.name || 'Услуга'}» (№${s.number})?`)) return ;
+                              api.subscriptions.cancel(s.id).then(() => api.subscriptions.my().then((d: any) => setSubscriptions(Array.isArray(d) ? d : []))).catch(() => {}) ;
+                            }}
+                            style={{ border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: 14, lineHeight: 1, cursor: 'pointer', padding: '0 2px' }}
+                          >
+                            ✕
+                          </button>
+                        )}
                         <span style={{ padding: '1px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>{st.label}</span>
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
