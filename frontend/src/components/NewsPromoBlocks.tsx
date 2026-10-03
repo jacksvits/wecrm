@@ -23,7 +23,9 @@ export function NewsPromoBlocks() {
     Promise.all([api.news.pinned(), api.news.list('limit=10')])
       .then(([pinned, list]) => {
         const pinnedIds = new Set((Array.isArray(pinned) ? pinned : []).map((n: News) => n.id));
-        const latest = (Array.isArray(list) ? list : [])
+        // GET /api/news возвращает объект { news, total, pages, page } — поддерживаем и массив
+        const listArr: News[] = Array.isArray(list) ? list : (list?.news || []);
+        const latest = listArr
           .filter((n: News) => !pinnedIds.has(n.id))
           .slice(0, 3);
         setItems(latest);
