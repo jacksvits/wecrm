@@ -830,13 +830,16 @@ function PromoBlockCard({ block: b, spanStyle, onOpen }: { block: PromoBlock; sp
         transition: tilt.hover ? 'opacity .12s ease-out' : 'opacity .5s ease',
         pointerEvents: 'none',
       }} />
-      <div style={{ position: 'absolute', left: 16, right: 16, bottom: 14, color: '#fff' }}>
-        <div style={{ fontSize: 18, fontWeight: 700 }}>{b.title}</div>
-        {b.subtitle && <div style={{ fontSize: 13, opacity: .85, marginTop: 4 }}>{b.subtitle}</div>}
+      {/* Текст слева, кнопка справа (flex-раскладка нижнего оверлея) */}
+      <div style={{ position: 'absolute', left: 16, right: 16, bottom: 14, color: '#fff', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{b.title}</div>
+          {b.subtitle && <div style={{ fontSize: 13, opacity: .85, marginTop: 4 }}>{b.subtitle}</div>}
+        </div>
         {/* Стиль кнопки: green — как «В резерв» (.btn-reserve), blue — как «В корзину» (.btn-cart) */}
         <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(); }}
           className={b.buttonStyle === 'green' ? 'btn-reserve' : 'btn-cart'}
-          style={{ marginTop: 10, padding: '6px 14px', borderRadius: 8, fontSize: 13 }}>
+          style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 8, fontSize: 13 }}>
           {b.buttonText || 'Подробнее'}
         </button>
       </div>
