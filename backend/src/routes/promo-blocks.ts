@@ -5,6 +5,7 @@ import { authMiddleware } from '../middleware/auth.js';
 const router = Router();
 
 const FORMATS = ['big', 'wide', 'square'];
+const BUTTON_STYLES = ['green', 'blue']; // green — как кнопка «В резерв», blue — как кнопка «В корзину»
 
 /**
  * GET /api/promo-blocks
@@ -47,9 +48,10 @@ router.get('/all', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { title, subtitle, imageUrl, buttonText, categoryId, format, sortOrder, isActive } = req.body;
+    const { title, subtitle, imageUrl, buttonText, buttonStyle, categoryId, format, sortOrder, isActive } = req.body;
     if (!title?.trim()) return res.status(400).json({ error: 'Заголовок обязателен' });
     if (format && !FORMATS.includes(format)) return res.status(400).json({ error: 'Некорректный формат блока' });
+    if (buttonStyle && !BUTTON_STYLES.includes(buttonStyle)) return res.status(400).json({ error: 'Некорректный стиль кнопки' });
     if (categoryId) {
       const cat = await prisma.productCategory.findUnique({ where: { id: categoryId } });
       if (!cat) return res.status(400).json({ error: 'Категория не найдена' });
@@ -60,6 +62,7 @@ router.post('/', async (req, res) => {
         subtitle: subtitle?.trim() || null,
         imageUrl: imageUrl || null,
         buttonText: buttonText?.trim() || 'Подробнее',
+        buttonStyle: BUTTON_STYLES.includes(buttonStyle) ? buttonStyle : 'blue',
         categoryId: categoryId || null,
         format: format || 'square',
         sortOrder: Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 0,
@@ -81,7 +84,7 @@ router.patch('/:id', async (req, res) => {
   try {
     const existing = await prisma.promoBlock.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Блок не найден' });
-    const { title, subtitle, imageUrl, buttonText, categoryId, format, sortOrder, isActive } = req.body;
+    const { title, subtitle, imageUrl, buttonText, buttonStyle, categoryId, format, sortOrder, isActive } = req.body;
     const data: any = {};
     if (title !== undefined) {
       if (!title.trim()) return res.status(400).json({ error: 'Заголовок не может быть пустым' });
@@ -90,6 +93,10 @@ router.patch('/:id', async (req, res) => {
     if (subtitle !== undefined) data.subtitle = subtitle?.trim() || null;
     if (imageUrl !== undefined) data.imageUrl = imageUrl || null;
     if (buttonText !== undefined) data.buttonText = buttonText?.trim() || 'Подробнее';
+    if (buttonStyle !== undefined) {
+      if (!BUTTON_STYLES.includes(buttonStyle)) return res.status(400).json({ error: 'Некорректный стиль кнопки' });
+      data.buttonStyle = buttonStyle;
+    }
     if (categoryId !== undefined) {
       if (categoryId) {
         const cat = await prisma.productCategory.findUnique({ where: { id: categoryId } });

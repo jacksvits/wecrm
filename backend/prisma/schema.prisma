@@ -1190,6 +1190,7 @@ model PromoBlock {
   buttonText String   @default("Подробнее") @map("button_text")
   categoryId String?  @map("category_id") // категория витрины, открываемая по клику
   format     String   @default("square") // big (2×2) | wide (2×1) | square (1×1)
+  buttonStyle String  @default("blue") @map("button_style") // green — как «В резерв» | blue — как «В корзину»
   sortOrder  Int      @default(0) @map("sort_order")
   isActive   Boolean  @default(true) @map("is_active")
 

@@ -833,8 +833,10 @@ function PromoBlockCard({ block: b, spanStyle, onOpen }: { block: PromoBlock; sp
       <div style={{ position: 'absolute', left: 16, right: 16, bottom: 14, color: '#fff' }}>
         <div style={{ fontSize: 18, fontWeight: 700 }}>{b.title}</div>
         {b.subtitle && <div style={{ fontSize: 13, opacity: .85, marginTop: 4 }}>{b.subtitle}</div>}
+        {/* Стиль кнопки: green — как «В резерв» (.btn-reserve), blue — как «В корзину» (.btn-cart) */}
         <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(); }}
-          style={{ marginTop: 10, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#007AFF', color: '#fff', fontSize: 13, cursor: 'pointer' }}>
+          className={b.buttonStyle === 'green' ? 'btn-reserve' : 'btn-cart'}
+          style={{ marginTop: 10, padding: '6px 14px', borderRadius: 8, fontSize: 13 }}>
           {b.buttonText || 'Подробнее'}
         </button>
       </div>

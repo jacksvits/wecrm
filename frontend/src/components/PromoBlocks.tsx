@@ -85,7 +85,7 @@ export default function PromoBlocks() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{b.title}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {FORMAT_LABELS[b.format] || b.format} · ссылка: {catName(b.categoryId)}
+                  {FORMAT_LABELS[b.format] || b.format} · ссылка: {catName(b.categoryId)} · кнопка: {b.buttonStyle === 'green' ? 'зелёная' : 'синяя'}
                 </div>
               </div>
               <button style={{ ...btnGhost, fontSize: 12 }} onClick={() => toggle(b)}>{b.isActive ? 'Активен' : 'Выключен'}</button>
@@ -119,6 +119,7 @@ function PromoBlockModal({ modal, categories, uploading, onUpload, onClose, onSa
   const [title, setTitle] = useState(isNew ? '' : b!.title);
   const [subtitle, setSubtitle] = useState(isNew ? '' : (b!.subtitle || ''));
   const [buttonText, setButtonText] = useState(isNew ? 'Подробнее' : b!.buttonText);
+  const [buttonStyle, setButtonStyle] = useState<'green' | 'blue'>(isNew ? 'blue' : (b!.buttonStyle || 'blue'));
   const [format, setFormat] = useState<string>(isNew ? 'square' : b!.format);
   const [categoryId, setCategoryId] = useState(isNew ? '' : (b!.categoryId || ''));
   const [imageUrl, setImageUrl] = useState(isNew ? '' : (b!.imageUrl || ''));
@@ -128,7 +129,7 @@ function PromoBlockModal({ modal, categories, uploading, onUpload, onClose, onSa
 
   const save = async () => {
     if (!title.trim()) { setError('Заголовок обязателен'); return; }
-    const data: Partial<PromoBlock> = { title, subtitle, buttonText, format: format as PromoBlock['format'], categoryId: categoryId || null, imageUrl: imageUrl || null, sortOrder, isActive };
+    const data: Partial<PromoBlock> = { title, subtitle, buttonText, buttonStyle, format: format as PromoBlock['format'], categoryId: categoryId || null, imageUrl: imageUrl || null, sortOrder, isActive };
     try {
       if (isNew) await api.promoBlocks.create(data);
       else await api.promoBlocks.update(b!.id, data);
@@ -148,6 +149,11 @@ function PromoBlockModal({ modal, categories, uploading, onUpload, onClose, onSa
           <input value={subtitle} onChange={e => setSubtitle(e.target.value)} style={inputStyle} placeholder="Необязательно" />
           <label style={{ fontSize: 14, fontWeight: 500 }}>Текст кнопки</label>
           <input value={buttonText} onChange={e => setButtonText(e.target.value)} style={inputStyle} placeholder="Подробнее" />
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Стиль кнопки</label>
+          <select value={buttonStyle} onChange={e => setButtonStyle(e.target.value as 'green' | 'blue')} style={inputStyle}>
+            <option value="blue">Синий (как «В корзину»)</option>
+            <option value="green">Зелёный (как «В резерв»)</option>
+          </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Формат блока</label>
           <select value={format} onChange={e => setFormat(e.target.value)} style={inputStyle}>
             <option value="square">Квадрат (1×1)</option>
