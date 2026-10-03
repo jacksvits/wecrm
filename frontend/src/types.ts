@@ -82,6 +82,8 @@ export interface Reminder {
 export interface Warehouse { id: string; name: string; location?: string | null; isActive: boolean; sortOrder: number; createdAt: string; }
 export interface PriceType { id: string; name: string; label: string; color: string; sortOrder: number; isActive: boolean; createdAt: string;   forVitrine?: boolean;
   forVk?: boolean;
+  isRetail?: boolean;
+  forCashless?: boolean;
 }
 export interface StockBalance { id: string; productId: string; warehouseId: string; quantity: number; reserved: number; updatedAt: string; }
 export interface ProductPrice { id: string; productId: string; priceTypeId: string; price: number; currency: string; updatedAt: string; priceFrom?: boolean; }

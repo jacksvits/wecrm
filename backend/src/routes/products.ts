@@ -16,8 +16,9 @@ const router = Router();
 router.get('/vitrine', async (_req, res) => {
   try {
     // Флаги «на витрине» — мультивыбор: отмеченных видов цены может быть несколько
-    const flaggedRows = await prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vitrine = true`) as any[];
+    const flaggedRows = await prisma.$queryRawUnsafe(`SELECT id, for_cashless FROM price_types WHERE for_vitrine = true`) as any[];
     const flaggedVitrineIds = new Set((flaggedRows as any[]).map((r: any) => r.id));
+    const cashlessIds = new Set((flaggedRows as any[]).filter((r: any) => r.for_cashless).map((r: any) => r.id));
     const productsRaw = await prisma.product.findMany({
       where: { onVitrine: true, isActive: true },
       include: {
@@ -29,7 +30,7 @@ router.get('/vitrine', async (_req, res) => {
     });
     const products = (productsRaw as any[]).map((prod) => ({
       ...prod,
-      prices: (prod.prices || []).map((pr: any) => ({ ...pr, priceType: { ...pr.priceType, forVitrine: flaggedVitrineIds.has(pr.priceTypeId) } })),
+      prices: (prod.prices || []).map((pr: any) => ({ ...pr, priceType: { ...pr.priceType, forVitrine: flaggedVitrineIds.has(pr.priceTypeId), forCashless: cashlessIds.has(pr.priceTypeId) } })),
     }));
     res.json(await withPriceFrom(products));
   } catch (err: any) {
@@ -229,11 +230,11 @@ router.delete('/meta/warehouses/:id', async (req, res) => {
 router.get('/meta/price-types', async (_req, res) => {
   try {
     const priceTypes = await prisma.priceType.findMany({ orderBy: { sortOrder: 'asc' } });
-    const flagRows = await prisma.$queryRawUnsafe(`SELECT id, for_vitrine, for_vk FROM price_types`) as any[];
+    const flagRows = await prisma.$queryRawUnsafe(`SELECT id, for_vitrine, for_vk, is_retail, for_cashless FROM price_types`) as any[];
     const flagMap = new Map(flagRows.map((r: any) => [r.id, r]));
     res.json(priceTypes.map((pt: any) => {
       const f = flagMap.get(pt.id);
-      return { ...pt, forVitrine: !!f?.for_vitrine, forVk: !!f?.for_vk };
+      return { ...pt, forVitrine: !!f?.for_vitrine, forVk: !!f?.for_vk, isRetail: !!f?.is_retail, forCashless: !!f?.for_cashless };
     }));
   } catch (err: any) {
     console.error('[products:price-types:list]', err);
@@ -247,13 +248,15 @@ router.get('/meta/price-types', async (_req, res) => {
  */
 router.post('/meta/price-types', async (req, res) => {
   try {
-    const { name, label, color, sortOrder, forVitrine, forVk } = req.body;
+    const { name, label, color, sortOrder, forVitrine, forVk, isRetail, forCashless } = req.body;
     if (!name?.trim() || !label?.trim()) return res.status(400).json({ error: 'Название и метка обязательны' });
     const count = await prisma.priceType.count();
     const priceType = await prisma.priceType.create({
       data: { name: name.trim(), label: label.trim(), color: color || '#f0f0f0', sortOrder: sortOrder ?? count + 1 },
     });
     if (forVitrine) await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = true WHERE id = '${priceType.id}'`);
+    if (isRetail) await prisma.$executeRawUnsafe(`UPDATE price_types SET is_retail = true WHERE id = '${priceType.id}'`);
+    if (forCashless) await prisma.$executeRawUnsafe(`UPDATE price_types SET for_cashless = true WHERE id = '${priceType.id}'`);
     if (forVk) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = true WHERE id = '${priceType.id}'`); }
     res.status(201).json(priceType);
   } catch (err: any) {
@@ -277,6 +280,12 @@ router.patch('/meta/price-types/:id', async (req, res) => {
     if (color !== undefined) data.color = color;
     if (isActive !== undefined) data.isActive = !!isActive;
     if (sortOrder !== undefined) data.sortOrder = Number(sortOrder);
+    if (req.body.isRetail !== undefined) {
+      await prisma.$executeRawUnsafe(`UPDATE price_types SET is_retail = ${req.body.isRetail ? 'true' : 'false'} WHERE id = '${req.params.id}'`);
+    }
+    if (req.body.forCashless !== undefined) {
+      await prisma.$executeRawUnsafe(`UPDATE price_types SET for_cashless = ${req.body.forCashless ? 'true' : 'false'} WHERE id = '${req.params.id}'`);
+    }
     if (req.body.forVitrine !== undefined) {
       if (req.body.forVitrine) await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = true WHERE id = '${req.params.id}'`);
       else await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = false WHERE id = '${req.params.id}'`);

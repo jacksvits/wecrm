@@ -113,6 +113,14 @@ export function Products() {
     } catch (e: any) { alert(e.message || 'Ошибка'); }
   };
 
+  // Переключение признаков «Розничная» и «Использовать для безнала» у вида цены
+  const togglePriceFlag = async (t: PriceType, flag: 'isRetail' | 'forCashless') => {
+    try {
+      await api.products.priceTypes.update(t.id, { [flag]: !t[flag] });
+      await load();
+    } catch (e: any) { alert(e.message || 'Ошибка'); }
+  };
+
   const load = async () => {
     try {
       const [p, w, t, m, c] = await Promise.all([
@@ -869,6 +877,20 @@ export function Products() {
                   Витрина
                 </button>
                 <button
+                  title={t.isRetail ? 'Розничная цена (нажмите, чтобы снять)' : 'Отметить как розничную цену'}
+                  onClick={() => togglePriceFlag(t, 'isRetail')}
+                  style={{ border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 8, background: t.isRetail ? '#2563eb' : 'rgba(0,0,0,0.12)', color: t.isRetail ? '#fff' : 'inherit' }}
+                >
+                  Розничная
+                </button>
+                <button
+                  title={t.forCashless ? 'Используется для безнала — счёт на организацию (нажмите, чтобы снять)' : 'Использовать эту цену при оплате «Счёт на организацию»'}
+                  onClick={() => togglePriceFlag(t, 'forCashless')}
+                  style={{ border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 8, background: t.forCashless ? '#7c3aed' : 'rgba(0,0,0,0.12)', color: t.forCashless ? '#fff' : 'inherit' }}
+                >
+                  Безнал
+                </button>
+                <button
                   onClick={() => setPtModal(t)}
                   style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}
                 >
@@ -1356,12 +1378,14 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
   const [color, setColor] = useState(isNew ? '#f0f0f0' : priceType.color);
   const [forVitrine, setForVitrine] = useState(isNew ? false : !!priceType.forVitrine);
   const [forVk, setForVk] = useState(isNew ? false : !!priceType.forVk);
+  const [isRetail, setIsRetail] = useState(isNew ? false : !!priceType.isRetail);
+  const [forCashless, setForCashless] = useState(isNew ? false : !!priceType.forCashless);
   const [error, setError] = useState('');
 
   const save = async () => {
     try {
-      if (isNew) await api.products.priceTypes.create({ name, label, color, forVitrine, forVk });
-      else await api.products.priceTypes.update(priceType.id, { label, color, forVitrine, forVk });
+      if (isNew) await api.products.priceTypes.create({ name, label, color, forVitrine, forVk, isRetail, forCashless });
+      else await api.products.priceTypes.update(priceType.id, { label, color, forVitrine, forVk, isRetail, forCashless });
       onSaved();
     } catch (e: any) { setError(e.message || 'Ошибка'); }
   };
@@ -1389,6 +1413,14 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
             <input type="checkbox" checked={forVitrine} onChange={e => setForVitrine(e.target.checked)} />
             Показывать на витрине
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+            <input type="checkbox" checked={isRetail} onChange={e => setIsRetail(e.target.checked)} />
+            Розничная
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+            <input type="checkbox" checked={forCashless} onChange={e => setForCashless(e.target.checked)} />
+            Использовать для безнала (счёт на организацию)
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
             <input type="checkbox" checked={forVk} onChange={e => setForVk(e.target.checked)} />

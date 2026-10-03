@@ -18,10 +18,12 @@ router.get('/', async (_req, res) => {
 
 // Создание: только по наличию (без минуса), номер автоинкремент
 router.post('/', async (req: any, res) => {
-  const { contactId, warehouseId, comment, items } = req.body || {};
+  const { contactId, warehouseId, comment, items, paymentMethod } = req.body || {};
   if (!Array.isArray(items) || !items.length) {
     return res.status(400).json({ error: 'Позиции обязательны' });
   }
+  const PAYMENT_METHODS = ['cash', 'card', 'invoice'];
+  const pm = PAYMENT_METHODS.includes(paymentMethod) ? paymentMethod : null;
   // Резерв «на себя» (роль «Пользователь»): контакт не выбирается —
   // подставляем личный контакт автора резерва (ищем по e-mail, иначе создаём)
   let resolvedContactId = contactId;
@@ -65,7 +67,7 @@ router.post('/', async (req: any, res) => {
       const number = (last?.number ?? 0) + 1;
       let total = 0;
       const r = await tx.reservation.create({
-        data: { number, contactId: resolvedContactId, warehouseId: whId, userId: req.user?.id, comment, total: 0 },
+        data: { number, contactId: resolvedContactId, warehouseId: whId, userId: req.user?.id, comment, paymentMethod: pm, total: 0 },
       });
       for (const it of items) {
         const sum = it.quantity * it.price;

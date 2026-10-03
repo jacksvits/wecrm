@@ -1274,6 +1274,8 @@ model PriceType {
   color     String   @default("#f0f0f0")
   sortOrder Int      @default(0) @map("sort_order")
   isActive  Boolean  @default(true) @map("is_active")
+  isRetail  Boolean  @default(false) @map("is_retail")
+  forCashless Boolean @default(false) @map("for_cashless")
   createdAt DateTime @default(now()) @map("created_at")
 
   prices       ProductPrice[]
@@ -1488,6 +1490,7 @@ model Reservation {
   userId      String?     @map("user_id")
   user        User?       @relation(fields: [userId], references: [id])
   comment     String?
+  paymentMethod String?   @map("payment_method")
   createdAt   DateTime    @default(now())
   issuedAt    DateTime?   @map("issued_at")
   items       ReservationItem[]

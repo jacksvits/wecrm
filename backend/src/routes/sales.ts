@@ -19,10 +19,12 @@ router.get('/', async (_req, res) => {
 // номер автоинкремент. Оплата (интернет-эквайринг) подключается позже —
 // поля status/paymentMethod/paymentId/paidAt зарезервированы.
 router.post('/', async (req: any, res) => {
-  const { contactId, warehouseId, comment, items } = req.body || {};
+  const { contactId, warehouseId, comment, items, paymentMethod } = req.body || {};
   if (!contactId || !Array.isArray(items) || !items.length) {
     return res.status(400).json({ error: 'Контакт и позиции обязательны' });
   }
+  const PAYMENT_METHODS = ['cash', 'card', 'invoice'];
+  const pm = PAYMENT_METHODS.includes(paymentMethod) ? paymentMethod : null;
   const whId = warehouseId || (await prisma.warehouse.findFirst())?.id;
   if (!whId) return res.status(400).json({ error: 'Склад не найден' });
 
@@ -48,7 +50,7 @@ router.post('/', async (req: any, res) => {
       const number = (last?.number ?? 0) + 1;
       let total = 0;
       const s = await tx.sale.create({
-        data: { number, contactId, warehouseId: whId, userId: req.user?.id, comment, total: 0 },
+        data: { number, contactId, warehouseId: whId, userId: req.user?.id, comment, paymentMethod: pm, total: 0 },
       });
       for (const it of items) {
         const sum = it.quantity * it.price;

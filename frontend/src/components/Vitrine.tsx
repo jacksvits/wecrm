@@ -32,6 +32,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
   });
   const [cartOpen, setCartOpen] = useState(false);
   const [saleComment, setSaleComment] = useState('');
+  // Способ оплаты: 'cash' — наличными, 'card' — банковской картой, 'invoice' — счёт на организацию (безнал)
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'invoice'>('cash');
   // Подписка на услугу: панель оформления подписочной заявки
   const [subscribeProduct, setSubscribeProduct] = useState<Product | null>(null);
   const [subscribePeriod, setSubscribePeriod] = useState<'month' | 'quarter' | 'year'>('month');
@@ -218,7 +220,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
     });
   };
 
-  const cartTotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const cartTotal = cart.reduce((s, i) => s + effPrice(i) * i.quantity, 0);
 
   const checkout = async () => {
     if (!contactId) { setSaleError('Выберите контрагента'); return; }
@@ -228,7 +230,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
       const s: any = await api.sales.create({
         contactId,
         comment: saleComment,
-        items: cart.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+        paymentMethod,
+        items: cart.map(i => ({ productId: i.productId, quantity: i.quantity, price: effPrice(i) })),
       });
       setSaleOk(`Заказ №${s.number} создан на сумму ${s.total} ₽`);
       setCart([]);
@@ -247,6 +250,17 @@ export function Vitrine({ search = '' }: { search?: string }) {
     const flaggedPrices = visiblePrices.filter((x: any) => x.priceType?.forVitrine);
     return Number((flaggedPrices.length ? flaggedPrices : visiblePrices)[0]?.price ?? 0);
   };
+
+  // Безналичная цена товара: минимальная ненулевая цена с признаком «Использовать для безнала».
+  // Если такой цены нет — null (остаётся обычная цена).
+  const cashlessPriceOf = (productId: string): number | null => {
+    const p = products.find((x: any) => x.id === productId);
+    const cl = p?.prices?.filter((x: any) => x.priceType?.forCashless && Number(x.price) > 0).sort((a: any, b: any) => Number(a.price) - Number(b.price))[0];
+    return cl ? Number(cl.price) : null;
+  };
+  // Эффективная цена позиции с учётом способа оплаты
+  const effPrice = (it: { productId: string; price: number }): number =>
+    paymentMethod === 'invoice' ? (cashlessPriceOf(it.productId) ?? it.price) : it.price;
 
   const openSubscribe = (p: Product) => {
     setSubscribeProduct(p);
@@ -276,7 +290,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
     }
   };
 
-  const reserveTotal = reserveList.reduce((s, i) => s + i.price * i.quantity, 0);
+  const reserveTotal = reserveList.reduce((s, i) => s + effPrice(i) * i.quantity, 0);
 
   const saveReserve = async () => {
     if (!isUserRole && !contactId) { setSaveError('Выберите заказчика'); return; }
@@ -285,7 +299,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
     try {
       const r: any = await api.reservations.create({
         ...(isUserRole ? {} : { contactId }),
-        items: reserveList.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+        paymentMethod,
+        items: reserveList.map((i) => ({ productId: i.productId, quantity: i.quantity, price: effPrice(i) })),
       });
       setSaveOk(`Резерв №${r.number} создан`);
       setReserveList([]);
@@ -593,7 +608,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtMoney(i.price)} ₽ × {fmtQty(i.quantity)} {i.unit} = <b style={{ color: 'var(--text-primary)' }}>{fmtMoney(i.price * i.quantity)} ₽</b></div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtMoney(effPrice(i))} ₽ × {fmtQty(i.quantity)} {i.unit} = <b style={{ color: 'var(--text-primary)' }}>{fmtMoney(effPrice(i) * i.quantity)} ₽</b></div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                       <button type="button" onClick={() => setCart(prev => prev.map(x => (x.productId === i.productId ? { ...x, quantity: Math.max(1, x.quantity - 1) } : x)))} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}>−</button>
                       <span style={{ fontSize: 13, minWidth: 24, textAlign: 'center', color: 'var(--text-primary)' }}>{fmtQty(i.quantity)}</span>
@@ -613,6 +628,17 @@ export function Vitrine({ search = '' }: { search?: string }) {
                 <option value="">— Контрагент —</option>
                 {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+<div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Способ оплаты</span>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {([['cash', 'Наличными'], ['card', 'Банковской картой'], ['invoice', 'Счёт на организацию']] as const).map(([val, lbl]) => (
+                    <button key={val} type="button" onClick={() => setPaymentMethod(val)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: paymentMethod === val ? '#1a1a1a' : 'var(--bg-card)', color: paymentMethod === val ? '#fff' : 'var(--text-primary)', fontSize: 12, fontWeight: paymentMethod === val ? 600 : 400, cursor: 'pointer' }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+                {paymentMethod === 'invoice' && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Цены пересчитаны по тарифу «Использовать для безнала».</span>}
+              </div>
               <input value={saleComment} onChange={e => setSaleComment(e.target.value)} placeholder="Комментарий" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }} />
               {saleError && <div style={{ color: '#ef4444', fontSize: 13 }}>{saleError}</div>}
               {saleOk && <div style={{ color: '#16a34a', fontSize: 13 }}>{saleOk}</div>}
@@ -689,7 +715,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtMoney(i.price)} ₽ × {fmtQty(i.quantity)} {i.unit} = <b style={{ color: 'var(--text-primary)' }}>{fmtMoney(i.price * i.quantity)} ₽</b></div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtMoney(effPrice(i))} ₽ × {fmtQty(i.quantity)} {i.unit} = <b style={{ color: 'var(--text-primary)' }}>{fmtMoney(effPrice(i) * i.quantity)} ₽</b></div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                       <button type="button" onClick={() => setReserveList(prev => prev.map(x => (x.productId === i.productId ? { ...x, quantity: Math.max(1, x.quantity - 1) } : x)))} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}>−</button>
                       <span style={{ fontSize: 13, minWidth: 24, textAlign: 'center', color: 'var(--text-primary)' }}>{fmtQty(i.quantity)}</span>
@@ -704,6 +730,17 @@ export function Vitrine({ search = '' }: { search?: string }) {
             <div style={{ borderTop: '1px solid var(--border-color)', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
                 <span>Итого</span><span>{fmtMoney(reserveTotal)} ₽</span>
+              </div>
+<div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Способ оплаты</span>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {([['cash', 'Наличными'], ['card', 'Банковской картой'], ['invoice', 'Счёт на организацию']] as const).map(([val, lbl]) => (
+                    <button key={val} type="button" onClick={() => setPaymentMethod(val)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: paymentMethod === val ? '#1a1a1a' : 'var(--bg-card)', color: paymentMethod === val ? '#fff' : 'var(--text-primary)', fontSize: 12, fontWeight: paymentMethod === val ? 600 : 400, cursor: 'pointer' }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+                {paymentMethod === 'invoice' && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Цены пересчитаны по тарифу «Использовать для безнала».</span>}
               </div>
               <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Заказчик</label>
               {isUserRole ? (
