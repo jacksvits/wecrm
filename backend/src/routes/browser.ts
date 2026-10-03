@@ -225,6 +225,25 @@ router.all('/proxy', browserAuth, async (req: any, res) => {
   if (target.protocol !== 'http:' && target.protocol !== 'https:') {
     return res.status(400).json({ error: 'Поддерживаются только http/https' });
   }
+  // Параметры формы/ссылки (?q=test и т.д.) дописываем в URL цели:
+  // формы на сайтах отправляются на action=.../proxy?url=<цель>, и их поля
+  // приходят сюда дополнительными параметрами — без слияния поиск/POST-формы
+  // на сайте ломаются. Берём сырой query, чтобы сохранить кодировку значений.
+  {
+    const rawQuery = String(req.originalUrl || '').split('?')[1] || '';
+    const extraPairs: string[] = [];
+    for (const pair of rawQuery.split('&')) {
+      if (!pair) continue;
+      const eq = pair.indexOf('=');
+      const key = eq === -1 ? pair : pair.slice(0, eq);
+      if (key === 'url' || key === 'token') continue;
+      extraPairs.push(pair);
+    }
+    if (extraPairs.length) {
+      target.search = (target.search ? target.search + '&' : '?') + extraPairs.join('&');
+    }
+  }
+
   // Запрет обращения к внутренней сети и localhost через прокси
   const host = target.hostname.toLowerCase();
   if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local') || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) {
