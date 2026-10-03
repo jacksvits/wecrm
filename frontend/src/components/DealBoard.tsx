@@ -368,7 +368,6 @@ export function DealBoard() {
       </div>
       {isMobile && deals.length === 0 && (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 14 }}>
-          <img src="/mascot/karlsson.png" alt="" aria-hidden style={{ width: 96, margin: '0 auto 8px', opacity: 0.9 }} className="mascot" draggable={false} />
           Сделки не найдены
         </div>
       )}

@@ -615,7 +615,6 @@ export function TaskList() {
             fontSize: 14,
           }}
         >
-          <img src="/mascot/karlsson.png" alt="" aria-hidden style={{ width: 96, margin: "0 auto 8px", opacity: 0.9 }} className="mascot" draggable={false} />
           {!isAdmin && projects.length === 0 ? "Вы не привязаны ни к одному проекту. Обратитесь к своему менеджеру" : "Задачи не найдены"}
         </div>
       )}{" "}
@@ -817,7 +816,6 @@ export function TaskList() {
             fontSize: 14,
           }}
         >
-          <img src="/mascot/karlsson.png" alt="" aria-hidden style={{ width: 96, margin: "0 auto 8px", opacity: 0.9 }} className="mascot" draggable={false} />
           {!isAdmin && projects.length === 0 ? "Вы не привязаны ни к одному проекту. Обратитесь к своему менеджеру" : "Задачи не найдены"}
         </div>
       )}{" "}
