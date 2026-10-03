@@ -725,6 +725,80 @@ export function Vitrine({ search = '' }: { search?: string }) {
   );
 }
 
+
+/* ---------- Промо-карточка с интерактивным 3D-наклоном за курсором ---------- */
+const TILT_MAX = 8; // максимальный угол наклона, градусы
+
+function PromoBlockCard({ block: b, spanStyle, onOpen }: { block: PromoBlock; spanStyle: React.CSSProperties; onOpen: () => void }) {
+  const [tilt, setTilt] = useState({ rx: 0, ry: 0, gx: 50, gy: 50, hover: false });
+
+  const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width;   // 0..1 слева направо
+    const py = (e.clientY - r.top) / r.height;   // 0..1 сверху вниз
+    setTilt({
+      ry: (px - 0.5) * 2 * TILT_MAX,
+      rx: (0.5 - py) * 2 * TILT_MAX,
+      gx: px * 100,
+      gy: py * 100,
+      hover: true,
+    });
+  };
+
+  const onLeave = () => setTilt({ rx: 0, ry: 0, gx: 50, gy: 50, hover: false });
+
+  // Тень усиливается и смещается по направлению наклона — эффект «парения» над сеткой
+  const shadow = tilt.hover
+    ? `0 ${18 + Math.abs(tilt.rx)}px ${42 + Math.abs(tilt.ry)}px rgba(0,0,0,.45), 0 4px 12px rgba(0,0,0,.3)`
+    : '0 2px 8px rgba(0,0,0,.18)';
+
+  return (
+    <div
+      onClick={onOpen}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      style={{
+        ...spanStyle,
+        position: 'relative',
+        borderRadius: 12,
+        overflow: 'hidden',
+        cursor: b.categoryId ? 'pointer' : 'default',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-color)',
+        transformStyle: 'preserve-3d',
+        willChange: 'transform',
+        zIndex: tilt.hover ? 2 : 1,
+        boxShadow: shadow,
+        transform: tilt.hover
+          ? `perspective(800px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg) scale3d(1.03, 1.03, 1.03)`
+          : 'perspective(800px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
+        transition: tilt.hover ? 'transform .12s ease-out, box-shadow .12s ease-out' : 'transform .5s ease, box-shadow .5s ease',
+      }}
+    >
+      {b.imageUrl
+        ? <img src={b.imageUrl} alt={b.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        : <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-hover)' }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.78) 100%)' }} />
+      {/* Блик, следующий за курсором — усиливает ощущение объёма */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: `radial-gradient(circle at ${tilt.gx}% ${tilt.gy}%, rgba(255,255,255,.18), rgba(255,255,255,0) 55%)`,
+        opacity: tilt.hover ? 1 : 0,
+        transition: tilt.hover ? 'opacity .12s ease-out' : 'opacity .5s ease',
+        pointerEvents: 'none',
+      }} />
+      <div style={{ position: 'absolute', left: 16, right: 16, bottom: 14, color: '#fff' }}>
+        <div style={{ fontSize: 18, fontWeight: 700 }}>{b.title}</div>
+        {b.subtitle && <div style={{ fontSize: 13, opacity: .85, marginTop: 4 }}>{b.subtitle}</div>}
+        <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(); }}
+          style={{ marginTop: 10, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#007AFF', color: '#fff', fontSize: 13, cursor: 'pointer' }}>
+          {b.buttonText || 'Подробнее'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Промо-мозаика раздела «Каталог» ---------- */
 function PromoMosaic({ onOpenCategory }: { onOpenCategory: (id: string) => void }) {
   const [blocks, setBlocks] = useState<PromoBlock[]>([]);
@@ -743,24 +817,7 @@ function PromoMosaic({ onOpenCategory }: { onOpenCategory: (id: string) => void 
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gridAutoRows: '170px', gap: 16, padding: '2px' }}>
         {blocks.map(b => (
-          <div key={b.id} onClick={() => open(b)} style={{
-            ...span(b.format), position: 'relative', borderRadius: 12, overflow: 'hidden',
-            cursor: b.categoryId ? 'pointer' : 'default',
-            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-          }}>
-            {b.imageUrl
-              ? <img src={b.imageUrl} alt={b.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-hover)' }} />}
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.78) 100%)' }} />
-            <div style={{ position: 'absolute', left: 16, right: 16, bottom: 14, color: '#fff' }}>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>{b.title}</div>
-              {b.subtitle && <div style={{ fontSize: 13, opacity: .85, marginTop: 4 }}>{b.subtitle}</div>}
-              <button type="button" onClick={(e) => { e.stopPropagation(); open(b); }}
-                style={{ marginTop: 10, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#007AFF', color: '#fff', fontSize: 13, cursor: 'pointer' }}>
-                {b.buttonText || 'Подробнее'}
-              </button>
-            </div>
-          </div>
+          <PromoBlockCard key={b.id} block={b} spanStyle={span(b.format)} onOpen={() => open(b)} />
         ))}
       </div>
       {!blocks.length && (
