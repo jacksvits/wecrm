@@ -50,3 +50,6 @@ tmp/
 __pycache__/
 # Профили Chromium VNC-браузера (создаются контейнером под root)
 vnc-data/
+# Локальные артефакты сервера (не для репозитория)
+backend/src/routes/*.bak-*
+vpn/sing-box/config.json
