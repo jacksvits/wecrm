@@ -48,7 +48,7 @@ router.get('/my', async (req: any, res) => {
 router.post('/', async (req: any, res) => {
   const { productId, contactId, period, comment } = req.body || {};
   if (!productId) return res.status(400).json({ error: 'Услуга обязательна' });
-  const subscriptionPeriod = ['month', 'quarter', 'year'].includes(period) ? period : 'month';
+  const subscriptionPeriod = ['month', 'year'].includes(period) ? period : 'month';
   try {
     const product = await prisma.product.findUnique({
       where: { id: productId },

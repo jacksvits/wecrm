@@ -36,7 +36,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'invoice'>('cash');
   // Подписка на услугу: панель оформления подписочной заявки
   const [subscribeProduct, setSubscribeProduct] = useState<Product | null>(null);
-  const [subscribePeriod, setSubscribePeriod] = useState<'month' | 'quarter' | 'year'>('month');
+  const [subscribePeriod, setSubscribePeriod] = useState<'month' | 'year'>('month');
   const [subscribeComment, setSubscribeComment] = useState('');
   const [savingSubscribe, setSavingSubscribe] = useState(false);
   const [subscribeError, setSubscribeError] = useState('');
@@ -691,7 +691,6 @@ export function Vitrine({ search = '' }: { search?: string }) {
                 Период оплаты
                 <select value={subscribePeriod} onChange={e => setSubscribePeriod(e.target.value as any)} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }}>
                   <option value="month">Месяц</option>
-                  <option value="quarter">Квартал</option>
                   <option value="year">Год</option>
                 </select>
               </label>
