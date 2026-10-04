@@ -9,8 +9,9 @@ import { News } from '../types';
 const CARD_HEIGHT = 150;
 
 /**
- * Последние новости на дашборде — сетка из 3 карточек в стиле промо-блока витрины:
- * обложка + тёмный градиент снизу, заголовок слева, кнопка «Читать» справа.
+ * Последние новости на дашборде — сетка из 3 карточек: обложка сверху,
+ * под ней заголовок и краткое описание (без наложения текста на картинку),
+ * кнопка «Читать» справа от заголовка.
  * Новости, уже показанные в слайдере закреплённых, не дублируются.
  * На мобильных (≤640px) сетка превращается в горизонтальный свайп-слайдер.
  */
@@ -84,7 +85,6 @@ function NewsPromoCard({ news: n, defaultCover, onOpen }: { news: News; defaultC
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        position: 'relative',
         height: CARD_HEIGHT,
         borderRadius: 12,
         overflow: 'hidden',
@@ -94,30 +94,32 @@ function NewsPromoCard({ news: n, defaultCover, onOpen }: { news: News; defaultC
         boxShadow: hover ? '0 8px 24px rgba(0,0,0,.28)' : '0 2px 8px rgba(0,0,0,.18)',
         transform: hover ? 'scale3d(1.02, 1.02, 1.02)' : 'scale3d(1, 1, 1)',
         transition: 'transform .2s ease, box-shadow .2s ease',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
+      {/* Обложка сверху — без наложения текста */}
       {cover
-        ? <img src={cover} alt={n.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-hover)' }} />}
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.78) 100%)' }} />
-      {/* Текст слева, кнопка справа — раскладка как в промо-блоке витрины */}
-      <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12, color: '#fff', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</div>
-          {summary && <div style={{ fontSize: 12, opacity: .85, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary}</div>}
+        ? <img src={cover} alt={n.title} style={{ width: '100%', height: 82, objectFit: 'cover', display: 'block', flexShrink: 0 }} />
+        : <div style={{ width: '100%', height: 82, background: 'var(--bg-hover)', flexShrink: 0 }} />}
+      {/* Текст под обложкой: заголовок слева, кнопка «Читать» справа, описание ниже */}
+      <div style={{ flex: 1, minHeight: 0, padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ minWidth: 0, fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</div>
+          {/* «Читать» — в стиле синей кнопки «В корзину» (.btn-cart) из карточки товара */}
+          <span style={{
+            flexShrink: 0,
+            padding: '5px 12px',
+            borderRadius: 10,
+            fontSize: 12,
+            fontWeight: 500,
+            color: '#fff',
+            border: '1px solid rgba(120,180,255,0.40)',
+            background: 'linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%)',
+            boxShadow: '0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)',
+          }}>Читать</span>
         </div>
-        {/* «Читать» — в стиле синей кнопки «В корзину» (.btn-cart) из карточки товара */}
-        <span style={{
-          flexShrink: 0,
-          padding: '6px 14px',
-          borderRadius: 10,
-          fontSize: 13,
-          fontWeight: 500,
-          color: '#fff',
-          border: '1px solid rgba(120,180,255,0.40)',
-          background: 'linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%)',
-          boxShadow: '0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)',
-        }}>Читать</span>
+        {summary && <div style={{ fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary}</div>}
       </div>
     </div>
   );
