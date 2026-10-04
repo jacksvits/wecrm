@@ -636,11 +636,16 @@ body {
   text-align: left;
 }
 .login-slider-desc p { margin: 0 0 4px; }
-.login-slider-desc a { color: #a5e879; }
 .login-slider-desc ul, .login-slider-desc ol {
   margin: 0;
   padding-left: 20px;
   text-align: left;
+}
+
+/* Ссылки на странице входа — акцентный цвет из настроек брендинга (--custom-accent) */
+.login-brand a,
+.login-form-side a {
+  color: var(--custom-accent, #6cc62e);
 }
 
 /* Парящие светящиеся шары поверх слайдера (зелёные, как на референсе) */
