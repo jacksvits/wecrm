@@ -6,7 +6,7 @@ import { stripHtml } from '../lib/stripHtml';
 import { useBrandNewsCover } from '../lib/branding';
 import { News } from '../types';
 
-const CARD_HEIGHT = 230;
+const CARD_HEIGHT = 246;
 
 /**
  * Последние новости на дашборде — сетка из 3 карточек: обложка сверху,
@@ -119,7 +119,7 @@ function NewsPromoCard({ news: n, defaultCover, onOpen }: { news: News; defaultC
             boxShadow: '0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)',
           }}>Читать</span>
         </div>
-        {summary && <div style={{ fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary}</div>}
+        {summary && <div style={{ fontSize: 12, lineHeight: 1.45, color: 'var(--text-secondary)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{summary}</div>}
       </div>
     </div>
   );
