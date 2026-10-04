@@ -24,7 +24,7 @@ rm -f /data/chrome/SingletonLock /data/chrome/SingletonSocket /data/chrome/Singl
 
 # Настоящий браузер; весь трафик — через уже установленный прокси (sing-box)
 chromium \
-  --no-sandbox --disable-gpu --disable-dev-shm-usage \
+  --no-sandbox --test-type --disable-gpu --disable-dev-shm-usage \
   --proxy-server="${PROXY_SERVER}" \
   --user-data-dir=/data/chrome \
   --no-first-run --no-default-browser-check --disable-session-crashed-bubble \

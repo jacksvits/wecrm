@@ -109,6 +109,14 @@ async function ensureSession(uid: string): Promise<VncSession> {
   const dataDir = path.join(DATA_BASE, uid);
   fs.mkdirSync(dataDir, { recursive: true });
 
+  // Конфликт имени (остаток после аварийного пересоздания) — подхватываем
+  try {
+    const stale = docker.getContainer(containerName(uid));
+    const info = await stale.inspect();
+    if (info.State.Running) await stale.stop({ t: 5 });
+    await stale.remove();
+  } catch { /* контейнера с таким именем нет — норма */ }
+
   const container = await docker.createContainer({
     Image: IMAGE,
     name: containerName(uid),
@@ -138,7 +146,11 @@ async function stopSession(uid: string) {
     const c = docker.getContainer(sess.id);
     await c.stop({ t: 5 });
     await c.remove();
-  } catch { /* уже остановлен/удалён */ }
+  } catch {
+    // stop/remove могли не успеть или контейнер уже частично удалён —
+    // добиваем принудительным remove, чтобы имя освободилось для recreate
+    try { await docker.getContainer(sess.id).remove({ force: true }); } catch { /* уже удалён */ }
+  }
 }
 
 // Проверка JWT из query (?token=) — для WebSocket-апгрейда (заголовки/cookie
