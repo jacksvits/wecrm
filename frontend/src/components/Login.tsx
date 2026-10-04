@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { sha256 } from "js-sha256"
 import { useAuth } from '../hooks/useAuth'
 import { useBrandLogo } from '../lib/branding';
+import { LoginSlide } from '../types'
 
 const API_URL = ''
 
@@ -26,6 +27,62 @@ function generateCodeChallenge(verifier: string): string {
 const vkIcon = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.118-5.335-3.202C4.624 10.857 4 8.57 4 8.098c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.863 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.814-.542 1.254-1.406 2.151-3.574 2.151-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.203 1.253.745.847 1.32 1.558 1.473 2.05.17.49-.085.744-.576.744z"/></svg>
 )
+
+/* Слайдер левой (зелёной) панели авторизации.
+   Слайды настраиваются в «Настройки → Системные настройки → Слайдер авторизации».
+   Автоматическая смена, без стрелок и индикаторов. */
+function LoginBrandSlider() {
+  const [slides, setSlides] = useState<LoginSlide[] | null>(null)
+  const [index, setIndex] = useState(0)
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/login-slides`)
+      .then(r => (r.ok ? r.json() : []))
+      .then((data: LoginSlide[]) => setSlides(Array.isArray(data) ? data.filter(sl => sl.imageUrl) : []))
+      .catch(() => setSlides([]))
+  }, [])
+
+  useEffect(() => {
+    if (!slides || slides.length < 2) return
+    const timer = setInterval(() => setIndex(i => (i + 1) % slides.length), 6000)
+    return () => clearInterval(timer)
+  }, [slides])
+
+  // Пока загружается или слайдов нет — статичный текст (прежний дизайн)
+  if (!slides || !slides.length) {
+    return (
+      <>
+        <h2 className="login-brand-title">
+          Управляйте бизнесом<br />
+          <span className="accent">в одном окне</span>
+        </h2>
+        <p className="login-brand-sub">
+          Клиенты, сделки, задачи и коммуникации — всё под рукой.<br />
+          CRM, которая работает на вас.
+        </p>
+      </>
+    )
+  }
+
+  return (
+    <div className="login-slider" aria-live="polite">
+      {slides.map((sl, i) => (
+        <div key={sl.id} className={`login-slider-slide${i === index ? ' active' : ''}`}>
+          <div className="login-slider-frame">
+            <img src={sl.imageUrl!} alt="" loading={i === 0 ? 'eager' : 'lazy'} />
+          </div>
+          <h3 className="login-slider-title">{sl.title}</h3>
+          {sl.description && (
+            <div
+              className="login-slider-desc"
+              dangerouslySetInnerHTML={{ __html: sl.description }}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export function Login() {
   const { login, register, guestLogin } = useAuth()
@@ -207,14 +264,7 @@ export function Login() {
         <div className="login-orb login-orb-2" />
         <div className="login-orb login-orb-3" />
         <img src={brandLogo} alt="Welans" className="login-brand-logo" />
-        <h2 className="login-brand-title">
-          Управляйте бизнесом<br />
-          <span className="accent">в одном окне</span>
-        </h2>
-        <p className="login-brand-sub">
-          Клиенты, сделки, задачи и коммуникации — всё под рукой.<br />
-          CRM, которая работает на вас.
-        </p>
+        <LoginBrandSlider />
       </section>
 
       {/* Правая панель с формой */}

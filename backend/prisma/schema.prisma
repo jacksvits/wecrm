@@ -1200,6 +1200,20 @@ model PromoBlock {
   @@map("promo_blocks")
 }
 
+model LoginSlide {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  // HTML-описание из WYSIWYG-редактора
+  imageUrl    String?  @map("image_url")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("login_slides")
+}
+
 model ProductCategory {
   id        String   @id @default(cuid())
   onecId    String?  @unique @map("onec_id") // Ref_Key вида/группы в 1С

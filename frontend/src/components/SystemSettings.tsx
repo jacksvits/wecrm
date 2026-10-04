@@ -6,6 +6,7 @@ import { loadBranding } from "../lib/branding";
 import { THEMES } from "../lib/themes";
 import { User, AutoReplyTrigger } from "../types";
 import PromoBlocks from "./PromoBlocks";
+import LoginSlides from "./LoginSlides";
 import { CallHistory } from "./CallHistory";
 
 // WYSIWYG-редактор — та же конфигурация, что и в остальных текстовых полях проекта
@@ -32,7 +33,7 @@ const TAB_CONFIGS = [
   { key: "games", label: "Игры", defaultPath: "/volume3/GAME" },
 ];
 
-type SystemSubTab = "design" | "themes" | "storage" | "promo" | "calls" | "handler" | "autoreply" | "legal";
+type SystemSubTab = "design" | "themes" | "storage" | "promo" | "slides" | "calls" | "handler" | "autoreply" | "legal";
 
 export function SystemSettings() {
   // По умолчанию открываем под-вкладку «Дизайн»
@@ -1359,6 +1360,9 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "promo")} onClick={() => setSubTab("promo")}>
           Промо-блоки
         </button>
+        <button style={subTabStyle(subTab === "slides")} onClick={() => setSubTab("slides")}>
+          Слайдер авторизации
+        </button>
         <button style={subTabStyle(subTab === "calls")} onClick={() => setSubTab("calls")}>
           Звонки
         </button>
@@ -1373,7 +1377,7 @@ export function SystemSettings() {
         </button>
       </div>
 
-      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "calls" ? <CallHistory /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : renderLegal()}
+      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "slides" ? <LoginSlides /> : subTab === "calls" ? <CallHistory /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : renderLegal()}
     </div>
   );
 }

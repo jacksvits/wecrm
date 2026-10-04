@@ -557,6 +557,67 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ==== Слайдер левой панели авторизации (настраивается в админке) ==== */
+.login-slider {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 480px;
+  margin: 24px auto 0;
+  animation: loginFadeUp 0.8s 0.45s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+.login-slider-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.9s ease, transform 0.9s ease;
+  pointer-events: none;
+}
+.login-slider-slide.active {
+  position: relative;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.login-slider-frame {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+.login-slider-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.login-slider-title {
+  color: #fff;
+  font-size: clamp(20px, 2vw, 26px);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  text-align: center;
+  margin: 18px 0 8px;
+}
+.login-slider-desc {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 15px;
+  line-height: 1.6;
+  text-align: center;
+}
+.login-slider-desc p { margin: 0 0 4px; }
+.login-slider-desc a { color: #a5e879; }
+.login-slider-desc ul, .login-slider-desc ol {
+  margin: 0 auto;
+  padding-left: 20px;
+  display: inline-block;
+  text-align: left;
+}
+
 /* Правая панель с формой */
 .login-form-side {
   flex: 1;
