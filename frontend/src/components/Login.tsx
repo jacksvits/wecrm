@@ -358,15 +358,6 @@ export function Login() {
         <div className="login-orb login-orb-1" />
         <div className="login-orb login-orb-2" />
         <div className="login-orb login-orb-3" />
-        {/* Крупные фоновые шары — слой за существующими шарами (z-index: 0) */}
-        <div className="login-ash-bg login-ash-bg-1" />
-        <div className="login-ash-bg login-ash-bg-2" />
-        <div className="login-ash-bg login-ash-bg-3" />
-        <div className="login-ash-bg login-ash-bg-4" />
-        <div className="login-ash-bg login-ash-bg-green login-ash-bg-green-1" />
-        <div className="login-ash-bg login-ash-bg-green login-ash-bg-green-2" />
-        <div className="login-ash-bg login-ash-bg-green login-ash-bg-green-3" />
-        <div className="login-ash-bg login-ash-bg-green login-ash-bg-green-4" />
         {/* Тёмные и зелёные шары по краям панели — вне зоны слайдера */}
         <div className="login-ash login-ash-1" />
         <div className="login-ash login-ash-2" />
