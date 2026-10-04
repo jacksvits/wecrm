@@ -6,7 +6,7 @@ import { stripHtml } from '../lib/stripHtml';
 import { useBrandNewsCover } from '../lib/branding';
 import { News } from '../types';
 
-const CARD_HEIGHT = 246;
+const CARD_HEIGHT = 270;
 
 /**
  * Последние новости на дашборде — сетка из 3 карточек: обложка сверху,
