@@ -161,8 +161,8 @@ function LoginBrandSplash() {
       .catch(() => setSplash(null))
   }, [])
 
-  // Опция выключена или настройки не загрузились — левая панель без заставки
-  if (!splash?.enabled) return null
+  // Показ заставки — только в мобильной версии; на десктопе левая панель без заставки
+  if (!splash?.enabled || isDesktop) return null
 
   return (
     <video
@@ -358,6 +358,11 @@ export function Login() {
         <div className="login-orb login-orb-1" />
         <div className="login-orb login-orb-2" />
         <div className="login-orb login-orb-3" />
+        {/* Тёмно-серые шары по краям панели — вне зоны слайдера */}
+        <div className="login-ash login-ash-1" />
+        <div className="login-ash login-ash-2" />
+        <div className="login-ash login-ash-3" />
+        <div className="login-ash login-ash-4" />
         <img src={brandLogo} alt="Welans" className="login-brand-logo" />
         <div className="login-brand-middle">
           <LoginBrandSlider />
