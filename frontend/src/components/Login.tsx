@@ -88,12 +88,25 @@ function LoginBrandSlider() {
   // (статичный текст под слайдером выводится всегда)
   if (!slides || !slides.length) return null
 
+  const go = (dir: -1 | 1) => {
+    setIndex(i => (i + dir + slides.length) % slides.length)
+  }
+
   return (
     <div className="login-slider" aria-live="polite">
       {/* Парящие светящиеся шары поверх слайдера */}
       <div className="login-sphere login-sphere-1" />
       <div className="login-sphere login-sphere-2" />
       <div className="login-sphere login-sphere-3" />
+      {/* Объёмные стрелки листания — в той же перспективе, что и карточка */}
+      {slides.length > 1 && (
+        <>
+          <button type="button" className="login-slider-arrow login-slider-arrow-prev"
+            aria-label="Предыдущий слайд" onClick={() => go(-1)}>‹</button>
+          <button type="button" className="login-slider-arrow login-slider-arrow-next"
+            aria-label="Следующий слайд" onClick={() => go(1)}>›</button>
+        </>
+      )}
       {slides.map((sl, i) => (
         <div key={sl.id} className={`login-slider-slide${i === index ? ' active' : ''}`}>
           <div className="login-slider-frame">

@@ -669,6 +669,49 @@ body {
   50% { transform: translateY(-18px); }
 }
 
+/* Объёмные стрелки листания — в плоскости перспективы карточки */
+.login-slider-arrow {
+  position: absolute;
+  top: 50%;
+  margin-top: -27px;
+  z-index: 4;
+  width: 54px;
+  height: 54px;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 30px;
+  line-height: 1;
+  padding: 0 0 4px;
+  font-family: inherit;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  background: radial-gradient(circle at 32% 30%, rgba(214, 245, 180, 0.95), rgba(140, 220, 90, 0.9) 45%, rgba(46, 125, 13, 0.85) 100%);
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.4),
+    0 0 22px rgba(140, 230, 90, 0.35),
+    inset -6px -8px 14px rgba(12, 34, 16, 0.4),
+    inset 4px 6px 10px rgba(255, 255, 255, 0.35);
+  transform: perspective(1200px) rotateX(4deg) rotateY(7deg);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.login-slider-arrow-prev { left: -27px; padding-right: 3px; }
+.login-slider-arrow-next { right: -27px; padding-left: 3px; }
+.login-slider-arrow:hover {
+  transform: perspective(1200px) rotateX(4deg) rotateY(7deg) translateZ(14px) scale(1.07);
+  box-shadow:
+    0 16px 32px rgba(0, 0, 0, 0.45),
+    0 0 30px rgba(140, 230, 90, 0.5),
+    inset -6px -8px 14px rgba(12, 34, 16, 0.4),
+    inset 4px 6px 10px rgba(255, 255, 255, 0.35);
+}
+.login-slider-arrow:active {
+  transform: perspective(1200px) rotateX(4deg) rotateY(7deg) translateZ(4px) scale(0.98);
+}
+
 /* Правая панель с формой */
 .login-form-side {
   flex: 1;
