@@ -574,7 +574,7 @@ body {
   position: relative;
   z-index: 2;
   width: 100%;
-  max-width: 720px;
+  max-width: 1080px;
   margin: 0 auto;
   animation: loginFadeUp 0.8s 0.45s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
