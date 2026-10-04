@@ -145,9 +145,9 @@ function LoginBrandSplash() {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
-  // В десктопной версии заставка идёт в 4 раза медленнее (плавный фон за слайдером)
+  // В десктопной версии заставка идёт в 16 раз медленнее (плавный фон за слайдером)
   useEffect(() => {
-    if (videoRef.current) videoRef.current.playbackRate = isDesktop ? 0.25 : 1
+    if (videoRef.current) videoRef.current.playbackRate = isDesktop ? 0.0625 : 1
   }, [isDesktop, splash])
 
   useEffect(() => {
