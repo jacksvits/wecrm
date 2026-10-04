@@ -9,8 +9,18 @@ mkdir -p /data/chrome
 Xvfb :0 -screen 0 "${SCREEN_W}x${SCREEN_H}x24" &
 for i in $(seq 1 40); do [ -S /tmp/.X11-unix/X0 ] && break; sleep 0.5; done
 
+# Заглушка fbsetbg: дефолтный стиль fluxbox зовёт его для обоев и показывает
+# xmessage («I can't find an app to set the wallpaper») поверх экрана. Обои
+# на виртуальном дисплее не нужны — молча ничего не делаем.
+printf '#!/bin/sh\nexit 0\n' > /usr/local/bin/fbsetbg
+chmod +x /usr/local/bin/fbsetbg
+
 # Лёгкий оконный менеджер (без него chromium стартует без рамки/фокуса)
 fluxbox &
+
+# Снять lock профиля: при пересоздании сессии Singleton* остаются от
+# старого контейнера, и Chromium показывает модальный диалог «Unlock Profile»
+rm -f /data/chrome/SingletonLock /data/chrome/SingletonSocket /data/chrome/SingletonCookie 2>/dev/null || true
 
 # Настоящий браузер; весь трафик — через уже установленный прокси (sing-box)
 chromium \
