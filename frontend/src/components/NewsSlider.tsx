@@ -14,7 +14,7 @@ const SWIPE_THRESHOLD = 50;
  * Слайдер закреплённых на главной новостей для дашборда.
  * Одна новость — статичный блок, несколько — карусель с автопрокруткой.
  * Листание: свайп на мобильных, точки навигации под слайдером.
- * Заголовок — слева вверху, описание — слева внизу.
+ * Обложка — сверху, под ней категория, заголовок и описание (без наложения текста на картинку).
  */
 export function NewsSlider() {
   const navigate = useNavigate();
@@ -88,17 +88,16 @@ export function NewsSlider() {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
+        {/* Обложка — сверху, без наложения текста */}
         {cover && (
           <img
             src={cover}
             alt=""
             style={{
-              position: 'absolute',
-              inset: 0,
               width: '100%',
-              height: '100%',
+              height: 120,
               objectFit: 'cover',
-              opacity: 0.3,
+              display: 'block',
             }}
           />
         )}
@@ -107,17 +106,17 @@ export function NewsSlider() {
           className={slideDir === 'left' ? 'news-slide-l' : 'news-slide-r'}
           style={{
             position: 'relative',
-            padding: '28px 32px',
+            padding: '16px 24px 20px',
             display: 'flex',
             flexDirection: 'column',
-            minHeight: SLIDER_HEIGHT,
+            minHeight: cover ? SLIDER_HEIGHT - 120 : SLIDER_HEIGHT,
             boxSizing: 'border-box',
           }}
         >
-          {/* Верхний блок: категория + заголовок (слева вверху) */}
+          {/* Категория + заголовок */}
           <div>
             {item.category && (
-              <div style={{ marginBottom: 10 }}>
+              <div style={{ marginBottom: 8 }}>
                 <span style={{
                   fontSize: 12,
                   fontWeight: 500,
@@ -130,22 +129,22 @@ export function NewsSlider() {
                 </span>
               </div>
             )}
-            <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)' }}>
+            <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3 }}>
               {item.title}
             </div>
           </div>
 
-          {/* Нижний блок: описание (слева внизу) */}
+          {/* Краткое описание — под картинкой, внизу блока */}
           {item.summary && (
             <div style={{
               marginTop: 'auto',
-              paddingTop: 12,
+              paddingTop: 10,
               fontSize: 14,
               color: 'var(--text-secondary)',
               lineHeight: 1.5,
               maxWidth: 720,
               display: '-webkit-box',
-              WebkitLineClamp: 3,
+              WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
             }}>
