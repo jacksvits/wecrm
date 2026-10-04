@@ -178,9 +178,9 @@ export function NewsDetail() {
           {news.title}
         </h1>
 
-        {/* Обложка с кратким описанием слева снизу */}
-        {coverSrc ? (
-          <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', margin: '0 0 18px' }}>
+        {/* Обложка */}
+        {coverSrc && (
+          <div style={{ borderRadius: 14, overflow: 'hidden', margin: '0 0 14px' }}>
             <img
               src={coverSrc}
               alt={news.title}
@@ -191,35 +191,23 @@ export function NewsDetail() {
                 display: 'block',
               }}
             />
-            {news.summary && (
-              <div style={{
-                position: 'absolute',
-                left: 14,
-                bottom: 14,
-                maxWidth: '70%',
-                background: 'rgba(0,0,0,0.55)',
-                color: '#fff',
-                padding: '8px 12px',
-                borderRadius: 10,
-                fontSize: 13,
-                lineHeight: 1.5,
-              }}>
-                {stripHtml(news.summary)}
-              </div>
-            )}
           </div>
-        ) : (
-          news.summary && (
-            <div style={{
-              fontSize: 15,
-              color: 'var(--text-secondary)',
-              fontStyle: 'italic',
-              margin: '0 0 18px',
-              lineHeight: 1.6,
-            }}>
-              {stripHtml(news.summary)}
-            </div>
-          )
+        )}
+
+        {/* Краткое описание — отдельным блоком между обложкой и полным текстом */}
+        {news.summary && (
+          <div style={{
+            background: 'var(--bg-hover)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 10,
+            padding: '12px 14px',
+            margin: '0 0 18px',
+            fontSize: 14,
+            lineHeight: 1.6,
+            color: 'var(--text-secondary)',
+          }}>
+            {stripHtml(news.summary)}
+          </div>
         )}
 
         {/* Полное описание — под картинкой */}

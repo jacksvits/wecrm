@@ -15,7 +15,7 @@ const quillModules = {
   ],
 };
 
-const quillFormats = ['bold', 'italic', 'underline', 'strike', 'list', 'bullet', 'link'];
+const quillFormats = ['bold', 'italic', 'underline', 'strike', 'list', 'bullet', 'link', 'image'];
 
 export function NewsEditor() {
   const { id } = useParams();
@@ -36,6 +36,9 @@ export function NewsEditor() {
   const [pinnedToHome, setPinnedToHome] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const contentQuillRef = useRef<ReactQuill>(null);
+  const contentImageInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingContentImage, setUploadingContentImage] = useState(false);
 
   // Справочники
   const [categories, setCategories] = useState<NewsCategory[]>([]);
@@ -127,6 +130,47 @@ export function NewsEditor() {
       setError(err.message || 'Ошибка загрузки обложки');
     }
     setUploadingCover(false);
+  };
+
+  // Вставка изображения в полный текст новости: загрузка на сервер и embed в Quill
+  const handleContentImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Можно загружать только изображения');
+      return;
+    }
+    setError('');
+    setUploadingContentImage(true);
+    try {
+      const att = await api.uploads.upload(file, 'news', id || `draft-${Date.now()}`);
+      const editor = contentQuillRef.current?.getEditor();
+      if (editor && att.path) {
+        const range = editor.getSelection(true) || { index: editor.getLength(), length: 0 };
+        editor.insertEmbed(range.index, 'image', att.path, 'user');
+        editor.setSelection(range.index + 1, 0, 'silent');
+        editor.focus();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Ошибка загрузки изображения');
+    }
+    setUploadingContentImage(false);
+  };
+
+  // Панель инструментов полного текста: базовая + кнопка вставки изображения
+  const contentQuillModules = {
+    toolbar: {
+      container: [
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['link', 'image'],
+        ['clean'],
+      ],
+      handlers: {
+        image: () => contentImageInputRef.current?.click(),
+      },
+    },
   };
 
   const handleSave = async (publish: boolean = false) => {
@@ -312,11 +356,12 @@ export function NewsEditor() {
           Полный текст *
         </label>
         <ReactQuill
+          ref={contentQuillRef}
           theme="snow"
           value={content}
           onChange={setContent}
           placeholder="Полный текст новости"
-          modules={quillModules}
+          modules={contentQuillModules}
           formats={quillFormats}
           style={{
             borderRadius: 10,
@@ -325,6 +370,18 @@ export function NewsEditor() {
             minHeight: 200,
           }}
         />
+        <input
+          ref={contentImageInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleContentImageUpload}
+          style={{ display: 'none' }}
+        />
+        {uploadingContentImage && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+            Загрузка изображения...
+          </div>
+        )}
       </div>
 
       {/* Обложка */}
