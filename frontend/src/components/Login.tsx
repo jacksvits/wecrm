@@ -90,6 +90,10 @@ function LoginBrandSlider() {
 
   return (
     <div className="login-slider" aria-live="polite">
+      {/* Парящие светящиеся шары поверх слайдера */}
+      <div className="login-sphere login-sphere-1" />
+      <div className="login-sphere login-sphere-2" />
+      <div className="login-sphere login-sphere-3" />
       {slides.map((sl, i) => (
         <div key={sl.id} className={`login-slider-slide${i === index ? ' active' : ''}`}>
           <div className="login-slider-frame">
