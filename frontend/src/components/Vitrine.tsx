@@ -397,6 +397,18 @@ export function Vitrine({ search = '' }: { search?: string }) {
           <PromoMosaic onOpenCategory={(id) => setActiveCategoryId(id)} />
         ) : (
         <div className="vitrine-grid">
+          {activeCategoryId && (
+            // Кнопка «Назад» — возврат на общий вид «Каталог»
+            <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" onClick={() => setActiveCategoryId(null)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 13 }}>
+                <span aria-hidden="true">←</span> Назад
+              </button>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                {categories.find(c => c.id === activeCategoryId)?.name || ''}
+              </span>
+            </div>
+          )}
           {filteredCards.length === 0 && (
             <div style={{ gridColumn: '1 / -1', padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
               По запросу «{search.trim()}» ничего не найдено
