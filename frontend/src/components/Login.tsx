@@ -358,11 +358,16 @@ export function Login() {
         <div className="login-orb login-orb-1" />
         <div className="login-orb login-orb-2" />
         <div className="login-orb login-orb-3" />
-        {/* Тёмно-серые шары по краям панели — вне зоны слайдера */}
+        {/* Тёмные и зелёные шары по краям панели — вне зоны слайдера */}
         <div className="login-ash login-ash-1" />
         <div className="login-ash login-ash-2" />
         <div className="login-ash login-ash-3" />
         <div className="login-ash login-ash-4" />
+        <div className="login-ash login-ash-5" />
+        <div className="login-ash login-ash-6" />
+        <div className="login-ash login-ash-7" />
+        <div className="login-ash login-ash-green-1" />
+        <div className="login-ash login-ash-green-2" />
         <img src={brandLogo} alt="Welans" className="login-brand-logo" />
         <div className="login-brand-middle">
           <LoginBrandSlider />
