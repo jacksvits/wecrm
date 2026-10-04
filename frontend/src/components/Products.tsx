@@ -47,7 +47,9 @@ export function Products() {
   const { user } = useAuth();
   const isAdmin = (user as any)?.role === 'admin';
   const canStock = isAdmin || (user as any)?.stockAccess !== false;
-  const visibleTabs = canStock ? TABS : TABS.filter((t) => t.key === 'vitrine');
+  // Гостевой доступ: в каталоге доступна только вкладка «Витрина»
+  const isGuest = (user as any)?.isGuest === true;
+  const visibleTabs = !isGuest && canStock ? TABS : TABS.filter((t) => t.key === 'vitrine');
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);

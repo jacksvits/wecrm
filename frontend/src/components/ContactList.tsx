@@ -226,6 +226,8 @@ export function ContactList() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<string>('');
   const { user } = useAuth();
+  // Гостевой доступ: создание контактов недоступно
+  const isGuest = (user as any)?.isGuest === true;
   const isAdmin = user?.role === 'admin';
   const isManager = user?.role === 'manager';
   const canEdit = isAdmin || isManager;
@@ -894,7 +896,7 @@ export function ContactList() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>Контакты</h2>
-        <button className="btn-action" onClick={openCreate} title="Создать контакт">+</button>
+        {!isGuest && (<button className="btn-action" onClick={openCreate} title="Создать контакт">+</button>)}
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
           <input placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} style={{ flex: 1, minWidth: 220, padding: '8px 14px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-color)', fontSize: 14, outline: 'none' }} />

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, guestCreateGuard } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -42,7 +42,7 @@ router.get('/', async (req, res) => {
   res.json(deals);
 });
 
-router.post('/', async (req, res) => {
+router.post('/', guestCreateGuard, async (req, res) => {
   try {
     const data = createSchema.parse(req.body);
     const deal = await prisma.deal.create({

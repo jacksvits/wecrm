@@ -6,6 +6,9 @@ import { prisma } from './prisma.js';
 // Скрытый маркер демо-контактов: по нему данные гостя находятся и удаляются
 export const GUEST_DEMO_TAG = 'wecrm-demo';
 
+// Email гостевого пользователя: по нему определяется гостевая сессия
+export const GUEST_EMAIL = 'guest@wecrm.local';
+
 // Создаёт (или находит) гостевого пользователя с правами обычного пользователя (роль "user")
 export async function ensureGuestUser() {
   let role = await prisma.role.findUnique({ where: { name: 'user' } });

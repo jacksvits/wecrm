@@ -23,6 +23,8 @@ export function TaskList() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  // Гостевой доступ: создание задач недоступно
+  const isGuest = (user as any)?.isGuest === true;
   const canEditTask = (task: Task) => isAdmin || task.creatorId === user?.id || (task.curators || []).some(c => c.id === user?.id);
   const [searchParams] = useSearchParams();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -1252,13 +1254,15 @@ export function TaskList() {
               {viewBtn("kanban", "Канбан", "▦")}{" "}
             </div>
           )}{" "}
-          <button
-            className="btn-action"
-            onClick={() => openCreate()}
-            title="Создать задачу"
-          >
-            +
-          </button>{" "}
+          {!isGuest && (
+            <button
+              className="btn-action"
+              onClick={() => openCreate()}
+              title="Создать задачу"
+            >
+              +
+            </button>
+          )}{" "}
         </div>{" "}
       </div>{" "}
       <div

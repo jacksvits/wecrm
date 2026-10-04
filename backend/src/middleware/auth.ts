@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
+import { GUEST_EMAIL } from '../lib/guest-demo.js';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -16,6 +17,7 @@ export interface AuthRequest extends Request {
     canCreateNews?: boolean;
     canEditNews?: boolean;
       canHandleSpam?: boolean;
+      isGuest?: boolean;
   };
 }
 
@@ -47,6 +49,8 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
     }
+    // Гостевая сессия: только просмотр — без склада, создания новостей и записей
+    const isGuest = user.email === GUEST_EMAIL;
     req.user = {
       id: user.id,
       email: user.email,
@@ -55,9 +59,10 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       allowedPages: user.role?.allowedPages || [],
       canAccessChat: user.role?.canAccessChat ?? true,
       showFinancesTab: user.role?.showFinancesTab ?? false,
-      stockAccess: user.role?.stockAccess ?? true,
-    canCreateNews: user.role?.canCreateNews ?? true,
-    canEditNews: user.role?.canEditNews ?? true,
+      isGuest,
+      stockAccess: isGuest ? false : (user.role?.stockAccess ?? true),
+      canCreateNews: isGuest ? false : (user.role?.canCreateNews ?? true),
+      canEditNews: isGuest ? false : (user.role?.canEditNews ?? true),
       canHandleSpam: user.role?.canHandleSpam ?? false,
       impersonatorId: decoded.imp,
     };
@@ -65,4 +70,13 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
   } catch {
     return res.status(401).json({ error: 'Invalid token' });
   }
+}
+
+
+// Гостевой доступ: запрет создания данных (контакты, сделки, задачи и т.п.)
+export function guestCreateGuard(req: AuthRequest, res: Response, next: NextFunction) {
+  if (req.user?.isGuest) {
+    return res.status(403).json({ error: 'Гостевой доступ: создание записей недоступно' });
+  }
+  next();
 }

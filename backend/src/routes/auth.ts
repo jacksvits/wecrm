@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { ensureGuestUser, resetGuestDemoData, generateGuestDemoData } from '../lib/guest-demo.js';
+import { ensureGuestUser, resetGuestDemoData, generateGuestDemoData, GUEST_EMAIL } from '../lib/guest-demo.js';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
@@ -184,12 +184,13 @@ router.get('/me', async (req, res) => {
       allowedPages: user.role?.allowedPages || [],
       mobileNav: user.mobileNav || [],
       showFinancesTab: user.role?.showFinancesTab ?? false,
-      stockAccess: user.role?.stockAccess ?? true,
+      isGuest: user.email === GUEST_EMAIL,
+      stockAccess: user.email === GUEST_EMAIL ? false : (user.role?.stockAccess ?? true),
       canChangeTaskStatus: user.role?.canChangeTaskStatus ?? true,
       allowedTaskStatuses: user.role?.allowedTaskStatuses ?? [],
-      canCreateNews: user.role?.canCreateNews ?? true,
+      canCreateNews: user.email === GUEST_EMAIL ? false : (user.role?.canCreateNews ?? true),
     canHandleSpam: user.role?.canHandleSpam ?? false,
-      canEditNews: user.role?.canEditNews ?? true,
+      canEditNews: user.email === GUEST_EMAIL ? false : (user.role?.canEditNews ?? true),
       lastActiveAt: user.lastActiveAt,
       impersonatorId: decoded.imp || null,
       impersonatorName,
@@ -217,17 +218,25 @@ const issueToken = (user: any, imp?: string) => {
   return { token, roleName, allowedPages };
 };
 
-const publicUser = (user: any, roleName: string, allowedPages: string[]) => ({
-  id: user.id,
-  email: user.email,
-  username: user.username,
-  name: user.name,
-  role: roleName,
-  roleId: user.roleId,
-  avatar: user.avatar,
-  allowedPages,
-  mobileNav: user.mobileNav ?? [],
-});
+const publicUser = (user: any, roleName: string, allowedPages: string[]) => {
+  // Гостевая сессия: только просмотр — без склада и создания новостей
+  const isGuest = user.email === GUEST_EMAIL;
+  return {
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    name: user.name,
+    role: roleName,
+    roleId: user.roleId,
+    avatar: user.avatar,
+    allowedPages,
+    mobileNav: user.mobileNav ?? [],
+    isGuest,
+    stockAccess: isGuest ? false : (user.role?.stockAccess ?? true),
+    canCreateNews: isGuest ? false : (user.role?.canCreateNews ?? true),
+    canEditNews: isGuest ? false : (user.role?.canEditNews ?? true),
+  };
+};
 
 // Мультиаккаунтность: администратор быстро переходит под аккаунт другого пользователя
 router.post('/impersonate', authMiddleware, adminOnly, async (req: AuthRequest, res) => {

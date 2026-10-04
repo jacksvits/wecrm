@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
+import { useAuth } from '../hooks/useAuth';
 import { Deal, Contact, Status, Project } from '../types';
 
 export function DealBoard() {
+  const { user } = useAuth();
+  // Гостевой доступ: создание сделок недоступно
+  const isGuest = (user as any)?.isGuest === true;
   const [searchParams] = useSearchParams();
   const contactFilter = searchParams.get('contactId') || '';
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -309,7 +313,7 @@ export function DealBoard() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>Воронка продаж</h2>
-        <button className="btn-action" onClick={openCreate} title="Создать сделку">+</button>
+        {!isGuest && (<button className="btn-action" onClick={openCreate} title="Создать сделку">+</button>)}
       </div>
       <div
         style={{ display: 'flex', gap: 12, overflowX: isMobile ? 'hidden' : 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch', minHeight: 400, alignItems: 'flex-start', flexDirection: isMobile ? 'column' : 'row' }}

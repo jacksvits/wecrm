@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import * as XLSX from 'xlsx';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest, guestCreateGuard } from '../middleware/auth.js';
 import { findDuplicateContacts, mergeContacts } from '../lib/contact-dedup.js';
 
 const router = Router();
@@ -128,7 +128,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', guestCreateGuard, async (req, res) => {
   try {
     const data = createSchema.parse(req.body);
     const { organizationId, projectIds, ...restData } = data;
@@ -228,7 +228,7 @@ router.post('/check-duplicates', async (req, res) => {
 });
 
 // Дополнение существующего контакта данными из формы создания (выбор «Объединить» при дубликате)
-router.post('/merge-new', async (req: AuthRequest, res) => {
+router.post('/merge-new', guestCreateGuard, async (req: AuthRequest, res) => {
   try {
     if (!isManagerOrAdmin(req)) {
       return res.status(403).json({ error: 'Недостаточно прав для объединения контактов' });
@@ -467,7 +467,7 @@ router.post('/bulk-kind', async (req: AuthRequest, res) => {
   }
 });
 
-router.post('/import', async (req: AuthRequest, res) => {
+router.post('/import', guestCreateGuard, async (req: AuthRequest, res) => {
   try {
     if (!isAdmin(req)) return res.status(403).json({ error: 'Недостаточно прав' });
     const { format, data } = z.object({ format: z.enum(['vcf', 'csv', 'xlsx']), data: z.string().min(1) }).parse(req.body);
