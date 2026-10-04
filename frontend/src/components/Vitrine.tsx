@@ -327,8 +327,9 @@ export function Vitrine({ search = '' }: { search?: string }) {
   return (
     <>
       <style>{`
-        .vitrine-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; padding: 4px 2px; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .vitrine-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; padding: 4px 2px; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; justify-items: stretch; align-content: start; }
         .vitrine-grid > div { height: max-content; }
+        .vitrine-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; width: 100%; min-height: 2.7em; }
         @media (max-width: 640px) {
           .vitrine-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
           .vitrine-card-body { padding: 10px !important; gap: 4px !important; }
@@ -428,7 +429,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
               <div className="vitrine-name" style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>{p.name}</div>
               <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <div className="vitrine-price" style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {price && Number(price.price) > 0 ? `${price.priceFrom ? 'от ' : ''}${fmtMoney(price.price)} ₽` : null}
+                  {price && Number(price.price) > 0 ? `${price.priceFrom ? 'от ' : ''}${fmtMoney(price.price)} ₽` : 'Договорная'}
                 </div>
                 {p.kind !== 'service' && (
                   <div style={{ fontSize: 12, fontWeight: 500, color: inStock > 0 ? '#16a34a' : 'var(--text-muted)' }}>
@@ -539,7 +540,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
                   )}
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {dMainPrice ? `${dMainPrice.priceFrom ? 'от ' : ''}${fmtMoney(dMainPrice.price)} ₽` : null}
+                      {dMainPrice ? `${dMainPrice.priceFrom ? 'от ' : ''}${fmtMoney(dMainPrice.price)} ₽` : 'Договорная'}
                     </span>
                     {d.kind !== 'service' && (
                       <span style={{ fontSize: 13, fontWeight: 500, color: dInStock > 0 ? '#16a34a' : 'var(--text-muted)' }}>
