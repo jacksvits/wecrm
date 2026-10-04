@@ -93,7 +93,8 @@ function LoginBrandSlider() {
   }
 
   return (
-    <div className="login-slider" aria-live="polite">
+    <div className="login-slider" aria-live="polite"
+      onContextMenu={e => e.preventDefault()}>
       {/* Парящие светящиеся шары поверх слайдера */}
       <div className="login-sphere login-sphere-1" />
       <div className="login-sphere login-sphere-2" />
@@ -110,7 +111,7 @@ function LoginBrandSlider() {
       {slides.map((sl, i) => (
         <div key={sl.id} className={`login-slider-slide${i === index ? ' active' : ''}`}>
           <div className="login-slider-frame">
-            <img src={sl.imageUrl!} alt="" loading={i === 0 ? 'eager' : 'lazy'} />
+            <img src={sl.imageUrl!} alt="" loading={i === 0 ? 'eager' : 'lazy'} draggable={false} />
             <div className="login-slider-caption">
               <h3 className="login-slider-title">{sl.title}</h3>
               {sl.description && (

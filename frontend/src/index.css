@@ -608,6 +608,12 @@ body {
   height: 100%;
   object-fit: cover;
   display: block;
+  /* Запрет копирования: перетаскивание, выделение, долгое нажатие (iOS) */
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
 }
 /* Подпись поверх изображения — внутри карточки, наследует перспективный наклон */
 .login-slider-caption {
