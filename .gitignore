@@ -48,3 +48,5 @@ coverage/
 temp/
 tmp/
 __pycache__/
+# Профили Chromium VNC-браузера (создаются контейнером под root)
+vnc-data/

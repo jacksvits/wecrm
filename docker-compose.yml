@@ -55,6 +55,8 @@ services:
       - ./backend/data:/app/data
       # Общий том с конфигом sing-box: бэкенд перезаписывает его из плагина «Прокси через VPN»
       - ./vpn/sing-box:/app/vpn-config
+      # Docker-сокет: спавн контейнеров VNC-браузера (routes/browser-vnc.ts)
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4000/api/health || exit 1"]
@@ -111,6 +113,15 @@ services:
     restart: unless-stopped
     volumes:
       - ./vpn/sing-box:/etc/sing-box:ro
+
+  # Образ VNC-сессии браузера: собирается вручную
+  # (docker compose --profile manual build vnc-session), запуск контейнеров —
+  # по требованию бэкендом (по сессии на пользователя CRM)
+  vnc-session:
+    build: ./vnc
+    image: wecrm-vnc:latest
+    profiles:
+      - manual
 
 volumes:
   pgdata:

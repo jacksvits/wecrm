@@ -63,6 +63,7 @@ import handlerSettingsRoutes from './routes/handler-settings.js';
 import autoReplySettingsRoutes from './routes/auto-reply-settings.js';
 import legalRoutes from './routes/legal.js';
 import browserRoutes from './routes/browser.js';
+import vncRoutes, { handleVncUpgrade, isVncUpgradePath } from './routes/browser-vnc.js';
 dotenv.config();
 
 const app = express();
@@ -164,6 +165,7 @@ app.use('/api/diadoc-plugin', diadocPluginRoutes);
 app.use('/api/handler-settings', handlerSettingsRoutes);
 app.use('/api/auto-reply-settings', autoReplySettingsRoutes);
 app.use('/api/legal', legalRoutes);
+app.use('/api/browser/vnc', vncRoutes);
 app.use('/api/browser', browserRoutes);
 app.use('/api/yandex', yandexRoutes);
 app.use('/api/dgis', dgisRoutes);
@@ -174,6 +176,14 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok', connections: getA
 // Один HTTP-сервер на приложение: поверх него работают WebSocket-каналы
 // /api/push/ws (нативный Android-клиент) и /api/calls/ws (сигнальник WebRTC)
 const server = http.createServer(app);
+// WebSocket-апгрейд для VNC-браузера (/api/browser/vnc/<uid>/websockify)
+server.on('upgrade', (req, socket, head) => {
+  if (isVncUpgradePath(String(req.url || ''))) {
+    handleVncUpgrade(req, socket, head);
+  } else {
+    socket.destroy();
+  }
+});
 setupPushWs(server);
 setupCallsWs(server);
 
