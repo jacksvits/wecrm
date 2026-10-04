@@ -663,7 +663,7 @@ body {
 }
 .login-sphere-1 { width: 46px; height: 46px; top: -20px; left: -18px; }
 .login-sphere-2 { width: 24px; height: 24px; top: 12%; right: -14px; animation-delay: -2.5s; animation-duration: 7s; }
-.login-sphere-3 { width: 58px; height: 58px; bottom: 22%; left: -26px; animation-delay: -5s; animation-duration: 9.5s; }
+.login-sphere-3 { width: 76px; height: 76px; bottom: -24px; right: -22px; left: auto; animation-delay: -5s; animation-duration: 9.5s; }
 @keyframes loginSphereFloat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-18px); }
@@ -698,8 +698,8 @@ body {
   transform: perspective(1200px) rotateX(4deg) rotateY(7deg);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-.login-slider-arrow-prev { left: -27px; padding-right: 3px; }
-.login-slider-arrow-next { right: -27px; padding-left: 3px; }
+.login-slider-arrow-prev { left: 14px; padding-right: 3px; }
+.login-slider-arrow-next { right: 14px; padding-left: 3px; }
 .login-slider-arrow:hover {
   transform: perspective(1200px) rotateX(4deg) rotateY(7deg) translateZ(14px) scale(1.07);
   box-shadow:
