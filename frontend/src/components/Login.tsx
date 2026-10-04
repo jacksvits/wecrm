@@ -48,21 +48,9 @@ function LoginBrandSlider() {
     return () => clearInterval(timer)
   }, [slides])
 
-  // Пока загружается или слайдов нет — статичный текст (прежний дизайн)
-  if (!slides || !slides.length) {
-    return (
-      <>
-        <h2 className="login-brand-title">
-          Управляйте бизнесом<br />
-          <span className="accent">в одном окне</span>
-        </h2>
-        <p className="login-brand-sub">
-          Клиенты, сделки, задачи и коммуникации — всё под рукой.<br />
-          CRM, которая работает на вас.
-        </p>
-      </>
-    )
-  }
+  // Пока загружается или слайдов нет — ничего не рендерим
+  // (статичный текст под слайдером выводится всегда)
+  if (!slides || !slides.length) return null
 
   return (
     <div className="login-slider" aria-live="polite">
@@ -264,7 +252,17 @@ export function Login() {
         <div className="login-orb login-orb-2" />
         <div className="login-orb login-orb-3" />
         <img src={brandLogo} alt="Welans" className="login-brand-logo" />
-        <LoginBrandSlider />
+        <div className="login-brand-middle">
+          <LoginBrandSlider />
+        </div>
+        <h2 className="login-brand-title">
+          Управляйте бизнесом<br />
+          <span className="accent">в одном окне</span>
+        </h2>
+        <p className="login-brand-sub">
+          Клиенты, сделки, задачи и коммуникации — всё под рукой.<br />
+          CRM, которая работает на вас.
+        </p>
       </section>
 
       {/* Правая панель с формой */}

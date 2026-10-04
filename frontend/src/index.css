@@ -506,8 +506,19 @@ body {
   z-index: 2;
   width: min(220px, 60%);
   height: auto;
-  margin-bottom: auto;
+  margin-bottom: 0;
   animation: loginFadeUp 0.8s 0.3s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+
+/* Центральная зона панели: слайдер по центру между логотипом и нижним текстом */
+.login-brand-middle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  width: 100%;
 }
 .login-brand-title {
   position: relative;
@@ -563,7 +574,7 @@ body {
   z-index: 2;
   width: 100%;
   max-width: 480px;
-  margin: 24px auto 0;
+  margin: 0 auto;
   animation: loginFadeUp 0.8s 0.45s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
 .login-slider-slide {
