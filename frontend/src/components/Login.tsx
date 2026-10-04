@@ -128,6 +128,40 @@ function LoginBrandSlider() {
   )
 }
 
+/* Заставка при запуске — фоновое видео за слайдером левой панели авторизации.
+   Включается опцией «Показать заставку» («Настройки → Системные настройки → Заставка при запуске»).
+   Видео — первый слой панели: кольца (.login-orb), слайдер и зелёные пузыри
+   (.login-sphere) остаются поверх и не затрагиваются. */
+function LoginBrandSplash() {
+  const [splash, setSplash] = useState<{ enabled: boolean; url: string } | null>(null)
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/branding`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((b: any) => {
+        if (!b) return setSplash(null)
+        // splashUrl не задан — дефолтная заставка /splash.mp4
+        setSplash({ enabled: b.splashEnabled ?? true, url: b.splashUrl || '/splash.mp4' })
+      })
+      .catch(() => setSplash(null))
+  }, [])
+
+  // Опция выключена или настройки не загрузились — левая панель без заставки
+  if (!splash?.enabled) return null
+
+  return (
+    <video
+      className="login-splash-video"
+      src={splash.url}
+      autoPlay
+      muted
+      loop
+      playsInline
+      aria-hidden="true"
+    />
+  )
+}
+
 export function Login() {
   const { login, register, guestLogin } = useAuth()
   const [isRegister, setIsRegister] = useState(false)
@@ -304,6 +338,7 @@ export function Login() {
     <div className="login-split">
       {/* Левая брендовая панель */}
       <section className="login-brand">
+        <LoginBrandSplash />
         <div className="login-orb login-orb-1" />
         <div className="login-orb login-orb-2" />
         <div className="login-orb login-orb-3" />

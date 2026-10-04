@@ -485,6 +485,27 @@ body {
   to   { transform: translateX(0); opacity: 1; }
 }
 
+/* Заставка при запуске — фоновое видео за слайдером левой панели авторизации.
+   Идёт первым слоем панели (перед кольцами в DOM): кольца, слайдер, текст
+   и зелёные пузыри остаются поверх видео. */
+.login-splash-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 0.3;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  animation: loginSplashFade 1.4s ease both;
+}
+@keyframes loginSplashFade {
+  from { opacity: 0; }
+  to   { opacity: 0.3; }
+}
+
 /* Плавающие кольца */
 .login-orb {
   position: absolute;
