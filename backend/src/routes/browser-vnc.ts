@@ -39,6 +39,13 @@ interface VncSession { id: string; ip: string }
 const sessions = new Map<string, VncSession>(); // userId -> {containerId, ip}
 
 const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true, xfwd: false });
+// Клиенту KasmVNC для SharedArrayBuffer/WebCodecs нужны заголовки изоляции;
+// цель (websockify) их не ставит — добавляем на ответы прокси
+proxy.on('proxyRes', (proxyRes: any) => {
+  proxyRes.headers['cross-origin-embedder-policy'] = 'require-corp';
+  proxyRes.headers['cross-origin-opener-policy'] = 'same-origin';
+});
+
 proxy.on('error', (err: any, _req: any, res: any) => {
   console.error('[VNC] Ошибка прокси:', err.message);
   if (res && !res.headersSent) res.status(502).json({ error: 'VNC-сессия недоступна' });
