@@ -98,14 +98,16 @@ function LoginBrandSlider() {
         <div key={sl.id} className={`login-slider-slide${i === index ? ' active' : ''}`}>
           <div className="login-slider-frame">
             <img src={sl.imageUrl!} alt="" loading={i === 0 ? 'eager' : 'lazy'} />
+            <div className="login-slider-caption">
+              <h3 className="login-slider-title">{sl.title}</h3>
+              {sl.description && (
+                <div
+                  className="login-slider-desc"
+                  dangerouslySetInnerHTML={{ __html: sl.description }}
+                />
+              )}
+            </div>
           </div>
-          <h3 className="login-slider-title">{sl.title}</h3>
-          {sl.description && (
-            <div
-              className="login-slider-desc"
-              dangerouslySetInnerHTML={{ __html: sl.description }}
-            />
-          )}
         </div>
       ))}
     </div>
