@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { sha256 } from "js-sha256"
 import { useAuth } from '../hooks/useAuth'
 import { useBrandLogo } from '../lib/branding';
@@ -134,6 +134,21 @@ function LoginBrandSlider() {
    (.login-sphere) остаются поверх и не затрагиваются. */
 function LoginBrandSplash() {
   const [splash, setSplash] = useState<{ enabled: boolean; url: string } | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  // Десктоп — тот же брейкпоинт, что в CSS (левая панель скрыта на мобильных)
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 900px)').matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 900px)')
+    const onChange = () => setIsDesktop(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  // В десктопной версии заставка идёт в 4 раза медленнее (плавный фон за слайдером)
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.playbackRate = isDesktop ? 0.25 : 1
+  }, [isDesktop, splash])
 
   useEffect(() => {
     fetch(`${API_URL}/api/branding`)
@@ -151,6 +166,7 @@ function LoginBrandSplash() {
 
   return (
     <video
+      ref={videoRef}
       className="login-splash-video"
       src={splash.url}
       autoPlay
