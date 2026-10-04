@@ -547,6 +547,7 @@ body {
   white-space: normal;
   animation: loginFadeUp 0.8s 0.6s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
+.login-brand-sub p { margin: 0 0 4px; }
 .login-brand-stats {
   position: relative;
   z-index: 2;

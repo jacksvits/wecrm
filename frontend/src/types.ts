@@ -90,6 +90,7 @@ export interface ProductPrice { id: string; productId: string; priceTypeId: stri
 
 // Промо-блок витрины (раздел «Каталог»): картинка + заголовок + кнопка-ссылка на категорию
 export interface PromoBlock { id: string; title: string; subtitle?: string | null; imageUrl?: string | null; buttonText: string; buttonStyle: 'green' | 'blue'; categoryId?: string | null; format: 'big' | 'wide' | 'square'; sortOrder: number; isActive: boolean; createdAt: string; updatedAt: string; }
+export interface LoginBrandText { title?: string | null; accent?: string | null; subtitle?: string | null; }
 export interface LoginSlide { id: string; title: string; description?: string | null; imageUrl?: string | null; sortOrder: number; isActive: boolean; createdAt: string; updatedAt: string; }
 export interface StockMovement { id: string; productId: string; warehouseId: string; type: 'income' | 'outcome' | 'adjust'; quantity: number; price?: number | null; comment?: string | null; date: string; userId?: string | null; createdAt: string; product?: { name: string; sku?: string | null; unit: string }; warehouse?: { name: string }; user?: { name: string } | null; }
 export interface PriceHistory { id: string; productId: string; priceTypeId: string; oldPrice: number; newPrice: number; createdAt: string; priceType?: { label: string }; user?: { name: string } | null; }

@@ -22,7 +22,48 @@ router.get('/', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/login-slides/text
+ * Публичный текст левой панели авторизации (null — использовать дефолтные тексты)
+ */
+router.get('/text', async (req, res) => {
+  try {
+    const branding = await prisma.branding.findUnique({ where: { id: 1 } });
+    res.json({
+      title: branding?.loginTitle || null,
+      accent: branding?.loginAccent || null,
+      subtitle: branding?.loginSubtitle || null,
+    });
+  } catch (err: any) {
+    console.error('[login-slides:text]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.use(authMiddleware);
+
+/**
+ * PUT /api/login-slides/text
+ * Сохранить текст левой панели авторизации (пустая строка — сброс к дефолту)
+ */
+router.put('/text', async (req, res) => {
+  try {
+    const { title, accent, subtitle } = req.body;
+    const branding = await prisma.branding.upsert({
+      where: { id: 1 },
+      create: { id: 1, loginTitle: title || null, loginAccent: accent || null, loginSubtitle: subtitle || null, updatedAt: new Date() },
+      update: { loginTitle: title || null, loginAccent: accent || null, loginSubtitle: subtitle || null, updatedAt: new Date() },
+    });
+    res.json({
+      title: branding.loginTitle,
+      accent: branding.loginAccent,
+      subtitle: branding.loginSubtitle,
+    });
+  } catch (err: any) {
+    console.error('[login-slides:text-save]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /**
  * GET /api/login-slides/all

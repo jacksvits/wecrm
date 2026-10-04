@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { api } from '../api/client';
-import { LoginSlide } from '../types';
+import { LoginSlide, LoginBrandText } from '../types';
 
 // Единая стилистика с PromoBlocks.tsx
 const inputStyle: React.CSSProperties = { padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', fontSize: 14, background: 'var(--bg-card)', color: 'var(--text-primary)' };
@@ -27,15 +27,27 @@ export default function LoginSlides() {
   const [error, setError] = useState('');
   const [modal, setModal] = useState<LoginSlide | 'new' | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [brandText, setBrandText] = useState<LoginBrandText>({});
+  const [textSaved, setTextSaved] = useState(false);
 
   const load = async () => {
     try {
-      setSlides(await api.loginSlides.listAll());
+      const [sl, txt] = await Promise.all([api.loginSlides.listAll(), api.loginSlides.getText()]);
+      setSlides(sl);
+      setBrandText(txt || {});
       setError('');
     } catch (e: any) { setError(e.message || 'Ошибка загрузки'); }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+
+  const saveText = async () => {
+    try {
+      setBrandText(await api.loginSlides.saveText(brandText));
+      setTextSaved(true);
+      setTimeout(() => setTextSaved(false), 2500);
+    } catch (e: any) { alert(e.message || 'Ошибка сохранения'); }
+  };
 
   const toggle = async (s: LoginSlide) => {
     await api.loginSlides.update(s.id, { isActive: !s.isActive });
@@ -77,6 +89,32 @@ export default function LoginSlides() {
       <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
         Слайды выводятся по центру левой (зелёной) панели страницы входа. Переключение — автоматическое, без стрелок и индикаторов.
       </div>
+      {/* Текст левой панели (под слайдером) */}
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 style={{ margin: 0, fontSize: 16 }}>Текст под слайдером</h3>
+          <button style={btnPrimary} onClick={saveText}>{textSaved ? 'Сохранено ✓' : 'Сохранить текст'}</button>
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          Заголовок и подзаголовок внизу зелёной панели страницы входа. Пустое поле — текст по умолчанию.
+        </div>
+        <label style={{ fontSize: 14, fontWeight: 500 }}>Заголовок — первая строка</label>
+        <div style={{ background: 'var(--bg-card)' }}>
+          <ReactQuill theme="snow" value={brandText.title || ''} onChange={v => setBrandText(t => ({ ...t, title: v }))}
+            modules={quillModules} formats={quillFormats} placeholder="Управляйте бизнесом" />
+        </div>
+        <label style={{ fontSize: 14, fontWeight: 500 }}>Заголовок — акцентная строка (градиент)</label>
+        <div style={{ background: 'var(--bg-card)' }}>
+          <ReactQuill theme="snow" value={brandText.accent || ''} onChange={v => setBrandText(t => ({ ...t, accent: v }))}
+            modules={quillModules} formats={quillFormats} placeholder="в одном окне" />
+        </div>
+        <label style={{ fontSize: 14, fontWeight: 500 }}>Подзаголовок</label>
+        <div style={{ background: 'var(--bg-card)' }}>
+          <ReactQuill theme="snow" value={brandText.subtitle || ''} onChange={v => setBrandText(t => ({ ...t, subtitle: v }))}
+            modules={quillModules} formats={quillFormats} placeholder="Клиенты, сделки, задачи и коммуникации — всё под рукой." />
+        </div>
+      </div>
+
       {error && <div style={{ color: '#dc2626', fontSize: 14 }}>{error}</div>}
       {loading ? <div>Загрузка…</div> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

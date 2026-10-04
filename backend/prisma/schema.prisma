@@ -1352,6 +1352,10 @@ model Branding {
   splashEnabled Boolean  @default(true) @map("splash_enabled")
   splashPath    String?  @map("splash_path")
   defaultTheme  String?  @map("default_theme")
+  // Текст левой панели страницы авторизации (null — дефолтные тексты)
+  loginTitle    String?  @map("login_title")     // первая строка заголовка
+  loginAccent   String?  @map("login_accent")    // акцентная строка (градиент)
+  loginSubtitle String?  @map("login_subtitle")  // подзаголовок (HTML из WYSIWYG)
   updatedAt    DateTime @default(now()) @map("updated_at")
 
   @@map("branding")
