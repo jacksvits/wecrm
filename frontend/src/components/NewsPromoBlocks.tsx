@@ -54,15 +54,6 @@ export function NewsPromoBlocks() {
           .news-promo-card { flex: 0 0 82%; scroll-snap-align: center; }
         }
       `}</style>
-      {/* Кнопка «Все новости» — слева над блоками */}
-      <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}>
-        <button
-          onClick={() => navigate('/news')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' }}
-        >
-          Все новости →
-        </button>
-      </div>
       <div className="news-promo-grid">
         {items.map(n => (
           <NewsPromoCard key={n.id} news={n} defaultCover={defaultCover} onOpen={() => navigate(`/news/${n.id}`)} />

@@ -253,8 +253,14 @@ export function Dashboard() {
       {/* Последние 3 новости в стиле промо-блока */}
       <NewsPromoBlocks />
 
-      {/* Кнопка настройки метрик */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8, flexShrink: 0 }}>
+      {/* Кнопки под новостями: «Все новости» слева, настройка метрик справа — на одном уровне */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8, flexShrink: 0 }}>
+        <button
+          onClick={() => navigate('/news')}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' }}
+        >
+          Все новости →
+        </button>
         <button
           onClick={() => setShowMetricSettings((v) => !v)}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' }}
