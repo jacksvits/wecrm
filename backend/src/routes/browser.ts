@@ -100,8 +100,9 @@ function readCookie(req: any, name: string): string | undefined {
   return undefined;
 }
 
-// Авторизация: JWT из ?token= или из cookie wecrm_browser
-function browserAuth(req: any, res: any, next: any) {
+// Авторизация: JWT из ?token= или из cookie wecrm_browser.
+// Общий для прокси и VNC-роутов (iframe не отправляет кастомные заголовки).
+export function browserAuth(req: any, res: any, next: any) {
   if (!req.query.token) {
     const cookieToken = readCookie(req, COOKIE_NAME);
     if (cookieToken) req.query.token = cookieToken;

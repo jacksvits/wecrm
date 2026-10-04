@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
 import { authMiddleware } from '../middleware/auth.js';
+import { browserAuth } from './browser.js';
 
 // === VNC-браузер (по сессии на пользователя) ===
 // Страница «Браузер» может работать в режиме VNC: для каждого пользователя CRM
@@ -226,7 +227,7 @@ router.delete('/session', authMiddleware, async (req: any, res) => {
 });
 
 // Прокси noVNC (HTTP): /api/browser/vnc/<uid>/vnc.html, /app/..., и т.д.
-router.all('/:uid/*', authMiddleware, vncProxyAuth, (req: any, res) => {
+router.all('/:uid/*', browserAuth, vncProxyAuth, (req: any, res) => {
   const uid = req.params.uid as string;
   const sess = sessions.get(uid)!;
   // Отрезаем префикс /api/browser/vnc/<uid> — контейнер ждёт пути noVNC
