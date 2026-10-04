@@ -601,7 +601,7 @@ body {
   background: rgba(255, 255, 255, 0.06);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   /* Перспективное искажение: верхний и правый края слегка уходят вглубь */
-  transform: perspective(1200px) rotateX(-4deg) rotateY(7deg);
+  transform: perspective(1200px) rotateX(4deg) rotateY(7deg);
 }
 .login-slider-frame img {
   width: 100%;
