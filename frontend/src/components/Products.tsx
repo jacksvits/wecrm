@@ -55,10 +55,15 @@ export function Products() {
   const effectiveTab = tab === 'stockgroup' ? stockTab : tab;
   const { user } = useAuth();
   const isAdmin = (user as any)?.role === 'admin';
-  const canStock = isAdmin || (user as any)?.stockAccess !== false;
+  // Складской учёт доступен только администратору и менеджеру
+  const isPrivileged = ['admin', 'manager'].includes((user as any)?.role);
   // Гостевой доступ: в каталоге доступна только вкладка «Витрина»
   const isGuest = (user as any)?.isGuest === true;
-  const visibleTabs = !isGuest && canStock ? TABS : TABS.filter((t) => t.key === 'vitrine');
+  const visibleTabs = TABS.filter((t) => {
+    if (isGuest) return t.key === 'vitrine';
+    if (t.key === 'stockgroup') return isPrivileged;
+    return true;
+  });
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);
@@ -1651,6 +1656,9 @@ function ReservesTab() {
 
 // Продажи (реализация) с корзины витрины; оплата — позже
 function SalesTab() {
+  const { user } = useAuth();
+  // Только администратор и менеджер могут менять статусы заказов
+  const canChangeStatus = ['admin', 'manager'].includes((user as any)?.role);
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -1697,6 +1705,7 @@ function SalesTab() {
   }, []);
 
   const changeStatus = async (s: any, status: string) => {
+    if (!canChangeStatus) return;
     try {
       await api.sales.update(s.id, { status });
       await load();
@@ -1739,7 +1748,7 @@ function SalesTab() {
                 <td style={tdStyle}>{s.warehouse?.name || '—'}</td>
                 <td style={tdStyle}>{Number(s.total).toFixed(2)} ₽</td>
                 <td style={{ ...tdStyle, color: statusColor(s.status), fontWeight: 600 }}>
-                  <select value={s.status} disabled={s.status === 'cancelled' || s.status === 'refund'} onChange={e => changeStatus(s, e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'inherit', fontSize: 12 }}>
+                  <select value={s.status} disabled={!canChangeStatus || s.status === 'cancelled' || s.status === 'refund'} onChange={e => changeStatus(s, e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'inherit', fontSize: 12 }}>
                     <option value="new">Новый</option>
                     <option value="paid">Оплачен</option>
                     <option value="cancelled">Отменён</option>

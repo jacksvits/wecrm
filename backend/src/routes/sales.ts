@@ -103,6 +103,10 @@ router.patch('/:id', async (req: any, res) => {
   if (!['new', 'paid', 'cancelled', 'refund'].includes(status || '')) {
     return res.status(400).json({ error: 'Недопустимый статус' });
   }
+  // Смена статуса заказа — только администратор и менеджер
+  if (!['admin', 'manager'].includes(req.user?.role)) {
+    return res.status(403).json({ error: 'Только администратор или менеджер может менять статусы заказов' });
+  }
   try {
     const result = await prisma.$transaction(async (tx) => {
       const sale = await tx.sale.findUnique({ where: { id: req.params.id }, include: { items: true } });
