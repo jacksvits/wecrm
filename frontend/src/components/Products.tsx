@@ -17,15 +17,19 @@ const quillModules = {
 };
 const quillFormats = ['bold', 'italic', 'underline', 'strike', 'list', 'bullet', 'link'];
 
-// group: 'stock' — вкладки складского учёта (показываются под заголовком «Складской учёт»)
 const TABS = [
   { key: 'vitrine', label: 'Витрина' },
   { key: 'sales', label: 'Заказы' },
   { key: 'reserves', label: 'Резервы' },
-  { key: 'nomenclature', label: 'Номенклатура', group: 'stock' },
-  { key: 'stock', label: 'Склад', group: 'stock' },
-  { key: 'prices', label: 'Цены', group: 'stock' },
-  { key: 'stats', label: 'Статистика', group: 'stock' },
+  { key: 'stockgroup', label: 'Складской учёт' },
+];
+
+// Под-вкладки внутри «Складской учёт»
+const STOCK_TABS = [
+  { key: 'nomenclature', label: 'Номенклатура' },
+  { key: 'stock', label: 'Склад' },
+  { key: 'prices', label: 'Цены' },
+  { key: 'stats', label: 'Статистика' },
 ];
 
 const KIND_LABELS: Record<string, string> = { product: 'Товар', service: 'Услуга' };
@@ -45,6 +49,10 @@ interface CategoryNode { key: string; name: string; children: CategoryNode[]; pr
 
 export function Products() {
   const [tab, setTab] = useState('vitrine');
+  // Активная под-вкладка внутри «Складской учёт»
+  const [stockTab, setStockTab] = useState('nomenclature');
+  // Фактически показываемая вкладка контента
+  const effectiveTab = tab === 'stockgroup' ? stockTab : tab;
   const { user } = useAuth();
   const isAdmin = (user as any)?.role === 'admin';
   const canStock = isAdmin || (user as any)?.stockAccess !== false;
@@ -479,7 +487,7 @@ export function Products() {
           </svg>
           {reserveCount > 0 && <span style={{ position: 'absolute', top: -6, right: -6, background: '#fff', color: 'rgb(10,136,0)', border: '1px solid rgba(120,255,122,0.40)', borderRadius: 10, fontSize: 11, padding: '1px 6px', fontWeight: 700 }}>{reserveCount}</span>}
         </button>
-        {tab === 'nomenclature' && (
+        {effectiveTab === 'nomenclature' && (
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={importFromVk} disabled={!!vkBusy} title="Загрузить все товары маркета группы ВК в проект"
               style={{ ...btnGhost, borderColor: '#0077FF', color: '#0077FF' }}>
@@ -492,10 +500,10 @@ export function Products() {
             <button onClick={() => setProductModal('new')} style={btnPrimary}>+ Позиция</button>
           </div>
         )}
-        {tab === 'stock' && (
+        {effectiveTab === 'stock' && (
           <button onClick={() => setWhModal('new')} style={btnPrimary}>+ Склад</button>
         )}
-        {tab === 'prices' && (
+        {effectiveTab === 'prices' && (
           <button onClick={() => setPtModal('new')} style={btnPrimary}>+ Вид цены</button>
         )}
       </div>
@@ -506,14 +514,8 @@ export function Products() {
         marginBottom: 16,
         ...(isMobile ? { margin: '0 -8px 16px', overflowX: 'auto', scrollbarWidth: 'none' } : {}),
       }}>
-        {visibleTabs.map((t, idx) => (
+        {visibleTabs.map((t) => (
           <Fragment key={t.key}>
-            {/* Разделитель группы «Складской учёт» перед первой складской вкладкой */}
-            {(t as any).group === 'stock' && !((visibleTabs[idx - 1] as any)?.group === 'stock') && (
-              <span style={{ alignSelf: 'center', margin: '0 4px 0 12px', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap', userSelect: 'none' }}>
-                Складской учёт
-              </span>
-            )}
             <button
               onClick={() => setTab(t.key)}
               style={{
@@ -530,6 +532,27 @@ export function Products() {
           </Fragment>
         ))}
       </div>
+
+      {/* Под-вкладки «Складского учёта» */}
+      {tab === 'stockgroup' && (
+        <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border-color)', marginBottom: 12, flexWrap: 'wrap' }}>
+          {STOCK_TABS.map(st => (
+            <button
+              key={st.key}
+              onClick={() => setStockTab(st.key)}
+              style={{
+                padding: '8px 14px', border: 'none',
+                background: stockTab === st.key ? 'var(--bg-hover)' : 'transparent',
+                color: stockTab === st.key ? '#007AFF' : 'var(--text-muted)',
+                borderBottom: stockTab === st.key ? '2px solid #007AFF' : '2px solid transparent',
+                cursor: 'pointer', fontSize: 13, fontWeight: 500, borderRadius: '8px 8px 0 0',
+              }}
+            >
+              {st.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Поиск по каталогу */}
       <div style={{ marginBottom: 12 }}>
@@ -560,7 +583,7 @@ export function Products() {
       {tab === 'sales' && <SalesTab />}
 
       {/* ===== Номенклатура ===== */}
-      {tab === 'nomenclature' && (
+      {effectiveTab === 'nomenclature' && (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           {categorySidebar}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -657,7 +680,7 @@ export function Products() {
       )}
 
       {/* ===== Склад ===== */}
-      {tab === 'stock' && (
+      {effectiveTab === 'stock' && (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           {categorySidebar}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minWidth: 0 }}>
@@ -775,7 +798,7 @@ export function Products() {
       )}
 
       {/* ===== Статистика ===== */}
-      {tab === 'stats' && (
+      {effectiveTab === 'stats' && (
         <div className='mobile-grid-1' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(520px, 1fr))', gap: 16, alignItems: 'start' }}>
           {/* Виджет среднего размера — первая ячейка сетки статистики; рядом в будущем — виджет «Самые продаваемые» */}
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
@@ -868,7 +891,7 @@ export function Products() {
       )}
 
       {/* ===== Цены ===== */}
-      {tab === 'prices' && (
+      {effectiveTab === 'prices' && (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           {categorySidebar}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minWidth: 0 }}>
