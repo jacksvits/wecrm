@@ -23,7 +23,7 @@ const TABS = [
   { key: 'stock', label: 'Склад' },
   { key: 'prices', label: 'Цены' },
   { key: 'reserves', label: 'Резервы' },
-  { key: 'sales', label: 'Продажи' },
+  { key: 'sales', label: 'Заказы' },
   { key: 'stats', label: 'Статистика' },
 ];
 
@@ -1766,7 +1766,7 @@ function SalesTab() {
           ))}
         </tbody>
       </table>
-      {!sales.length && <div style={{ padding: 16, color: 'var(--text-muted)' }}>Продаж пока нет.</div>}
+      {!sales.length && <div style={{ padding: 16, color: 'var(--text-muted)' }}>Заказов пока нет.</div>}
     </div>
   );
 }
