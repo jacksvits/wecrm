@@ -720,7 +720,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
                       <rect x="2" y="5" width="20" height="14" rx="2"/>
                       <path d="M2 10h20"/>
                     </svg>
-                    Оплатить сейчас
+                    Оплата онлайн
                   </button>
                 </div>
               </div>
@@ -732,12 +732,13 @@ export function Vitrine({ search = '' }: { search?: string }) {
               {saleOk && <div style={{ color: '#16a34a', fontSize: 13 }}>{saleOk}</div>}
               {paySale && (
                 <div style={{ border: '1px solid var(--border-color)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Оплата заказа №{paySale.number} — {fmtMoney(paySale.total)} ₽
-                  </div>
-                  <button type="button" onClick={payOnline} disabled={paying}
-                    style={{ padding: '10px 8px', borderRadius: 10, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 13, fontWeight: 600, cursor: paying ? 'default' : 'pointer', opacity: paying ? 0.7 : 1 }}>
-                    {paying ? 'Создание платежа...' : 'Перейти к оплате (карта / СБП / T-Pay / «Долями»)'}
+                  <button type="button" onClick={payOnline} disabled={paying} className="btn-action-cart"
+                    style={{ width: '100%', justifyContent: 'center', padding: '10px 8px', fontWeight: 600, cursor: paying ? 'default' : 'pointer', opacity: paying ? 0.7 : 1 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="2" y="5" width="20" height="14" rx="2"/>
+                      <path d="M2 10h20"/>
+                    </svg>
+                    {paying ? 'Создание платежа...' : 'Перейти к оплате'}
                   </button>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                     Оплата на защищённой странице банка Точка. После оплаты вы вернётесь в витрину, статус заказа обновится автоматически.
