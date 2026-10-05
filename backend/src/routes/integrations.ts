@@ -24,7 +24,7 @@ router.get('/status', async (_req, res) => {
       Promise.resolve(!!loadTokens()?.access_token),
       prisma.vpnSettings.findFirst({ select: { isActive: true } }),
       prisma.diadocPluginSettings.findFirst({ select: { isActive: true } }),
-      prisma.tochkaAcquiringSettings.findFirst({ select: { isActive: true, terminalKey: true, password: true } }),
+      prisma.tochkaAcquiringSettings.findFirst({ select: { isActive: true } }),
     ]);
     res.json({
       email: email?.isActive ?? false,
@@ -42,7 +42,7 @@ router.get('/status', async (_req, res) => {
       tochka: tochka === true,
       vpn: vpn?.isActive ?? false,
       diadoc: diadoc?.isActive ?? false,
-      tochkaAcquiring: !!(tochkaAcquiring?.isActive && tochkaAcquiring?.terminalKey && tochkaAcquiring?.password),
+      tochkaAcquiring: tochkaAcquiring?.isActive ?? false,
     });
   } catch (err: any) {
     console.error('[integrations] status error:', err.message);

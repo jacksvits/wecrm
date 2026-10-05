@@ -82,6 +82,7 @@ app.use('/api', (_req, res, next) => {
   res.setHeader('Expires', '0');
   next();
 });
+app.use('/api/tochka-acquiring/webhook', express.text({ type: () => true, limit: '64kb' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static('/app/uploads'));

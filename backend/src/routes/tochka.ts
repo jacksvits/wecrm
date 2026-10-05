@@ -111,7 +111,7 @@ function saveAccountUsers(mapping: Record<string, string>) {
 export { loadAccountUsers };
 
 // Обновление пары токенов через refresh_token; true — удалось, false — нет refresh_token или банк отклонил
-async function refreshTokens(): Promise<boolean> {
+export async function refreshTokens(): Promise<boolean> {
   const tokens = loadTokens();
   if (!tokens?.refresh_token) return false;
   try {
@@ -149,7 +149,7 @@ async function authHeadersWithRetry(getResponse: (headers: Record<string, string
   return { response, refreshed: false };
 }
 
-function tochkaRequest(urlPath: string, options: { headers?: Record<string, string>; method?: string; body?: string } = {}): Promise<{ status: number; body: any; text: string }> {
+export function tochkaRequest(urlPath: string, options: { headers?: Record<string, string>; method?: string; body?: string } = {}): Promise<{ status: number; body: any; text: string }> {
   return new Promise((resolve, reject) => {
     const url = urlPath.startsWith('http') ? urlPath : `${TOCHKA_BASE}${urlPath}`;
     const parsed = new URL(url);
@@ -237,7 +237,7 @@ router.get('/auth-url', async (req, res) => {
 
   // Иначе — генерируем URL для авторизации
   try {
-    const ccBody = `grant_type=client_credentials&client_id=${encodeURIComponent(TOCHKA_CLIENT_ID)}&client_secret=${encodeURIComponent(TOCHKA_CLIENT_SECRET)}&scope=accounts+balances+customers+statements`;
+    const ccBody = `grant_type=client_credentials&client_id=${encodeURIComponent(TOCHKA_CLIENT_ID)}&client_secret=${encodeURIComponent(TOCHKA_CLIENT_SECRET)}&scope=accounts+balances+customers+statements+acquiring`;
     const ccRes = await tokenRequest(ccBody);
     if (ccRes.status !== 200) return res.status(500).json({ error: 'Failed to get client token', details: ccRes.body });
 
@@ -261,7 +261,7 @@ router.get('/auth-url', async (req, res) => {
       response_type: 'code',
       state,
       redirect_uri: TOCHKA_REDIRECT_URI,
-      scope: 'accounts balances customers statements',
+      scope: 'accounts balances customers statements acquiring',
       consent_id: consentId,
     });
     const authUrl = `https://enter.tochka.com/connect/authorize?${params.toString()}`;

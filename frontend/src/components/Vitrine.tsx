@@ -49,7 +49,6 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const [paySale, setPaySale] = useState<any | null>(null);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState('');
-  const [payQr, setPayQr] = useState<string | null>(null);
   const [payOrderId, setPayOrderId] = useState('');
 
   useEffect(() => {
@@ -254,8 +253,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
         items: cart.map(i => ({ productId: i.productId, quantity: i.quantity, price: effPrice(i) })),
       });
       if (paymentMethod === 'tochka') {
-        // Заказ создан — дальше экран онлайн-оплаты (карта: редирект, СБП: QR)
-        setPaySale(s); setPayQr(null); setPayError('');
+        // Заказ создан — дальше кнопка онлайн-оплаты (карта/СБП выбор на странице банка)
+        setPaySale(s); setPayError('');
         setSaleOk(`Заказ №${s.number} создан на сумму ${s.total} ₽. Оплатите его ниже.`);
         setCart([]);
         setSaleComment('');
@@ -308,12 +307,13 @@ export function Vitrine({ search = '' }: { search?: string }) {
     }
   };
 
-  // Оплата картой: редирект на платёжную страницу Точки
-  const payByCard = async () => {
+  // Оплата онлайн: создаём платёжную ссылку Точки и переходим на неё
+  // (выбор карта/СБП/T-Pay/«Долями» — на странице банка)
+  const payOnline = async () => {
     if (!paySale) return;
     setPaying(true); setPayError('');
     try {
-      const r: any = await api.tochkaAcquiring.pay(paySale.id, 'card');
+      const r: any = await api.tochkaAcquiring.pay(paySale.id, 'link');
       if (r.paymentUrl) window.location.href = r.paymentUrl;
       else setPayError('Банк не вернул ссылку на оплату');
     } catch (e: any) {
@@ -321,35 +321,21 @@ export function Vitrine({ search = '' }: { search?: string }) {
     } finally { setPaying(false); }
   };
 
-  // Оплата через СБП: показываем QR-код и ждём webhook/поллинг
-  const payBySbp = async () => {
-    if (!paySale) return;
-    setPaying(true); setPayError('');
-    try {
-      const r: any = await api.tochkaAcquiring.pay(paySale.id, 'sbp');
-      if (r.qrData) { setPayQr(r.qrData); setPayOrderId(r.orderId); }
-      else if (r.paymentUrl) window.location.href = r.paymentUrl; // запасной вариант — страница оплаты
-      else setPayError('Банк не вернул QR-код для СБП');
-    } catch (e: any) {
-      setPayError(e.message || 'Ошибка создания платежа');
-    } finally { setPaying(false); }
-  };
-
-  // Оплата СБП: опрашиваем статус платежа, пока заказ не станет оплаченным
+  // После возврата со страницы банка опрашиваем статус, пока заказ не станет оплаченным
   useEffect(() => {
-    if (!payQr || !payOrderId) return;
+    if (!paySale) return;
     const t = setInterval(async () => {
       try {
-        const st: any = await api.tochkaAcquiring.paymentStatus(payOrderId);
+        const st: any = await api.tochkaAcquiring.paymentStatus(`wecrm-sale-${paySale.number}`);
         if (st.status === 'paid') {
           clearInterval(t);
-          setSaleOk('Заказ оплачен через СБП');
-          setPaySale(null); setPayQr(null); setPayOrderId('');
+          setSaleOk(`Заказ №${paySale.number} оплачен`);
+          setPaySale(null); setPayOrderId('');
         }
       } catch { /* повторим на следующем тике */ }
     }, 5000);
     return () => clearInterval(t);
-  }, [payQr, payOrderId]);
+  }, [paySale]);
 
   const reserveTotal = reserveList.reduce((s, i) => s + effPrice(i) * i.quantity, 0);
 
@@ -731,25 +717,15 @@ export function Vitrine({ search = '' }: { search?: string }) {
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
                     Оплата заказа №{paySale.number} — {fmtMoney(paySale.total)} ₽
                   </div>
-                  {!payQr ? (
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button type="button" onClick={payByCard} disabled={paying}
-                        style={{ flex: 1, padding: '10px 8px', borderRadius: 10, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                        💳 Оплатить картой
-                      </button>
-                      <button type="button" onClick={payBySbp} disabled={paying}
-                        style={{ flex: 1, padding: '10px 8px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                        СБП по QR-коду
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: 'center' }}>
-                      <img src={`data:image/png;base64,${payQr}`} alt="QR СБП" style={{ width: 180, height: 180, borderRadius: 12, border: '1px solid var(--border-color)' }} />
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Отсканируйте код в приложении банка. Оплата подтвердится автоматически.</div>
-                    </div>
-                  )}
+                  <button type="button" onClick={payOnline} disabled={paying}
+                    style={{ padding: '10px 8px', borderRadius: 10, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 13, fontWeight: 600, cursor: paying ? 'default' : 'pointer', opacity: paying ? 0.7 : 1 }}>
+                    {paying ? 'Создание платежа...' : 'Перейти к оплате (карта / СБП / T-Pay / «Долями»)'}
+                  </button>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    Оплата на защищённой странице банка Точка. После оплаты вы вернётесь в витрину, статус заказа обновится автоматически.
+                  </div>
                   {payError && <div style={{ fontSize: 12, color: '#dc2626' }}>{payError}</div>}
-                  <button type="button" onClick={() => { setPaySale(null); setPayQr(null); }} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>
+                  <button type="button" onClick={() => { setPaySale(null); }} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>
                     Закрыть (оплатить позже из списка продаж)
                   </button>
                 </div>
