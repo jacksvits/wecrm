@@ -246,7 +246,7 @@ router.get('/auth-url', async (req, res) => {
       headers: { Authorization: `Bearer ${ccRes.body.access_token}` },
       body: JSON.stringify({
         Data: {
-          permissions: ['ReadAccountsBasic','ReadAccountsDetail','ReadBalances','ReadStatements','ReadCustomerData'],
+          permissions: ['ReadAccountsBasic','ReadAccountsDetail','ReadBalances','ReadStatements','ReadCustomerData','MakeAcquiringOperation','ReadAcquiringData','ManageWebhookData'],
           expirationDateTime: '2030-12-31T00:00:00+00:00'
         }
       })
