@@ -626,9 +626,13 @@ export function Vitrine({ search = '' }: { search?: string }) {
                     <button style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 14 }}
                       onClick={() => setDetails(null)}>Закрыть</button>
                     {d.kind !== 'service' && (
-                      <button type="button" className="btn-action" style={{ flex: 1, justifyContent: 'center' }}
+                      <button type="button" className="btn-action" style={{ flex: 1, justifyContent: 'center', borderRadius: 12, padding: '10px 16px', fontWeight: 600 }}
                         disabled={dInStock <= 0}
                         onClick={() => { addToReserve(d); setDetails(null); setReserveOpen(true); }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                          <path d="M9 12l2 2 4-4"/>
+                        </svg>
                         Зарезервировать
                       </button>
                     )}
@@ -638,9 +642,14 @@ export function Vitrine({ search = '' }: { search?: string }) {
                         Подписаться
                       </button>
                     ) : (
-                      <button type="button" className="btn-action-cart" style={{ flex: 1, justifyContent: 'center' }}
+                      <button type="button" className="btn-action-cart" style={{ flex: 1, justifyContent: 'center', borderRadius: 12, padding: '10px 16px', fontWeight: 600 }}
                         disabled={d.kind !== 'service' && dInStock <= 0}
                         onClick={() => { addToCart(d); setDetails(null); setCartOpen(true); }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="9" cy="21" r="1"/>
+                          <circle cx="20" cy="21" r="1"/>
+                          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                        </svg>
                         В корзину
                       </button>
                     )}
