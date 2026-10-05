@@ -187,20 +187,33 @@ router.post('/pay', authMiddleware, async (req: AuthRequest, res) => {
     }
 
     const purpose = `Оплата заказа №${sale.number}${sale.contact ? ` (${sale.contact.name})` : ''}`.slice(0, 140);
-    const body = {
-      Data: {
-        customerCode: cc,
-        merchantId,
-        amount: amount.toFixed(2),
-        purpose,
-        paymentMode: ['card', 'sbp'],
-        paymentLinkId: orderId,
-      },
-    };
-    const { response } = await withAuthRetry((h) =>
-      tochkaRequest(`/acquiring/v1.0/payments?customerCode=${cc}`, { method: 'POST', headers: h, body: JSON.stringify(body) }),
-    );
-    const data = response.body;
+    // Создание платёжной ссылки; при конфликте paymentLinkId («заказ существует» в банке)
+    // пересоздаём с уникальным суффиксом — ссылки одноразовые на стороне банка
+    let paymentLinkId = orderId;
+    let data: any = null;
+    let response: { status: number; body: any; text: string } = { status: 0, body: null, text: '' };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const body = {
+        Data: {
+          customerCode: cc,
+          merchantId,
+          amount: amount.toFixed(2),
+          purpose,
+          paymentMode: ['card', 'sbp'],
+          paymentLinkId,
+        },
+      };
+      const r = await withAuthRetry((h) =>
+        tochkaRequest(`/acquiring/v1.0/payments?customerCode=${cc}`, { method: 'POST', headers: h, body: JSON.stringify(body) }),
+      );
+      response = r.response;
+      data = response.body;
+      const conflict =
+        (response.status === 400 || response.status === 409 || response.status === 424) &&
+        JSON.stringify(data?.Errors || '').includes('существует');
+      if (!conflict || attempt === 1) break;
+      paymentLinkId = `${orderId}-${Date.now().toString(36)}`;
+    }
     if (response.status !== 200 && response.status !== 201) {
       console.error('[tochka-acquiring] payments error:', response.status, JSON.stringify(data).slice(0, 300));
       return res.status(400).json({ error: data?.message || 'Банк отклонил создание платежа', details: data?.Errors });
