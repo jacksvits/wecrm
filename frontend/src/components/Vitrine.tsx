@@ -66,7 +66,6 @@ export function Vitrine({ search = '' }: { search?: string }) {
   // Интерактивный выбор контрагента: поиск по имени/телефону/email, список открыт при фокусе
   const [contactQuery, setContactQuery] = useState('');
   const [contactOpen, setContactOpen] = useState(false);
-  const [contactAnchor, setContactAnchor] = useState<{ top: number; left: number; width: number } | null>(null);
   const contactWrapRef = useRef<HTMLDivElement | null>(null);
 
   // Закрытие выпадающего списка контрагентов по клику вне него
@@ -719,19 +718,13 @@ export function Vitrine({ search = '' }: { search?: string }) {
                   <input
                     value={contactQuery}
                     onChange={e => { setContactQuery(e.target.value); setContactOpen(true); }}
-                    onFocus={e => {
-                      setContactOpen(true);
-                      const r = (e.target as HTMLInputElement).getBoundingClientRect();
-                      const panel = document.querySelector('.cart-panel');
-                      const pr = panel ? panel.getBoundingClientRect() : { top: 0, left: 0 };
-                      setContactAnchor({ top: r.bottom - pr.top + 4, left: r.left - pr.left, width: r.width });
-                    }}
+                    onFocus={() => setContactOpen(true)}
                     placeholder="Поиск контрагента…"
                     style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
                   />
                 )}
-                {contactOpen && !contactId && contactAnchor && (
-                  <div style={{ position: 'absolute', top: contactAnchor.top, left: contactAnchor.left, width: contactAnchor.width, maxHeight: 260, overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10, zIndex: 40, boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
+                {contactOpen && !contactId && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, maxHeight: 260, overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10, zIndex: 40, boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
                     {(() => {
                       const q = contactQuery.trim().toLowerCase();
                       const list = contacts.filter((x: any) =>
