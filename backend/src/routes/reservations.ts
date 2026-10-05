@@ -8,8 +8,11 @@ const router = Router();
 router.use(authMiddleware);
 
 // Список резервов: на чьё имя, какие товары, на какую сумму
-router.get('/', async (_req, res) => {
+router.get('/', async (req: any, res) => {
+  // Админ и менеджер видят все резервы, остальные — только свои
+  const isPrivileged = ['admin', 'manager'].includes(req.user?.role);
   const list = await prisma.reservation.findMany({
+    where: isPrivileged ? {} : { userId: req.user?.id },
     orderBy: { number: 'desc' },
     include: { contact: true, warehouse: true, user: true, items: { include: { product: true } } },
   });

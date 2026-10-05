@@ -17,14 +17,15 @@ const quillModules = {
 };
 const quillFormats = ['bold', 'italic', 'underline', 'strike', 'list', 'bullet', 'link'];
 
+// group: 'stock' — вкладки складского учёта (показываются под заголовком «Складской учёт»)
 const TABS = [
   { key: 'vitrine', label: 'Витрина' },
-  { key: 'nomenclature', label: 'Номенклатура' },
-  { key: 'stock', label: 'Склад' },
-  { key: 'prices', label: 'Цены' },
-  { key: 'reserves', label: 'Резервы' },
   { key: 'sales', label: 'Заказы' },
-  { key: 'stats', label: 'Статистика' },
+  { key: 'reserves', label: 'Резервы' },
+  { key: 'nomenclature', label: 'Номенклатура', group: 'stock' },
+  { key: 'stock', label: 'Склад', group: 'stock' },
+  { key: 'prices', label: 'Цены', group: 'stock' },
+  { key: 'stats', label: 'Статистика', group: 'stock' },
 ];
 
 const KIND_LABELS: Record<string, string> = { product: 'Товар', service: 'Услуга' };
@@ -505,21 +506,28 @@ export function Products() {
         marginBottom: 16,
         ...(isMobile ? { margin: '0 -8px 16px', overflowX: 'auto', scrollbarWidth: 'none' } : {}),
       }}>
-        {visibleTabs.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              padding: '10px 16px', border: 'none',
-              background: tab === t.key ? 'var(--bg-hover)' : 'transparent',
-              color: tab === t.key ? '#007AFF' : 'var(--text-primary)',
-              borderBottom: tab === t.key ? '2px solid #007AFF' : '2px solid transparent',
-              cursor: 'pointer', fontSize: 14, fontWeight: 500, borderRadius: '8px 8px 0 0',
-              ...(isMobile ? { flexShrink: 0, padding: '10px 12px', whiteSpace: 'nowrap' } : {}),
-            }}
-          >
-            {t.label}
-          </button>
+        {visibleTabs.map((t, idx) => (
+          <Fragment key={t.key}>
+            {/* Разделитель группы «Складской учёт» перед первой складской вкладкой */}
+            {(t as any).group === 'stock' && !((visibleTabs[idx - 1] as any)?.group === 'stock') && (
+              <span style={{ alignSelf: 'center', margin: '0 4px 0 12px', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                Складской учёт
+              </span>
+            )}
+            <button
+              onClick={() => setTab(t.key)}
+              style={{
+                padding: '10px 16px', border: 'none',
+                background: tab === t.key ? 'var(--bg-hover)' : 'transparent',
+                color: tab === t.key ? '#007AFF' : 'var(--text-primary)',
+                borderBottom: tab === t.key ? '2px solid #007AFF' : '2px solid transparent',
+                cursor: 'pointer', fontSize: 14, fontWeight: 500, borderRadius: '8px 8px 0 0',
+                ...(isMobile ? { flexShrink: 0, padding: '10px 12px', whiteSpace: 'nowrap' } : {}),
+              }}
+            >
+              {t.label}
+            </button>
+          </Fragment>
         ))}
       </div>
 
