@@ -42,7 +42,26 @@ router.post('/', async (req: any, res) => {
     }
     resolvedContactId = personal.id;
   }
-  const whId = warehouseId || (await prisma.warehouse.findFirst())?.id;
+  // Склад не указан — выбираем склад, где хватает остатка по всем позициям
+  // (иначе резерв «Сервер Dell доступен на неосновном складе» ошибочно падает с «свободно 0»)
+  let whId: string | undefined = warehouseId;
+  if (!whId) {
+    const warehouses = await prisma.warehouse.findMany({ orderBy: { id: 'asc' } });
+    const productIds = items.map((i: any) => i.productId);
+    const balances = await prisma.stockBalance.findMany({ where: { productId: { in: productIds } } });
+    const freeOn = (pid: string, wid: string) => {
+      const b = balances.find((x) => x.productId === pid && x.warehouseId === wid);
+      return (b?.quantity ?? 0) - (b?.reserved ?? 0);
+    };
+    whId = warehouses.find((w) => items.every((it: any) => it.quantity <= freeOn(it.productId, w.id)))?.id;
+    if (!whId) {
+      // Ни на одном складе не хватает всего сразу — берём склад с максимальной доступностью,
+      // чтобы сообщение об ошибке показывало реальные цифры
+      whId = warehouses
+        .map((w) => ({ id: w.id, fit: items.filter((it: any) => it.quantity <= freeOn(it.productId, w.id)).length }))
+        .sort((a, b) => b.fit - a.fit)[0]?.id;
+    }
+  }
   if (!whId) return res.status(400).json({ error: 'Склад не найден' });
 
   try {
