@@ -7,10 +7,12 @@ const router = Router();
 
 // === Плагин «Эквайринг от Точки» (uapi) ===
 // Создание платёжной ссылки: POST /uapi/acquiring/v1.0/payments?customerCode={cc}
-//   тело: {"Data":{"customerCode":cc,"amount":"1.00","purpose":"...","paymentMode":["card","sbp"],"paymentLinkId":"wecrm-sale-<номер>"}}
-//   ответ: {"Data":{"Operation":[{"paymentLink":"https://...","operationId":"..."}]}}
-// Webhook acquiringInternetPayment приходит в теле как JWT; в payload: paymentLinkId, amount (рубли), status (APPROVED), paymentType (card|sbp).
-// Регистрация webhook: POST /uapi/webhook/v1.0/{cc} {"url":"...","webhooks_list":["acquiringInternetPayment"]}
+//   тело: {"Data":{"customerCode":cc,"merchantId":mid,"amount":"1.00","purpose":"...","paymentMode":["card","sbp"],"paymentLinkId":"wecrm-sale-<номер>"}}
+//   ответ: {"Data":{"paymentLink":"https://...","operationId":"..."}}
+// Подтверждение оплаты — опрос статуса: GET /uapi/acquiring/v1.0/payments/{operationId}?customerCode={cc}
+//   status: CREATED (новый) -> APPROVED (оплачен, для СБП всегда APPROVED)
+// Webhook acquiringInternetPayment (если банк примет регистрацию) — мгновенное подтверждение,
+//   тело JWT, payload: paymentLinkId, amount (рубли), status (APPROVED), paymentType (card|sbp).
 // Авторизация — OAuth «Точка Банк» (общие токены), требуется scope acquiring.
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://welans.cc';
@@ -18,6 +20,8 @@ const WEBHOOK_PATH = '/api/tochka-acquiring/webhook';
 
 // customerCode кешируем на сессию: получаем через Get Customers List (первый Business-клиент)
 let customerCodeCache: string | null = null;
+// merchantId кешируем: из Get Retailers выбираем точку с режимом card (приоритет — домен PUBLIC_BASE_URL)
+let merchantIdCache: string | null = null;
 
 async function getCustomerCode(): Promise<string | null> {
   if (customerCodeCache) return customerCodeCache;
@@ -27,6 +31,20 @@ async function getCustomerCode(): Promise<string | null> {
   const business = list.find((c: any) => c.customerType === 'Business') || list[0];
   customerCodeCache = business?.customerCode ? String(business.customerCode) : null;
   return customerCodeCache;
+}
+
+async function getMerchantId(customerCode: string): Promise<string | null> {
+  if (merchantIdCache) return merchantIdCache;
+  const { response } = await withAuthRetry((h) => tochkaRequest(`/acquiring/v1.0/retailers?customerCode=${customerCode}`, { headers: h }));
+  if (response.status !== 200) return null;
+  const list = response.body?.Data?.Operation || response.body?.Data?.Retailers || [];
+  const host = PUBLIC_BASE_URL.replace(/^https?:\/\//, '');
+  const pick =
+    list.find((r: any) => Array.isArray(r.paymentModes) && r.paymentModes.includes('card') && String(r.url || '').includes(host)) ||
+    list.find((r: any) => Array.isArray(r.paymentModes) && r.paymentModes.includes('card')) ||
+    list[0];
+  merchantIdCache = pick?.merchantId ? String(pick.merchantId) : null;
+  return merchantIdCache;
 }
 
 // Обёртка с авто-refresh токена при 401/403 (как в tochka.ts)
@@ -51,6 +69,20 @@ async function getSettings() {
 export async function isTochkaAcquiringActive(): Promise<boolean> {
   const s = await getSettings();
   return !!s?.isActive;
+}
+
+// Отметить платёж и продажу оплаченными
+async function markPaid(payment: { id: string; saleId: string; paymentId: string | null }, operationId?: string | null) {
+  await prisma.$transaction([
+    prisma.tochkaAcquiringPayment.update({
+      where: { id: payment.id },
+      data: { status: 'paid', paymentId: payment.paymentId || (operationId ? String(operationId) : null), paidAt: new Date() },
+    }),
+    prisma.sale.update({
+      where: { id: payment.saleId },
+      data: { status: 'paid', paymentMethod: 'tochka', paidAt: new Date() },
+    }),
+  ]);
 }
 
 // POST /uapi/webhook/v1.0/{customerCode} — регистрация webhook acquiringInternetPayment (идемпотентно)
@@ -143,6 +175,8 @@ router.post('/pay', authMiddleware, async (req: AuthRequest, res) => {
 
     const cc = await getCustomerCode();
     if (!cc) return res.status(400).json({ error: 'Не удалось получить customerCode (проверьте подключение Точки)' });
+    const merchantId = await getMerchantId(cc);
+    if (!merchantId) return res.status(400).json({ error: 'Не удалось получить merchantId (нет торговых точек в Точке)' });
 
     // Один платёж на заказ: повторное нажатие возвращает существующую ссылку (свежую)
     const orderId = `wecrm-sale-${sale.number}`;
@@ -156,6 +190,7 @@ router.post('/pay', authMiddleware, async (req: AuthRequest, res) => {
     const body = {
       Data: {
         customerCode: cc,
+        merchantId,
         amount: amount.toFixed(2),
         purpose,
         paymentMode: ['card', 'sbp'],
@@ -170,7 +205,7 @@ router.post('/pay', authMiddleware, async (req: AuthRequest, res) => {
       console.error('[tochka-acquiring] payments error:', response.status, JSON.stringify(data).slice(0, 300));
       return res.status(400).json({ error: data?.message || 'Банк отклонил создание платежа', details: data?.Errors });
     }
-    const op = data?.Data?.Operation?.[0] || data?.Data || {};
+    const op = data?.Data || {};
     const paymentUrl = op.paymentLink || op.PaymentLink || null;
     const operationId = op.operationId || op.OperationId || null;
     if (!paymentUrl) {
@@ -231,17 +266,8 @@ router.post('/webhook', async (req, res) => {
     }
 
     if (status === 'APPROVED' && payment.status !== 'paid') {
-      await prisma.$transaction([
-        prisma.tochkaAcquiringPayment.update({
-          where: { id: payment.id },
-          data: { status: 'paid', paymentId: payment.paymentId || (payload.operationId ? String(payload.operationId) : null), paidAt: new Date() },
-        }),
-        prisma.sale.update({
-          where: { id: payment.saleId },
-          data: { status: 'paid', paymentMethod: 'tochka', paidAt: new Date() },
-        }),
-      ]);
-      console.log('[tochka-acquiring] заказ оплачен:', orderId, payload.paymentType || '');
+      await markPaid(payment, payload.operationId);
+      console.log('[tochka-acquiring] заказ оплачен (webhook):', orderId, payload.paymentType || '');
     } else if (['REJECTED', 'CANCELLED', 'EXPIRED'].includes(status) && payment.status !== 'paid') {
       await prisma.tochkaAcquiringPayment.update({ where: { id: payment.id }, data: { status: 'failed' } });
     }
@@ -252,11 +278,30 @@ router.post('/webhook', async (req, res) => {
   }
 });
 
-// GET /api/tochka-acquiring/status/:orderId — статус платежа (поллинг экрана оплаты)
+// GET /api/tochka-acquiring/status/:orderId — статус платежа.
+// Если в БД ещё не «paid» — спрашиваем статус у банка (опрос платёжной ссылки).
 router.get('/status/:orderId', authMiddleware, async (req, res) => {
   try {
     const payment = await prisma.tochkaAcquiringPayment.findUnique({ where: { orderId: req.params.orderId } });
     if (!payment) return res.status(404).json({ error: 'Платёж не найден' });
+
+    if (payment.status !== 'paid' && payment.paymentId && loadTokens()?.access_token) {
+      const cc = await getCustomerCode();
+      if (cc) {
+        const { response } = await withAuthRetry((h) =>
+          tochkaRequest(`/acquiring/v1.0/payments/${encodeURIComponent(payment.paymentId!)}?customerCode=${cc}`, { headers: h }),
+        );
+        const status = String(response.body?.Data?.status || response.body?.Data?.Status || '');
+        if (status === 'APPROVED' || status === 'PAID') {
+          await markPaid(payment, payment.paymentId);
+          return res.json({ status: 'paid', paidAt: new Date() });
+        }
+        if (['REJECTED', 'CANCELLED', 'EXPIRED'].includes(status) && payment.status !== 'paid') {
+          await prisma.tochkaAcquiringPayment.update({ where: { id: payment.id }, data: { status: 'failed' } });
+          return res.json({ status: 'failed', paidAt: null });
+        }
+      }
+    }
     res.json({ status: payment.status, paidAt: payment.paidAt });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
