@@ -88,6 +88,9 @@ export async function mergeContacts(targetId: string, sourceIds: string[], extra
     await prisma.call.updateMany({ where: { contactId: source.id }, data: { contactId: targetId } });
     await prisma.smsMessage.updateMany({ where: { contactId: source.id }, data: { contactId: targetId } });
     await prisma.contact.updateMany({ where: { organizationId: source.id }, data: { organizationId: targetId } });
+    // Заказы и резервы — перенос в новый контакт (иначе deleteMany падает по внешнему ключу)
+    await prisma.sale.updateMany({ where: { contactId: source.id }, data: { contactId: targetId } });
+    await prisma.reservation.updateMany({ where: { contactId: source.id }, data: { contactId: targetId } });
   }
 
   if (sources.length > 0) {
