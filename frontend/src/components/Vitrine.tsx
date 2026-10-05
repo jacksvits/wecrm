@@ -84,6 +84,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
     try { return JSON.parse(localStorage.getItem('wecrm_vitrine_reserve') || '[]'); } catch { return []; }
   });
   const [reserveOpen, setReserveOpen] = useState(false);
+  const [reserveComment, setReserveComment] = useState('');
 
   useEffect(() => {
     try { localStorage.setItem('wecrm_vitrine_reserve', JSON.stringify(reserveList)); } catch { /* ignore */ }
@@ -92,7 +93,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
 
   // Открытие резерв-листа по событию из шапки страницы «Товары»
   useEffect(() => {
-    const h = () => { setSaveError(''); setSaveOk(''); setReserveOpen(true); };
+    const h = () => { setSaveError(''); setSaveOk(''); setPaymentMethod('invoice'); setReserveOpen(true); };
     window.addEventListener('wecrm:open-reserve', h);
     return () => window.removeEventListener('wecrm:open-reserve', h);
   }, []);
@@ -360,10 +361,12 @@ export function Vitrine({ search = '' }: { search?: string }) {
       const r: any = await api.reservations.create({
         ...(isUserRole ? {} : { contactId }),
         paymentMethod,
+        comment: reserveComment,
         items: reserveList.map((i) => ({ productId: i.productId, quantity: i.quantity, price: effPrice(i) })),
       });
       setSaveOk(`Резерв №${r.number} создан`);
       setReserveList([]);
+      setReserveComment('');
       setTimeout(() => setReserveOpen(false), 1200);
     } catch (e: any) {
       setSaveError(e.message || 'Ошибка создания резерва');
@@ -641,7 +644,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
                     {d.kind !== 'service' && (
                       <button type="button" className="btn-action" style={{ flex: 1, minWidth: 0, justifyContent: 'center', borderRadius: 12, padding: '10px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}
                         disabled={dInStock <= 0}
-                        onClick={() => { addToReserve(d); setDetails(null); setReserveOpen(true); }}>
+                        onClick={() => { addToReserve(d); setDetails(null); setPaymentMethod('invoice'); setReserveOpen(true); }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                           <path d="M9 12l2 2 4-4"/>
@@ -880,7 +883,6 @@ export function Vitrine({ search = '' }: { search?: string }) {
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {([
                     ['invoice', 'Запросить счёт'],
-                    ...(tochkaActive ? [['tochka', 'Оплатить сейчас'] as const] : []),
                   ] as const).map(([val, lbl]) => (
                     <button key={val} type="button" onClick={() => setPaymentMethod(val)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: paymentMethod === val ? '#1a1a1a' : 'var(--bg-card)', color: paymentMethod === val ? '#fff' : 'var(--text-primary)', fontSize: 12, fontWeight: paymentMethod === val ? 600 : 400, cursor: 'pointer' }}>
                       {lbl}
@@ -898,6 +900,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
                   {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}{c.kind === 'organization' ? ' (организация)' : ''}</option>)}
                 </select>
               )}
+              <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Комментарий</label>
+              <input value={reserveComment} onChange={e => setReserveComment(e.target.value)} placeholder="Комментарий к резерву" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }} />
               {saveError && <div style={{ color: '#ef4444', fontSize: 13 }}>{saveError}</div>}
               {saveOk && <div style={{ color: '#16a34a', fontSize: 13 }}>{saveOk}</div>}
               <button type="button" className="btn-reserve" disabled={saving || !reserveList.length} onClick={saveReserve}
