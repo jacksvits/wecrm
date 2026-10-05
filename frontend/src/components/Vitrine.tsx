@@ -256,12 +256,11 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const cartTotal = cart.reduce((s, i) => s + effPrice(i) * i.quantity, 0);
 
   const checkout = async () => {
-    if (!contactId) { setSaleError('Выберите контрагента'); return; }
     if (!cart.length) { setSaleError('Корзина пуста'); return; }
     setSavingSale(true); setSaleError('');
     try {
       const s: any = await api.sales.create({
-        contactId,
+        // контрагент не передаём — backend подставит личный контакт автора (ФИО пользователя)
         comment: saleComment,
         paymentMethod: paymentMethod === 'tochka' ? 'card' : paymentMethod,
         items: cart.map(i => ({ productId: i.productId, quantity: i.quantity, price: effPrice(i) })),
@@ -892,14 +891,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
                 {paymentMethod === 'invoice' && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Цены пересчитаны по тарифу «Использовать для безнала».</span>}
               </div>
               <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Заказчик</label>
-              {isUserRole ? (
-                <input value={user?.name || ''} readOnly style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontSize: 14 }} />
-              ) : (
-                <select value={contactId} onChange={e => setContactId(e.target.value)} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }}>
-                  <option value="">— выберите контакт или организацию —</option>
-                  {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}{c.kind === 'organization' ? ' (организация)' : ''}</option>)}
-                </select>
-              )}
+              <input value={user?.name || ''} readOnly title="Заказ оформляется на вас — ваше ФИО будет указано как контрагент" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontSize: 14 }} />
               <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Комментарий</label>
               <input value={reserveComment} onChange={e => setReserveComment(e.target.value)} placeholder="Комментарий к резерву" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }} />
               {saveError && <div style={{ color: '#ef4444', fontSize: 13 }}>{saveError}</div>}
