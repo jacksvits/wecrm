@@ -548,7 +548,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
         return (
           <div className="vitrine-details-overlay reserve-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
             onClick={() => setDetails(null)}>
-            <div className="vitrine-details-modal" style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, width: '100%', maxWidth: 720, maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--border-color)' }}
+            <div className="vitrine-details-modal" style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, width: '100%', maxWidth: 920, maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--border-color)' }}
               onClick={(e) => e.stopPropagation()}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
                 <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>{d.name}</div>
@@ -622,11 +622,11 @@ export function Vitrine({ search = '' }: { search?: string }) {
                       <div className="rich-text" style={{ fontSize: 14, color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: d.description }} />
                     </div>
                   )}
-                  <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 4 }}>
-                    <button style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 14 }}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 4, flexWrap: 'nowrap', alignItems: 'center' }}>
+                    <button style={{ padding: '8px 12px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}
                       onClick={() => setDetails(null)}>Закрыть</button>
                     {d.kind !== 'service' && (
-                      <button type="button" className="btn-action" style={{ flex: 1, justifyContent: 'center', borderRadius: 12, padding: '10px 16px', fontWeight: 600 }}
+                      <button type="button" className="btn-action" style={{ flex: 1, minWidth: 0, justifyContent: 'center', borderRadius: 12, padding: '10px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}
                         disabled={dInStock <= 0}
                         onClick={() => { addToReserve(d); setDetails(null); setReserveOpen(true); }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -637,12 +637,12 @@ export function Vitrine({ search = '' }: { search?: string }) {
                       </button>
                     )}
                     {d.kind === 'service' && d.isSubscription ? (
-                      <button type="button" className="btn-action" style={{ flex: 1, justifyContent: 'center' }}
+                      <button type="button" className="btn-action" style={{ flex: 1, minWidth: 0, justifyContent: 'center', whiteSpace: 'nowrap' }}
                         onClick={() => { openSubscribe(d); setDetails(null); }}>
                         Подписаться
                       </button>
                     ) : (
-                      <button type="button" className="btn-action-cart" style={{ flex: 1, justifyContent: 'center', borderRadius: 12, padding: '10px 16px', fontWeight: 600 }}
+                      <button type="button" className="btn-action-cart" style={{ flex: 1, minWidth: 0, justifyContent: 'center', borderRadius: 12, padding: '10px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}
                         disabled={d.kind !== 'service' && dInStock <= 0}
                         onClick={() => { addToCart(d); setDetails(null); setCartOpen(true); }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
