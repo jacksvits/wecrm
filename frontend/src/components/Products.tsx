@@ -1489,6 +1489,7 @@ function ReservesTab() {
   const [editItems, setEditItems] = useState<any[]>([]);
   const [editBusy, setEditBusy] = useState(false);
   const [delFor, setDelFor] = useState<string | null>(null);
+  const [expandedRes, setExpandedRes] = useState<string | null>(null);
 
   const load = () => api.reservations.list().then(setReserves).catch(() => {});
   useEffect(() => {
@@ -1559,35 +1560,85 @@ function ReservesTab() {
     <div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>
-          <th style={thStyle}>№</th><th style={thStyle}>Дата</th><th style={thStyle}>Заказчик</th>
-          <th style={thStyle}>Товары</th><th style={thStyle}>Сумма</th><th style={thStyle}>Статус</th><th style={thStyle}></th>
+          <th style={thStyle}>№</th><th style={thStyle}>Дата</th><th style={thStyle}>Контрагент</th>
+          <th style={thStyle}>Склад</th><th style={thStyle}>Сумма</th>
+          <th style={thStyle}>Статус</th><th style={thStyle}>Автор</th><th style={thStyle}>Документ</th>
         </tr></thead>
         <tbody>
           {reserves.map((r: any) => (
-            <tr key={r.id}>
-              <td style={tdStyle}>РЗ-{String(r.number).padStart(6, '0')}</td>
-              <td style={tdStyle}>{new Date(r.createdAt).toLocaleString('ru-RU')}</td>
-              <td style={tdStyle}>{r.contact?.name}</td>
-              <td style={tdStyle}>{r.items.map((i: any) => `${i.product.name} × ${i.quantity}`).join('; ')}</td>
-              <td style={tdStyle}>{r.total.toFixed(2)} ₽</td>
-              <td style={tdStyle}>{statusLabel(r.status)}</td>
-              <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
-                {r.status === 'held' && <button style={btnGhost} onClick={() => setStatus(r, 'issued')}>Выдать</button>}
-                {r.status === 'held' && <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => openEdit(r)}>Изменить</button>}
-                {r.status === 'held' && <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => setStatus(r, 'canceled')}>Отменить</button>}
-                {r.status === 'canceled' && <button style={btnGhost} onClick={() => setStatus(r, 'held')}>Вернуть в резерв</button>}
-                <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => api.reservations.downloadPdf(r.id, r.number)}>PDF</button>
-                <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => openShare(r.id)}>В задачу</button>
-                {r.status !== 'issued' && (delFor === r.id ? (
-                  <>
-                    <button style={{ ...btnGhost, marginLeft: 8, borderColor: '#FF3B30', color: '#FF3B30' }} onClick={() => doDelete(r)}>Удалить?</button>
-                    <button style={{ ...btnGhost, marginLeft: 8 }} onClick={() => setDelFor(null)}>Нет</button>
-                  </>
-                ) : (
-                  <button style={{ ...btnGhost, marginLeft: 8, borderColor: '#FF3B30', color: '#FF3B30' }} onClick={() => setDelFor(r.id)}>Удалить</button>
-                ))}
-              </td>
-            </tr>
+            <Fragment key={r.id}>
+              <tr>
+                <td style={tdStyle}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button
+                      onClick={() => setExpandedRes(expandedRes === r.id ? null : r.id)}
+                      title={expandedRes === r.id ? 'Скрыть состав' : 'Показать состав'}
+                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13, padding: '0 2px', lineHeight: 1 }}
+                    >
+                      {expandedRes === r.id ? '▾' : '▸'}
+                    </button>
+                    <span>РЗ-{String(r.number).padStart(6, '0')}</span>
+                  </div>
+                </td>
+                <td style={tdStyle}>{new Date(r.createdAt).toLocaleString('ru-RU')}</td>
+                <td style={tdStyle}>{r.contact?.name}</td>
+                <td style={tdStyle}>{r.warehouse?.name || '—'}</td>
+                <td style={tdStyle}>{r.total.toFixed(2)} ₽</td>
+                <td style={tdStyle}>{statusLabel(r.status)}</td>
+                <td style={tdStyle}>{r.user?.name || '—'}</td>
+                <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button style={btnGhost} onClick={() => api.reservations.downloadPdf(r.id, r.number)}>Счёт</button>
+                    {r.status === 'held' && <button style={btnGhost} onClick={() => setStatus(r, 'issued')}>Выдать</button>}
+                    {r.status === 'held' && <button style={btnGhost} onClick={() => openEdit(r)}>Изменить</button>}
+                    {r.status === 'held' && <button style={btnGhost} onClick={() => setStatus(r, 'canceled')}>Отменить</button>}
+                    {r.status === 'canceled' && <button style={btnGhost} onClick={() => setStatus(r, 'held')}>Вернуть в резерв</button>}
+                    <button style={btnGhost} onClick={() => openShare(r.id)}>В задачу</button>
+                    {r.status !== 'issued' && (delFor === r.id ? (
+                      <>
+                        <button style={{ ...btnGhost, borderColor: '#FF3B30', color: '#FF3B30' }} onClick={() => doDelete(r)}>Удалить?</button>
+                        <button style={btnGhost} onClick={() => setDelFor(null)}>Нет</button>
+                      </>
+                    ) : (
+                      <button style={{ ...btnGhost, borderColor: '#FF3B30', color: '#FF3B30' }} onClick={() => setDelFor(r.id)}>Удалить</button>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+              {expandedRes === r.id && (
+                <tr>
+                  <td colSpan={8} style={{ ...tdStyle, background: 'var(--bg-hover)', padding: '10px 16px' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Состав резерва РЗ-{String(r.number).padStart(6, '0')}</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ ...thStyle, textAlign: 'left' }}>Товар</th>
+                          <th style={{ ...thStyle, textAlign: 'right' }}>Кол-во</th>
+                          <th style={{ ...thStyle, textAlign: 'right' }}>Цена</th>
+                          <th style={{ ...thStyle, textAlign: 'right' }}>Сумма</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {r.items.map((i: any) => (
+                          <tr key={i.id}>
+                            <td style={{ padding: '4px 8px 4px 0', borderTop: '1px solid var(--border-color)' }}>
+                              {i.product?.name}{i.product?.sku ? ` (арт. ${i.product.sku})` : ''}
+                            </td>
+                            <td style={{ padding: '4px 8px', borderTop: '1px solid var(--border-color)', textAlign: 'right', whiteSpace: 'nowrap' }}>{i.quantity} {i.product?.unit || 'шт'}</td>
+                            <td style={{ padding: '4px 8px', borderTop: '1px solid var(--border-color)', textAlign: 'right', whiteSpace: 'nowrap' }}>{Number(i.price).toFixed(2)} ₽</td>
+                            <td style={{ padding: '4px 0 4px 8px', borderTop: '1px solid var(--border-color)', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 500 }}>{(Number(i.price) * i.quantity).toFixed(2)} ₽</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td colSpan={3} style={{ padding: '6px 8px 0 0', textAlign: 'right', fontWeight: 600 }}>Итого:</td>
+                          <td style={{ padding: '6px 0 0 8px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{r.total.toFixed(2)} ₽</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>
