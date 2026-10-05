@@ -246,6 +246,14 @@ router.patch('/:id', async (req: any, res) => {
           throw new Error('Недопустимый статус резерва');
         }
         if (status === 'paid' && r.status === 'issued') throw new Error('Выданный резерв нельзя отметить оплаченным');
+        // Оплачен / Завершён — без движения остатков, только смена статуса
+        if (status === 'paid' || status === 'completed') {
+          return tx.reservation.update({
+            where: { id: r.id },
+            data: { status },
+            include: { items: { include: { product: true } }, contact: true, user: true },
+          });
+        }
         if (status === 'issued') {
           if (r.status !== 'held') throw new Error('Выдать можно только отложенный резерв');
           for (const it of r.items) {
