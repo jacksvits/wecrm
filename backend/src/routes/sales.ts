@@ -83,7 +83,7 @@ router.post('/', async (req: any, res) => {
 // и замораживает документ (дальнейшие изменения запрещены)
 router.patch('/:id', async (req: any, res) => {
   const { status } = (req.body || {}) as { status?: string };
-  if (!['new', 'paid', 'cancelled'].includes(status || '')) {
+  if (!['new', 'paid', 'cancelled', 'refund'].includes(status || '')) {
     return res.status(400).json({ error: 'Недопустимый статус' });
   }
   try {
