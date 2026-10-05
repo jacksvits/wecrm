@@ -1487,6 +1487,12 @@ function ReservesTab() {
   const [products, setProducts] = useState<any[]>([]);
   const [editRes, setEditRes] = useState<any | null>(null);
   const [editContactId, setEditContactId] = useState('');
+  const [editUserId, setEditUserId] = useState('');
+  const [editUsers, setEditUsers] = useState<any[]>([]);
+  // Добавление товара в резерв из модалки: поиск + выбор вида цены
+  const [addQuery, setAddQuery] = useState('');
+  const [addFound, setAddFound] = useState<any[]>([]);
+  const [addPriceType, setAddPriceType] = useState('base');
   const [editComment, setEditComment] = useState('');
   const [editItems, setEditItems] = useState<any[]>([]);
   const [editBusy, setEditBusy] = useState(false);
@@ -1508,17 +1514,58 @@ function ReservesTab() {
     try { await api.reservations.delete(r.id); setDelFor(null); load(); }
     catch (e: any) { alert(e.message || e.error || 'Ошибка'); }
   };
-  const openEdit = (r: any) => {
+  const openEdit = async (r: any) => {
     setEditRes(r);
     setEditContactId(r.contactId || '');
+    setEditUserId(r.userId || '');
     setEditComment(r.comment || '');
+    setAddQuery(''); setAddFound([]); setAddPriceType('base');
+    if (isPrivileged) {
+      try { setEditUsers(await api.users.list()); } catch { setEditUsers([]); }
+    }
     setEditItems(r.items.map((i: any) => ({ productId: i.productId, name: i.product.name, quantity: i.quantity, price: i.price })));
   };
+  // Поиск товара для добавления в резерв
+  const searchAddProduct = async (q: string) => {
+    setAddQuery(q);
+    if (q.trim().length < 2) { setAddFound([]); return; }
+    try {
+      const list = await api.products.list({ q });
+      setAddFound(Array.isArray(list) ? list.slice(0, 8) : []);
+    } catch { setAddFound([]); }
+  };
+
+  // Виды цен товара: из объекта prices (base / безнал / кор. и т.п.)
+  const priceOptions = (p: any) => {
+    const pr = p?.prices || {};
+    const opts: Array<{ key: string; label: string; value: number }> = [];
+    if (pr.base) opts.push({ key: 'base', label: 'Базовая', value: Number(pr.base) });
+    if (pr.cash) opts.push({ key: 'cash', label: 'Наличный расчёт', value: Number(pr.cash) });
+    if (pr.noncash) opts.push({ key: 'noncash', label: 'Безналичный расчёт', value: Number(pr.noncash) });
+    Object.entries(pr).forEach(([k, v]: [string, any]) => {
+      if (!['base', 'cash', 'noncash'].includes(k) && typeof v === 'number' && v > 0) {
+        opts.push({ key: k, label: k, value: Number(v) });
+      }
+    });
+    return opts.length ? opts : [{ key: 'manual', label: 'Вручную', value: 0 }];
+  };
+
+  const addProductToEdit = (p: any) => {
+    const opt = priceOptions(p).find(o => o.key === addPriceType) || priceOptions(p)[0];
+    setEditItems((prev: any[]) => {
+      const ex = prev.find(i => i.productId === p.id);
+      if (ex) return prev.map(i => i.productId === p.id ? { ...i, quantity: (Number(i.quantity) || 0) + 1 } : i);
+      return [...prev, { productId: p.id, name: p.name, quantity: 1, price: opt.value }];
+    });
+    setAddQuery(''); setAddFound([]);
+  };
+
   const saveEdit = async () => {
     setEditBusy(true);
     try {
       await api.reservations.update(editRes.id, {
         ...(isUserRole ? {} : { contactId: editContactId }),
+        ...(isPrivileged && editUserId ? { userId: editUserId } : {}),
         comment: editComment,
         items: editItems.map((i) => ({ productId: i.productId, quantity: Number(i.quantity) || 0, price: Number(i.price) || 0 })),
       });
@@ -1604,6 +1651,15 @@ function ReservesTab() {
                 <td style={tdStyle}>{r.user?.name || '—'}</td>
                 <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {/* Редактировать — иконка карандаша */}
+                    {isPrivileged && (
+                      <button title="Изменить резерв" onClick={() => openEdit(r)}
+                        style={{ ...btnGhost, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '6px 8px' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                        </svg>
+                      </button>
+                    )}
                     {/* Счёт — только при безналичном способе оплаты (invoice) */}
                     {r.paymentMethod === 'invoice' && <button style={btnGhost} onClick={() => api.reservations.downloadPdf(r.id, r.number)}>Счёт</button>}
                     {isPrivileged && <button style={btnGhost} onClick={() => openShare(r.id)}>В задачу</button>}
@@ -1662,6 +1718,15 @@ function ReservesTab() {
                 {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
+            {/* Смена автора резерва — только admin/manager */}
+            {isPrivileged && (
+              <>
+                <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Автор</label>
+                <select value={editUserId} onChange={e => setEditUserId(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 10 }}>
+                  {editUsers.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </>
+            )}
             <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Комментарий</label>
             <input value={editComment} onChange={e => setEditComment(e.target.value)} placeholder="Комментарий" style={{ ...inputStyle, marginTop: 4, marginBottom: 12 }} />
             {editItems.map((it, idx) => (
@@ -1672,14 +1737,32 @@ function ReservesTab() {
                 <button onClick={() => setEditItems(editItems.filter((_, i) => i !== idx))} style={{ ...btnGhost, flex: 'none', borderColor: '#FF3B30', color: '#FF3B30' }}>✕</button>
               </div>
             ))}
-            <select defaultValue="" onChange={e => {
-              const p = products.find((x: any) => x.id === e.target.value);
-              if (p && !editItems.some((i) => i.productId === p.id)) setEditItems([...editItems, { productId: p.id, name: p.name, quantity: 1, price: p.price ?? 0 }]);
-              e.target.value = '';
-            }} style={{ ...inputStyle, marginBottom: 14 }}>
-              <option value="">+ Добавить позицию</option>
-              {products.filter((p: any) => p.kind !== 'service' && !editItems.some((i) => i.productId === p.id)).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            {/* Добавление позиции: поиск товара + выбор вида цены */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+              <input value={addQuery} onChange={e => searchAddProduct(e.target.value)} placeholder="Поиск товара…" style={{ ...inputStyle, flex: 2, minWidth: 200, marginBottom: 0 }} />
+              <select value={addPriceType} onChange={e => setAddPriceType(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: 150, marginBottom: 0 }}>
+                <option value="base">Базовая</option>
+                <option value="cash">Наличный расчёт</option>
+                <option value="noncash">Безналичный расчёт</option>
+              </select>
+            </div>
+            {addFound.length > 0 && (
+              <div style={{ border: '1px solid var(--border-color)', borderRadius: 8, marginBottom: 12, maxHeight: 200, overflowY: 'auto' }}>
+                {addFound.map((p: any) => (
+                  <div key={p.id} onClick={() => addProductToEdit(p)}
+                    style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--border-color)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    {p.name}
+                    <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>
+                      {(priceOptions(p).find(o => o.key === addPriceType) || priceOptions(p)[0])?.value
+                        ? `${(priceOptions(p).find(o => o.key === addPriceType) || priceOptions(p)[0]).value.toFixed(2)} ₽`
+                        : 'цена вручную'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setEditRes(null)} style={btnGhost}>Отмена</button>
               <button onClick={saveEdit} disabled={editBusy} style={btnPrimary}>{editBusy ? 'Сохранение...' : 'Сохранить'}</button>

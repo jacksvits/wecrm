@@ -365,9 +365,10 @@ router.patch('/:id', async (req: any, res) => {
         where: { id: r.id },
         data: {
           ...(contactId ? { contactId } : {}),
+          ...(userId ? { userId } : {}),
           ...(comment !== undefined ? { comment } : {}),
         },
-        include: { items: { include: { product: true } }, contact: true },
+        include: { items: { include: { product: true } }, contact: true, user: true },
       });
     });
     res.json(result);
