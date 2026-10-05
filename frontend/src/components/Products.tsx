@@ -1623,6 +1623,21 @@ function SalesTab() {
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [payingSaleId, setPayingSaleId] = useState<string | null>(null);
+
+  // Онлайн-оплата продажи: создаём (или переиспользуем) платёжную ссылку Точки и переходим на неё
+  const paySaleOnline = async (s: any) => {
+    setPayingSaleId(s.id);
+    try {
+      const r: any = await api.tochkaAcquiring.pay(s.id, 'link');
+      if (r.paymentUrl) window.open(r.paymentUrl, '_blank');
+      else alert('Банк не вернул ссылку на оплату');
+    } catch (e: any) {
+      alert(e.message || 'Ошибка создания платежа');
+    } finally {
+      setPayingSaleId(null);
+    }
+  };
   const salesRef = useRef<any[]>([]);
   salesRef.current = sales;
 
@@ -1701,7 +1716,18 @@ function SalesTab() {
                   </select>
                 </td>
                 <td style={tdStyle}>{s.user?.name || '—'}</td>
-                <td style={tdStyle}>{s.status === 'new' && <button style={{ ...btnGhost }} onClick={() => api.sales.downloadPdf(s.id, s.number)}>Счёт</button>}</td>
+                <td style={tdStyle}>
+                  {s.status === 'new' && (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn-action" style={{ padding: '4px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}
+                        disabled={payingSaleId === s.id}
+                        onClick={() => paySaleOnline(s)}>
+                        {payingSaleId === s.id ? 'Создание...' : 'Оплатить'}
+                      </button>
+                      <button style={{ ...btnGhost }} onClick={() => api.sales.downloadPdf(s.id, s.number)}>Счёт</button>
+                    </div>
+                  )}
+                </td>
               </tr>
               {expanded === s.id && (
                 <tr>
