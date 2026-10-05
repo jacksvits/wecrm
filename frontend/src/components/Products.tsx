@@ -1477,6 +1477,8 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
 
 function ReservesTab() {
   const { user } = useAuth();
+  // Администратор и менеджер видят все кнопки действий, остальным — только «Счёт» и «Отменить»
+  const isPrivileged = ['admin', 'manager'].includes((user as any)?.role);
   // Роль «Пользователь»: резерв оформляется на себя — контакт не выбирается
   const isUserRole = (user as any)?.role === 'user';
   const [reserves, setReserves] = useState<any[]>([]);
@@ -1589,12 +1591,12 @@ function ReservesTab() {
                 <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button style={btnGhost} onClick={() => api.reservations.downloadPdf(r.id, r.number)}>Счёт</button>
-                    {r.status === 'held' && <button style={btnGhost} onClick={() => setStatus(r, 'issued')}>Выдать</button>}
-                    {r.status === 'held' && <button style={btnGhost} onClick={() => openEdit(r)}>Изменить</button>}
+                    {isPrivileged && r.status === 'held' && <button style={btnGhost} onClick={() => setStatus(r, 'issued')}>Выдать</button>}
+                    {isPrivileged && r.status === 'held' && <button style={btnGhost} onClick={() => openEdit(r)}>Изменить</button>}
                     {r.status === 'held' && <button style={btnGhost} onClick={() => setStatus(r, 'canceled')}>Отменить</button>}
-                    {r.status === 'canceled' && <button style={btnGhost} onClick={() => setStatus(r, 'held')}>Вернуть в резерв</button>}
-                    <button style={btnGhost} onClick={() => openShare(r.id)}>В задачу</button>
-                    {r.status !== 'issued' && (delFor === r.id ? (
+                    {isPrivileged && r.status === 'canceled' && <button style={btnGhost} onClick={() => setStatus(r, 'held')}>Вернуть в резерв</button>}
+                    {isPrivileged && <button style={btnGhost} onClick={() => openShare(r.id)}>В задачу</button>}
+                    {isPrivileged && r.status !== 'issued' && (delFor === r.id ? (
                       <>
                         <button style={{ ...btnGhost, borderColor: '#FF3B30', color: '#FF3B30' }} onClick={() => doDelete(r)}>Удалить?</button>
                         <button style={btnGhost} onClick={() => setDelFor(null)}>Нет</button>
