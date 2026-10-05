@@ -1488,6 +1488,7 @@ function ReservesTab() {
   const [editRes, setEditRes] = useState<any | null>(null);
   const [editContactId, setEditContactId] = useState('');
   const [editUserId, setEditUserId] = useState('');
+  const [editNumber, setEditNumber] = useState('');
   const [editUsers, setEditUsers] = useState<any[]>([]);
   // Добавление товара в резерв из модалки: поиск + выбор вида цены
   const [addQuery, setAddQuery] = useState('');
@@ -1518,6 +1519,7 @@ function ReservesTab() {
     setEditRes(r);
     setEditContactId(r.contactId || '');
     setEditUserId(r.userId || '');
+    setEditNumber(String(r.number || ''));
     setEditComment(r.comment || '');
     setAddQuery(''); setAddFound([]); setAddPriceType('base');
     if (isPrivileged) {
@@ -1564,6 +1566,7 @@ function ReservesTab() {
     setEditBusy(true);
     try {
       await api.reservations.update(editRes.id, {
+        ...(isPrivileged && editNumber ? { number: editNumber } : {}),
         ...(isUserRole ? {} : { contactId: editContactId }),
         ...(isPrivileged && editUserId ? { userId: editUserId } : {}),
         comment: editComment,
@@ -1710,6 +1713,12 @@ function ReservesTab() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
           <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 20, width: 560, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ margin: '0 0 14px' }}>Резерв РЗ-{String(editRes.number).padStart(6, '0')}</h3>
+            {isPrivileged && (
+              <>
+                <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Номер</label>
+                <input value={editNumber} onChange={e => setEditNumber(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 10 }} />
+              </>
+            )}
             <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Заказчик</label>
             {isUserRole ? (
               <input value={user?.name || ''} readOnly style={{ ...inputStyle, marginTop: 4, marginBottom: 10, background: 'var(--bg-hover)' }} />

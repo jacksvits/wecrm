@@ -226,7 +226,11 @@ router.patch('/:id', async (req: any, res) => {
     const result = await prisma.$transaction(async (tx) => {
       const r = await tx.reservation.findUnique({ where: { id: req.params.id }, include: { items: true } });
       if (!r) throw new Error('Резерв не найден');
-      const { contactId, comment, items, status } = req.body || {};
+      const { contactId, userId, number, comment, items, status } = req.body || {};
+      // Смена автора или номера резерва — только администратор и менеджер
+      if ((userId || number !== undefined) && !['admin', 'manager'].includes(req.user?.role)) {
+        throw new Error('Только администратор или менеджер может менять автора или номер резерва');
+      }
 
       // Смена статуса: admin/manager — любые переходы; автор резерва — только отмена своего резерва
       if (status && status !== r.status && !['admin', 'manager'].includes(req.user?.role)) {
@@ -365,6 +369,8 @@ router.patch('/:id', async (req: any, res) => {
         where: { id: r.id },
         data: {
           ...(contactId ? { contactId } : {}),
+          ...(userId ? { userId } : {}),
+          ...(number ? { number: Number(number) } : {}),
           ...(userId ? { userId } : {}),
           ...(comment !== undefined ? { comment } : {}),
         },
