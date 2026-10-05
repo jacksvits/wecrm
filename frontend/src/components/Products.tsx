@@ -1723,9 +1723,12 @@ function SalesTab() {
     <div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>
-          <th style={thStyle}>№</th><th style={thStyle}>Дата</th><th style={thStyle}>Контрагент</th>
+          <th style={thStyle}>№</th><th style={thStyle}>Дата</th>
+          {canChangeStatus && <th style={thStyle}>Контрагент</th>}
           <th style={thStyle}>Склад</th><th style={thStyle}>Сумма</th>
-          <th style={thStyle}>Статус</th><th style={thStyle}>Автор</th><th style={thStyle}>Документ</th>
+          <th style={thStyle}>Статус</th>
+          {canChangeStatus && <th style={thStyle}>Автор</th>}
+          <th style={thStyle}>Документ</th>
         </tr></thead>
         <tbody>
           {sales.map((s: any) => (
@@ -1744,7 +1747,7 @@ function SalesTab() {
                   </div>
                 </td>
                 <td style={tdStyle}>{new Date(s.createdAt).toLocaleString('ru-RU')}</td>
-                <td style={tdStyle}>{s.contact?.name}</td>
+                {canChangeStatus && <td style={tdStyle}>{s.contact?.name}</td>}
                 <td style={tdStyle}>{s.warehouse?.name || '—'}</td>
                 <td style={tdStyle}>{Number(s.total).toFixed(2)} ₽</td>
                 <td style={{ ...tdStyle, color: statusColor(s.status), fontWeight: 600 }}>
@@ -1755,7 +1758,7 @@ function SalesTab() {
                     <option value="refund">Возврат</option>
                   </select>
                 </td>
-                <td style={tdStyle}>{s.user?.name || '—'}</td>
+                {canChangeStatus && <td style={tdStyle}>{s.user?.name || '—'}</td>}
                 <td style={tdStyle}>
                   {s.status === 'new' && (
                     <div style={{ display: 'flex', gap: 6 }}>
@@ -1771,7 +1774,7 @@ function SalesTab() {
               </tr>
               {expanded === s.id && (
                 <tr>
-                  <td colSpan={8} style={{ ...tdStyle, background: 'var(--bg-hover)', padding: '10px 16px' }}>
+                  <td colSpan={canChangeStatus ? 8 : 6} style={{ ...tdStyle, background: 'var(--bg-hover)', padding: '10px 16px' }}>
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Состав заказа {saleNo(s)}</div>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                       <thead>
