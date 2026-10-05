@@ -1629,7 +1629,7 @@ function ReservesTab() {
                     >
                       {expandedRes === r.id ? '▾' : '▸'}
                     </button>
-                    <span>РЗ-{String(r.number).padStart(6, '0')}</span>
+                    <span>00We-{String(r.number).padStart(6, '0')}</span>
                   </div>
                 </td>
                 <td style={tdStyle}>{new Date(r.createdAt).toLocaleString('ru-RU')}</td>
@@ -1672,7 +1672,7 @@ function ReservesTab() {
               {expandedRes === r.id && (
                 <tr>
                   <td colSpan={8} style={{ ...tdStyle, background: 'var(--bg-hover)', padding: '10px 16px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Состав резерва РЗ-{String(r.number).padStart(6, '0')}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Состав резерва 00We-{String(r.number).padStart(6, '0')}</div>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                       <thead>
                         <tr>
@@ -1712,7 +1712,7 @@ function ReservesTab() {
       {editRes && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
           <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 20, width: 560, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3 style={{ margin: '0 0 14px' }}>Резерв РЗ-{String(editRes.number).padStart(6, '0')}</h3>
+            <h3 style={{ margin: '0 0 14px' }}>Резерв 00We-{String(editRes.number).padStart(6, '0')}</h3>
             {isPrivileged && (
               <>
                 <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Номер</label>
