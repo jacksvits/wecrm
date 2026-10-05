@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { format } from 'date-fns';
@@ -1622,10 +1622,32 @@ function ReservesTab() {
 function SalesTab() {
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const salesRef = useRef<any[]>([]);
+  salesRef.current = sales;
 
   const load = () => api.sales.list().then(setSales).catch(() => {});
   useEffect(() => {
     load().finally(() => setLoading(false));
+  }, []);
+
+  // Автоопрос статуса онлайн-оплат Точки: «Новый» + способ «tochka» — сверяем с банком
+  useEffect(() => {
+    const check = async () => {
+      let changed = false;
+      for (const s of salesRef.current) {
+        if (s.status === 'new' && s.paymentMethod === 'tochka') {
+          try {
+            const st: any = await api.tochkaAcquiring.paymentStatus(`WE-${String(s.number).padStart(9, '0')}`);
+            if (st.status === 'paid' || st.status === 'failed') changed = true;
+          } catch { /* повторим на следующем тике */ }
+        }
+      }
+      if (changed) load();
+    };
+    check();
+    const t = setInterval(check, 10000);
+    return () => clearInterval(t);
   }, []);
 
   const changeStatus = async (s: any, status: string) => {
@@ -1634,6 +1656,9 @@ function SalesTab() {
       await load();
     } catch (e: any) { alert(e.message || 'Ошибка смены статуса'); }
   };
+
+  // Номер продажи = номер заказа в банке: WE- + 9 цифр
+  const saleNo = (s: any) => `WE-${String(s.number).padStart(9, '0')}`;
 
   const statusLabel = (s: string) => s === 'new' ? 'Новый' : s === 'paid' ? 'Оплачен' : s === 'cancelled' ? 'Отменён' : s;
   const statusColor = (s: string) => s === 'paid' ? '#16a34a' : s === 'new' ? '#d97706' : 'var(--text-muted)';
@@ -1649,23 +1674,69 @@ function SalesTab() {
         </tr></thead>
         <tbody>
           {sales.map((s: any) => (
-            <tr key={s.id} style={s.status === 'cancelled' ? { opacity: 0.55 } : undefined}>
-              <td style={tdStyle}>ПР-{String(s.number).padStart(6, '0')}</td>
-              <td style={tdStyle}>{new Date(s.createdAt).toLocaleString('ru-RU')}</td>
-              <td style={tdStyle}>{s.contact?.name}</td>
-              <td style={tdStyle}>{s.warehouse?.name || '—'}</td>
-              <td style={tdStyle}>{s.items.map((i: any) => `${i.product?.name} × ${i.quantity}`).join('; ')}</td>
-              <td style={tdStyle}>{Number(s.total).toFixed(2)} ₽</td>
-              <td style={{ ...tdStyle, color: statusColor(s.status), fontWeight: 600 }}>
-                <select value={s.status} disabled={s.status === 'cancelled'} onChange={e => changeStatus(s, e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'inherit', fontSize: 12 }}>
-                  <option value="new">Новый</option>
-                  <option value="paid">Оплачен</option>
-                  <option value="cancelled">Отменён</option>
-                </select>
-              </td>
-              <td style={tdStyle}>{s.user?.name || '—'}</td>
-              <td style={tdStyle}><button style={{ ...btnGhost }} onClick={() => api.sales.downloadPdf(s.id, s.number)}>PDF</button></td>
-            </tr>
+            <Fragment key={s.id}>
+              <tr style={s.status === 'cancelled' ? { opacity: 0.55 } : undefined}>
+                <td style={tdStyle}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button
+                      onClick={() => setExpanded(expanded === s.id ? null : s.id)}
+                      title={expanded === s.id ? 'Скрыть состав' : 'Показать состав'}
+                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13, padding: '0 2px', lineHeight: 1 }}
+                    >
+                      {expanded === s.id ? '▾' : '▸'}
+                    </button>
+                    <span>{saleNo(s)}</span>
+                  </div>
+                </td>
+                <td style={tdStyle}>{new Date(s.createdAt).toLocaleString('ru-RU')}</td>
+                <td style={tdStyle}>{s.contact?.name}</td>
+                <td style={tdStyle}>{s.warehouse?.name || '—'}</td>
+                <td style={tdStyle}>{s.items.map((i: any) => `${i.product?.name} × ${i.quantity}`).join('; ')}</td>
+                <td style={tdStyle}>{Number(s.total).toFixed(2)} ₽</td>
+                <td style={{ ...tdStyle, color: statusColor(s.status), fontWeight: 600 }}>
+                  <select value={s.status} disabled={s.status === 'cancelled'} onChange={e => changeStatus(s, e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'inherit', fontSize: 12 }}>
+                    <option value="new">Новый</option>
+                    <option value="paid">Оплачен</option>
+                    <option value="cancelled">Отменён</option>
+                  </select>
+                </td>
+                <td style={tdStyle}>{s.user?.name || '—'}</td>
+                <td style={tdStyle}><button style={{ ...btnGhost }} onClick={() => api.sales.downloadPdf(s.id, s.number)}>Счёт</button></td>
+              </tr>
+              {expanded === s.id && (
+                <tr>
+                  <td colSpan={9} style={{ ...tdStyle, background: 'var(--bg-hover)', padding: '10px 16px' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Состав заказа {saleNo(s)}</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ ...thStyle, textAlign: 'left' }}>Товар</th>
+                          <th style={{ ...thStyle, textAlign: 'right' }}>Кол-во</th>
+                          <th style={{ ...thStyle, textAlign: 'right' }}>Цена</th>
+                          <th style={{ ...thStyle, textAlign: 'right' }}>Сумма</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {s.items.map((i: any) => (
+                          <tr key={i.id}>
+                            <td style={{ padding: '4px 8px 4px 0', borderTop: '1px solid var(--border-color)' }}>
+                              {i.product?.name}{i.product?.sku ? ` (арт. ${i.product.sku})` : ''}
+                            </td>
+                            <td style={{ padding: '4px 8px', borderTop: '1px solid var(--border-color)', textAlign: 'right', whiteSpace: 'nowrap' }}>{i.quantity} {i.product?.unit || 'шт'}</td>
+                            <td style={{ padding: '4px 8px', borderTop: '1px solid var(--border-color)', textAlign: 'right', whiteSpace: 'nowrap' }}>{Number(i.price).toFixed(2)} ₽</td>
+                            <td style={{ padding: '4px 0 4px 8px', borderTop: '1px solid var(--border-color)', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 500 }}>{(Number(i.price) * i.quantity).toFixed(2)} ₽</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td colSpan={3} style={{ padding: '6px 8px 0 0', textAlign: 'right', fontWeight: 600 }}>Итого:</td>
+                          <td style={{ padding: '6px 0 0 8px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{Number(s.total).toFixed(2)} ₽</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>
@@ -1673,7 +1744,6 @@ function SalesTab() {
     </div>
   );
 }
-
 
 /* ---------- Модалка категории (создание / редактирование) ---------- */
 function CategoryModal({ modal, categories, onClose, onSaved }: {
