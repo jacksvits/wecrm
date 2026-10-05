@@ -33,7 +33,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const [cartOpen, setCartOpen] = useState(false);
   const [saleComment, setSaleComment] = useState('');
   // Способ оплаты: 'cash' — наличными, 'card' — банковской картой, 'invoice' — счёт на организацию (безнал)
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'invoice' | 'tochka'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'invoice' | 'tochka'>('tochka');
   // Подписка на услугу: панель оформления подписочной заявки
   const [subscribeProduct, setSubscribeProduct] = useState<Product | null>(null);
   const [subscribePeriod, setSubscribePeriod] = useState<'month' | 'year'>('month');
@@ -63,6 +63,20 @@ export function Vitrine({ search = '' }: { search?: string }) {
     return () => window.removeEventListener('wecrm:open-cart', h);
   }, []);
   const [contactId, setContactId] = useState('');
+  // Интерактивный выбор контрагента: поиск по имени/телефону/email, список открыт при фокусе
+  const [contactQuery, setContactQuery] = useState('');
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactAnchor, setContactAnchor] = useState<{ top: number; left: number; width: number } | null>(null);
+  const contactWrapRef = useRef<HTMLDivElement | null>(null);
+
+  // Закрытие выпадающего списка контрагентов по клику вне него
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (contactWrapRef.current && !contactWrapRef.current.contains(e.target as Node)) setContactOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveOk, setSaveOk] = useState('');
@@ -93,7 +107,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
       .then(setProducts)
       .catch((e: any) => setError(e.message || 'Ошибка загрузки витрины'))
       .finally(() => setLoading(false));
-    api.contacts.list().then(setContacts).catch(() => {});
+    api.contacts.list('kind=contact').then(setContacts).catch(() => {});
     api.tochkaAcquiring.get().then((s: any) => setTochkaActive(!!s.isActive)).catch(() => {});
     api.products.vitrineCategories()
       .then((cats) => {
@@ -693,18 +707,60 @@ export function Vitrine({ search = '' }: { search?: string }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
                 <span>Итого</span><span>{fmtMoney(cartTotal)} ₽</span>
               </div>
-              <select value={contactId} onChange={e => setContactId(e.target.value)} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }}>
-                <option value="">— Контрагент —</option>
-                {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <div ref={contactWrapRef} style={{ position: 'relative' }}>
+                {contactId ? (
+                  // Выбранный контрагент: имя + крестик сброса
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }}>
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contacts.find((x: any) => x.id === contactId)?.name || 'Контрагент'}</span>
+                    <button type="button" onClick={() => { setContactId(''); setContactQuery(''); }} title="Сбросить"
+                      style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: 2 }}>×</button>
+                  </div>
+                ) : (
+                  <input
+                    value={contactQuery}
+                    onChange={e => { setContactQuery(e.target.value); setContactOpen(true); }}
+                    onFocus={e => {
+                      setContactOpen(true);
+                      const r = (e.target as HTMLInputElement).getBoundingClientRect();
+                      const panel = document.querySelector('.cart-panel');
+                      const pr = panel ? panel.getBoundingClientRect() : { top: 0, left: 0 };
+                      setContactAnchor({ top: r.bottom - pr.top + 4, left: r.left - pr.left, width: r.width });
+                    }}
+                    placeholder="Поиск контрагента…"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                  />
+                )}
+                {contactOpen && !contactId && contactAnchor && (
+                  <div style={{ position: 'absolute', top: contactAnchor.top, left: contactAnchor.left, width: contactAnchor.width, maxHeight: 260, overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10, zIndex: 40, boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
+                    {(() => {
+                      const q = contactQuery.trim().toLowerCase();
+                      const list = contacts.filter((x: any) =>
+                        !q ||
+                        String(x.name || '').toLowerCase().includes(q) ||
+                        String(x.phone || '').toLowerCase().includes(q) ||
+                        String(x.email || '').toLowerCase().includes(q)
+                      );
+                      return list.length ? list.map((x: any) => (
+                        <div key={x.id}
+                          onClick={() => { setContactId(x.id); setContactOpen(false); setContactQuery(''); }}
+                          style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 14, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <div>{x.name}</div>
+                          {(x.phone || x.email) && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{[x.phone, x.email].filter(Boolean).join(' · ')}</div>}
+                        </div>
+                      )) : <div style={{ padding: '10px 12px', fontSize: 13, color: 'var(--text-muted)' }}>Ничего не найдено</div>;
+                    })()}
+                  </div>
+                )}
+              </div>
 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Способ оплаты</span>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {([
-                    ['cash', 'Наличными'],
-                    ['card', 'Банковской картой'],
-                    ['invoice', 'Счёт на организацию'],
-                    ...(tochkaActive ? [['tochka', 'Онлайн (карта/СБП)'] as const] : []),
+                    ['invoice', 'Запросить счёт'],
+                    ...(tochkaActive ? [['tochka', 'Оплатить сейчас'] as const] : []),
                   ] as const).map(([val, lbl]) => (
                     <button key={val} type="button" onClick={() => setPaymentMethod(val)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: paymentMethod === val ? '#1a1a1a' : 'var(--bg-card)', color: paymentMethod === val ? '#fff' : 'var(--text-primary)', fontSize: 12, fontWeight: paymentMethod === val ? 600 : 400, cursor: 'pointer' }}>
                       {lbl}
@@ -742,7 +798,6 @@ export function Vitrine({ search = '' }: { search?: string }) {
               <button disabled={savingSale || !cart.length} onClick={checkout} style={{ padding: '10px 16px', borderRadius: 12, border: 'none', background: savingSale || !cart.length ? 'var(--bg-hover)' : '#1a1a1a', color: savingSale || !cart.length ? 'var(--text-muted)' : '#fff', fontSize: 14, fontWeight: 600, cursor: savingSale || !cart.length ? 'not-allowed' : 'pointer' }}>
                 {savingSale ? 'Оформление...' : 'Оформить заказ'}
               </button>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Оплата (интернет-эквайринг) будет доступна позже.</div>
             </div>
           </div>
         </div>
@@ -831,10 +886,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Способ оплаты</span>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {([
-                    ['cash', 'Наличными'],
-                    ['card', 'Банковской картой'],
-                    ['invoice', 'Счёт на организацию'],
-                    ...(tochkaActive ? [['tochka', 'Онлайн (карта/СБП)'] as const] : []),
+                    ['invoice', 'Запросить счёт'],
+                    ...(tochkaActive ? [['tochka', 'Оплатить сейчас'] as const] : []),
                   ] as const).map(([val, lbl]) => (
                     <button key={val} type="button" onClick={() => setPaymentMethod(val)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: paymentMethod === val ? '#1a1a1a' : 'var(--bg-card)', color: paymentMethod === val ? '#fff' : 'var(--text-primary)', fontSize: 12, fontWeight: paymentMethod === val ? 600 : 400, cursor: 'pointer' }}>
                       {lbl}
