@@ -1602,7 +1602,7 @@ function ReservesTab() {
                 <td style={tdStyle}>{r.user?.name || '—'}</td>
                 <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {isPrivileged && <button style={btnGhost} onClick={() => api.reservations.downloadPdf(r.id, r.number)}>Счёт</button>}
+                    <button style={btnGhost} onClick={() => api.reservations.downloadPdf(r.id, r.number)}>Счёт</button>
                     {isPrivileged && r.status === 'held' && <button style={btnGhost} onClick={() => setStatus(r, 'issued')}>Выдать</button>}
                     {isPrivileged && r.status === 'held' && <button style={btnGhost} onClick={() => openEdit(r)}>Изменить</button>}
                     {r.status === 'held' && <button style={btnGhost} onClick={() => setStatus(r, 'canceled')}>Отменить</button>}
