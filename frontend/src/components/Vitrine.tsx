@@ -372,7 +372,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
   return (
     <>
       <style>{`
-        .vitrine-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; padding: 4px 2px; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; justify-items: stretch; align-content: start; }
+        .vitrine-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; padding: 4px 2px; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; justify-items: stretch; align-content: start; }
         .vitrine-grid > div { height: max-content; }
         .vitrine-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; width: 100%; min-height: 2.7em; }
         @media (max-width: 640px) {
