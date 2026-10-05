@@ -228,6 +228,11 @@ router.patch('/:id', async (req: any, res) => {
       if (!r) throw new Error('Резерв не найден');
       const { contactId, comment, items, status } = req.body || {};
 
+      // Смена статуса — только администратор и менеджер
+      if (status && status !== r.status && !['admin', 'manager'].includes(req.user?.role)) {
+        throw new Error('Только администратор или менеджер может менять статусы резервов');
+      }
+
       // Смена статуса
       if (status && status !== r.status) {
         if (status === 'issued') {

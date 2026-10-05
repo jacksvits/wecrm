@@ -1586,7 +1586,19 @@ function ReservesTab() {
                 <td style={tdStyle}>{r.contact?.name}</td>
                 <td style={tdStyle}>{r.warehouse?.name || '—'}</td>
                 <td style={tdStyle}>{r.total.toFixed(2)} ₽</td>
-                <td style={tdStyle}>{statusLabel(r.status)}</td>
+                <td style={tdStyle}>
+                  {/* Статус — выпадающий список как у заказов; менять могут только admin/manager */}
+                  <select
+                    value={r.status}
+                    disabled={!isPrivileged}
+                    onChange={e => setStatus(r, e.target.value)}
+                    style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: r.status === 'issued' ? '#16a34a' : r.status === 'held' ? '#d97706' : 'var(--text-muted)', fontSize: 12 }}
+                  >
+                    <option value="held">Отложено</option>
+                    <option value="issued">Выдано</option>
+                    <option value="canceled">Отменён</option>
+                  </select>
+                </td>
                 <td style={tdStyle}>{r.user?.name || '—'}</td>
                 <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
