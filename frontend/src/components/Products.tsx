@@ -1660,8 +1660,8 @@ function SalesTab() {
   // Номер продажи = номер заказа в банке: WE- + 9 цифр
   const saleNo = (s: any) => `WE-${String(s.number).padStart(9, '0')}`;
 
-  const statusLabel = (s: string) => s === 'new' ? 'Новый' : s === 'paid' ? 'Оплачен' : s === 'cancelled' ? 'Отменён' : s;
-  const statusColor = (s: string) => s === 'paid' ? '#16a34a' : s === 'new' ? '#d97706' : 'var(--text-muted)';
+  const statusLabel = (s: string) => s === 'new' ? 'Новый' : s === 'paid' ? 'Оплачен' : s === 'cancelled' ? 'Отменён' : s === 'refund' ? 'Возврат' : s;
+  const statusColor = (s: string) => s === 'paid' ? '#16a34a' : s === 'new' ? '#d97706' : s === 'refund' ? '#7c3aed' : 'var(--text-muted)';
 
   if (loading) return <div style={{ padding: 16, color: 'var(--text-muted)' }}>Загрузка...</div>;
   return (
@@ -1669,13 +1669,13 @@ function SalesTab() {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>
           <th style={thStyle}>№</th><th style={thStyle}>Дата</th><th style={thStyle}>Контрагент</th>
-          <th style={thStyle}>Склад</th><th style={thStyle}>Товары</th><th style={thStyle}>Сумма</th>
+          <th style={thStyle}>Склад</th><th style={thStyle}>Сумма</th>
           <th style={thStyle}>Статус</th><th style={thStyle}>Автор</th><th style={thStyle}>Документ</th>
         </tr></thead>
         <tbody>
           {sales.map((s: any) => (
             <Fragment key={s.id}>
-              <tr style={s.status === 'cancelled' ? { opacity: 0.55 } : undefined}>
+              <tr style={s.status === 'cancelled' || s.status === 'refund' ? { opacity: 0.55 } : undefined}>
                 <td style={tdStyle}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <button
@@ -1691,21 +1691,21 @@ function SalesTab() {
                 <td style={tdStyle}>{new Date(s.createdAt).toLocaleString('ru-RU')}</td>
                 <td style={tdStyle}>{s.contact?.name}</td>
                 <td style={tdStyle}>{s.warehouse?.name || '—'}</td>
-                <td style={tdStyle}>{s.items.map((i: any) => `${i.product?.name} × ${i.quantity}`).join('; ')}</td>
                 <td style={tdStyle}>{Number(s.total).toFixed(2)} ₽</td>
                 <td style={{ ...tdStyle, color: statusColor(s.status), fontWeight: 600 }}>
-                  <select value={s.status} disabled={s.status === 'cancelled'} onChange={e => changeStatus(s, e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'inherit', fontSize: 12 }}>
+                  <select value={s.status} disabled={s.status === 'cancelled' || s.status === 'refund'} onChange={e => changeStatus(s, e.target.value)} style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'inherit', fontSize: 12 }}>
                     <option value="new">Новый</option>
                     <option value="paid">Оплачен</option>
                     <option value="cancelled">Отменён</option>
+                    <option value="refund">Возврат</option>
                   </select>
                 </td>
                 <td style={tdStyle}>{s.user?.name || '—'}</td>
-                <td style={tdStyle}><button style={{ ...btnGhost }} onClick={() => api.sales.downloadPdf(s.id, s.number)}>Счёт</button></td>
+                <td style={tdStyle}>{s.status === 'new' && <button style={{ ...btnGhost }} onClick={() => api.sales.downloadPdf(s.id, s.number)}>Счёт</button>}</td>
               </tr>
               {expanded === s.id && (
                 <tr>
-                  <td colSpan={9} style={{ ...tdStyle, background: 'var(--bg-hover)', padding: '10px 16px' }}>
+                  <td colSpan={8} style={{ ...tdStyle, background: 'var(--bg-hover)', padding: '10px 16px' }}>
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Состав заказа {saleNo(s)}</div>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                       <thead>
