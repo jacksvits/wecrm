@@ -46,10 +46,16 @@ proxy.on('proxyRes', (proxyRes: any) => {
   proxyRes.headers['cross-origin-opener-policy'] = 'same-origin';
 });
 
-proxy.on('error', (err: any, _req: any, res: any) => {
+proxy.on('error', (err: any, _req: any, resOrSocket: any) => {
   console.error('[VNC] Ошибка прокси:', err.message);
-  if (res && !res.headersSent) res.status(502).json({ error: 'VNC-сессия недоступна' });
-  else if (res && res.end) res.end();
+  // В WS-режиме http-proxy передаёт сокет, а не express-res
+  if (resOrSocket && typeof resOrSocket.write === 'function' && !resOrSocket.setHeader) {
+    try { resOrSocket.write('HTTP/1.1 502 Bad Gateway\r\n\r\n'); } catch { /* уже закрыт */ }
+    resOrSocket.destroy();
+    return;
+  }
+  if (resOrSocket && !resOrSocket.headersSent) resOrSocket.status(502).json({ error: 'VNC-сессия недоступна' });
+  else if (resOrSocket && resOrSocket.end) resOrSocket.end();
 });
 
 function containerName(uid: string): string {
@@ -185,8 +191,10 @@ export function handleVncUpgrade(req: any, socket: any, head: any) {
       if (tokenUid !== uid) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); socket.destroy(); return; }
       const sess = sessions.get(uid);
       if (!sess) { socket.write('HTTP/1.1 404 Not Found\r\n\r\n'); socket.destroy(); return; }
+      // Xvnc принимает RFB-over-WebSocket на своём websocketPort (6082);
+      // websockify в контейнере раздаёт только статику клиента
       req.url = '/websockify';
-      proxy.ws(req, socket, head, { target: `http://${sess.ip}:6080` });
+      proxy.ws(req, socket, head, { target: `http://${sess.ip}:6082` });
     } catch (e) {
       console.error('[VNC] Ошибка upgrade:', e);
       socket.destroy();

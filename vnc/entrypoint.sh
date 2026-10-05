@@ -6,9 +6,12 @@
 #   → fluxbox → Chromium (весь трафик через VPN-прокси sing-box)
 set -e
 
-mkdir -p /data/chrome /data/.config/pulse
+mkdir -p /data/chrome
 
 # --- PulseAudio: виртуальный sink, с которого KasmVNC забирает звук ---
+# runtime-артефакты прошлой сессии (сокеты/pid) мешают старту — чистим
+rm -rf /data/.config/pulse
+mkdir -p /data/.config/pulse
 cat > /data/.config/pulse/default.pa <<'PA'
 load-module module-native-protocol-unix
 load-module module-null-sink sink_name=KasmVNC sink_properties=device.description=KasmVNC
@@ -59,4 +62,6 @@ chromium \
 
 # Статика веб-клиента KasmVNC + websocket-мост в RFB (аудио/видео-расширения
 # KasmVNC идут внутри RFB-потока — транспорт им безразличен)
-exec websockify --web /usr/share/kasmvnc/www 6080 localhost:5900
+# Статика веб-клиента KasmVNC. WS-стрим идёт напрямую backend → Xvnc :6082,
+# поэтому target-заглушка (сюда WS-клиенты не приходят)
+exec websockify --web /usr/share/kasmvnc/www 6080 localhost:1

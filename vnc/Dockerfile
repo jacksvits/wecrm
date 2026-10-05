@@ -16,7 +16,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # chromium — браузер, fluxbox — лёгкий WM, pulseaudio — захват звука
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
-      chromium fluxbox pulseaudio websockify \
+      chromium fluxbox pulseaudio websockify ffmpeg \
       fonts-liberation fonts-dejavu-core ca-certificates wget \
     && rm -rf /var/lib/apt/lists/*
 
