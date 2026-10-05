@@ -305,7 +305,9 @@ router.get('/status/:orderId', authMiddleware, async (req, res) => {
         const { response } = await withAuthRetry((h) =>
           tochkaRequest(`/acquiring/v1.0/payments/${encodeURIComponent(payment.paymentId!)}?customerCode=${cc}`, { headers: h }),
         );
-        const status = String(response.body?.Data?.status || response.body?.Data?.Status || '');
+        // Ответ банка: Data.Operation[0] — статус и данные платежа
+        const op = response.body?.Data?.Operation?.[0] || response.body?.Data || {};
+        const status = String(op.status || op.Status || '');
         if (status === 'APPROVED' || status === 'PAID') {
           await markPaid(payment, payment.paymentId);
           return res.json({ status: 'paid', paidAt: new Date() });
