@@ -37,7 +37,7 @@ router.post('/', async (req: any, res) => {
     }
     resolvedContactId = personal.id;
   }
-  const PAYMENT_METHODS = ['cash', 'card', 'invoice'];
+  const PAYMENT_METHODS = ['cash', 'card', 'invoice', 'postpone'];
   const pm = PAYMENT_METHODS.includes(paymentMethod) ? paymentMethod : null;
   const whId = warehouseId || (await prisma.warehouse.findFirst())?.id;
   if (!whId) return res.status(400).json({ error: 'Склад не найден' });

@@ -22,7 +22,7 @@ router.post('/', async (req: any, res) => {
   if (!Array.isArray(items) || !items.length) {
     return res.status(400).json({ error: 'Позиции обязательны' });
   }
-  const PAYMENT_METHODS = ['cash', 'card', 'invoice'];
+  const PAYMENT_METHODS = ['cash', 'card', 'invoice', 'postpone'];
   const pm = PAYMENT_METHODS.includes(paymentMethod) ? paymentMethod : null;
   // Резерв «на себя» (роль «Пользователь»): контакт не выбирается —
   // подставляем личный контакт автора резерва (ищем по e-mail, иначе создаём)

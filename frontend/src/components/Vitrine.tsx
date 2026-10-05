@@ -93,7 +93,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
 
   // Открытие резерв-листа по событию из шапки страницы «Товары»
   useEffect(() => {
-    const h = () => { setSaveError(''); setSaveOk(''); setPaymentMethod('invoice'); setReserveOpen(true); };
+    const h = () => { setSaveError(''); setSaveOk(''); setPaymentMethod('postpone'); setReserveOpen(true); };
     window.addEventListener('wecrm:open-reserve', h);
     return () => window.removeEventListener('wecrm:open-reserve', h);
   }, []);
@@ -643,7 +643,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
                     {d.kind !== 'service' && (
                       <button type="button" className="btn-action" style={{ flex: 1, minWidth: 0, justifyContent: 'center', borderRadius: 12, padding: '10px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}
                         disabled={dInStock <= 0}
-                        onClick={() => { addToReserve(d); setDetails(null); setPaymentMethod('invoice'); setReserveOpen(true); }}>
+                        onClick={() => { addToReserve(d); setDetails(null); setPaymentMethod('postpone'); setReserveOpen(true); }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                           <path d="M9 12l2 2 4-4"/>
@@ -708,59 +708,19 @@ export function Vitrine({ search = '' }: { search?: string }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
                 <span>Итого</span><span>{fmtMoney(cartTotal)} ₽</span>
               </div>
-              <div ref={contactWrapRef} style={{ position: 'relative' }}>
-                {contactId ? (
-                  // Выбранный контрагент: имя + крестик сброса
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }}>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contacts.find((x: any) => x.id === contactId)?.name || 'Контрагент'}</span>
-                    <button type="button" onClick={() => { setContactId(''); setContactQuery(''); }} title="Сбросить"
-                      style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: 2 }}>×</button>
-                  </div>
-                ) : (
-                  <input
-                    value={contactQuery}
-                    onChange={e => { setContactQuery(e.target.value); setContactOpen(true); }}
-                    onFocus={() => setContactOpen(true)}
-                    placeholder="Поиск контрагента…"
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-                  />
-                )}
-                {contactOpen && !contactId && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, maxHeight: 260, overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10, zIndex: 40, boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
-                    {(() => {
-                      const q = contactQuery.trim().toLowerCase();
-                      const list = contacts.filter((x: any) =>
-                        !q ||
-                        String(x.name || '').toLowerCase().includes(q) ||
-                        String(x.phone || '').toLowerCase().includes(q) ||
-                        String(x.email || '').toLowerCase().includes(q)
-                      );
-                      return list.length ? list.map((x: any) => (
-                        <div key={x.id}
-                          onClick={() => { setContactId(x.id); setContactOpen(false); setContactQuery(''); }}
-                          style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 14, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          <div>{x.name}</div>
-                          {(x.phone || x.email) && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{[x.phone, x.email].filter(Boolean).join(' · ')}</div>}
-                        </div>
-                      )) : <div style={{ padding: '10px 12px', fontSize: 13, color: 'var(--text-muted)' }}>Ничего не найдено</div>;
-                    })()}
-                  </div>
-                )}
+              <div>
+                <input value={user?.name || ''} readOnly title="Заказ оформляется на вас — ваше ФИО будет указано как контрагент" style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
               </div>
 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Способ оплаты</span>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {([
-                    ['invoice', 'Запросить счёт'],
-                    ...(tochkaActive ? [['tochka', 'Оплатить сейчас'] as const] : []),
-                  ] as const).map(([val, lbl]) => (
-                    <button key={val} type="button" onClick={() => setPaymentMethod(val)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: paymentMethod === val ? '#1a1a1a' : 'var(--bg-card)', color: paymentMethod === val ? '#fff' : 'var(--text-primary)', fontSize: 12, fontWeight: paymentMethod === val ? 600 : 400, cursor: 'pointer' }}>
-                      {lbl}
-                    </button>
-                  ))}
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <button type="button" className="btn-action" style={{ justifyContent: 'center', borderRadius: 12, padding: '10px 24px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="2" y="5" width="20" height="14" rx="2"/>
+                      <path d="M2 10h20"/>
+                    </svg>
+                    Оплатить сейчас
+                  </button>
                 </div>
                 {paymentMethod === 'invoice' && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Цены пересчитаны по тарифу «Использовать для безнала».</span>}
               </div>
@@ -790,7 +750,12 @@ export function Vitrine({ search = '' }: { search?: string }) {
                   </button>
                 </div>
               )}
-              <button disabled={savingSale || !cart.length} onClick={checkout} style={{ padding: '10px 16px', borderRadius: 12, border: 'none', background: savingSale || !cart.length ? 'var(--bg-hover)' : '#1a1a1a', color: savingSale || !cart.length ? 'var(--text-muted)' : '#fff', fontSize: 14, fontWeight: 600, cursor: savingSale || !cart.length ? 'not-allowed' : 'pointer' }}>
+              <button disabled={savingSale || !cart.length} onClick={checkout} className="btn-action-cart" style={{ width: '100%', justifyContent: 'center', padding: '10px 16px', fontWeight: 600, opacity: savingSale || !cart.length ? 0.6 : 1, cursor: savingSale || !cart.length ? 'not-allowed' : 'pointer' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="9" cy="21" r="1"/>
+                  <circle cx="20" cy="21" r="1"/>
+                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                </svg>
                 {savingSale ? 'Оформление...' : 'Оформить заказ'}
               </button>
             </div>
@@ -881,6 +846,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Способ оплаты</span>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {([
+                    ['postpone', 'Отложить'],
                     ['invoice', 'Запросить счёт'],
                   ] as const).map(([val, lbl]) => (
                     <button key={val} type="button" onClick={() => setPaymentMethod(val)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: paymentMethod === val ? '#1a1a1a' : 'var(--bg-card)', color: paymentMethod === val ? '#fff' : 'var(--text-primary)', fontSize: 12, fontWeight: paymentMethod === val ? 600 : 400, cursor: 'pointer' }}>
@@ -896,8 +862,12 @@ export function Vitrine({ search = '' }: { search?: string }) {
               <input value={reserveComment} onChange={e => setReserveComment(e.target.value)} placeholder="Комментарий к резерву" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }} />
               {saveError && <div style={{ color: '#ef4444', fontSize: 13 }}>{saveError}</div>}
               {saveOk && <div style={{ color: '#16a34a', fontSize: 13 }}>{saveOk}</div>}
-              <button type="button" className="btn-reserve" disabled={saving || !reserveList.length} onClick={saveReserve}
-                style={{ justifyContent: 'center', width: '100%', padding: '10px 16px', fontSize: 14, fontWeight: 600 }}>
+              <button type="button" className="btn-action-cart" disabled={saving || !reserveList.length} onClick={saveReserve}
+                style={{ width: '100%', justifyContent: 'center', padding: '10px 16px', fontWeight: 600, opacity: saving || !reserveList.length ? 0.6 : 1, cursor: saving || !reserveList.length ? 'not-allowed' : 'pointer' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <path d="M9 12l2 2 4-4"/>
+                </svg>
                 {saving ? 'Сохранение...' : 'Создать резерв'}
               </button>
             </div>
