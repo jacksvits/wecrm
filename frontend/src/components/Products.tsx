@@ -1604,20 +1604,9 @@ function ReservesTab() {
                 <td style={tdStyle}>{r.user?.name || '—'}</td>
                 <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <button style={btnGhost} onClick={() => api.reservations.downloadPdf(r.id, r.number)}>Счёт</button>
-                    {isPrivileged && r.status === 'held' && <button style={btnGhost} onClick={() => setStatus(r, 'issued')}>Выдать</button>}
-                    {isPrivileged && r.status === 'held' && <button style={btnGhost} onClick={() => openEdit(r)}>Изменить</button>}
-                    {r.status === 'held' && <button style={btnGhost} onClick={() => setStatus(r, 'canceled')}>Отменить</button>}
-                    {isPrivileged && r.status === 'canceled' && <button style={btnGhost} onClick={() => setStatus(r, 'held')}>Вернуть в резерв</button>}
-                    {isPrivileged && <button style={btnGhost} onClick={() => openShare(r.id)}>В задачу</button>}
-                    {isPrivileged && r.status !== 'issued' && (delFor === r.id ? (
-                      <>
-                        <button style={{ ...btnGhost, borderColor: '#FF3B30', color: '#FF3B30' }} onClick={() => doDelete(r)}>Удалить?</button>
-                        <button style={btnGhost} onClick={() => setDelFor(null)}>Нет</button>
-                      </>
-                    ) : (
-                      <button style={{ ...btnGhost, borderColor: '#FF3B30', color: '#FF3B30' }} onClick={() => setDelFor(r.id)}>Удалить</button>
-                    ))}
+                    {/* Счёт — только при безналичном способе оплаты (invoice) */}
+                    {r.paymentMethod === 'invoice' && <button style={btnGhost} onClick={() => api.reservations.downloadPdf(r.id, r.number)}>Счёт</button>}
+                    <button style={btnGhost} onClick={() => openShare(r.id)}>В задачу</button>
                   </div>
                 </td>
               </tr>
