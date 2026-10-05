@@ -1592,11 +1592,13 @@ function ReservesTab() {
                     value={r.status}
                     disabled={!isPrivileged}
                     onChange={e => setStatus(r, e.target.value)}
-                    style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: r.status === 'issued' ? '#16a34a' : r.status === 'held' ? '#d97706' : 'var(--text-muted)', fontSize: 12 }}
+                    style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: r.status === 'issued' || r.status === 'paid' ? '#16a34a' : r.status === 'completed' ? '#0d9488' : r.status === 'held' ? '#d97706' : 'var(--text-muted)', fontSize: 12 }}
                   >
                     <option value="held">Отложено</option>
                     <option value="issued">Выдано</option>
                     <option value="canceled">Отменён</option>
+                    <option value="paid">Оплачен</option>
+                    <option value="completed">Завершён</option>
                   </select>
                 </td>
                 <td style={tdStyle}>{r.user?.name || '—'}</td>

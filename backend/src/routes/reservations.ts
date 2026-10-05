@@ -238,6 +238,10 @@ router.patch('/:id', async (req: any, res) => {
 
       // Смена статуса
       if (status && status !== r.status) {
+        if (!['held', 'issued', 'canceled', 'paid', 'completed'].includes(status)) {
+          throw new Error('Недопустимый статус резерва');
+        }
+        if (status === 'paid' && r.status === 'issued') throw new Error('Выданный резерв нельзя отметить оплаченным');
         if (status === 'issued') {
           if (r.status !== 'held') throw new Error('Выдать можно только отложенный резерв');
           for (const it of r.items) {
