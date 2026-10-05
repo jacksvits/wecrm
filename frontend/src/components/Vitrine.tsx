@@ -33,7 +33,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const [cartOpen, setCartOpen] = useState(false);
   const [saleComment, setSaleComment] = useState('');
   // Способ оплаты: 'cash' — наличными, 'card' — банковской картой, 'invoice' — счёт на организацию (безнал)
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'invoice' | 'tochka'>('tochka');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'invoice' | 'tochka' | 'postpone'>('tochka');
   // Подписка на услугу: панель оформления подписочной заявки
   const [subscribeProduct, setSubscribeProduct] = useState<Product | null>(null);
   const [subscribePeriod, setSubscribePeriod] = useState<'month' | 'year'>('month');
