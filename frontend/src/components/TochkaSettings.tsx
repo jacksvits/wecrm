@@ -153,13 +153,19 @@ export default function TochkaSettings() {
           </span>
         )}
         <div style={{ flex: 1 }} />
-        {!state?.connected && (
+        {state?.connected && (
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 260 }}>
+            Переподключение нужно для выдачи новых разрешений (например, эквайринг)
+          </span>
+        )}
+        {(
           <button
             onClick={connect}
             disabled={connecting}
-            style={{ padding: '8px 16px', borderRadius: 10, background: '#007AFF', color: '#fff', border: 'none', cursor: connecting ? 'default' : 'pointer', fontSize: 13, opacity: connecting ? 0.7 : 1 }}
+            title={state?.connected ? 'Пройти авторизацию заново (обновить разрешения)' : undefined}
+            style={{ padding: '8px 16px', borderRadius: 10, background: state?.connected ? 'var(--bg-card)' : '#007AFF', color: state?.connected ? 'var(--text-primary)' : '#fff', border: state?.connected ? '1px solid var(--border-color)' : 'none', cursor: connecting ? 'default' : 'pointer', fontSize: 13, opacity: connecting ? 0.7 : 1 }}
           >
-            {connecting ? 'Подключение...' : 'Подключить банк'}
+            {connecting ? 'Подключение...' : state?.connected ? 'Переподключить' : 'Подключить банк'}
           </button>
         )}
       </div>
