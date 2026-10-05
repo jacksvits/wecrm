@@ -56,11 +56,11 @@ export default function TochkaAcquiringSettings() {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
           <span style={{ color: 'var(--text-muted)' }}>Уведомления об оплате (webhook)</span>
-          <span style={{ color: state?.webhookOk ? '#16a34a' : '#dc2626' }}>{state?.webhookOk === null ? '—' : state?.webhookOk ? 'Зарегистрирован' : 'Ошибка (нужен scope acquiring)'}</span>
+          <span style={{ color: state?.webhookOk ? '#16a34a' : '#d97706' }}>{state?.webhookOk === null ? '—' : state?.webhookOk ? 'Зарегистрирован' : 'Не принят банком'}</span>
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
           {state?.connected && !state?.webhookOk && (
-            <>Переподключите «Точка Банк» в интеграциях — при повторной авторизации запросится разрешение «Эквайринг».</>
+            <>Банк пока не подтверждает регистрацию webhook — не страшно: оплата подтверждается автоматическим опросом статуса каждые 5 секунд.</>
           )}
           {!state?.connected && (
             <>Сначала подключите плагин «Точка Банк» в этих же интеграциях.</>
