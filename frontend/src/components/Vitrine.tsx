@@ -33,7 +33,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const [cartOpen, setCartOpen] = useState(false);
   const [saleComment, setSaleComment] = useState('');
   // Способ оплаты: 'cash' — наличными, 'card' — банковской картой, 'invoice' — счёт на организацию (безнал)
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'invoice'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'invoice' | 'tochka'>('cash');
   // Подписка на услугу: панель оформления подписочной заявки
   const [subscribeProduct, setSubscribeProduct] = useState<Product | null>(null);
   const [subscribePeriod, setSubscribePeriod] = useState<'month' | 'year'>('month');
@@ -44,6 +44,13 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const [savingSale, setSavingSale] = useState(false);
   const [saleError, setSaleError] = useState('');
   const [saleOk, setSaleOk] = useState('');
+  // Онлайн-оплата через «Эквайринг от Точки»: активность плагина, экран оплаты заказа
+  const [tochkaActive, setTochkaActive] = useState(false);
+  const [paySale, setPaySale] = useState<any | null>(null);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState('');
+  const [payQr, setPayQr] = useState<string | null>(null);
+  const [payOrderId, setPayOrderId] = useState('');
 
   useEffect(() => {
     try { localStorage.setItem('wecrm_vitrine_cart', JSON.stringify(cart)); } catch { /* ignore */ }
@@ -88,6 +95,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
       .catch((e: any) => setError(e.message || 'Ошибка загрузки витрины'))
       .finally(() => setLoading(false));
     api.contacts.list().then(setContacts).catch(() => {});
+    api.tochkaAcquiring.get().then((s: any) => setTochkaActive(!!s.isActive)).catch(() => {});
     api.products.vitrineCategories()
       .then((cats) => {
         setCategories(cats);
@@ -242,12 +250,20 @@ export function Vitrine({ search = '' }: { search?: string }) {
       const s: any = await api.sales.create({
         contactId,
         comment: saleComment,
-        paymentMethod,
+        paymentMethod: paymentMethod === 'tochka' ? 'card' : paymentMethod,
         items: cart.map(i => ({ productId: i.productId, quantity: i.quantity, price: effPrice(i) })),
       });
-      setSaleOk(`Заказ №${s.number} создан на сумму ${s.total} ₽`);
-      setCart([]);
-      setSaleComment('');
+      if (paymentMethod === 'tochka') {
+        // Заказ создан — дальше экран онлайн-оплаты (карта: редирект, СБП: QR)
+        setPaySale(s); setPayQr(null); setPayError('');
+        setSaleOk(`Заказ №${s.number} создан на сумму ${s.total} ₽. Оплатите его ниже.`);
+        setCart([]);
+        setSaleComment('');
+      } else {
+        setSaleOk(`Заказ №${s.number} создан на сумму ${s.total} ₽`);
+        setCart([]);
+        setSaleComment('');
+      }
     } catch (e: any) {
       setSaleError(e.message || 'Ошибка создания заказа');
     } finally {
@@ -291,6 +307,49 @@ export function Vitrine({ search = '' }: { search?: string }) {
       setSavingSubscribe(false);
     }
   };
+
+  // Оплата картой: редирект на платёжную страницу Точки
+  const payByCard = async () => {
+    if (!paySale) return;
+    setPaying(true); setPayError('');
+    try {
+      const r: any = await api.tochkaAcquiring.pay(paySale.id, 'card');
+      if (r.paymentUrl) window.location.href = r.paymentUrl;
+      else setPayError('Банк не вернул ссылку на оплату');
+    } catch (e: any) {
+      setPayError(e.message || 'Ошибка создания платежа');
+    } finally { setPaying(false); }
+  };
+
+  // Оплата через СБП: показываем QR-код и ждём webhook/поллинг
+  const payBySbp = async () => {
+    if (!paySale) return;
+    setPaying(true); setPayError('');
+    try {
+      const r: any = await api.tochkaAcquiring.pay(paySale.id, 'sbp');
+      if (r.qrData) { setPayQr(r.qrData); setPayOrderId(r.orderId); }
+      else if (r.paymentUrl) window.location.href = r.paymentUrl; // запасной вариант — страница оплаты
+      else setPayError('Банк не вернул QR-код для СБП');
+    } catch (e: any) {
+      setPayError(e.message || 'Ошибка создания платежа');
+    } finally { setPaying(false); }
+  };
+
+  // Оплата СБП: опрашиваем статус платежа, пока заказ не станет оплаченным
+  useEffect(() => {
+    if (!payQr || !payOrderId) return;
+    const t = setInterval(async () => {
+      try {
+        const st: any = await api.tochkaAcquiring.paymentStatus(payOrderId);
+        if (st.status === 'paid') {
+          clearInterval(t);
+          setSaleOk('Заказ оплачен через СБП');
+          setPaySale(null); setPayQr(null); setPayOrderId('');
+        }
+      } catch { /* повторим на следующем тике */ }
+    }, 5000);
+    return () => clearInterval(t);
+  }, [payQr, payOrderId]);
 
   const reserveTotal = reserveList.reduce((s, i) => s + effPrice(i) * i.quantity, 0);
 
@@ -646,7 +705,12 @@ export function Vitrine({ search = '' }: { search?: string }) {
 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Способ оплаты</span>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {([['cash', 'Наличными'], ['card', 'Банковской картой'], ['invoice', 'Счёт на организацию']] as const).map(([val, lbl]) => (
+                  {([
+                    ['cash', 'Наличными'],
+                    ['card', 'Банковской картой'],
+                    ['invoice', 'Счёт на организацию'],
+                    ...(tochkaActive ? [['tochka', 'Онлайн (карта/СБП)'] as const] : []),
+                  ] as const).map(([val, lbl]) => (
                     <button key={val} type="button" onClick={() => setPaymentMethod(val)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: paymentMethod === val ? '#1a1a1a' : 'var(--bg-card)', color: paymentMethod === val ? '#fff' : 'var(--text-primary)', fontSize: 12, fontWeight: paymentMethod === val ? 600 : 400, cursor: 'pointer' }}>
                       {lbl}
                     </button>
@@ -657,6 +721,39 @@ export function Vitrine({ search = '' }: { search?: string }) {
               <input value={saleComment} onChange={e => setSaleComment(e.target.value)} placeholder="Комментарий" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }} />
               {saleError && <div style={{ color: '#ef4444', fontSize: 13 }}>{saleError}</div>}
               {saleOk && <div style={{ color: '#16a34a', fontSize: 13 }}>{saleOk}</div>}
+              {tochkaActive && paymentMethod === 'tochka' && !paySale && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  После создания заказа выберите оплату картой (переход на страницу банка) или по QR-коду СБП
+                </div>
+              )}
+              {paySale && (
+                <div style={{ border: '1px solid var(--border-color)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Оплата заказа №{paySale.number} — {fmtMoney(paySale.total)} ₽
+                  </div>
+                  {!payQr ? (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" onClick={payByCard} disabled={paying}
+                        style={{ flex: 1, padding: '10px 8px', borderRadius: 10, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                        💳 Оплатить картой
+                      </button>
+                      <button type="button" onClick={payBySbp} disabled={paying}
+                        style={{ flex: 1, padding: '10px 8px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                        СБП по QR-коду
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center' }}>
+                      <img src={`data:image/png;base64,${payQr}`} alt="QR СБП" style={{ width: 180, height: 180, borderRadius: 12, border: '1px solid var(--border-color)' }} />
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Отсканируйте код в приложении банка. Оплата подтвердится автоматически.</div>
+                    </div>
+                  )}
+                  {payError && <div style={{ fontSize: 12, color: '#dc2626' }}>{payError}</div>}
+                  <button type="button" onClick={() => { setPaySale(null); setPayQr(null); }} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>
+                    Закрыть (оплатить позже из списка продаж)
+                  </button>
+                </div>
+              )}
               <button disabled={savingSale || !cart.length} onClick={checkout} style={{ padding: '10px 16px', borderRadius: 12, border: 'none', background: savingSale || !cart.length ? 'var(--bg-hover)' : '#1a1a1a', color: savingSale || !cart.length ? 'var(--text-muted)' : '#fff', fontSize: 14, fontWeight: 600, cursor: savingSale || !cart.length ? 'not-allowed' : 'pointer' }}>
                 {savingSale ? 'Оформление...' : 'Оформить заказ'}
               </button>
@@ -748,7 +845,12 @@ export function Vitrine({ search = '' }: { search?: string }) {
 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Способ оплаты</span>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {([['cash', 'Наличными'], ['card', 'Банковской картой'], ['invoice', 'Счёт на организацию']] as const).map(([val, lbl]) => (
+                  {([
+                    ['cash', 'Наличными'],
+                    ['card', 'Банковской картой'],
+                    ['invoice', 'Счёт на организацию'],
+                    ...(tochkaActive ? [['tochka', 'Онлайн (карта/СБП)'] as const] : []),
+                  ] as const).map(([val, lbl]) => (
                     <button key={val} type="button" onClick={() => setPaymentMethod(val)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: paymentMethod === val ? '#1a1a1a' : 'var(--bg-card)', color: paymentMethod === val ? '#fff' : 'var(--text-primary)', fontSize: 12, fontWeight: paymentMethod === val ? 600 : 400, cursor: 'pointer' }}>
                       {lbl}
                     </button>
