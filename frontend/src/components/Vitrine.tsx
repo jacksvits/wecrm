@@ -858,7 +858,6 @@ export function Vitrine({ search = '' }: { search?: string }) {
                     </button>
                   ))}
                 </div>
-                {paymentMethod === 'invoice' && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Цены пересчитаны по тарифу «Использовать для безнала».</span>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Комментарий</span>
