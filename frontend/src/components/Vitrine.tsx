@@ -708,10 +708,11 @@ export function Vitrine({ search = '' }: { search?: string }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
                 <span>Итого</span><span>{fmtMoney(cartTotal)} ₽</span>
               </div>
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Заказчик</span>
                 <input value={user?.name || ''} readOnly title="Заказ оформляется на вас — ваше ФИО будет указано как контрагент" style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
               </div>
-<div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Способ оплаты</span>
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
                   <button type="button" className="btn-action" style={{ justifyContent: 'center', borderRadius: 12, padding: '10px 24px', fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -722,16 +723,13 @@ export function Vitrine({ search = '' }: { search?: string }) {
                     Оплатить сейчас
                   </button>
                 </div>
-                {paymentMethod === 'invoice' && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Цены пересчитаны по тарифу «Использовать для безнала».</span>}
               </div>
-              <input value={saleComment} onChange={e => setSaleComment(e.target.value)} placeholder="Комментарий" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Комментарий</span>
+                <input value={saleComment} onChange={e => setSaleComment(e.target.value)} placeholder="Комментарий" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
+              </div>
               {saleError && <div style={{ color: '#ef4444', fontSize: 13 }}>{saleError}</div>}
               {saleOk && <div style={{ color: '#16a34a', fontSize: 13 }}>{saleOk}</div>}
-              {tochkaActive && paymentMethod === 'tochka' && !paySale && (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  После создания заказа выберите оплату картой (переход на страницу банка) или по QR-коду СБП
-                </div>
-              )}
               {paySale && (
                 <div style={{ border: '1px solid var(--border-color)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -842,24 +840,30 @@ export function Vitrine({ search = '' }: { search?: string }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
                 <span>Итого</span><span>{fmtMoney(reserveTotal)} ₽</span>
               </div>
-<div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Заказчик</span>
+                <input value={user?.name || ''} readOnly title="Заказ оформляется на вас — ваше ФИО будет указано как контрагент" style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Способ оплаты</span>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
                   {([
                     ['postpone', 'Отложить'],
                     ['invoice', 'Запросить счёт'],
                   ] as const).map(([val, lbl]) => (
-                    <button key={val} type="button" onClick={() => setPaymentMethod(val)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: paymentMethod === val ? '#1a1a1a' : 'var(--bg-card)', color: paymentMethod === val ? '#fff' : 'var(--text-primary)', fontSize: 12, fontWeight: paymentMethod === val ? 600 : 400, cursor: 'pointer' }}>
+                    <button key={val} type="button" onClick={() => setPaymentMethod(val)}
+                      className={paymentMethod === val ? 'btn-action' : undefined}
+                      style={{ flex: 1, justifyContent: 'center', borderRadius: 12, padding: '10px 12px', fontWeight: paymentMethod === val ? 600 : 400, whiteSpace: 'nowrap', border: paymentMethod === val ? 'none' : '1px solid var(--border-color)', background: paymentMethod === val ? undefined : 'var(--bg-card)', color: paymentMethod === val ? '#fff' : 'var(--text-primary)', cursor: 'pointer' }}>
                       {lbl}
                     </button>
                   ))}
                 </div>
                 {paymentMethod === 'invoice' && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Цены пересчитаны по тарифу «Использовать для безнала».</span>}
               </div>
-              <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Заказчик</label>
-              <input value={user?.name || ''} readOnly title="Заказ оформляется на вас — ваше ФИО будет указано как контрагент" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontSize: 14 }} />
-              <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Комментарий</label>
-              <input value={reserveComment} onChange={e => setReserveComment(e.target.value)} placeholder="Комментарий к резерву" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Комментарий</span>
+                <input value={reserveComment} onChange={e => setReserveComment(e.target.value)} placeholder="Комментарий" style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
+              </div>
               {saveError && <div style={{ color: '#ef4444', fontSize: 13 }}>{saveError}</div>}
               {saveOk && <div style={{ color: '#16a34a', fontSize: 13 }}>{saveOk}</div>}
               <button type="button" className="btn-action-cart" disabled={saving || !reserveList.length} onClick={saveReserve}
