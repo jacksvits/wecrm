@@ -353,12 +353,11 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const reserveTotal = reserveList.reduce((s, i) => s + effPrice(i) * i.quantity, 0);
 
   const saveReserve = async () => {
-    if (!isUserRole && !contactId) { setSaveError('Выберите заказчика'); return; }
     if (!reserveList.length) { setSaveError('Нет позиций'); return; }
     setSaving(true); setSaveError('');
     try {
       const r: any = await api.reservations.create({
-        ...(isUserRole ? {} : { contactId }),
+        // контрагент не передаём — backend подставит личный контакт автора (ФИО пользователя)
         paymentMethod,
         comment: reserveComment,
         items: reserveList.map((i) => ({ productId: i.productId, quantity: i.quantity, price: effPrice(i) })),
