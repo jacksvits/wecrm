@@ -37,7 +37,7 @@ async function getMerchantId(customerCode: string): Promise<string | null> {
   if (merchantIdCache) return merchantIdCache;
   const { response } = await withAuthRetry((h) => tochkaRequest(`/acquiring/v1.0/retailers?customerCode=${customerCode}`, { headers: h }));
   if (response.status !== 200) return null;
-  const list = response.body?.Data?.Operation || response.body?.Data?.Retailers || [];
+  const list = response.body?.Data?.Retailer || response.body?.Data?.Operation || [];
   const host = PUBLIC_BASE_URL.replace(/^https?:\/\//, '');
   const pick =
     list.find((r: any) => Array.isArray(r.paymentModes) && r.paymentModes.includes('card') && String(r.url || '').includes(host)) ||
