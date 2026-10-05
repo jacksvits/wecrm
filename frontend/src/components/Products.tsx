@@ -1606,7 +1606,7 @@ function ReservesTab() {
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {/* Счёт — только при безналичном способе оплаты (invoice) */}
                     {r.paymentMethod === 'invoice' && <button style={btnGhost} onClick={() => api.reservations.downloadPdf(r.id, r.number)}>Счёт</button>}
-                    <button style={btnGhost} onClick={() => openShare(r.id)}>В задачу</button>
+                    {isPrivileged && <button style={btnGhost} onClick={() => openShare(r.id)}>В задачу</button>}
                   </div>
                 </td>
               </tr>
