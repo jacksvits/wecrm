@@ -179,7 +179,8 @@ router.post('/pay', authMiddleware, async (req: AuthRequest, res) => {
     if (!merchantId) return res.status(400).json({ error: 'Не удалось получить merchantId (нет торговых точек в Точке)' });
 
     // Один платёж на заказ: повторное нажатие возвращает существующую ссылку (свежую)
-    const orderId = `wecrm-sale-${sale.number}`;
+    // Номер заказа для банка: WE- + номер продажи с ведущими нулями (9 цифр), виден клиенту на странице оплаты
+    const orderId = `WE-${String(sale.number).padStart(9, '0')}`;
     const existing = await prisma.tochkaAcquiringPayment.findUnique({ where: { orderId } });
     if (existing?.status === 'paid') return res.status(400).json({ error: 'Заказ уже оплачен' });
     if (existing?.paymentUrl && existing.createdAt.getTime() > Date.now() - 24 * 3600 * 1000) {

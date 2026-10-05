@@ -326,7 +326,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
     if (!paySale) return;
     const t = setInterval(async () => {
       try {
-        const st: any = await api.tochkaAcquiring.paymentStatus(`wecrm-sale-${paySale.number}`);
+        const st: any = await api.tochkaAcquiring.paymentStatus(`WE-${String(paySale.number).padStart(9, '0')}`);
         if (st.status === 'paid') {
           clearInterval(t);
           setSaleOk(`Заказ №${paySale.number} оплачен`);
