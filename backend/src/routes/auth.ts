@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { ensureGuestUser, resetGuestDemoData, generateGuestDemoData, GUEST_EMAIL } from '../lib/guest-demo.js';
+import { ensureGuestUser } from '../lib/guest-demo.js';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
@@ -124,13 +124,10 @@ router.post('/login', async (req, res) => {
 
 
 // Гостевой доступ: вход без регистрации с правами обычного пользователя (роль user).
-// Каждая гостевая сессия начинается с чистых демо-данных: данные предыдущей
-// сессии удаляются и генерируются заново (см. src/lib/guest-demo.ts).
+// Демо-данные не создаются — гость работает с реальными данными в рамках своих прав.
 router.post('/guest', async (req, res) => {
   try {
     const guest = await ensureGuestUser();
-    await resetGuestDemoData(guest.id);
-    await generateGuestDemoData(guest.id);
 
     const user = await prisma.user.findUnique({
       where: { id: guest.id },
