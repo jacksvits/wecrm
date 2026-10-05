@@ -730,33 +730,32 @@ export function Vitrine({ search = '' }: { search?: string }) {
               </div>
               {saleError && <div style={{ color: '#ef4444', fontSize: 13 }}>{saleError}</div>}
               {saleOk && <div style={{ color: '#16a34a', fontSize: 13 }}>{saleOk}</div>}
-              {paySale && (
-                <div style={{ border: '1px solid var(--border-color)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {paySale ? (
+                // Заказ создан — вместо «Оформить заказ» показываем оплату
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <button type="button" onClick={payOnline} disabled={paying} className="btn-action-cart"
-                    style={{ width: '100%', justifyContent: 'center', padding: '10px 8px', fontWeight: 600, cursor: paying ? 'default' : 'pointer', opacity: paying ? 0.7 : 1 }}>
+                    style={{ width: '100%', justifyContent: 'center', padding: '10px 16px', fontWeight: 600, cursor: paying ? 'default' : 'pointer', opacity: paying ? 0.7 : 1 }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <rect x="2" y="5" width="20" height="14" rx="2"/>
                       <path d="M2 10h20"/>
                     </svg>
                     {paying ? 'Создание платежа...' : 'Перейти к оплате'}
                   </button>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    Оплата на защищённой странице банка Точка. После оплаты вы вернётесь в витрину, статус заказа обновится автоматически.
-                  </div>
                   {payError && <div style={{ fontSize: 12, color: '#dc2626' }}>{payError}</div>}
-                  <button type="button" onClick={() => { setPaySale(null); }} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>
+                  <button type="button" onClick={() => { setPaySale(null); }} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer', alignSelf: 'center' }}>
                     Закрыть (оплатить позже из списка продаж)
                   </button>
                 </div>
+              ) : (
+                <button disabled={savingSale || !cart.length} onClick={checkout} className="btn-action-cart" style={{ width: '100%', justifyContent: 'center', padding: '10px 16px', fontWeight: 600, opacity: savingSale || !cart.length ? 0.6 : 1, cursor: savingSale || !cart.length ? 'not-allowed' : 'pointer' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="9" cy="21" r="1"/>
+                    <circle cx="20" cy="21" r="1"/>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                  </svg>
+                  {savingSale ? 'Оформление...' : 'Оформить заказ'}
+                </button>
               )}
-              <button disabled={savingSale || !cart.length} onClick={checkout} className="btn-action-cart" style={{ width: '100%', justifyContent: 'center', padding: '10px 16px', fontWeight: 600, opacity: savingSale || !cart.length ? 0.6 : 1, cursor: savingSale || !cart.length ? 'not-allowed' : 'pointer' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="9" cy="21" r="1"/>
-                  <circle cx="20" cy="21" r="1"/>
-                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                </svg>
-                {savingSale ? 'Оформление...' : 'Оформить заказ'}
-              </button>
             </div>
           </div>
         </div>
