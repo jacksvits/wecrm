@@ -71,6 +71,8 @@ export function Products() {
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [q, setQ] = useState('');
   const [whFilter, setWhFilter] = useState('all');
+  // Сортировка таблицы «Склад»: текст — А→Я/Я→А, числа — по убыванию/возрастанию
+  const [stockSort, setStockSort] = useState<{ key: 'name' | 'warehouse' | 'quantity' | 'reserved' | 'available'; dir: 'asc' | 'desc' } | null>(null);
   // фильтр склада для виджета «История движений» на вкладке «Статистика»
   const [statsWhFilter, setStatsWhFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -471,6 +473,42 @@ export function Products() {
   // товары (не услуги) для складского учёта
   const stockProducts = useMemo(() => visible.filter(p => p.kind !== 'service'), [visible]);
 
+  // Кликабельный заголовок таблицы «Склад»: первый клик — А→Я (текст) или по убыванию (числа),
+  // повторный — в обратную сторону; клик по другой колонке начинает с её направления по умолчанию
+  const stockTh = (label: string, key: 'name' | 'warehouse' | 'quantity' | 'reserved' | 'available', numeric = false) => (
+    <th
+      style={{ ...thStyle, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+      title="Нажмите для сортировки"
+      onClick={() => setStockSort(prev => (prev && prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: numeric ? 'desc' : 'asc' }))}
+    >
+      {label}
+      {stockSort?.key === key && <span style={{ marginLeft: 4, fontSize: 10 }}>{stockSort.dir === 'asc' ? '▲' : '▼'}</span>}
+    </th>
+  );
+
+  // Строки таблицы «Склад» в плоском виде — сортировка применяется к ним после фильтров
+  const stockRows = stockProducts.flatMap(p => {
+    const list = (p.stocks || []).filter(s => whFilter === 'all' || s.warehouseId === whFilter);
+    // товары без остатков тоже показываем с нулями — иначе часть каталога невидима в складской вкладке
+    if (!list.length) {
+      return [{ key: `${p.id}-empty`, p, wh: whFilter === 'all' ? null : warehouses.find(w => w.id === whFilter), qty: 0, res: 0, empty: true }];
+    }
+    return list.map(s => ({ key: s.id, p, wh: warehouses.find(w => w.id === s.warehouseId), qty: s.quantity, res: s.reserved, empty: false }));
+  });
+  if (stockSort) {
+    const { key, dir } = stockSort;
+    const mul = dir === 'asc' ? 1 : -1;
+    stockRows.sort((a, b) => {
+      let r = 0;
+      if (key === 'name') r = (a.p.name || '').localeCompare(b.p.name || '', 'ru');
+      else if (key === 'warehouse') r = (a.wh?.name || '').localeCompare(b.wh?.name || '', 'ru');
+      else if (key === 'quantity') r = a.qty - b.qty;
+      else if (key === 'reserved') r = a.res - b.res;
+      else r = (a.qty - a.res) - (b.qty - b.res);
+      return r * mul;
+    });
+  }
+
   if (loading) return <div style={{ padding: 24 }}>Загрузка...</div>;
 
   return (
@@ -719,80 +757,44 @@ export function Products() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Товар</th>
-                  <th style={thStyle}>Склад</th>
-                  <th style={thStyle}>Остаток</th>
-                  <th style={thStyle}>Резерв</th>
-                  <th style={thStyle}>Доступно</th>
+                  {stockTh('Товар', 'name')}
+                  {stockTh('Склад', 'warehouse')}
+                  {stockTh('Остаток', 'quantity', true)}
+                  {stockTh('Резерв', 'reserved', true)}
+                  {stockTh('Доступно', 'available', true)}
                   <th style={thStyle}>Действия</th>
                 </tr>
               </thead>
               <tbody>
-                {stockProducts.flatMap(p => {
-                  const rows = (p.stocks || [])
-                    .filter(s => whFilter === 'all' || s.warehouseId === whFilter)
-                    .map(s => {
-                      const wh = warehouses.find(w => w.id === s.warehouseId);
-                      return (
-                        <tr key={s.id}>
-                          <td style={tdStyle}>
-                            <div style={{ fontWeight: 500 }}>{p.name}</div>
-                            {p.sku && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.sku}</div>}
-                          </td>
-                          <td style={tdStyle}>{wh?.name || '—'}</td>
-                          <td style={tdStyle}>{fmtMoney(s.quantity)} {p.unit}</td>
-                          <td style={tdStyle}>{fmtMoney(s.reserved)} {p.unit}</td>
-                          <td style={{ ...tdStyle, fontWeight: 600 }}>{fmtMoney(s.quantity - s.reserved)} {p.unit}</td>
-                          <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
-                            <button
-                              style={{ ...btnGhost, marginRight: 8, color: '#059669' }}
-                              onClick={() => setMovementModal({ product: p, type: 'income' })}
-                            >
-                              Приход
-                            </button>
-                            <button
-                              style={{ ...btnGhost, color: '#dc2626' }}
-                              onClick={() => setMovementModal({ product: p, type: 'outcome' })}
-                            >
-                              Расход
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    });
-                  // товары без остатков тоже показываем с нулями — иначе часть каталога невидима в складской вкладке
-                  if (rows.length === 0) {
-                    rows.push(
-                      <tr key={`${p.id}-empty`}>
-                        <td style={tdStyle}>
-                          <div style={{ fontWeight: 500 }}>{p.name}</div>
-                          {p.sku && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.sku}</div>}
-                        </td>
-                        <td style={tdStyle}>{whFilter === 'all' ? '—' : (warehouses.find(w => w.id === whFilter)?.name || '—')}</td>
-                        <td style={tdStyle}>0 {p.unit}</td>
-                        <td style={tdStyle}>0 {p.unit}</td>
-                        <td style={{ ...tdStyle, fontWeight: 600 }}>0 {p.unit}</td>
-                        <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
-                          <button
-                            style={{ ...btnGhost, marginRight: 8, color: '#059669' }}
-                            onClick={() => setMovementModal({ product: p, type: 'income' })}
-                          >
-                            Приход
-                          </button>
-                          <button
-                            style={{ ...btnGhost, color: '#dc2626', opacity: 0.5, cursor: 'not-allowed' }}
-                            disabled
-                            title="Нет остатка для списания"
-                          >
-                            Расход
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  }
-                  return rows;
-                })}
-                {stockProducts.every(p => !(p.stocks || []).some(s => whFilter === 'all' || s.warehouseId === whFilter)) && (
+                {stockRows.map(r => (
+                  <tr key={r.key}>
+                    <td style={tdStyle}>
+                      <div style={{ fontWeight: 500 }}>{r.p.name}</div>
+                      {r.p.sku && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.p.sku}</div>}
+                    </td>
+                    <td style={tdStyle}>{r.wh?.name || '—'}</td>
+                    <td style={tdStyle}>{fmtMoney(r.qty)} {r.p.unit}</td>
+                    <td style={tdStyle}>{fmtMoney(r.res)} {r.p.unit}</td>
+                    <td style={{ ...tdStyle, fontWeight: 600 }}>{fmtMoney(r.qty - r.res)} {r.p.unit}</td>
+                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                      <button
+                        style={{ ...btnGhost, marginRight: 8, color: '#059669' }}
+                        onClick={() => setMovementModal({ product: r.p, type: 'income' })}
+                      >
+                        Приход
+                      </button>
+                      <button
+                        style={{ ...btnGhost, color: '#dc2626', ...(r.empty ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                        disabled={r.empty}
+                        {...(r.empty ? { title: 'Нет остатка для списания' } : {})}
+                        onClick={() => setMovementModal({ product: r.p, type: 'outcome' })}
+                      >
+                        Расход
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {stockRows.length === 0 && (
                   <tr>
                     <td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
                       Остатков нет — добавьте приход
