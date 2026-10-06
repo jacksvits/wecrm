@@ -1,28 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { sha256 } from "js-sha256"
 import { useAuth } from '../hooks/useAuth'
 import { useBrandLogo } from '../lib/branding';
 import { LoginSlide } from '../types'
 
 const API_URL = ''
-
-function generateCodeVerifier(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
-  let result = ''
-  for (let i = 0; i < 128; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return result
-}
-
-function generateCodeChallenge(verifier: string): string {
-  const hash = sha256(verifier)
-  const bytes = new Uint8Array(hash.match(/.{2}/g)!.map(byte => parseInt(byte, 16)))
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
-}
 
 const vkIcon = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.118-5.335-3.202C4.624 10.857 4 8.57 4 8.098c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.863 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.814-.542 1.254-1.406 2.151-3.574 2.151-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.203 1.253.745.847 1.32 1.558 1.473 2.05.17.49-.085.744-.576.744z"/></svg>
@@ -203,45 +184,18 @@ export function Login() {
       .catch(() => {})
   }, [])
 
+  // Серверный VK ID OAuth: бэкенд сам обменял код на JWT и вернул его в fragment
+  // (/#vk_token=...). Fragment не уходит на сервер и не попадает в логи — забираем здесь.
+  // PKCE verifier хранился на сервере, поэтому вход не зависит от localStorage устройства.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const code = params.get('code')
-    const device_id = params.get('device_id')
-    const state = params.get('state')
-    if (code && device_id && state) {
-      const codeVerifier = localStorage.getItem('vk_code_verifier')
-      if (!codeVerifier) {
-        setError('PKCE code verifier not found. Please try again.')
-        window.history.replaceState({}, document.title, window.location.pathname)
-        return
-      }
-      setVkLoading(true)
-      setError('')
-      fetch(`${API_URL}/api/vk/id-auth`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, device_id, state, code_verifier: codeVerifier }),
-      })
-        .then(r => r.json())
-        .then(result => {
-          if (result.error) {
-            setError(result.error)
-            setVkLoading(false)
-            return
-          }
-          localStorage.setItem('token', result.token)
-          localStorage.removeItem('vk_code_verifier')
-          localStorage.removeItem('vk_state')
-          localStorage.removeItem('vk_device_id')
-          // Показать запрос на звук после VK авторизации
-          setShowSoundPrompt(true)
-          setPendingRedirect(true)
-        })
-        .catch(err => {
-          setError(err.message || 'VK auth error')
-          setVkLoading(false)
-        })
-    }
+    if (!window.location.hash.startsWith('#vk_token=')) return
+    const token = window.location.hash.slice('#vk_token='.length)
+    if (!token) return
+    localStorage.setItem('token', token)
+    window.history.replaceState({}, document.title, window.location.pathname)
+    // Показать запрос на звук после VK авторизации
+    setShowSoundPrompt(true)
+    setPendingRedirect(true)
   }, [])
 
   useEffect(() => {
@@ -254,6 +208,7 @@ export function Login() {
         no_token: 'VK ID did not return token',
         user_info_error: 'Failed to get user info from VK',
         server_error: 'Server error during VK auth',
+        invalid_state: 'Сессия входа устарела. Попробуйте ещё раз.',
         pkce_required: 'PKCE required. Use frontend redirect.',
       }
       setError(messages[vkError] || `VK error: ${vkError}`)
@@ -330,24 +285,22 @@ export function Login() {
     }
     setVkLoading(true)
     setError('')
-    const state = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)
-    const deviceId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)
-    const codeVerifier = generateCodeVerifier()
-    const codeChallenge = await generateCodeChallenge(codeVerifier)
-    localStorage.setItem('vk_state', state)
-    localStorage.setItem('vk_device_id', deviceId)
-    localStorage.setItem('vk_code_verifier', codeVerifier)
-    const params = new URLSearchParams({
-      client_id: vkConfig.appId.toString(),
-      redirect_uri: vkConfig.redirectUri,
-      response_type: 'code',
-      state,
-      device_id: deviceId,
-      scope: 'email',
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
-    })
-    window.location.href = `https://id.vk.ru/authorize?${params.toString()}`
+    try {
+      // Серверный PKCE: code_verifier генерируется и хранится на бэкенде
+      // (сессия привязана к state, TTL 10 минут) — localStorage не используем,
+      // т.к. iOS Safari/PWA теряли verifier после редиректа на id.vk.ru.
+      const res = await fetch(`${API_URL}/api/vk/login-url`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.url) {
+        setError(data.error || 'VK ID not configured')
+        setVkLoading(false)
+        return
+      }
+      window.location.href = data.url
+    } catch (err: any) {
+      setError(err.message || 'VK auth error')
+      setVkLoading(false)
+    }
   }
 
   return (
