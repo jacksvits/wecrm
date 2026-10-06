@@ -169,7 +169,13 @@ router.post('/:id/issue', async (req: any, res) => {
     const result = await prisma.$transaction(async (tx) => {
       const r = await tx.reservation.findUnique({ where: { id: req.params.id }, include: { items: true } });
       if (!r) throw new Error('Резерв не найден');
-      if (r.status === 'issued') throw new Error('Резерв уже выдан');
+      // Атомарная смена статуса до списания: условный UPDATE применится один раз,
+      // параллельный повторный запрос получит count=0 и откатится — остатки не спишутся дважды
+      const flip = await tx.reservation.updateMany({
+        where: { id: r.id, status: 'held' },
+        data: { status: 'issued', issuedAt: new Date() },
+      });
+      if (flip.count === 0) throw new Error('Резерв уже выдан или отменён — обновите страницу');
       for (const it of r.items) {
         const stock = await tx.stockBalance.findFirst({
           where: { productId: it.productId, warehouseId: r.warehouseId },
@@ -194,10 +200,9 @@ router.post('/:id/issue', async (req: any, res) => {
           },
         });
       }
-      return tx.reservation.update({
+      return tx.reservation.findUnique({
         where: { id: r.id },
-        data: { status: 'issued', issuedAt: new Date() },
-        include: { items: { include: { product: true } }, contact: true },
+        include: { items: { include: { product: true } }, contact: true, user: true },
       });
     });
     res.json(result);
@@ -270,13 +275,17 @@ router.patch('/:id', async (req: any, res) => {
           throw new Error('Недопустимый статус резерва');
         }
         if (status === 'paid' && r.status === 'issued') throw new Error('Выданный резерв нельзя отметить оплаченным');
+        // Атомарная смена статуса до любых движений остатков: условный UPDATE применится
+        // только один раз — параллельный запрос получит count=0 и откатится (защита от двойного клика)
+        const flipStatus = async (from: string, data: Record<string, unknown>) => {
+          const { count } = await tx.reservation.updateMany({ where: { id: r.id, status: from }, data });
+          if (count === 0) throw new Error('Статус уже изменён другим запросом — обновите страницу');
+        };
+        const withItems = { items: { include: { product: true } }, contact: true, user: true };
         // Оплачен / Завершён — без движения остатков, только смена статуса
         if (status === 'paid' || status === 'completed') {
-          return tx.reservation.update({
-            where: { id: r.id },
-            data: { status },
-            include: { items: { include: { product: true } }, contact: true, user: true },
-          });
+          await flipStatus(r.status, { status });
+          return tx.reservation.findUnique({ where: { id: r.id }, include: withItems });
         }
         if (status === 'issued') {
           if (r.status !== 'held') throw new Error('Выдать можно только отложенный резерв');
@@ -287,6 +296,7 @@ router.patch('/:id', async (req: any, res) => {
               throw new Error(`Недостаточно остатка для выдачи: ${p?.name}`);
             }
           }
+          await flipStatus('held', { status: 'issued', issuedAt: new Date() });
           for (const it of r.items) {
             await tx.stockBalance.updateMany({
               where: { productId: it.productId, warehouseId: r.warehouseId },
@@ -296,25 +306,18 @@ router.patch('/:id', async (req: any, res) => {
               data: { type: 'outcome', productId: it.productId, warehouseId: r.warehouseId, quantity: it.quantity, price: it.price, comment: `Резерв №${r.number}`, userId: req.user?.id },
             });
           }
-          return tx.reservation.update({
-            where: { id: r.id },
-            data: { status: 'issued', issuedAt: new Date() },
-            include: { items: { include: { product: true } }, contact: true },
-          });
+          return tx.reservation.findUnique({ where: { id: r.id }, include: withItems });
         }
         if (status === 'canceled') {
           if (r.status !== 'held') throw new Error('Отменить можно только отложенный резерв');
+          await flipStatus('held', { status: 'canceled' });
           for (const it of r.items) {
             await tx.stockBalance.updateMany({
               where: { productId: it.productId, warehouseId: r.warehouseId },
               data: { reserved: { decrement: it.quantity } },
             });
           }
-          return tx.reservation.update({
-            where: { id: r.id },
-            data: { status: 'canceled' },
-            include: { items: { include: { product: true } }, contact: true },
-          });
+          return tx.reservation.findUnique({ where: { id: r.id }, include: withItems });
         }
         if (status === 'held') {
           if (r.status !== 'canceled') throw new Error('Вернуть в резерв можно только отменённый резерв');
@@ -326,17 +329,14 @@ router.patch('/:id', async (req: any, res) => {
               throw new Error(`Недостаточно остатка: ${p?.name} (свободно ${free} ${p?.unit || ''})`);
             }
           }
+          await flipStatus('canceled', { status: 'held', issuedAt: null });
           for (const it of r.items) {
             await tx.stockBalance.updateMany({
               where: { productId: it.productId, warehouseId: r.warehouseId },
               data: { reserved: { increment: it.quantity } },
             });
           }
-          return tx.reservation.update({
-            where: { id: r.id },
-            data: { status: 'held', issuedAt: null },
-            include: { items: { include: { product: true } }, contact: true },
-          });
+          return tx.reservation.findUnique({ where: { id: r.id }, include: withItems });
         }
         throw new Error('Неизвестный статус');
       }
