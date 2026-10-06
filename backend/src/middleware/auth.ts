@@ -60,7 +60,8 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       canAccessChat: user.role?.canAccessChat ?? true,
       showFinancesTab: user.role?.showFinancesTab ?? false,
       isGuest,
-      stockAccess: isGuest ? false : (user.role?.stockAccess ?? true),
+      // Складской учёт: персональный флаг пользователя ИЛИ флаг его роли
+      stockAccess: isGuest ? false : (user.stockAccess || user.role?.stockAccess || false),
       canCreateNews: isGuest ? false : (user.role?.canCreateNews ?? true),
       canEditNews: isGuest ? false : (user.role?.canEditNews ?? true),
       canHandleSpam: user.role?.canHandleSpam ?? false,

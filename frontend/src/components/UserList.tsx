@@ -26,6 +26,7 @@ export function UserList() {
     password: "",
     roleId: "" as string,
     canBeCurator: false,
+    stockAccess: false,
     defaultTaskAssignee: false,
     defaultTaskCurator: false,
     novofonExtension: "" as string,
@@ -45,7 +46,7 @@ export function UserList() {
   };
   const openCreate = () => {
     setEditingId(null);
-    setForm({ name: "", email: "", password: "", roleId: roles[0]?.id || "", canBeCurator: false, defaultTaskAssignee: false, defaultTaskCurator: false, novofonExtension: "" });
+    setForm({ name: "", email: "", password: "", roleId: roles[0]?.id || "", canBeCurator: false, stockAccess: false, defaultTaskAssignee: false, defaultTaskCurator: false, novofonExtension: "" });
     setError("");
     setShowModal(true);
   };
@@ -57,6 +58,7 @@ export function UserList() {
       password: "",
       roleId: u.roleId || "",
       canBeCurator: u.canBeCurator ?? false,
+      stockAccess: u.stockAccess ?? false,
       defaultTaskAssignee: u.defaultTaskAssignee ?? false,
       defaultTaskCurator: u.defaultTaskCurator ?? false,
       novofonExtension: u.novofonExtension || "",
@@ -69,7 +71,7 @@ export function UserList() {
     setError("");
     try {
       if (editingId) {
-        const data: any = { name: form.name, roleId: form.roleId || null, canBeCurator: form.canBeCurator, defaultTaskAssignee: form.defaultTaskAssignee, defaultTaskCurator: form.defaultTaskCurator, novofonExtension: form.novofonExtension || null };
+        const data: any = { name: form.name, roleId: form.roleId || null, stockAccess: form.stockAccess, canBeCurator: form.canBeCurator, defaultTaskAssignee: form.defaultTaskAssignee, defaultTaskCurator: form.defaultTaskCurator, novofonExtension: form.novofonExtension || null };
         if (form.email !== users.find((u) => u.id === editingId)?.email)
           data.email = form.email;
         await api.users.update(editingId, data);
@@ -322,6 +324,22 @@ export function UserList() {
                       >
                         Куратор
                       </span>
+                    )}{" "}
+                    {u.stockAccess && (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          marginTop: 4,
+                          padding: "2px 8px",
+                          borderRadius: 8,
+                          fontSize: 11,
+                          fontWeight: 500,
+                          background: "#dcfce7",
+                          color: "#166534",
+                        }}
+                      >
+                        Складской учёт
+                      </span>
                     )}
                     {u.lastActiveAt && (
                       <div
@@ -563,6 +581,24 @@ export function UserList() {
                   }
                 />
                 Может быть куратором
+              </label>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={form.stockAccess}
+                  onChange={(e) =>
+                    setForm({ ...form, stockAccess: e.target.checked })
+                  }
+                />
+                Доступ к складскому учёту
               </label>
               <label
                 style={{

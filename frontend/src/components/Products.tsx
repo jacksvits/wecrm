@@ -56,8 +56,8 @@ export function Products() {
   const effectiveTab = tab === 'stockgroup' ? stockTab : tab;
   const { user } = useAuth();
   const isAdmin = (user as any)?.role === 'admin';
-  // Складской учёт доступен только администратору и менеджеру
-  const isPrivileged = ['admin', 'manager'].includes((user as any)?.role);
+  // Складской учёт: администратор, менеджер или пользователь с опцией «Доступ к складскому учёту»
+  const isPrivileged = ['admin', 'manager'].includes((user as any)?.role) || !!(user as any)?.stockAccess;
   // Гостевой доступ: в каталоге доступна только вкладка «Витрина»
   const isGuest = (user as any)?.isGuest === true;
   const visibleTabs = TABS.filter((t) => {
@@ -1580,7 +1580,7 @@ function ReserveDetailModal({ product, warehouseId, onClose }: { product: Produc
 function ReservesTab() {
   const { user } = useAuth();
   // Администратор и менеджер видят все кнопки действий, остальным — только «Счёт» и «Отменить»
-  const isPrivileged = ['admin', 'manager'].includes((user as any)?.role);
+  const isPrivileged = ['admin', 'manager'].includes((user as any)?.role) || !!(user as any)?.stockAccess;
   // Роль «Пользователь»: резерв оформляется на себя — контакт не выбирается
   const isUserRole = (user as any)?.role === 'user';
   const [reserves, setReserves] = useState<any[]>([]);
@@ -1908,7 +1908,7 @@ function ReservesTab() {
 // Продление подписки — кнопка «Продлить», редактирование номера и даты окончания — иконка ✎
 function SubscriptionsTab() {
   const { user } = useAuth();
-  const isPrivileged = ['admin', 'manager'].includes((user as any)?.role);
+  const isPrivileged = ['admin', 'manager'].includes((user as any)?.role) || !!(user as any)?.stockAccess;
   const [subs, setSubs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editSub, setEditSub] = useState<any | null>(null);

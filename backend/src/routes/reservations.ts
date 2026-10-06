@@ -10,7 +10,7 @@ router.use(authMiddleware);
 // Список резервов: на чьё имя, какие товары, на какую сумму
 router.get('/', async (req: any, res) => {
   // Админ и менеджер видят все резервы, остальные — только свои
-  const isPrivileged = ['admin', 'manager'].includes(req.user?.role);
+  const isPrivileged = ['admin', 'manager'].includes(req.user?.role) || !!req.user?.stockAccess;
   const list = await prisma.reservation.findMany({
     where: isPrivileged ? {} : { userId: req.user?.id },
     orderBy: { number: 'desc' },
@@ -24,7 +24,7 @@ router.get('/', async (req: any, res) => {
 router.get('/by-product/:productId', async (req: any, res) => {
   const { productId } = req.params;
   const warehouseId = typeof req.query.warehouseId === 'string' && req.query.warehouseId ? req.query.warehouseId : undefined;
-  const isPrivileged = ['admin', 'manager'].includes(req.user?.role);
+  const isPrivileged = ['admin', 'manager'].includes(req.user?.role) || !!req.user?.stockAccess;
   // Только активные (отложенные) резервы — именно они держат количество в колонке «Резерв»;
   // обычные пользователи видят только свои резервы (как в общем списке)
   const items = await prisma.reservationItem.findMany({
@@ -135,7 +135,8 @@ router.post('/', async (req: any, res) => {
     // Уведомляем пользователей с доступом к складскому учёту о новом резерве (push + in-app)
     try {
       const recipients = await prisma.user.findMany({
-        where: { role: { stockAccess: true } },
+        // Пользователи с доступом к складу: флаг роли или персональный флаг
+        where: { OR: [{ role: { stockAccess: true } }, { stockAccess: true }] },
         select: { id: true },
       });
       const authorName = req.user?.name || 'Пользователь';
@@ -257,12 +258,12 @@ router.patch('/:id', async (req: any, res) => {
       if (!r) throw new Error('Резерв не найден');
       const { contactId, userId, number, comment, items, status } = req.body || {};
       // Смена автора или номера резерва — только администратор и менеджер
-      if ((userId || number !== undefined) && !['admin', 'manager'].includes(req.user?.role)) {
+      if ((userId || number !== undefined) && !['admin', 'manager'].includes(req.user?.role) && !req.user?.stockAccess) {
         throw new Error('Только администратор или менеджер может менять автора или номер резерва');
       }
 
       // Смена статуса: admin/manager — любые переходы; автор резерва — только отмена своего резерва
-      if (status && status !== r.status && !['admin', 'manager'].includes(req.user?.role)) {
+      if (status && status !== r.status && !['admin', 'manager'].includes(req.user?.role) && !req.user?.stockAccess) {
         const isOwnCancel = r.userId === req.user?.id && status === 'canceled';
         if (!isOwnCancel) {
           throw new Error('Только администратор или менеджер может менять статусы резервов');

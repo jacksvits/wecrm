@@ -55,7 +55,7 @@ router.post('/register', async (req, res) => {
 
     const roleName = user.role?.name || 'user';
     const allowedPages = user.role?.allowedPages || [];
-    const stockAccess = user.role?.stockAccess ?? true;
+    const stockAccess = user.stockAccess || user.role?.stockAccess || false;
     const token = jwt.sign(
       { id: user.id, email: user.email, role: roleName, allowedPages, stockAccess },
       JWT_SECRET,
@@ -105,7 +105,7 @@ router.post('/login', async (req, res) => {
 
     const roleName = user.role?.name || 'user';
     const allowedPages = user.role?.allowedPages || [];
-    const stockAccess = user.role?.stockAccess ?? true;
+    const stockAccess = user.stockAccess || user.role?.stockAccess || false;
     const token = jwt.sign(
       { id: user.id, email: user.email, role: roleName, allowedPages, stockAccess },
       JWT_SECRET,
@@ -191,7 +191,7 @@ router.get('/me', async (req, res) => {
       mobileNav: user.mobileNav || [],
       showFinancesTab: user.role?.showFinancesTab ?? false,
       isGuest: user.email === GUEST_EMAIL,
-      stockAccess: user.email === GUEST_EMAIL ? false : (user.role?.stockAccess ?? true),
+      stockAccess: user.email === GUEST_EMAIL ? false : (user.stockAccess || user.role?.stockAccess || false),
       canChangeTaskStatus: user.role?.canChangeTaskStatus ?? true,
       allowedTaskStatuses: user.role?.allowedTaskStatuses ?? [],
       canCreateNews: user.email === GUEST_EMAIL ? false : (user.role?.canCreateNews ?? true),
@@ -238,7 +238,7 @@ const publicUser = (user: any, roleName: string, allowedPages: string[]) => {
     allowedPages,
     mobileNav: user.mobileNav ?? [],
     isGuest,
-    stockAccess: isGuest ? false : (user.role?.stockAccess ?? true),
+    stockAccess: isGuest ? false : (user.stockAccess || user.role?.stockAccess || false),
     canCreateNews: isGuest ? false : (user.role?.canCreateNews ?? true),
     canEditNews: isGuest ? false : (user.role?.canEditNews ?? true),
   };

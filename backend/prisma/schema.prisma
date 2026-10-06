@@ -53,6 +53,9 @@ model User {
   hideCompletedTasks Boolean @default(true)
   darkTheme         Boolean @default(false)
   canBeCurator      Boolean @default(false) @map("can_be_curator")
+  // Персональный доступ к складскому учёту (склады, цены, номенклатура) на уровне менеджера,
+  // независимо от роли. Итоговый доступ = флаг пользователя ИЛИ флаг роли (Role.stockAccess).
+  stockAccess       Boolean @default(false) @map("stock_access")
   defaultTaskAssignee Boolean @default(false) @map("default_task_assignee")
   defaultTaskCurator  Boolean @default(false) @map("default_task_curator")
   lastActiveAt DateTime? @map("last_active_at")

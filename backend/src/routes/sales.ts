@@ -9,7 +9,7 @@ router.use(authMiddleware);
 // Список продаж (реализаций): на чьё имя, какие товары, на какую сумму
 router.get('/', async (req: any, res) => {
   // Админ и менеджер видят все заказы, остальные — только свои
-  const isPrivileged = ['admin', 'manager'].includes(req.user?.role);
+  const isPrivileged = ['admin', 'manager'].includes(req.user?.role) || !!req.user?.stockAccess;
   const list = await prisma.sale.findMany({
     where: isPrivileged ? {} : { userId: req.user?.id },
     orderBy: { number: 'desc' },
@@ -103,8 +103,8 @@ router.patch('/:id', async (req: any, res) => {
   if (!['new', 'paid', 'cancelled', 'refund'].includes(status || '')) {
     return res.status(400).json({ error: 'Недопустимый статус' });
   }
-  // Смена статуса заказа — только администратор и менеджер
-  if (!['admin', 'manager'].includes(req.user?.role)) {
+  // Смена статуса заказа — администратор, менеджер или пользователь с доступом к складу
+  if (!['admin', 'manager'].includes(req.user?.role) && !req.user?.stockAccess) {
     return res.status(403).json({ error: 'Только администратор или менеджер может менять статусы заказов' });
   }
   try {
