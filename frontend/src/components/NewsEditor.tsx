@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
@@ -159,7 +159,13 @@ export function NewsEditor() {
   };
 
   // Панель инструментов полного текста: базовая + кнопка вставки изображения
-  const contentQuillModules = {
+  // Конфиг Quill должен оставаться deep-equal-стабильным между рендерами:
+  // react-quill сравнивает modules через deep-equal и пересоздаёт редактор,
+  // если найдёт отличие. Инлайн-объект с функцией-обработчиком image давал
+  // новую ссылку на каждый рендер -> редактор постоянно регенерировал,
+  // тулбар пропадал и поле «Полный текст» было недоступно для ввода.
+  // useMemo фиксирует ссылку (ref contentImageInputRef стабилен, замыкание безопасно).
+  const contentQuillModules = useMemo(() => ({
     toolbar: {
       container: [
         ['bold', 'italic', 'underline', 'strike'],
@@ -171,7 +177,7 @@ export function NewsEditor() {
         image: () => contentImageInputRef.current?.click(),
       },
     },
-  };
+  }), []);
 
   const handleSave = async (publish: boolean = false) => {
     if (!title.trim()) {
