@@ -1607,6 +1607,9 @@ model ProductSubscription {
   price     Decimal  @default(0)
   period    String   @default("month") // month | quarter | year
   status    String   @default("new") // new | active | paused | cancelled
+  // Дата окончания оплаченного периода: задаётся при активации/продлении,
+  // редактируется вручную на вкладке «Подписки» каталога
+  endsAt    DateTime? @map("ends_at")
   comment   String   @default("")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

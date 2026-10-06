@@ -21,6 +21,7 @@ const TABS = [
   { key: 'vitrine', label: 'Витрина' },
   { key: 'sales', label: 'Заказы' },
   { key: 'reserves', label: 'Резервы' },
+  { key: 'subscriptions', label: 'Подписки' },
   { key: 'stockgroup', label: 'Складской учёт' },
 ];
 
@@ -586,6 +587,9 @@ export function Products() {
       {/* ===== Резервы ===== */}
       {tab === 'reserves' && <ReservesTab />}
       {tab === 'sales' && <SalesTab />}
+
+      {/* ===== Подписки ===== */}
+      {tab === 'subscriptions' && <SubscriptionsTab />}
 
       {/* ===== Номенклатура ===== */}
       {effectiveTab === 'nomenclature' && (
@@ -1794,6 +1798,124 @@ function ReservesTab() {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setShareRes(null)} style={btnGhost}>Отмена</button>
               <button onClick={doShare} disabled={shareBusy || !shareTaskId} style={btnPrimary}>{shareBusy ? 'Отправка...' : 'Отправить'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Подписки: admin/manager видят все подписки всех пользователей, остальные — только свои.
+// Продление подписки — кнопка «Продлить», редактирование номера и даты окончания — иконка ✎
+function SubscriptionsTab() {
+  const { user } = useAuth();
+  const isPrivileged = ['admin', 'manager'].includes((user as any)?.role);
+  const [subs, setSubs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editSub, setEditSub] = useState<any | null>(null);
+  const [editNumber, setEditNumber] = useState('');
+  const [editEndsAt, setEditEndsAt] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+
+  const load = () => api.subscriptions.list().then(setSubs).catch(() => {});
+  useEffect(() => {
+    load().finally(() => setLoading(false));
+  }, []);
+
+  const subNo = (s: any) => `00We-${String(s.number).padStart(6, '0')}`;
+  const SUBST: Record<string, { label: string; color: string; bg: string }> = {
+    new: { label: 'Новая', color: '#1d4ed8', bg: '#dbeafe' },
+    active: { label: 'Активна', color: '#166534', bg: '#dcfce7' },
+    paused: { label: 'Пауза', color: '#92400e', bg: '#fef3c7' },
+    cancelled: { label: 'Отменена', color: '#991b1b', bg: '#fee2e2' },
+  };
+  const PERIOD_LBL: Record<string, string> = { month: 'мес.', quarter: 'квартал', year: 'год' };
+
+  const doRenew = async (s: any) => {
+    try { await api.subscriptions.renew(s.id); load(); }
+    catch (e: any) { alert(e.message || e.error || 'Ошибка'); }
+  };
+
+  const openEdit = (s: any) => {
+    setEditSub(s);
+    setEditNumber(String(s.number || ''));
+    // datetime-local: YYYY-MM-DDTHH:mm в локальном времени
+    const d = s.endsAt ? new Date(s.endsAt) : null;
+    setEditEndsAt(d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : '');
+  };
+
+  const saveEdit = async () => {
+    setEditBusy(true);
+    try {
+      await api.subscriptions.update(editSub.id, {
+        number: Number(editNumber),
+        endsAt: editEndsAt ? new Date(editEndsAt).toISOString() : null,
+      });
+      setEditSub(null);
+      load();
+    } catch (e: any) { alert(e.message || e.error || 'Ошибка'); }
+    setEditBusy(false);
+  };
+
+  if (loading) return <div style={{ padding: 16, color: 'var(--text-muted)' }}>Загрузка...</div>;
+  return (
+    <div>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr>
+          <th style={thStyle}>№</th><th style={thStyle}>Дата оформления</th><th style={thStyle}>Дата окончания</th>
+          <th style={thStyle}>Тариф</th><th style={thStyle}>Сумма</th>
+          <th style={thStyle}>Статус</th><th style={thStyle}>Автор</th><th style={thStyle}>Продление</th>
+        </tr></thead>
+        <tbody>
+          {subs.map((s: any) => {
+            const st = SUBST[s.status] || { label: s.status, color: 'var(--text-secondary)', bg: 'var(--bg-hover)' };
+            return (
+              <tr key={s.id}>
+                <td style={tdStyle}>{subNo(s)}</td>
+                <td style={tdStyle}>{new Date(s.createdAt).toLocaleDateString('ru-RU')}</td>
+                <td style={tdStyle}>{s.status === 'active' && s.activeUntil ? new Date(s.activeUntil).toLocaleDateString('ru-RU') : '—'}</td>
+                <td style={tdStyle}>{s.product?.name || 'Услуга'}{s.period ? ` · ${PERIOD_LBL[s.period] || s.period}` : ''}</td>
+                <td style={tdStyle}>{fmtMoney(Number(s.price || 0))} ₽</td>
+                <td style={tdStyle}>
+                  <span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: st.bg, color: st.color }}>{st.label}</span>
+                </td>
+                <td style={tdStyle}>{s.user?.name || s.contact?.name || '—'}</td>
+                <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {s.status === 'active' && (
+                      <button title="Продлить подписку на один период" onClick={() => doRenew(s)} style={btnGhost}>Продлить</button>
+                    )}
+                    {/* Редактировать — иконка карандаша, как у резервов; только admin/manager */}
+                    {isPrivileged && (
+                      <button title="Изменить подписку" onClick={() => openEdit(s)}
+                        style={{ ...btnGhost, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '6px 8px' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {!subs.length && <div style={{ padding: 16, color: 'var(--text-muted)' }}>Подписок пока нет.</div>}
+
+      {/* Модал редактирования подписки: номер и дата окончания */}
+      {editSub && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 20, width: 420, maxWidth: '100%' }}>
+            <h3 style={{ margin: '0 0 14px' }}>Подписка {subNo(editSub)}</h3>
+            <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Номер</label>
+            <input type="number" min={1} value={editNumber} onChange={e => setEditNumber(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 10 }} />
+            <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Дата окончания</label>
+            <input type="datetime-local" value={editEndsAt} onChange={e => setEditEndsAt(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 14 }} />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setEditSub(null)} style={btnGhost}>Отмена</button>
+              <button onClick={saveEdit} disabled={editBusy || !editNumber} style={btnPrimary}>{editBusy ? 'Сохранение...' : 'Сохранить'}</button>
             </div>
           </div>
         </div>

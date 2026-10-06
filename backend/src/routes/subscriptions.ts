@@ -5,10 +5,24 @@ import { authMiddleware } from '../middleware/auth.js';
 const router = Router();
 router.use(authMiddleware);
 
-// Список подписочных заявок: на какую услугу, от кого, статус
-router.get('/', async (_req, res) => {
+// Дата окончания оплаченного периода: явное поле endsAt,
+// для старых записей без него — дата последнего изменения + длительность периода
+function addPaidPeriod(date: Date, period: string): Date {
+  const d = new Date(date);
+  if (period === 'year') d.setFullYear(d.getFullYear() + 1);
+  else if (period === 'quarter') d.setMonth(d.getMonth() + 3);
+  else d.setMonth(d.getMonth() + 1);
+  return d;
+}
+
+// Список подписок для вкладки «Подписки» каталога.
+// Администратор и менеджер видят все подписки, остальные — только свои.
+// Для активных подписок вычисляется дата окончания оплаченного периода.
+router.get('/', async (req: any, res) => {
   try {
+    const isPrivileged = ['admin', 'manager'].includes(req.user?.role);
     const list = await prisma.productSubscription.findMany({
+      where: isPrivileged ? {} : { userId: req.user?.id || undefined },
       orderBy: { number: 'desc' },
       include: {
         product: { select: { id: true, name: true, unit: true } },
@@ -16,7 +30,11 @@ router.get('/', async (_req, res) => {
         user: { select: { id: true, name: true } },
       },
     });
-    res.json(list);
+    const enriched = list.map((s: any) => ({
+      ...s,
+      activeUntil: s.status === 'active' ? (s.endsAt ?? addPaidPeriod(s.updatedAt, s.period)).toISOString() : null,
+    }));
+    res.json(enriched);
   } catch (err: any) {
     console.error('[subscriptions:list]', err);
     res.status(500).json({ error: err.message });
@@ -94,15 +112,7 @@ router.post('/', async (req: any, res) => {
 
 // Биллинг (страница директора): все подписки всех пользователей.
 // Для активных подписок вычисляется окончание оплаченного периода
-// (дата последней активации + длительность периода: месяц/квартал/год).
-function addPaidPeriod(date: Date, period: string): Date {
-  const d = new Date(date);
-  if (period === 'year') d.setFullYear(d.getFullYear() + 1);
-  else if (period === 'quarter') d.setMonth(d.getMonth() + 3);
-  else d.setMonth(d.getMonth() + 1);
-  return d;
-}
-
+// (явное поле endsAt, для старых записей — дата последнего изменения + период).
 router.get('/billing', async (req: any, res) => {
   try {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Доступ только для директора' });
@@ -116,7 +126,7 @@ router.get('/billing', async (req: any, res) => {
     });
     const enriched = list.map((s: any) => ({
       ...s,
-      activeUntil: s.status === 'active' ? addPaidPeriod(s.updatedAt, s.period).toISOString() : null,
+      activeUntil: s.status === 'active' ? (s.endsAt ?? addPaidPeriod(s.updatedAt, s.period)).toISOString() : null,
     }));
     res.json(enriched);
   } catch (err: any) {
@@ -144,36 +154,89 @@ router.post('/:id/cancel', async (req: any, res) => {
   }
 });
 
-// Смена статуса / комментария заявки (new | active | paused | cancelled)
+// Редактирование заявки: статус/комментарий/цена/период — только директор,
+// номер и дату окончания подписки — директор и менеджер (как у резервов).
 router.patch('/:id', async (req: any, res) => {
-  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Доступ только для директора' });
-  const { status, comment, price, period } = req.body || {};
+  const isPrivileged = ['admin', 'manager'].includes(req.user?.role);
+  if (!isPrivileged) return res.status(403).json({ error: 'Нет доступа к редактированию' });
+  const { status, comment, price, period, number, endsAt } = req.body || {};
   try {
     const existing = await prisma.productSubscription.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Заявка не найдена' });
     const data: any = {};
     if (status !== undefined) {
+      if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Статус меняет только директор' });
       if (!['new', 'active', 'paused', 'cancelled'].includes(status)) {
         return res.status(400).json({ error: 'Неизвестный статус' });
       }
       data.status = status;
+      // При активации без явной даты окончания — конец периода от текущей даты
+      if (status === 'active' && endsAt === undefined && !existing.endsAt) {
+        data.endsAt = addPaidPeriod(new Date(), existing.period);
+      }
     }
     if (comment !== undefined) data.comment = (comment || '').trim();
     if (price !== undefined) {
+      if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Цену меняет только директор' });
       const p = Number(price);
       if (!Number.isFinite(p) || p < 0) return res.status(400).json({ error: 'Некорректная цена' });
       data.price = p;
     }
     if (period !== undefined) {
+      if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Период меняет только директор' });
       if (!['month', 'quarter', 'year'].includes(period)) {
         return res.status(400).json({ error: 'Неизвестный период' });
       }
       data.period = period;
     }
-    const updated = await prisma.productSubscription.update({ where: { id: req.params.id }, data });
+    if (number !== undefined) {
+      const n = Number(number);
+      if (!Number.isInteger(n) || n < 1) return res.status(400).json({ error: 'Некорректный номер' });
+      if (n !== existing.number) {
+        const clash = await prisma.productSubscription.findFirst({ where: { number: n, NOT: { id: existing.id } } });
+        if (clash) return res.status(400).json({ error: `Номер ${n} уже занят` });
+      }
+      data.number = n;
+    }
+    if (endsAt !== undefined) {
+      if (endsAt === null) {
+        data.endsAt = null;
+      } else {
+        const d = new Date(endsAt);
+        if (Number.isNaN(d.getTime())) return res.status(400).json({ error: 'Некорректная дата окончания' });
+        data.endsAt = d;
+      }
+    }
+    const updated = await prisma.productSubscription.update({ where: { id: existing.id }, data });
     res.json(updated);
   } catch (err: any) {
     console.error('[subscriptions:patch]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Продление подписки: к дате окончания (или к текущей дате, если срок прошёл)
+// добавляется один оплаченный период. Администратор и менеджер — любую подписку,
+// обычный пользователь — только свою.
+router.post('/:id/renew', async (req: any, res) => {
+  try {
+    const isPrivileged = ['admin', 'manager'].includes(req.user?.role);
+    const existing = await prisma.productSubscription.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Подписка не найдена' });
+    if (!isPrivileged && existing.userId !== req.user?.id) {
+      return res.status(403).json({ error: 'Нет доступа к этой подписке' });
+    }
+    if (existing.status !== 'active') {
+      return res.status(400).json({ error: 'Продлить можно только активную подписку' });
+    }
+    const base = existing.endsAt && existing.endsAt > new Date() ? existing.endsAt : new Date();
+    const updated = await prisma.productSubscription.update({
+      where: { id: existing.id },
+      data: { endsAt: addPaidPeriod(base, existing.period) },
+    });
+    res.json(updated);
+  } catch (err: any) {
+    console.error('[subscriptions:renew]', err);
     res.status(500).json({ error: err.message });
   }
 });
