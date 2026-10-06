@@ -1832,10 +1832,57 @@ function SubscriptionsTab() {
   };
   const PERIOD_LBL: Record<string, string> = { month: 'мес.', quarter: 'квартал', year: 'год' };
 
-  const doRenew = async (s: any) => {
-    try { await api.subscriptions.renew(s.id); load(); }
-    catch (e: any) { alert(e.message || e.error || 'Ошибка'); }
+  // Окно продления подписки: «корзина» с выбранным тарифом и онлайн-оплатой (Точка)
+  const [renewSub, setRenewSub] = useState<any | null>(null);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState('');
+  const [payOk, setPayOk] = useState('');
+  // Контекст активного платежа (orderId) — восстанавливается из sessionStorage
+  // после возврата со страницы банка, чтобы опрос статуса продолжился
+  const [payCtx, setPayCtx] = useState<{ orderId: string } | null>(() => {
+    try { const o = sessionStorage.getItem('subRenewOrderId'); return o ? { orderId: o } : null; }
+    catch { return null; }
+  });
+
+  // Переход к оплате: создаём платёжную ссылку Точки и уходим на страницу банка
+  const payRenew = async () => {
+    if (!renewSub) return;
+    setPaying(true); setPayError(''); setPayOk('');
+    try {
+      const r: any = await api.tochkaAcquiring.paySubscription(renewSub.id);
+      if (r.paymentUrl) {
+        try { sessionStorage.setItem('subRenewOrderId', r.orderId); } catch { /* приватный режим */ }
+        setPayCtx({ orderId: r.orderId });
+        window.location.href = r.paymentUrl;
+      } else setPayError('Банк не вернул ссылку на оплату');
+    } catch (e: any) {
+      setPayError(e.message || 'Ошибка создания платежа');
+    } finally { setPaying(false); }
   };
+
+  // Опрос статуса платежа, пока он не станет paid/failed
+  useEffect(() => {
+    if (!payCtx) return;
+    const t = setInterval(async () => {
+      try {
+        const st: any = await api.tochkaAcquiring.paymentStatus(payCtx.orderId);
+        if (st.status === 'paid') {
+          clearInterval(t);
+          try { sessionStorage.removeItem('subRenewOrderId'); } catch { /* ignore */ }
+          setPayCtx(null);
+          setPayOk('Оплата получена — подписка продлена');
+          load();
+        } else if (st.status === 'failed') {
+          clearInterval(t);
+          try { sessionStorage.removeItem('subRenewOrderId'); } catch { /* ignore */ }
+          setPayCtx(null);
+          setPayError('Платёж не прошёл — попробуйте ещё раз');
+        }
+      } catch { /* повторим на следующем тике */ }
+    }, 5000);
+    return () => clearInterval(t);
+  }, [payCtx]);
+
   // Смена статуса — только admin/manager
   const setStatusSub = async (s: any, status: string) => {
     try { await api.subscriptions.update(s.id, { status }); load(); }
@@ -1899,7 +1946,7 @@ function SubscriptionsTab() {
                 <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     {(s.status === 'active' || s.status === 'expired') && (
-                      <button title="Продлить подписку на один период" onClick={() => doRenew(s)} style={btnGhost}>Продлить</button>
+                      <button title="Продлить подписку" onClick={() => { setPayError(''); setPayOk(''); setRenewSub(s); }} style={btnGhost}>Продлить</button>
                     )}
                     {/* Редактировать — иконка карандаша, как у резервов; только admin/manager */}
                     {isPrivileged && (
@@ -1932,6 +1979,38 @@ function SubscriptionsTab() {
               <button onClick={() => setEditSub(null)} style={btnGhost}>Отмена</button>
               <button onClick={saveEdit} disabled={editBusy || !editNumber} style={btnPrimary}>{editBusy ? 'Сохранение...' : 'Сохранить'}</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модал продления: «корзина» с выбранным тарифом и онлайн-оплатой */}
+      {renewSub && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 20, width: 440, maxWidth: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ margin: 0 }}>Продление подписки {subNo(renewSub)}</h3>
+              <button onClick={() => setRenewSub(null)} style={{ border: 'none', background: 'transparent', fontSize: 15, cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>✕</button>
+            </div>
+            {/* Позиция «корзины» — выбранный тариф */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '1px solid var(--border-color)', borderRadius: 10 }}>
+              <span style={{ fontSize: 18 }}>🛒</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{renewSub.product?.name || 'Услуга'}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  Тариф: {PERIOD_LBL[renewSub.period] || renewSub.period} · 1 × {fmtMoney(Number(renewSub.price || 0))} ₽
+                  {renewSub.activeUntil ? ` · действует до ${new Date(renewSub.activeUntil).toLocaleDateString('ru-RU')}` : ''}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+              <span>Итого к оплате</span><span>{fmtMoney(Number(renewSub.price || 0))} ₽</span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>После оплаты к сроку окончания добавится {PERIOD_LBL[renewSub.period] || 'период'} тарифа. Выбор карта/СБП — на странице банка.</div>
+            {payError && <div style={{ color: '#dc2626', fontSize: 13 }}>{payError}</div>}
+            {payOk && <div style={{ color: '#16a34a', fontSize: 13 }}>{payOk}</div>}
+            <button onClick={payRenew} disabled={paying} style={{ ...btnPrimary, width: '100%', justifyContent: 'center', padding: '10px 16px', fontWeight: 600, opacity: paying ? 0.7 : 1 }}>
+              {paying ? 'Создание платежа...' : 'Перейти к оплате'}
+            </button>
           </div>
         </div>
       )}

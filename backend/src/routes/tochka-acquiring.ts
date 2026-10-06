@@ -65,24 +65,56 @@ async function getSettings() {
   return prisma.tochkaAcquiringSettings.findUnique({ where: { id: 1 } });
 }
 
+// Дата окончания оплаченного периода + один период (month/quarter/year)
+// — так же, как в routes/subscriptions.ts
+function addPaidPeriod(date: Date, period: string): Date {
+  const d = new Date(date);
+  if (period === 'year') d.setFullYear(d.getFullYear() + 1);
+  else if (period === 'quarter') d.setMonth(d.getMonth() + 3);
+  else d.setMonth(d.getMonth() + 1);
+  return d;
+}
+
+// Продление подписки после оплаты: к дате окончания (или к текущей дате,
+// если срок прошёл) добавляется один оплаченный период, подписка снова активна
+async function extendSubscription(subscriptionId: string) {
+  const sub = await prisma.productSubscription.findUnique({ where: { id: subscriptionId } });
+  if (!sub) return;
+  const base = sub.endsAt && sub.endsAt > new Date() ? sub.endsAt : new Date();
+  await prisma.productSubscription.update({
+    where: { id: sub.id },
+    data: { status: 'active', endsAt: addPaidPeriod(base, sub.period) },
+  });
+}
+
 // Активность плагина для /api/integrations/status
 export async function isTochkaAcquiringActive(): Promise<boolean> {
   const s = await getSettings();
   return !!s?.isActive;
 }
 
-// Отметить платёж и продажу оплаченными
-async function markPaid(payment: { id: string; saleId: string; paymentId: string | null }, operationId?: string | null) {
-  await prisma.$transaction([
+// Отметить платёж оплаченным; заодно — продажу и/или продление подписки
+async function markPaid(
+  payment: { id: string; saleId: string | null; subscriptionId: string | null; paymentId: string | null },
+  operationId?: string | null,
+) {
+  const ops: any[] = [
     prisma.tochkaAcquiringPayment.update({
       where: { id: payment.id },
       data: { status: 'paid', paymentId: payment.paymentId || (operationId ? String(operationId) : null), paidAt: new Date() },
     }),
-    prisma.sale.update({
-      where: { id: payment.saleId },
-      data: { status: 'paid', paymentMethod: 'tochka', paidAt: new Date() },
-    }),
-  ]);
+  ];
+  if (payment.saleId) {
+    ops.push(
+      prisma.sale.update({
+        where: { id: payment.saleId },
+        data: { status: 'paid', paymentMethod: 'tochka', paidAt: new Date() },
+      }),
+    );
+  }
+  await prisma.$transaction(ops);
+  // Продление подписки — вне транзакции: подписка может быть уже удалена
+  if (payment.subscriptionId) await extendSubscription(payment.subscriptionId);
 }
 
 // POST /uapi/webhook/v1.0/{customerCode} — регистрация webhook acquiringInternetPayment (идемпотентно)
@@ -246,6 +278,89 @@ router.post('/pay', authMiddleware, async (req: AuthRequest, res) => {
     res.json({ orderId, paymentUrl, paymentId: payment.paymentId, amount: payment.amount });
   } catch (err: any) {
     console.error('[tochka-acquiring] pay error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/tochka-acquiring/pay-subscription — платёжная ссылка для продления подписки.
+// Оплата проходит на странице банка; после подтверждения срок подписки продлевается
+// на один период тарифа (см. extendSubscription в markPaid).
+router.post('/pay-subscription', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const s = await getSettings();
+    if (!s?.isActive) return res.status(400).json({ error: 'Эквайринг от Точки не активирован' });
+    if (!loadTokens()?.access_token) return res.status(400).json({ error: 'Точка Банк не подключена (OAuth)' });
+
+    const { subscriptionId } = req.body || {};
+    const sub = await prisma.productSubscription.findUnique({
+      where: { id: subscriptionId },
+      include: { product: { select: { name: true } }, contact: { select: { name: true } }, user: { select: { name: true } } },
+    });
+    if (!sub) return res.status(404).json({ error: 'Подписка не найдена' });
+    const isPrivileged = ['admin', 'manager'].includes(req.user?.role || '');
+    if (!isPrivileged && sub.userId !== req.user?.id) {
+      return res.status(403).json({ error: 'Нет доступа к этой подписке' });
+    }
+    if (!['active', 'expired'].includes(sub.status)) {
+      return res.status(400).json({ error: 'Оплатить продление можно только активную или закончившуюся подписку' });
+    }
+
+    const amount = Number(sub.price);
+    if (!(amount > 0)) return res.status(400).json({ error: 'Сумма подписки должна быть больше нуля' });
+
+    const cc = await getCustomerCode();
+    if (!cc) return res.status(400).json({ error: 'Не удалось получить customerCode (проверьте подключение Точки)' });
+    const merchantId = await getMerchantId(cc);
+    if (!merchantId) return res.status(400).json({ error: 'Не удалось получить merchantId (нет торговых точек в Точке)' });
+
+    // Номер заказа для банка: SUB-<номер подписки>-<суффикс> (продлений может быть много)
+    const orderId = `SUB-${String(sub.number).padStart(9, '0')}-${Date.now().toString(36)}`;
+    const customerName = sub.user?.name || sub.contact?.name || '';
+    const periodLbl = { month: 'месяц', quarter: 'квартал', year: 'год' }[sub.period] || sub.period;
+    const purpose = `Продление подписки №${sub.number} (${sub.product.name}, ${periodLbl})${customerName ? ` (${customerName})` : ''}`.slice(0, 140);
+
+    const body = {
+      Data: {
+        customerCode: cc,
+        merchantId,
+        amount: amount.toFixed(2),
+        purpose,
+        paymentMode: ['card', 'sbp'],
+        paymentLinkId: orderId,
+      },
+    };
+    const { response } = await withAuthRetry((h) =>
+      tochkaRequest(`/acquiring/v1.0/payments?customerCode=${cc}`, { method: 'POST', headers: h, body: JSON.stringify(body) }),
+    );
+    const data = response.body;
+    if (response.status !== 200 && response.status !== 201) {
+      console.error('[tochka-acquiring] payments(subscription) error:', response.status, JSON.stringify(data).slice(0, 300));
+      return res.status(400).json({ error: data?.message || 'Банк отклонил создание платежа', details: data?.Errors });
+    }
+    const op = data?.Data || {};
+    const paymentUrl = op.paymentLink || op.PaymentLink || null;
+    const operationId = op.operationId || op.OperationId || null;
+    if (!paymentUrl) {
+      console.error('[tochka-acquiring] нет paymentLink в ответе:', JSON.stringify(data).slice(0, 300));
+      return res.status(502).json({ error: 'Банк не вернул ссылку на оплату' });
+    }
+
+    const payment = await prisma.tochkaAcquiringPayment.create({
+      data: {
+        saleId: null,
+        subscriptionId: sub.id,
+        orderId,
+        paymentId: operationId ? String(operationId) : null,
+        amount: Math.round(amount * 100),
+        method: 'link',
+        status: 'created',
+        paymentUrl,
+      },
+    });
+
+    res.json({ orderId, paymentUrl, paymentId: payment.paymentId, amount: payment.amount });
+  } catch (err: any) {
+    console.error('[tochka-acquiring] pay-subscription error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

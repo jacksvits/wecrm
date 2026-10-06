@@ -62,6 +62,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     get: () => fetchApi('/api/tochka-acquiring'),
     save: (data: any) => fetchApi('/api/tochka-acquiring', { method: 'POST', body: JSON.stringify(data) }),
     pay: (saleId: string, method: string) => fetchApi('/api/tochka-acquiring/pay', { method: 'POST', body: JSON.stringify({ saleId, method }) }),
+    paySubscription: (subscriptionId: string) => fetchApi('/api/tochka-acquiring/pay-subscription', { method: 'POST', body: JSON.stringify({ subscriptionId }) }),
     paymentStatus: (orderId: string) => fetchApi(`/api/tochka-acquiring/status/${orderId}`),
   },
   oneCPlugin: {

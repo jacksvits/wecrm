@@ -1613,6 +1613,7 @@ model ProductSubscription {
   comment   String   @default("")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  payments  TochkaAcquiringPayment[]
 
   @@index([productId])
   @@index([contactId])
@@ -1633,19 +1634,22 @@ model TochkaAcquiringSettings {
 
 // Онлайн-платежи витрины (карта/СБП): одна запись на заказ, статус из webhook банка
 model TochkaAcquiringPayment {
-  id         String    @id @default(cuid())
-  saleId     String    @map("sale_id")
-  orderId    String    @unique @map("order_id")
-  paymentId  String?   @map("payment_id")
-  amount     Int       // сумма в копейках
-  method     String    // card | sbp
-  status     String    @default("created") // created | paid | failed
-  paymentUrl String?   @map("payment_url")
-  qrData     String?   @map("qr_data")
-  paidAt     DateTime? @map("paid_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-  sale       Sale      @relation(fields: [saleId], references: [id])
+  id             String    @id @default(cuid())
+  // либо продажа (заказ с витрины), либо подписка (продление) — одно из полей заполнено
+  saleId         String?   @map("sale_id")
+  subscriptionId String?   @map("subscription_id")
+  orderId        String    @unique @map("order_id")
+  paymentId      String?   @map("payment_id")
+  amount         Int       // сумма в копейках
+  method         String    // card | sbp
+  status         String    @default("created") // created | paid | failed
+  paymentUrl     String?   @map("payment_url")
+  qrData         String?   @map("qr_data")
+  paidAt         DateTime? @map("paid_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  sale           Sale?     @relation(fields: [saleId], references: [id])
+  subscription   ProductSubscription? @relation(fields: [subscriptionId], references: [id])
 
   @@map("tochka_acquiring_payments")
 }
