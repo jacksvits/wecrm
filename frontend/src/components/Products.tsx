@@ -73,6 +73,8 @@ export function Products() {
   const [whFilter, setWhFilter] = useState('all');
   // Сортировка таблицы «Склад»: текст — А→Я/Я→А, числа — по убыванию/возрастанию
   const [stockSort, setStockSort] = useState<{ key: 'name' | 'warehouse' | 'quantity' | 'reserved' | 'available'; dir: 'asc' | 'desc' } | null>(null);
+// Детализация резерва: товар + склад строки таблицы «Склад», по которым кликнули в колонке «Резерв»
+const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouseId: string | null } | null>(null);
   // фильтр склада для виджета «История движений» на вкладке «Статистика»
   const [statsWhFilter, setStatsWhFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -774,7 +776,18 @@ export function Products() {
                     </td>
                     <td style={tdStyle}>{r.wh?.name || '—'}</td>
                     <td style={tdStyle}>{fmtMoney(r.qty)} {r.p.unit}</td>
-                    <td style={tdStyle}>{fmtMoney(r.res)} {r.p.unit}</td>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        ...(r.res > 0 && !r.empty ? { cursor: 'pointer', color: '#d97706', fontWeight: 500 } : {}),
+                      }}
+                      {...(r.res > 0 && !r.empty ? {
+                        title: 'Нажмите, чтобы увидеть, кем и под каким номером зарезервировано',
+                        onClick: () => setReserveDetail({ product: r.p, warehouseId: r.wh?.id || null }),
+                      } : {})}
+                    >
+                      {fmtMoney(r.res)} {r.p.unit}
+                    </td>
                     <td style={{ ...tdStyle, fontWeight: 600 }}>{fmtMoney(r.qty - r.res)} {r.p.unit}</td>
                     <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                       <button
@@ -806,6 +819,15 @@ export function Products() {
           </div>
         </div>
         </div>
+      )}
+
+      {/* Модал детализации резерва по клику из колонки «Резерв» таблицы «Склад» */}
+      {reserveDetail && (
+        <ReserveDetailModal
+          product={reserveDetail.product}
+          warehouseId={reserveDetail.warehouseId}
+          onClose={() => setReserveDetail(null)}
+        />
       )}
 
       {/* ===== Статистика ===== */}
@@ -1475,6 +1497,67 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
             {!isNew && <button onClick={remove} style={{ ...btnPrimary, background: '#dc2626' }}>Удалить</button>}
             <button onClick={onClose} style={btnGhost}>Отмена</button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Модал детализации резерва: кем и под каким номером зарезервирован товар
+// (открывается по клику на количество в колонке «Резерв» таблицы «Склад»)
+function ReserveDetailModal({ product, warehouseId, onClose }: { product: Product; warehouseId: string | null; onClose: () => void }) {
+  const [items, setItems] = useState<any[] | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    setItems(null);
+    setError('');
+    api.reservations.byProduct(product.id, warehouseId || undefined)
+      .then((list: any[]) => { if (!cancelled) setItems(list); })
+      .catch((e: any) => { if (!cancelled) setError(e.message || 'Ошибка загрузки'); });
+    return () => { cancelled = true; };
+  }, [product.id, warehouseId]);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 20, width: 760, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3 style={{ margin: '0 0 4px' }}>Резерв: {product.name}</h3>
+        {product.sku && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Артикул: {product.sku}</div>}
+        {error && <div style={{ color: '#dc2626', margin: '8px 0' }}>{error}</div>}
+        {!error && items === null && <div style={{ padding: '12px 0', color: 'var(--text-muted)' }}>Загрузка...</div>}
+        {items !== null && items.length === 0 && (
+          <div style={{ padding: '12px 0', color: 'var(--text-muted)' }}>Активных резервов по этой позиции нет.</div>
+        )}
+        {items !== null && items.length > 0 && (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Резерв</th>
+                  <th style={thStyle}>Кто зарезервировал</th>
+                  <th style={thStyle}>Заказчик</th>
+                  {!warehouseId && <th style={thStyle}>Склад</th>}
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Кол-во</th>
+                  <th style={thStyle}>Дата</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it: any) => (
+                  <tr key={it.id}>
+                    <td style={{ ...tdStyle, fontWeight: 600, whiteSpace: 'nowrap' }}>00We-{String(it.reservation.number).padStart(6, '0')}</td>
+                    <td style={tdStyle}>{it.reservation.user?.name || '—'}</td>
+                    <td style={tdStyle}>{it.reservation.contact?.name || '—'}</td>
+                    {!warehouseId && <td style={tdStyle}>{it.reservation.warehouse?.name || '—'}</td>}
+                    <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtMoney(it.quantity)} {product.unit}</td>
+                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{new Date(it.reservation.createdAt).toLocaleString('ru-RU')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+          <button onClick={onClose} style={btnGhost}>Закрыть</button>
         </div>
       </div>
     </div>

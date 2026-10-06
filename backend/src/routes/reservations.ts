@@ -19,6 +19,30 @@ router.get('/', async (req: any, res) => {
   res.json(list);
 });
 
+// Детализация резерва по товару: кем и под каким номером зарезервировано
+// (клик по количеству в колонке «Резерв» таблицы «Склад» складского учёта)
+router.get('/by-product/:productId', async (req: any, res) => {
+  const { productId } = req.params;
+  const warehouseId = typeof req.query.warehouseId === 'string' && req.query.warehouseId ? req.query.warehouseId : undefined;
+  const isPrivileged = ['admin', 'manager'].includes(req.user?.role);
+  // Только активные (отложенные) резервы — именно они держат количество в колонке «Резерв»;
+  // обычные пользователи видят только свои резервы (как в общем списке)
+  const items = await prisma.reservationItem.findMany({
+    where: {
+      productId,
+      quantity: { gt: 0 },
+      reservation: {
+        status: 'held',
+        ...(warehouseId ? { warehouseId } : {}),
+        ...(isPrivileged ? {} : { userId: req.user?.id }),
+      },
+    },
+    orderBy: { reservation: { number: 'desc' } },
+    include: { reservation: { include: { contact: true, user: true, warehouse: true } } },
+  });
+  res.json(items);
+});
+
 // Создание: только по наличию (без минуса), номер автоинкремент
 router.post('/', async (req: any, res) => {
   const { contactId, warehouseId, comment, items, paymentMethod } = req.body || {};
