@@ -121,7 +121,7 @@ const createSchema = z.object({
 // Проверка доступа к задаче: админ, создатель, исполнители и кураторы
 // (аналог canAccessTask из routes/tasks.ts — локальная копия, чтобы не тащить весь роутер)
 const canAccessTask = async (taskId: string, userId: string, role: string) => {
-  if (role === 'admin') return true;
+  if (role === 'admin' || role === 'developer') return true;
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     select: {

@@ -567,6 +567,20 @@ router.post("/iov", async (req, res) => {
 // Внешний API Novofon v1: GET /v1/webrtc/get_key/?sip=<login>, авторизация —
 // заголовок Authorization: <apiKey>:<HMAC-SHA1(params, apiSecret)>, ключ живёт 72 ч.
 // Доступен любому авторизованному пользователю с сопоставленным внутренним номером АТС.
+// Настройки читает веб-телефонный виджет у всех авторизованных пользователей:
+// админу и разработчику — полный набор (без apiSecret), остальным — только
+// публичные флаги isActive/webRtcEnabled (API-ключи и секреты не отдаём)
+router.get("/settings", authMiddleware, async (req: AuthRequest, res) => {
+  const settings = await prisma.telephonySettings.findFirst();
+  if (!settings) return res.json(null);
+  const { apiSecret, ...rest } = settings;
+  if (req.user!.role === "admin" || req.user!.role === "developer") {
+    return res.json({ ...rest, hasSecret: !!apiSecret });
+  }
+  const { isActive, webRtcEnabled } = rest;
+  res.json({ isActive, webRtcEnabled });
+});
+
 router.get("/webrtc/key", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const settings = await prisma.telephonySettings.findFirst();
@@ -636,12 +650,6 @@ router.get("/webrtc/key", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 router.use(authMiddleware, adminOnly);
-router.get("/settings", async (_req, res) => {
-  const settings = await prisma.telephonySettings.findFirst();
-  if (!settings) return res.json(null);
-  const { apiSecret, ...rest } = settings;
-  res.json({ ...rest, hasSecret: !!apiSecret });
-});
 const settingsSchema = z.object({
   isActive: z.boolean(),
   webRtcEnabled: z.boolean().default(false),

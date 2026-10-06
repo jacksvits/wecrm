@@ -72,6 +72,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const streamRef = useRef<MediaStream | null>(null);
   const durationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectDelayRef = useRef(3000);
   const mountedRef = useRef(true);
 
   phaseRef.current = phase;
@@ -265,6 +266,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      reconnectDelayRef.current = 3000; // соединение восстановлено — сброс задержки
       console.log('[CallsWS] Connected');
     };
 
@@ -329,10 +331,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     ws.onclose = () => {
       if (!mountedRef.current) return;
       wsRef.current = null;
-      // Переподключение с нарастающей задержкой; во время звонка reconnect
-      // должен успеть быстро — сервер хранит звонок в БД, состояние
-      // восстановим через /api/calls/active ниже
-      reconnectTimerRef.current = setTimeout(connectWs, 3000);
+      // Переподключение с нарастающей задержкой 3с -> 6с -> ... -> 60с,
+      // иначе при недоступном канале консоль забивается попытками каждые 3с.
+      // Во время звонка reconnect должен успеть быстро — сервер хранит звонок
+      // в БД, состояние восстановим через /api/calls/active ниже
+      const delay = reconnectDelayRef.current;
+      reconnectTimerRef.current = setTimeout(connectWs, delay);
+      reconnectDelayRef.current = Math.min(delay * 2, 60000);
     };
 
     ws.onerror = () => {

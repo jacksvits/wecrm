@@ -183,10 +183,11 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok', connections: getA
 const server = http.createServer(app);
 // WebSocket-апгрейд для VNC-браузера (/api/browser/vnc/<uid>/websockify)
 server.on('upgrade', (req, socket, head) => {
+  // Обрабатываем только VNC-путь. Чужие апгрейды (/api/calls/ws, /api/push/ws)
+  // молча пропускаем: иначе сокет уничтожается здесь раньше, чем его примет
+  // setupPushWs/setupCallsWs, и WebSocket-каналы рвутся с "Empty reply"
   if (isVncUpgradePath(String(req.url || ''))) {
     handleVncUpgrade(req, socket, head);
-  } else {
-    socket.destroy();
   }
 });
 setupPushWs(server);
