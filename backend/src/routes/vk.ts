@@ -16,7 +16,7 @@ const VK_REDIRECT_URI = process.env.VK_REDIRECT_URI || 'https://welans.cc/api/vk
 // Серверный вариант PKCE: code_verifier хранится на сервере (привязан к state),
 // поэтому вход не зависит от localStorage на устройстве (iOS Safari/PWA теряли
 // verifier после редиректа на id.vk.ru — обмен кода на токен не происходил).
-const vkIdSessions = new Map<string, { verifier: string; deviceId: string; expires: number }>();
+const vkIdSessions = new Map<string, { verifier: string; expires: number }>();
 const VK_ID_SESSION_TTL = 10 * 60 * 1000; // 10 минут
 
 // Ensure uploads dir exists
@@ -238,7 +238,7 @@ router.get('/login-url', (_req, res) => {
     const state = randomUUID();
     const deviceId = randomUUID();
     const verifier = randomBytes(32).toString('base64url');
-    vkIdSessions.set(state, { verifier, deviceId, expires: now + VK_ID_SESSION_TTL });
+    vkIdSessions.set(state, { verifier, expires: now + VK_ID_SESSION_TTL });
     const challenge = createHash('sha256').update(verifier).digest('base64url');
     const params = new URLSearchParams({
       client_id: VK_CLIENT_ID,
@@ -301,7 +301,10 @@ router.get('/callback', async (req: Request, res: Response) => {
     }
     vkIdSessions.delete(state as string);
 
-    const result = await completeVkIdAuth(code as string, session.deviceId, state as string, session.verifier);
+    // ВАЖНО: при type=code_v2 VK возвращает СВОЙ device_id в callback
+    // (длинный base64url, ~96 символов) — обмен кода на токен требует именно его,
+    // а не device_id из authorize-запроса (иначе id.vk.ru: «invalid device id provided»).
+    const result = await completeVkIdAuth(code as string, device_id as string, state as string, session.verifier);
     if (!result.ok) {
       return res.redirect(`/?vk_error=${result.errorKey}`);
     }
