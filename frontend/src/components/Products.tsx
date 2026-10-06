@@ -1823,7 +1823,7 @@ function SubscriptionsTab() {
     load().finally(() => setLoading(false));
   }, []);
 
-  const subNo = (s: any) => `00We-${String(s.number).padStart(6, '0')}`;
+  const subNo = (s: any) => `We-${String(s.number).padStart(6, '0')}`;
   const SUBST: Record<string, { label: string; color: string; bg: string }> = {
     new: { label: 'Новая', color: '#1d4ed8', bg: '#dbeafe' },
     active: { label: 'Активна', color: '#166534', bg: '#dcfce7' },
