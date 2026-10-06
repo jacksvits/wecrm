@@ -779,16 +779,29 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
                     <td
                       style={{
                         ...tdStyle,
-                        ...(r.res > 0 && !r.empty ? { cursor: 'pointer', color: '#d97706', fontWeight: 500 } : {}),
+                        ...(r.res !== 0 && !r.empty ? { cursor: 'pointer', color: r.res < 0 ? '#dc2626' : '#d97706', fontWeight: 500 } : {}),
                       }}
-                      {...(r.res > 0 && !r.empty ? {
+                      {...(r.res !== 0 && !r.empty ? {
                         title: 'Нажмите, чтобы увидеть, кем и под каким номером зарезервировано',
                         onClick: () => setReserveDetail({ product: r.p, warehouseId: r.wh?.id || null }),
                       } : {})}
                     >
                       {fmtMoney(r.res)} {r.p.unit}
                     </td>
-                    <td style={{ ...tdStyle, fontWeight: 600 }}>{fmtMoney(r.qty - r.res)} {r.p.unit}</td>
+                    {/* Отрицательное «Доступно» = резерв превышает остаток: тоже показываем детализацию резерва */}
+                    <td
+                      style={{
+                        ...tdStyle,
+                        fontWeight: 600,
+                        ...(r.qty - r.res < 0 && !r.empty ? { cursor: 'pointer', color: '#dc2626' } : {}),
+                      }}
+                      {...(r.qty - r.res < 0 && !r.empty ? {
+                        title: 'Резерв превышает остаток — нажмите, чтобы увидеть детализацию',
+                        onClick: () => setReserveDetail({ product: r.p, warehouseId: r.wh?.id || null }),
+                      } : {})}
+                    >
+                      {fmtMoney(r.qty - r.res)} {r.p.unit}
+                    </td>
                     <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                       <button
                         style={{ ...btnGhost, marginRight: 8, color: '#059669' }}
