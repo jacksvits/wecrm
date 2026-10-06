@@ -33,6 +33,14 @@ router.post('/register', async (req, res) => {
       if (existingUsername) return res.status(400).json({ error: 'Username already exists' });
     }
 
+    // Роль по умолчанию для самостоятельной регистрации — обычный пользователь (роль "user")
+    let defaultRole = await prisma.role.findUnique({ where: { name: 'user' } });
+    if (!defaultRole) {
+      defaultRole = await prisma.role.create({
+        data: { name: 'user', label: 'Пользователи', color: '#f0f0f0', textColor: '#666', sortOrder: 4 },
+      });
+    }
+
     const hash = await bcrypt.hash(data.password, 10);
     const user = await prisma.user.create({
       data: {
@@ -40,6 +48,7 @@ router.post('/register', async (req, res) => {
         username: data.username || null,
         password: hash,
         name: data.name,
+        roleId: defaultRole.id,
       },
       include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
     });
