@@ -30,10 +30,12 @@ router.get('/', async (req: any, res) => {
         user: { select: { id: true, name: true } },
       },
     });
-    const enriched = list.map((s: any) => ({
-      ...s,
-      activeUntil: s.status === 'active' ? (s.endsAt ?? addPaidPeriod(s.updatedAt, s.period)).toISOString() : null,
-    }));
+    const enriched = list.map((s: any) => {
+      const activeUntil = s.status === 'active' ? (s.endsAt ?? addPaidPeriod(s.updatedAt, s.period)) : null;
+      // Активная подписка с истекшим сроком показывается со статусом «Закончилась»
+      const status = activeUntil && activeUntil.getTime() < Date.now() ? 'expired' : s.status;
+      return { ...s, status, activeUntil: activeUntil ? activeUntil.toISOString() : null };
+    });
     res.json(enriched);
   } catch (err: any) {
     console.error('[subscriptions:list]', err);
@@ -124,10 +126,12 @@ router.get('/billing', async (req: any, res) => {
         user: { select: { id: true, name: true } },
       },
     });
-    const enriched = list.map((s: any) => ({
-      ...s,
-      activeUntil: s.status === 'active' ? (s.endsAt ?? addPaidPeriod(s.updatedAt, s.period)).toISOString() : null,
-    }));
+    const enriched = list.map((s: any) => {
+      const activeUntil = s.status === 'active' ? (s.endsAt ?? addPaidPeriod(s.updatedAt, s.period)) : null;
+      // Активная подписка с истекшим сроком показывается со статусом «Закончилась»
+      const status = activeUntil && activeUntil.getTime() < Date.now() ? 'expired' : s.status;
+      return { ...s, status, activeUntil: activeUntil ? activeUntil.toISOString() : null };
+    });
     res.json(enriched);
   } catch (err: any) {
     console.error('[subscriptions:billing]', err);
@@ -165,13 +169,13 @@ router.patch('/:id', async (req: any, res) => {
     if (!existing) return res.status(404).json({ error: 'Заявка не найдена' });
     const data: any = {};
     if (status !== undefined) {
-      if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Статус меняет только директор' });
-      if (!['new', 'active', 'paused', 'cancelled'].includes(status)) {
+      // Статус меняют администратор и менеджер
+      if (!['active', 'expired', 'cancelled'].includes(status)) {
         return res.status(400).json({ error: 'Неизвестный статус' });
       }
       data.status = status;
       // При активации без явной даты окончания — конец периода от текущей даты
-      if (status === 'active' && endsAt === undefined && !existing.endsAt) {
+      if (status === 'active' && endsAt === undefined && !(existing.endsAt && existing.endsAt > new Date())) {
         data.endsAt = addPaidPeriod(new Date(), existing.period);
       }
     }
@@ -216,8 +220,9 @@ router.patch('/:id', async (req: any, res) => {
 });
 
 // Продление подписки: к дате окончания (или к текущей дате, если срок прошёл)
-// добавляется один оплаченный период. Администратор и менеджер — любую подписку,
-// обычный пользователь — только свою.
+// добавляется один оплаченный период. Продлить можно активную или закончившуюся
+// (после продления подписка снова активна). Администратор и менеджер — любую
+// подписку, обычный пользователь — только свою.
 router.post('/:id/renew', async (req: any, res) => {
   try {
     const isPrivileged = ['admin', 'manager'].includes(req.user?.role);
@@ -226,13 +231,13 @@ router.post('/:id/renew', async (req: any, res) => {
     if (!isPrivileged && existing.userId !== req.user?.id) {
       return res.status(403).json({ error: 'Нет доступа к этой подписке' });
     }
-    if (existing.status !== 'active') {
-      return res.status(400).json({ error: 'Продлить можно только активную подписку' });
+    if (!['active', 'expired'].includes(existing.status)) {
+      return res.status(400).json({ error: 'Продлить можно только активную или закончившуюся подписку' });
     }
     const base = existing.endsAt && existing.endsAt > new Date() ? existing.endsAt : new Date();
     const updated = await prisma.productSubscription.update({
       where: { id: existing.id },
-      data: { endsAt: addPaidPeriod(base, existing.period) },
+      data: { status: 'active', endsAt: addPaidPeriod(base, existing.period) },
     });
     res.json(updated);
   } catch (err: any) {

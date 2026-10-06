@@ -1080,9 +1080,8 @@ export function Director() {
         const activeCount = billingSubs.filter((s: any) => s.status === "active").length;
         const inactiveCount = total - activeCount;
         const SUBST: Record<string, { label: string; color: string; bg: string }> = {
-          new: { label: "Новая", color: "#1d4ed8", bg: "#dbeafe" },
-          active: { label: "Активна", color: "#166534", bg: "#dcfce7" },
-          paused: { label: "Пауза", color: "#92400e", bg: "#fef3c7" },
+          active: { label: "Активная", color: "#166534", bg: "#dcfce7" },
+          expired: { label: "Закончилась", color: "#92400e", bg: "#fef3c7" },
           cancelled: { label: "Отменена", color: "#991b1b", bg: "#fee2e2" },
         };
         const PERIOD_LBL: Record<string, string> = { month: "мес.", quarter: "квартал", year: "год" };
@@ -1093,7 +1092,7 @@ export function Director() {
         };
         const startEditSub = (s: any) => {
           setEditingSubId(s.id);
-          setEditSubForm({ price: String(s.price ?? ''), period: s.period || 'month', status: s.status || 'new', comment: s.comment || '' });
+          setEditSubForm({ price: String(s.price ?? ''), period: s.period || 'month', status: s.status || 'active', comment: s.comment || '' });
         };
         const saveEditSub = (id: string) => {
           api.subscriptions.update(id, { price: Number(editSubForm.price), period: editSubForm.period, status: editSubForm.status, comment: editSubForm.comment }).then(() => {
@@ -1127,7 +1126,7 @@ export function Director() {
                       <button onClick={() => setSubStatus(s.id, "active")} style={{ padding: "1px 8px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>Активировать</button>
                     )}
                     {s.status === "active" && (
-                      <button onClick={() => setSubStatus(s.id, "paused")} style={{ padding: "1px 8px", borderRadius: 8, border: "none", background: "#d97706", color: "#fff", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>Приостановить</button>
+                      <button onClick={() => setSubStatus(s.id, "cancelled")} style={{ padding: "1px 8px", borderRadius: 8, border: "none", background: "#d97706", color: "#fff", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>Отменить</button>
                     )}
                     <button onClick={() => startEditSub(s)} style={{ padding: "1px 8px", borderRadius: 8, border: "1px solid var(--border-color, #ddd)", background: "transparent", color: "var(--text-secondary)", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>Изменить</button>
                   </div>
@@ -1143,9 +1142,8 @@ export function Director() {
                       </select>
                       <label style={{ fontSize: 11, color: "var(--text-muted)" }}>Статус</label>
                       <select value={editSubForm.status} onChange={(e) => setEditSubForm({ ...editSubForm, status: e.target.value })} style={{ padding: "3px 6px", borderRadius: 6, border: "1px solid var(--border-color, #ddd)", fontSize: 12, background: "var(--bg-input, #fff)", color: "var(--text-primary)" }}>
-                        <option value="new">Новая</option>
-                        <option value="active">Активна</option>
-                        <option value="paused">Приостановлена</option>
+                        <option value="active">Активная</option>
+                        <option value="expired">Закончилась</option>
                         <option value="cancelled">Отменена</option>
                       </select>
                       <input placeholder="Комментарий" value={editSubForm.comment} onChange={(e) => setEditSubForm({ ...editSubForm, comment: e.target.value })} style={{ flex: 1, minWidth: 120, padding: "3px 6px", borderRadius: 6, border: "1px solid var(--border-color, #ddd)", fontSize: 12, background: "var(--bg-input, #fff)", color: "var(--text-primary)" }} />

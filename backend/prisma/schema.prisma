@@ -1606,7 +1606,7 @@ model ProductSubscription {
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   price     Decimal  @default(0)
   period    String   @default("month") // month | quarter | year
-  status    String   @default("new") // new | active | paused | cancelled
+  status    String   @default("active") // active | cancelled (expired вычисляется по endsAt)
   // Дата окончания оплаченного периода: задаётся при активации/продлении,
   // редактируется вручную на вкладке «Подписки» каталога
   endsAt    DateTime? @map("ends_at")

@@ -1824,16 +1824,21 @@ function SubscriptionsTab() {
   }, []);
 
   const subNo = (s: any) => `We-${String(s.number).padStart(6, '0')}`;
-  const SUBST: Record<string, { label: string; color: string; bg: string }> = {
-    new: { label: 'Новая', color: '#1d4ed8', bg: '#dbeafe' },
-    active: { label: 'Активна', color: '#166534', bg: '#dcfce7' },
-    paused: { label: 'Пауза', color: '#92400e', bg: '#fef3c7' },
-    cancelled: { label: 'Отменена', color: '#991b1b', bg: '#fee2e2' },
+  // Статусы: «Закончилась» бэкенд выставляет автоматически при истечении срока
+  const SUBST: Record<string, { label: string; color: string }> = {
+    active: { label: 'Активная', color: '#16a34a' },
+    expired: { label: 'Закончилась', color: '#d97706' },
+    cancelled: { label: 'Отменена', color: 'var(--text-muted)' },
   };
   const PERIOD_LBL: Record<string, string> = { month: 'мес.', quarter: 'квартал', year: 'год' };
 
   const doRenew = async (s: any) => {
     try { await api.subscriptions.renew(s.id); load(); }
+    catch (e: any) { alert(e.message || e.error || 'Ошибка'); }
+  };
+  // Смена статуса — только admin/manager
+  const setStatusSub = async (s: any, status: string) => {
+    try { await api.subscriptions.update(s.id, { status }); load(); }
     catch (e: any) { alert(e.message || e.error || 'Ошибка'); }
   };
 
@@ -1869,21 +1874,31 @@ function SubscriptionsTab() {
         </tr></thead>
         <tbody>
           {subs.map((s: any) => {
-            const st = SUBST[s.status] || { label: s.status, color: 'var(--text-secondary)', bg: 'var(--bg-hover)' };
+            const st = SUBST[s.status] || { label: s.status, color: 'var(--text-muted)' };
             return (
               <tr key={s.id}>
                 <td style={tdStyle}>{subNo(s)}</td>
                 <td style={tdStyle}>{new Date(s.createdAt).toLocaleDateString('ru-RU')}</td>
-                <td style={tdStyle}>{s.status === 'active' && s.activeUntil ? new Date(s.activeUntil).toLocaleDateString('ru-RU') : '—'}</td>
+                <td style={tdStyle}>{s.activeUntil ? new Date(s.activeUntil).toLocaleDateString('ru-RU') : '—'}</td>
                 <td style={tdStyle}>{s.product?.name || 'Услуга'}{s.period ? ` · ${PERIOD_LBL[s.period] || s.period}` : ''}</td>
                 <td style={tdStyle}>{fmtMoney(Number(s.price || 0))} ₽</td>
                 <td style={tdStyle}>
-                  <span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: st.bg, color: st.color }}>{st.label}</span>
+                  {/* Статус — выпадающий список как у резервов; менять могут только admin/manager */}
+                  <select
+                    value={s.status}
+                    disabled={!isPrivileged}
+                    onChange={e => setStatusSub(s, e.target.value)}
+                    style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: st.color, fontSize: 12 }}
+                  >
+                    <option value="active">Активная</option>
+                    <option value="expired">Закончилась</option>
+                    <option value="cancelled">Отменена</option>
+                  </select>
                 </td>
                 <td style={tdStyle}>{s.user?.name || s.contact?.name || '—'}</td>
                 <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    {s.status === 'active' && (
+                    {(s.status === 'active' || s.status === 'expired') && (
                       <button title="Продлить подписку на один период" onClick={() => doRenew(s)} style={btnGhost}>Продлить</button>
                     )}
                     {/* Редактировать — иконка карандаша, как у резервов; только admin/manager */}
