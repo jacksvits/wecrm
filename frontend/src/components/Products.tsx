@@ -1360,7 +1360,8 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     if (!form.name.trim()) { setError('Название обязательно'); return; }
     setSaving(true); setError('');
     try {
-      const payload = { ...form, categoryId: categoryId || null };
+      const num = (v: string) => (v === '' ? null : Number(v));
+      const payload = { ...form, categoryId: categoryId || null, weight: num(form.weight), width: num(form.width), height: num(form.height), depth: num(form.depth) };
       if (isNew) await api.products.create(payload);
       else await api.products.update(product.id, payload);
       onSaved();
