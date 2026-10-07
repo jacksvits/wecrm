@@ -35,11 +35,11 @@ async function ozonApi<T = any>(method: string, path: string, body: any, creds?:
   return data as T;
 }
 
-/** Проверка подключения: запрос списка товаров (1 шт.) */
+/** Проверка подключения: запрос списка товаров (1 шт.). Метод /v2/product/info/list удалён из API — используем /v3/product/list */
 export async function testOzonConnection(creds?: OzonCredentials): Promise<{ ok: boolean; total?: number; error?: string }> {
   try {
-    const data = await ozonApi('POST', '/v2/product/info/list', { limit: 1 }, creds);
-    return { ok: true, total: data?.result?.total ?? undefined };
+    const data = await ozonApi('POST', '/v3/product/list', { filter: { visibility: 'ALL' }, limit: 1 }, creds);
+    return { ok: true, total: data?.result?.total_items ?? data?.result?.total ?? undefined };
   } catch (e: any) {
     return { ok: false, error: e.message };
   }
@@ -78,7 +78,7 @@ export async function ozonUpdateStocks(items: { product_id: number; stock: numbe
 /** Найти товар в OZON по offer_id (внутренний артикул/артикул из CRM) */
 export async function ozonFindProductId(offerId: string): Promise<number | null> {
   try {
-    const data = await ozonApi('POST', '/v2/product/info/list', {
+    const data = await ozonApi('POST', '/v3/product/list', {
       filter: { offer_id: [offerId] },
       limit: 1,
     });
