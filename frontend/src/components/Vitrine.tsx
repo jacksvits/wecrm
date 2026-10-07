@@ -19,6 +19,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   // Выбранные теги — фильтр показа витрины (мультивыбор: товар подходит по любому из тегов)
   const [activeTags, setActiveTags] = useState<string[]>([]);
+  // Сортировка каталога: по названию / по цене, по возрастанию / убыванию
+  const [sort, setSort] = useState<'name-asc' | 'name-desc' | 'price-asc' | 'price-desc'>('name-asc');
   const [inStockOnly, setInStockOnly] = useState(true);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -191,11 +193,31 @@ export function Vitrine({ search = '' }: { search?: string }) {
   };
 
   const filteredCards = useMemo(() => {
-    if (!activeTags.length) return baseCards;
-    const sel = new Set(activeTags);
-    // Мультивыбор: остаются карточки с любым из выбранных тегов
-    return baseCards.filter((c) => (c.product.tags || []).some(t => sel.has(t)));
-  }, [baseCards, activeTags]);
+    let list = baseCards;
+    if (activeTags.length) {
+      const sel = new Set(activeTags);
+      // Мультивыбор: остаются карточки с любым из выбранных тегов
+      list = list.filter((c) => (c.product.tags || []).some(t => sel.has(t)));
+    }
+    if (sort === 'name-asc' || sort === 'name-desc') {
+      list = [...list].sort((a, b) => {
+        const cmp = a.product.name.localeCompare(b.product.name, 'ru');
+        return sort === 'name-asc' ? cmp : -cmp;
+      });
+    } else {
+      // Договорная цена (нет цены) всегда в конце, в обоих направлениях сортировки
+      const priceOf = (c: VitrineCard) => {
+        const v = Number(c.price?.price ?? 0);
+        return v > 0 ? v : Number.POSITIVE_INFINITY;
+      };
+      list = [...list].sort((a, b) => {
+        const pa = priceOf(a), pb = priceOf(b);
+        if (pa !== pb) return sort === 'price-asc' ? pa - pb : pb - pa;
+        return a.product.name.localeCompare(b.product.name, 'ru');
+      });
+    }
+    return list;
+  }, [baseCards, activeTags, sort]);
 
   const toggleExpand = (id: string) => {
     const next = new Set(expanded);
@@ -493,6 +515,16 @@ export function Vitrine({ search = '' }: { search?: string }) {
               </span>
             </div>
           )}
+          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6 }}>
+            <label htmlFor="vitrine-sort" style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Сортировка:</label>
+            <select id="vitrine-sort" value={sort} onChange={e => setSort(e.target.value as typeof sort)}
+              style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}>
+              <option value="name-asc">Название А→Я</option>
+              <option value="name-desc">Название Я→А</option>
+              <option value="price-asc">Цена ↑</option>
+              <option value="price-desc">Цена ↓</option>
+            </select>
+          </div>
           {(availableTags.length > 0 || activeTags.length > 0) && (
             // Фильтр по тегам: собирается из тегов показанных карточек, мультивыбор
             <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
