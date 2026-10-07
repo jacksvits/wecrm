@@ -203,11 +203,11 @@ export async function fetchAllOzonProducts(): Promise<any[]> {
 }
 
 /**
- * Импорт каталога из OZON в CRM:
- * чтение названий/цен товаров недоступно в текущем API (методы info/prices отдают 404),
- * поэтому импорт работает как ПРИВЯЗКА — товары CRM сопоставляются с OZON по артикулу (offer_id),
- * привязывается ozonProductId и ставится отметка «OZON Seller». Цены и остатки после привязки
- * обновляются обычной синхронизацией CRM → OZON.
+ * Импорт каталога из OZON в CRM (двусторонняя синхронизация):
+ * 1. Товары CRM сопоставляются с OZON по артикулу (offer_id) → привязка ozonProductId + отметка «OZON Seller».
+ * 2. Товаров в CRM нет → СОЗДАЮТСЯ автоматически (название = артикул, т.к. API OZON не отдаёт названия)
+ *    в категории «OZON Seller» (создаётся при первом импорте).
+ * Цены и остатки после импорта обновляются обычной синхронизацией CRM → OZON.
  */
 export async function importOzonProducts(): Promise<{ created: number; linked: number; skipped: number; errors: string[] }> {
   const settings = await getOzonSettings();
@@ -215,6 +215,12 @@ export async function importOzonProducts(): Promise<{ created: number; linked: n
   const summary = { created: 0, linked: 0, skipped: 0, errors: [] as string[] };
 
   const items = await fetchAllOzonProducts();
+
+  // Категория для автосозданных товаров (создаётся один раз)
+  let ozonCategory = await prisma.productCategory.findFirst({ where: { name: 'OZON Seller', parentId: null } });
+  if (!ozonCategory) {
+    ozonCategory = await prisma.productCategory.create({ data: { name: 'OZON Seller', isGroup: false } });
+  }
 
   for (const it of items) {
     try {
@@ -238,7 +244,18 @@ export async function importOzonProducts(): Promise<{ created: number; linked: n
         summary.linked++;
         continue;
       }
-      summary.skipped++;
+      // товара нет в CRM — создаём автоматически
+      await prisma.product.create({
+        data: {
+          article: offerId,
+          name: offerId, // API OZON не отдаёт названий — заполните название в карточке
+          kind: 'product',
+          categoryId: ozonCategory.id,
+          syncToOzon: true,
+          ozonProductId: BigInt(productId),
+        },
+      });
+      summary.created++;
     } catch (err: any) {
       summary.errors.push(`${it.offer_id || it.product_id}: ${err.message}`);
     }
