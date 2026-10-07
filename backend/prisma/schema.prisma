@@ -1158,6 +1158,7 @@ model Product {
   height      Float?
   depth       Float?
   brand       String?  @map("brand") // Бренд товара (единое значение, как тег)
+  tnved       String?  @map("tnved") // Код ТН ВЭД (из OZON)
   syncToVk    Boolean  @default(false) @map("sync_to_vk")
   vkItemId    Int?     @unique @map("vk_item_id")
   // «OZON Seller»: выгружать позицию в маркетплейс OZON

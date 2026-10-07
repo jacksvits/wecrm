@@ -636,7 +636,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, brand, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, brand, tnved, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
     const productKind = kind === 'service' ? 'service' : 'product';
     // Категория из дерева 1С (группы/виды номенклатуры)

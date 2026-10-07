@@ -254,6 +254,70 @@ export async function fetchOzonAttributes(offerIds: string[]): Promise<Map<strin
   return map;
 }
 
+const catAttrCache = new Map<string, Promise<Map<number, string>>>();
+
+/** Атрибуты категории OZON: id → название (для поиска Бренд/ТН ВЭД/Хештеги по имени) */
+function fetchOzonCategoryAttributes(descriptionCategoryId: number, typeId: number): Promise<Map<number, string>> {
+  const key = `${descriptionCategoryId}:${typeId}`;
+  if (!catAttrCache.has(key)) {
+    catAttrCache.set(key, (async () => {
+      const map = new Map<number, string>();
+      try {
+        const data = await ozonApi('POST', '/v1/description-category/attribute', { description_category_id: descriptionCategoryId, type_id: typeId, language: 'RU' });
+        for (const a of data?.result || []) map.set(Number(a.id), String(a.name ?? ''));
+      } catch { /* нет доступа — определим по известным id */ }
+      // резервные известные идентификаторы OZON
+      if (!map.get(85)) map.set(85, 'Бренд');
+      return map;
+    })());
+  }
+  return catAttrCache.get(key)!;
+}
+
+/** Извлечь значение атрибута по имени (регистронезависимо, по подстроке) */
+function attrValueByName(attrs: any[], nameMap: Map<number, string>, needle: string): string | null {
+  const n = needle.toLowerCase();
+  for (const a of attrs || []) {
+    const name = (nameMap.get(Number(a.id)) || '').toLowerCase();
+    if (name.includes(n)) {
+      const v = a.values?.[0]?.value;
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+  }
+  return null;
+}
+
+/** Название категории OZON по description_category_id (из кэшированного дерева) */
+async function resolveOzonCategoryName(descriptionCategoryId: number): Promise<string | null> {
+  try {
+    const tree = await fetchOzonCategoryTree();
+    const walk = (nodes: any[]): string | null => {
+      for (const n of nodes) {
+        if (Number(n.description_category_id) === descriptionCategoryId) return String(n.category_name ?? '') || null;
+        if (n.children?.length) {
+          const f = walk(n.children);
+          if (f) return f;
+        }
+      }
+      return null;
+    };
+    return walk(tree);
+  } catch {
+    return null;
+  }
+}
+
+/** Аннотация (описание) товара из OZON, HTML (/v1/product/info/description) */
+export async function fetchOzonDescription(productId: number): Promise<string | null> {
+  try {
+    const data = await ozonApi('POST', '/v1/product/info/description', { product_id: productId });
+    const d = data?.result?.description;
+    return d && String(d).trim() ? String(d) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Импорт каталога из OZON в CRM по документации api-seller.ozon.ru:
  * 1. /v3/product/list → список product_id + offer_id.
@@ -294,6 +358,27 @@ export async function importOzonProducts(authorId?: string): Promise<{ created: 
         info.primary_image?.[0]?.[0] || info.images?.[0]?.[0] || info.primary_image?.[0] || info.images?.[0] || null;
       const a = attrs.get(offerId);
       const barcode = info.barcodes?.[0] || a?.barcode || null;
+
+      // Бренд, ТН ВЭД, хештеги — атрибуты ищем по названию категории
+      const attrNameMap = (a?.description_category_id && a?.type_id)
+        ? await fetchOzonCategoryAttributes(Number(a.description_category_id), Number(a.type_id))
+        : null;
+      const brandVal = attrNameMap ? attrValueByName(a?.attributes || [], attrNameMap, 'бренд') : null;
+      const tnvedVal = attrNameMap ? attrValueByName(a?.attributes || [], attrNameMap, 'тн вэд') : null;
+      const hashtagsRaw = attrNameMap ? attrValueByName(a?.attributes || [], attrNameMap, 'хештег') : null;
+      const hashtags = hashtagsRaw ? hashtagsRaw.split(/[\s,;#]+/).map((s) => s.trim()).filter(Boolean) : [];
+      // аннотация (описание) из OZON
+      const description = await fetchOzonDescription(productId);
+      // категория OZON → категория CRM под группой «OZON Seller»
+      let ozonCatId: string | null = null;
+      if (a?.description_category_id) {
+        const catName = await resolveOzonCategoryName(Number(a.description_category_id));
+        if (catName) {
+          let cat = await prisma.productCategory.findFirst({ where: { name: catName, parentId: ozonCategory.id } });
+          if (!cat) cat = await prisma.productCategory.create({ data: { name: catName, isGroup: false, parentId: ozonCategory.id } });
+          ozonCatId = cat.id;
+        }
+      }
       // OZON отдаёт вес в граммах, габариты в миллиметрах → CRM: кг и см
       const weightKg = a?.weight ? Number(a.weight) / 1000 : null;
       const widthCm = a?.width ? Number(a.width) / 10 : null;
@@ -303,7 +388,7 @@ export async function importOzonProducts(authorId?: string): Promise<{ created: 
       // уже привязана?
       const byOzon = await prisma.product.findFirst({ where: { ozonProductId: BigInt(productId) } });
       if (byOzon) {
-        await fillFromOzon(byOzon.id, { name, placeholder: byOzon.article, barcode, weightKg, widthCm, heightCm, depthCm, price, retailTypeId: retailType?.id });
+        await fillFromOzon(byOzon.id, { name, placeholder: byOzon.article, barcode, weightKg, widthCm, heightCm, depthCm, price, retailTypeId: retailType?.id, brand: brandVal, tnved: tnvedVal, hashtags, description, ozonCatId });
         await prisma.product.update({ where: { id: byOzon.id }, data: { syncToOzon: true } });
         if (imageUrl && authorId) await attachOzonImage(byOzon.id, imageUrl, authorId);
         summary.linked++;
@@ -315,7 +400,7 @@ export async function importOzonProducts(authorId?: string): Promise<{ created: 
       });
       if (byArticle) {
         await prisma.product.update({ where: { id: byArticle.id }, data: { ozonProductId: BigInt(productId), syncToOzon: true } });
-        await fillFromOzon(byArticle.id, { name, placeholder: byArticle.article, barcode, weightKg, widthCm, heightCm, depthCm, price, retailTypeId: retailType?.id });
+        await fillFromOzon(byArticle.id, { name, placeholder: byArticle.article, barcode, weightKg, widthCm, heightCm, depthCm, price, retailTypeId: retailType?.id, brand: brandVal, tnved: tnvedVal, hashtags, description, ozonCatId });
         if (imageUrl && authorId) await attachOzonImage(byArticle.id, imageUrl, authorId);
         summary.linked++;
         continue;
@@ -326,12 +411,16 @@ export async function importOzonProducts(authorId?: string): Promise<{ created: 
           article: offerId,
           name,
           kind: 'product',
-          categoryId: ozonCategory.id,
+          categoryId: ozonCatId || ozonCategory.id,
           barcode,
           weight: weightKg,
           width: widthCm,
           height: heightCm,
           depth: depthCm,
+          brand: brandVal,
+          tnved: tnvedVal,
+          description: description || undefined,
+          tags: hashtags.length ? hashtags : undefined,
           syncToOzon: true,
           ozonProductId: BigInt(productId),
         },
@@ -388,6 +477,7 @@ async function fillFromOzon(productId: string, d: {
   name: string; placeholder: string | null; barcode: string | null;
   weightKg: number | null; widthCm: number | null; heightCm: number | null; depthCm: number | null;
   price: number | null; retailTypeId: string | null | undefined;
+  brand: string | null; tnved: string | null; hashtags: string[]; description: string | null; ozonCatId: string | null;
 }) {
   const p = await prisma.product.findUnique({ where: { id: productId } });
   if (!p) return;
@@ -399,7 +489,18 @@ async function fillFromOzon(productId: string, d: {
   if (p.width == null && d.widthCm != null) data.width = d.widthCm;
   if (p.height == null && d.heightCm != null) data.height = d.heightCm;
   if (p.depth == null && d.depthCm != null) data.depth = d.depthCm;
+  if (!p.brand && d.brand) data.brand = d.brand;
+  if (!p.tnved && d.tnved) data.tnved = d.tnved;
+  if ((!p.description || !String(p.description).trim()) && d.description) data.description = d.description;
+  if (!p.categoryId && d.ozonCatId) data.categoryId = d.ozonCatId;
   if (Object.keys(data).length) await prisma.product.update({ where: { id: productId }, data });
+  // хештеги OZON → теги CRM (добавляем недостающие)
+  if (d.hashtags.length) {
+    const existing = new Set((p.tags as string[] | null) || []);
+    const merged = [...existing];
+    for (const h of d.hashtags) if (!existing.has(h)) merged.push(h);
+    if (merged.length !== existing.size) await prisma.product.update({ where: { id: productId }, data: { tags: merged } }).catch(() => {});
+  }
   // розничная цена из OZON — только если в CRM своей нет
   if (d.price != null && d.retailTypeId) {
     const has = await prisma.productPrice.findFirst({ where: { productId, priceTypeId: d.retailTypeId } });

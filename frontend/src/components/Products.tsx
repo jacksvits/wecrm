@@ -1308,13 +1308,14 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : product.kind,
     sku: isNew ? '' : product.sku || '',
     unit: isNew ? 'шт' : product.unit,
     barcode: isNew ? '' : product.barcode || '',
     brand: isNew ? '' : product.brand || '',
+    tnved: isNew ? '' : product.tnved || '',
     weight: isNew ? '' : (product.weight != null ? String(product.weight) : ''),
     width: isNew ? '' : (product.width != null ? String(product.width) : ''),
     height: isNew ? '' : (product.height != null ? String(product.height) : ''),
@@ -1370,7 +1371,7 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     setSaving(true); setError('');
     try {
       const num = (v: string) => (v === '' ? null : Number(v));
-      const payload = { ...form, categoryId: categoryId || null, weight: num(form.weight), width: num(form.width), height: num(form.height), depth: num(form.depth), brand: form.brand.trim() || null };
+      const payload = { ...form, categoryId: categoryId || null, weight: num(form.weight), width: num(form.width), height: num(form.height), depth: num(form.depth), brand: form.brand.trim() || null, tnved: form.tnved.trim() || null };
       if (isNew) await api.products.create(payload);
       else await api.products.update(product.id, payload);
       onSaved();
@@ -1513,6 +1514,13 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
           <datalist id="product-brand-suggestions">
             {brandSuggestions.map(b => <option key={b} value={b} />)}
           </datalist>
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Код ТН ВЭД</label>
+          <input
+            value={form.tnved}
+            onChange={e => setForm({ ...form, tnved: e.target.value })}
+            placeholder="Например: 7009100009 (подтягивается из OZON при импорте)"
+            style={inputStyle}
+          />
           <label style={{ fontSize: 14, fontWeight: 500 }}>Описание</label>
           <ReactQuill theme="snow" value={form.description} onChange={v => setForm({ ...form, description: v })}
             modules={quillModules} formats={quillFormats} />
