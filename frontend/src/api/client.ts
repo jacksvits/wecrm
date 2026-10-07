@@ -232,6 +232,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     vkSync: (): Promise<{ created: number; updated: number; failed: number; errors: string[] }> => fetchApi('/api/products/meta/vk-sync', { method: 'POST' }),
     ozonSync: (): Promise<{ created: number; updated: number; failed: number; errors: string[] }> => fetchApi('/api/products/meta/ozon-sync', { method: 'POST' }),
     addImage: (id: string, attachmentId: string): Promise<ProductImage> => fetchApi(`/api/products/${id}/images`, { method: 'POST', body: JSON.stringify({ attachmentId }) }),
+    addImageByUrl: (id: string, url: string): Promise<ProductImage> => fetchApi(`/api/products/${id}/images/url`, { method: 'POST', body: JSON.stringify({ url }) }),
     deleteImage: (id: string, imageId: string) => fetchApi(`/api/products/${id}/images/${imageId}`, { method: 'DELETE' }),
     movements: (params?: { productId?: string; warehouseId?: string }): Promise<StockMovement[]> => {
       const qs = new URLSearchParams();

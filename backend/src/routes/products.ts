@@ -861,6 +861,51 @@ router.post('/:id/images', async (req, res) => {
 });
 
 /**
+ * POST /api/products/:id/images/url
+ * Скачать изображение по внешней ссылке (например, из кабинета OZON: ir.ozone.ru) и прикрепить к товару
+ */
+router.post('/:id/images/url', async (req, res) => {
+  try {
+    const product = await prisma.product.findUnique({ where: { id: req.params.id } });
+    if (!product) return res.status(404).json({ error: 'Товар не найден' });
+    const { url } = req.body || {};
+    if (!url || typeof url !== 'string' || !/^https:\/\//i.test(url)) {
+      return res.status(400).json({ error: 'Укажите корректный URL изображения (https://)' });
+    }
+    const resp = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(20000) });
+    if (!resp.ok) return res.status(400).json({ error: `Не удалось скачать изображение: HTTP ${resp.status}` });
+    const mime = resp.headers.get('content-type')?.split(';')[0] || '';
+    if (!mime.startsWith('image/')) return res.status(400).json({ error: 'По ссылке не изображение' });
+    const buf = Buffer.from(await resp.arrayBuffer());
+    if (!buf.length || buf.length > 10 * 1024 * 1024) return res.status(400).json({ error: 'Изображение пустое или больше 10 МБ' });
+
+    const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[mime] || 'jpg';
+    const filename = `product-${product.id}-${Date.now()}.${ext}`;
+    fs.writeFileSync(path.join(UPLOAD_ROOT, filename), buf);
+
+    const attachment = await prisma.fileAttachment.create({
+      data: {
+        entityType: 'product',
+        entityId: product.id,
+        field: 'image',
+        filename: url.split('/').pop()?.split('?')[0] || filename,
+        mimeType: mime,
+        size: buf.length,
+        path: `/uploads/${filename}`,
+      },
+    });
+    const maxSort = await prisma.productImage.aggregate({ where: { productId: product.id }, _max: { sortOrder: true } });
+    const image = await prisma.productImage.create({
+      data: { productId: product.id, attachmentId: attachment.id, sortOrder: (maxSort._max.sortOrder ?? -1) + 1 },
+    });
+    res.json({ id: image.id, productId: product.id, attachmentId: attachment.id, sortOrder: image.sortOrder, url: attachment.path, attachment });
+  } catch (err: any) {
+    console.error('[products:images:url]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * DELETE /api/products/:id/images/:imageId
  * Удалить изображение товара (вместе с файлом и вложением)
  */

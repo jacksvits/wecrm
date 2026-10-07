@@ -1340,6 +1340,9 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Загрузка изображения по внешней ссылке (например, из кабинета OZON)
+  const [imageUrl, setImageUrl] = useState('');
+  const [urlBusy, setUrlBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const origin = window.location.origin;
 
@@ -1378,6 +1381,18 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     if (isNew) return;
     try { await api.products.deleteImage(product.id, imageId); onSaved(); }
     catch (e: any) { setError(e.message || 'Ошибка удаления изображения'); }
+  };
+
+  // Скачать изображение по ссылке (например, из кабинета OZON) и прикрепить к товару
+  const addImageByUrl = async () => {
+    if (isNew || !imageUrl.trim()) return;
+    setUrlBusy(true); setError('');
+    try {
+      await api.products.addImageByUrl(product.id, imageUrl.trim());
+      setImageUrl('');
+      onSaved();
+    } catch (e: any) { setError(e.message || 'Ошибка загрузки по ссылке'); }
+    finally { setUrlBusy(false); }
   };
 
   const images = isNew ? [] : (product.images || []);
@@ -1481,6 +1496,19 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
               <button onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{ ...btnGhost, alignSelf: 'flex-start' }}>
                 {uploading ? 'Загрузка...' : '+ Добавить изображения'}
               </button>
+              {!isNew && (
+                <span style={{ display: 'flex', gap: 8, alignItems: 'center', alignSelf: 'flex-start', flexWrap: 'wrap' }}>
+                  <input
+                    value={imageUrl}
+                    onChange={e => setImageUrl(e.target.value)}
+                    placeholder="или URL картинки (например, из OZON)"
+                    style={{ ...inputStyle, width: 280, padding: '6px 10px', fontSize: 13 }}
+                  />
+                  <button type="button" onClick={addImageByUrl} disabled={urlBusy || !imageUrl.trim()} style={{ ...btnGhost, opacity: (urlBusy || !imageUrl.trim()) ? 0.5 : 1 }}>
+                    {urlBusy ? 'Загрузка...' : 'По ссылке'}
+                  </button>
+                </span>
+              )}
             </div>
           )}
 

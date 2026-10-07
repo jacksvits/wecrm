@@ -1,6 +1,8 @@
 import { prisma } from './prisma.js';
 
 const OZON_API = 'https://api-seller.ozon.ru';
+// Публичный адрес CRM — картинки товаров отдаются по нему, OZON заберёт их при импорте
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || 'https://welans.cc').replace(/\/$/, '');
 
 export interface OzonCredentials {
   clientId: string;
@@ -68,7 +70,7 @@ async function resolveOzonDescriptionCategoryId(typeId: number): Promise<number 
 
 /** Создать товары в OZON (актуальный метод /v3/product/import; /v1 и /v2 удалены из API).
  *  Важно: OZON требует ОБА идентификатора — type_id (листовой тип) и description_category_id (родительская группа типа). */
-export async function ozonImportProducts(items: { offer_id: string; name: string; typeId: number; descriptionCategoryId: number; barcode?: string; price?: number; quantity?: number }[]): Promise<number> {
+export async function ozonImportProducts(items: { offer_id: string; name: string; typeId: number; descriptionCategoryId: number; barcode?: string; price?: number; quantity?: number; images?: string[] }[]): Promise<number> {
   const data = await ozonApi('POST', '/v3/product/import', {
     items: items.map((it) => ({
       offer_id: it.offer_id,
@@ -78,6 +80,7 @@ export async function ozonImportProducts(items: { offer_id: string; name: string
       barcode: it.barcode || undefined,
       price: it.price != null ? String(it.price) : undefined,
       quantity: it.quantity != null ? String(it.quantity) : undefined,
+      images: it.images?.length ? it.images : undefined,
       currency_code: 'RUB',
       vat: '0',
       attributes: [],
@@ -275,7 +278,7 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
   const products = await prisma.product.findMany({
     where: { syncToOzon: true, isActive: true, kind: 'product' },
     include: {
-      images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+      images: { orderBy: { sortOrder: 'asc' }, take: 1, include: { attachment: true } },
       stocks: true,
       prices: true,
     },
@@ -354,6 +357,8 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         barcode: product.barcode || undefined,
         price: price != null ? Math.round(price) : undefined,
         quantity: Math.max(0, Math.round(quantity)),
+        // картинка из карточки CRM → OZON забирает её по публичному URL
+        images: product.images?.[0]?.attachment?.path ? [`${PUBLIC_BASE_URL}${product.images[0].attachment.path}`] : undefined,
       }]);
       // результат импорта асинхронный: ждём завершения задачи; предупреждения (например, бренд) не считаем падением
       if (taskId) {
