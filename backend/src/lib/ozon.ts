@@ -215,7 +215,7 @@ export async function fetchOzonCategoryTree(): Promise<any[]> {
 export async function ozonFindProductId(offerId: string): Promise<number | null> {
   try {
     const data = await ozonApi('POST', '/v3/product/list', {
-      filter: { offer_id: [offerId] },
+      filter: { offer_id: [offerId], visibility: 'ACTIVE' },
       limit: 1,
     });
     const items = data?.result?.items || [];
