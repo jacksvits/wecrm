@@ -79,11 +79,11 @@ async function buildOzonAttributes(product: { brand?: string | null; tnved?: str
     const modelAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'название модели');
     if (modelAttrId) attrs.push({ id: modelAttrId, values: [{ value: modelName }] });
   }
-  // Аннотация OZON = описание карточки CRM
+  // Аннотация OZON = описание карточки CRM (атрибут «Описание», системный id 4191)
   const desc = product.description?.trim();
   if (desc) {
-    const descAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'описание');
-    if (descAttrId) attrs.push({ id: descAttrId, values: [{ value: desc }] });
+    const descAttrId = (await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'описание')) ?? 4191;
+    attrs.push({ id: descAttrId, values: [{ value: desc }] });
   }
   // Хештеги OZON = теги карточки CRM (#тег через пробел; внутри тега пробелов быть не должно — заменяем на _)
   const tagList = (product.tags || []).map((t) => String(t).trim()).filter(Boolean);
