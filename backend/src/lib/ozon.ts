@@ -289,8 +289,9 @@ export async function importOzonProducts(authorId?: string): Promise<{ created: 
 
       const name = String(info.name ?? '').trim() || offerId;
       const price = parseFloat(String(info.price ?? '').replace(',', '.')) || null;
-      // картинка товара из OZON (primary_image приоритетнее images)
-      const imageUrl = info.primary_image?.[0] || info.images?.[0] || null;
+      // картинка товара из OZON (primary_image — массив массивов URL: [["..."]])
+      const imageUrl: string | null =
+        info.primary_image?.[0]?.[0] || info.images?.[0]?.[0] || info.primary_image?.[0] || info.images?.[0] || null;
       const a = attrs.get(offerId);
       const barcode = info.barcodes?.[0] || a?.barcode || null;
       // OZON отдаёт вес в граммах, габариты в миллиметрах → CRM: кг и см
