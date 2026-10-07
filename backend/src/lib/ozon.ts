@@ -147,8 +147,7 @@ export async function getOzonWarehouseIds(): Promise<number[]> {
 /** Обновить остатки существующих товаров (на первом складе продавца) */
 export async function ozonUpdateStocks(items: { product_id: number; stock: number }[], warehouseId: number): Promise<void> {
   await ozonApi('POST', '/v2/products/stocks', {
-    stocks: items.map((it) => ({ product_id: it.product_id, stock: it.stock })),
-    warehouse_id: warehouseId,
+    stocks: items.map((it) => ({ product_id: it.product_id, stock: it.stock, warehouse_id: warehouseId })),
   });
 }
 
