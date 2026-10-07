@@ -100,14 +100,32 @@ async function buildOzonAttributes(product: { brand?: string | null; tnved?: str
   // Обязательный булев «Нужен код маркировки» → по умолчанию «нет»
   const markingAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'код маркировки');
   if (markingAttrId) attrs.push({ id: markingAttrId, values: [{ value: 'false' }] });
-  // Обязательный «Тип» (например тип памяти DDR4) — ищем в названии/описании карточки CRM
+  // Обязательный «Тип» — значение подбираем по названию категории OZON (словарь небольшой, листаем целиком)
   const typeAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'тип');
   if (typeAttrId) {
-    const hay = `${product.name || ''} ${product.description || ''}`.toLowerCase();
-    const m = hay.match(/\b(ddr[2-5][lx]?|so-?dim[a-z]*)\b/i) || hay.match(/\b(ssd|hdd)\b/i);
-    if (m) {
-      const dv = await findOzonDictionaryValueId(typeAttrId, descriptionCategoryId, typeId, m[1].toUpperCase());
-      attrs.push({ id: typeAttrId, values: [{ value: m[1].toUpperCase(), ...(dv ? { dictionary_value_id: dv } : {}) }] });
+    const catName = (await resolveOzonCategoryName(descriptionCategoryId)) || product.name || '';
+    const words = catName.toLowerCase().replace(/[^a-zа-яё0-9\s]/gi, ' ').split(/\s+/).filter((w) => w.length >= 4);
+    if (words.length) {
+      const vals: { id: number; value: string }[] = [];
+      let lastId = 0;
+      for (let page = 0; page < 10; page++) {
+        const body: any = { attribute_id: typeAttrId, description_category_id: descriptionCategoryId, type_id: typeId, language: 'RU', limit: 200 };
+        if (lastId) body.last_value_id = lastId;
+        const data = await ozonApi('POST', '/v1/description-category/attribute/values', body);
+        const batch = data?.result || [];
+        if (!batch.length) break;
+        vals.push(...batch.map((v: any) => ({ id: Number(v.id), value: String(v.value) })));
+        const next = Number(batch[batch.length - 1]?.id ?? 0);
+        if (!next || next === lastId) break;
+        lastId = next;
+      }
+      let best: { id: number; value: string; score: number } | null = null;
+      for (const v of vals) {
+        const vw = v.value.toLowerCase().replace(/[^a-zа-яё0-9\s]/gi, ' ').split(/\s+/);
+        const score = words.filter((w) => vw.some((x) => x.startsWith(w.slice(0, 5)) || w.startsWith(x.slice(0, 5)))).length;
+        if (score > 0 && (!best || score > best.score)) best = { ...v, score };
+      }
+      if (best) attrs.push({ id: typeAttrId, values: [{ value: best.value, dictionary_value_id: best.id }] });
     }
   }
   return attrs;
@@ -347,10 +365,13 @@ function fetchOzonCategoryAttributes(descriptionCategoryId: number, typeId: numb
   return promise;
 }
 
-/** ID атрибута категории по названию (регистронезависимо) */
+/** ID атрибута категории по названию (сначала точное совпадение, затем по подстроке) */
 async function findOzonAttributeIdByName(descriptionCategoryId: number, typeId: number, needle: string): Promise<number | null> {
   const map = await fetchOzonCategoryAttributes(descriptionCategoryId, typeId);
   const n = needle.toLowerCase();
+  for (const [id, name] of map) {
+    if (name.toLowerCase() === n) return id;
+  }
   for (const [id, name] of map) {
     if (name.toLowerCase().includes(n)) return id;
   }
@@ -371,7 +392,7 @@ function findOzonDictionaryValueId(attributeId: number, descriptionCategoryId: n
       try {
         const target = search.toLowerCase().trim();
         let lastId = 0;
-        for (let page = 0; page < 30; page++) {
+        for (let page = 0; page < 100; page++) {
           const body: any = {
             attribute_id: attributeId,
             description_category_id: descriptionCategoryId,
