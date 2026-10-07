@@ -893,6 +893,7 @@ router.post('/:id/images/url', async (req, res) => {
         mimeType: mime,
         size: buf.length,
         path: `/uploads/${filename}`,
+        authorId: (req as AuthRequest).user!.id,
       },
     });
     const maxSort = await prisma.productImage.aggregate({ where: { productId: product.id }, _max: { sortOrder: true } });
