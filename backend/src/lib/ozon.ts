@@ -56,7 +56,7 @@ export async function testOzonConnection(creds?: OzonCredentials): Promise<{ ok:
  * поэтому значение ищется в справочнике (/v1/description-category/attribute/values).
  * Автозаполняемые обязательные: «Название модели» = артикул, «Нужен код маркировки» = нет.
  */
-async function buildOzonAttributes(product: { brand?: string | null; tnved?: string | null; article?: string | null }, typeId: number, descriptionCategoryId: number): Promise<any[]> {
+async function buildOzonAttributes(product: { brand?: string | null; tnved?: string | null; article?: string | null; name?: string; description?: string | null }, typeId: number, descriptionCategoryId: number): Promise<any[]> {
   const attrs: any[] = [];
   const brand = product.brand?.trim();
   if (brand) {
@@ -82,6 +82,16 @@ async function buildOzonAttributes(product: { brand?: string | null; tnved?: str
   // Обязательный булев «Нужен код маркировки» → по умолчанию «нет»
   const markingAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'код маркировки');
   if (markingAttrId) attrs.push({ id: markingAttrId, values: [{ value: 'false' }] });
+  // Обязательный «Тип» (например тип памяти DDR4) — ищем в названии/описании карточки CRM
+  const typeAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'тип');
+  if (typeAttrId) {
+    const hay = `${product.name || ''} ${product.description || ''}`.toLowerCase();
+    const m = hay.match(/\b(ddr[2-5][lx]?|so-?dim[a-z]*)\b/i) || hay.match(/\b(ssd|hdd)\b/i);
+    if (m) {
+      const dv = await findOzonDictionaryValueId(typeAttrId, descriptionCategoryId, typeId, m[1].toUpperCase());
+      attrs.push({ id: typeAttrId, values: [{ value: m[1].toUpperCase(), ...(dv ? { dictionary_value_id: dv } : {}) }] });
+    }
+  }
   return attrs;
 }
 
