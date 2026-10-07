@@ -316,24 +316,29 @@ export async function fetchOzonAttributes(offerIds: string[]): Promise<Map<strin
   return map;
 }
 
-const catAttrCache = new Map<string, Promise<Map<number, string>>>();
+const catAttrCache = new Map<string, { at: number; promise: Promise<Map<number, string>> }>();
 
-/** Атрибуты категории OZON: id → название (для поиска Бренд/ТН ВЭД/Хештеги по имени) */
+/** Атрибуты категории OZON: id → название (для поиска Бренд/ТН ВЭД/Хештеги по имени).
+ *  Пустой результат не кэшируем навсегда — повторяем при следующем запросе. */
 function fetchOzonCategoryAttributes(descriptionCategoryId: number, typeId: number): Promise<Map<number, string>> {
   const key = `${descriptionCategoryId}:${typeId}`;
-  if (!catAttrCache.has(key)) {
-    catAttrCache.set(key, (async () => {
-      const map = new Map<number, string>();
-      try {
-        const data = await ozonApi('POST', '/v1/description-category/attribute', { description_category_id: descriptionCategoryId, type_id: typeId, language: 'RU' });
-        for (const a of data?.result || []) map.set(Number(a.id), String(a.name ?? ''));
-      } catch { /* нет доступа — определим по известным id */ }
-      // резервные известные идентификаторы OZON
-      if (!map.get(85)) map.set(85, 'Бренд');
-      return map;
-    })());
-  }
-  return catAttrCache.get(key)!;
+  const cached = catAttrCache.get(key);
+  if (cached && Date.now() - cached.at < 60 * 60 * 1000) return cached.promise;
+  const promise = (async () => {
+    const map = new Map<number, string>();
+    try {
+      const data = await ozonApi('POST', '/v1/description-category/attribute', { description_category_id: descriptionCategoryId, type_id: typeId, language: 'RU' });
+      for (const a of data?.result || []) map.set(Number(a.id), String(a.name ?? ''));
+    } catch { /* нет доступа — определим по известным id */ }
+    // резервные известные идентификаторы OZON
+    if (!map.get(85)) map.set(85, 'Бренд');
+    // пустой результат не кэшируем (удалим запись)
+    if (map.size <= 1) catAttrCache.delete(key);
+    else catAttrCache.set(key, { at: Date.now(), promise });
+    return map;
+  })();
+  if (!catAttrCache.has(key)) catAttrCache.set(key, { at: Date.now(), promise });
+  return promise;
 }
 
 /** ID атрибута категории по названию (регистронезависимо) */
