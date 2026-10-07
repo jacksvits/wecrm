@@ -212,6 +212,42 @@ export async function fetchAllOzonProducts(): Promise<any[]> {
   return all;
 }
 
+/** Минимальное декодирование HTML-сущностей в названиях из поиска */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'");
+}
+
+let ddgLastAt = 0;
+
+/**
+ * Поиск названия товара по артикулу через DuckDuckGo (Seller API OZON не отдаёт названия).
+ * Возвращает первый заголовок результата или null. Нежный режим: задержка между запросами,
+ * любая ошибка → null (импорт продолжится с названием = артикул).
+ */
+export async function searchProductTitleByArticle(article: string): Promise<string | null> {
+  try {
+    const now = Date.now();
+    if (now - ddgLastAt < 1500) await new Promise((r) => setTimeout(r, 1500 - (now - ddgLastAt)));
+    ddgLastAt = Date.now();
+    const r = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(article)}`, {
+      signal: AbortSignal.timeout(15000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' },
+    });
+    if (!r.ok) return null;
+    const html = await r.text();
+    const m = html.match(/class="result__a"[^>]*>([^<]+)</);
+    if (!m) return null;
+    const title = decodeEntities(m[1]).replace(/\s+/g, ' ').trim();
+    return title && title.length >= 3 ? title.slice(0, 200) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Импорт каталога из OZON в CRM (двусторонняя синхронизация):
  * 1. Товары CRM сопоставляются с OZON по артикулу (offer_id) → привязка ozonProductId + отметка «OZON Seller».
@@ -238,10 +274,15 @@ export async function importOzonProducts(): Promise<{ created: number; linked: n
       const offerId = String(it.offer_id ?? '').trim();
       if (!offerId) { summary.skipped++; continue; }
 
+      // название из открытого поиска (Seller API OZON не отдаёт названия)
+      const searchedName = await searchProductTitleByArticle(offerId);
+
       // уже привязана?
       const byOzon = await prisma.product.findFirst({ where: { ozonProductId: BigInt(productId) } });
       if (byOzon) {
-        await prisma.product.update({ where: { id: byOzon.id }, data: { syncToOzon: true } });
+        // переименуем ранее автосозданную «заглушку» (название = артикул)
+        const rename = byOzon.name === offerId && searchedName ? { name: searchedName } : {};
+        await prisma.product.update({ where: { id: byOzon.id }, data: { syncToOzon: true, ...rename } });
         summary.linked++;
         continue;
       }
@@ -250,7 +291,8 @@ export async function importOzonProducts(): Promise<{ created: number; linked: n
         where: { OR: [{ article: offerId }, { sku: offerId }] },
       });
       if (byArticle) {
-        await prisma.product.update({ where: { id: byArticle.id }, data: { ozonProductId: BigInt(productId), syncToOzon: true } });
+        const rename = byArticle.name === offerId && searchedName ? { name: searchedName } : {};
+        await prisma.product.update({ where: { id: byArticle.id }, data: { ozonProductId: BigInt(productId), syncToOzon: true, ...rename } });
         summary.linked++;
         continue;
       }
@@ -258,7 +300,7 @@ export async function importOzonProducts(): Promise<{ created: number; linked: n
       await prisma.product.create({
         data: {
           article: offerId,
-          name: offerId, // API OZON не отдаёт названий — заполните название в карточке
+          name: searchedName || offerId, // API OZON не отдаёт названий — подставляем найденное или артикул
           kind: 'product',
           categoryId: ozonCategory.id,
           syncToOzon: true,
