@@ -211,15 +211,20 @@ export async function fetchOzonCategoryTree(): Promise<any[]> {
   return tree;
 }
 
-/** Найти товар в OZON по offer_id (внутренний артикул/артикул из CRM) */
+/** Найти АКТИВНЫЙ товар в OZON по offer_id (архивные не подходят — их нельзя обновить) */
 export async function ozonFindProductId(offerId: string): Promise<number | null> {
   try {
     const data = await ozonApi('POST', '/v3/product/list', {
-      filter: { offer_id: [offerId], visibility: 'ACTIVE' },
+      filter: { offer_id: [offerId] },
       limit: 1,
     });
     const items = data?.result?.items || [];
-    return items.length ? items[0].product_id ?? null : null;
+    if (!items.length) return null;
+    // фильтр visibility в /v3/product/list игнорируется — проверяем флаг напрямую
+    const info = await ozonApi('POST', '/v3/product/info/list', { offer_id: [offerId], limit: 1 });
+    const it = (info?.items || [])[0];
+    if (it?.is_archived) return null;
+    return items[0].product_id ?? null;
   } catch {
     return null;
   }
