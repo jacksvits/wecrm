@@ -85,11 +85,17 @@ async function buildOzonAttributes(product: { brand?: string | null; tnved?: str
     const descAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'описание');
     if (descAttrId) attrs.push({ id: descAttrId, values: [{ value: desc }] });
   }
-  // Хештеги OZON = теги карточки CRM (#тег через пробел)
+  // Хештеги OZON = теги карточки CRM (#тег через пробел; внутри тега пробелов быть не должно — заменяем на _)
   const tagList = (product.tags || []).map((t) => String(t).trim()).filter(Boolean);
   if (tagList.length) {
     const hashAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'хештег');
-    if (hashAttrId) attrs.push({ id: hashAttrId, values: [{ value: tagList.map((t) => (t.startsWith('#') ? t : `#${t}`)).join(' ') }] });
+    if (hashAttrId) {
+      const hashStr = tagList.map((t) => {
+        const clean = t.replace(/\s+/g, '_');
+        return clean.startsWith('#') ? clean : `#${clean}`;
+      }).join(' ');
+      attrs.push({ id: hashAttrId, values: [{ value: hashStr }] });
+    }
   }
   // Обязательный булев «Нужен код маркировки» → по умолчанию «нет»
   const markingAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'код маркировки');
