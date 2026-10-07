@@ -275,7 +275,6 @@ router.patch('/:id', async (req: any, res) => {
         if (!['held', 'issued', 'canceled', 'paid', 'completed'].includes(status)) {
           throw new Error('Недопустимый статус резерва');
         }
-        if (status === 'paid' && r.status === 'issued') throw new Error('Выданный резерв нельзя отметить оплаченным');
         // Атомарная смена статуса до любых движений остатков: условный UPDATE применится
         // только один раз — параллельный запрос получит count=0 и откатится (защита от двойного клика)
         const flipStatus = async (from: string, data: Record<string, unknown>) => {
@@ -283,46 +282,28 @@ router.patch('/:id', async (req: any, res) => {
           if (count === 0) throw new Error('Статус уже изменён другим запросом — обновите страницу');
         };
         const withItems = { items: { include: { product: true } }, contact: true, user: true };
-        // Оплачен / Завершён — без движения остатков, только смена статуса
-        if (status === 'paid' || status === 'completed') {
-          await flipStatus(r.status, { status });
-          return tx.reservation.findUnique({ where: { id: r.id }, include: withItems });
-        }
-        if (status === 'issued') {
-          if (r.status !== 'held') throw new Error('Выдать можно только отложенный резерв');
-          for (const it of r.items) {
+        // Вклад статуса в остатки: сколько он забирает из количества (q) и держит в резерве (r).
+        // Переход — разница вкладов: admin/manager могут сменить любой статус на любой,
+        // остатки при этом пересчитываются автоматически (например, «Выдано» → «Отменён»
+        // возвращает товар на склад, а «Оплачен» → «Выдано» списывает его)
+        const effect = (s: string, qty: number) =>
+          s === 'issued' ? { q: -qty, r: 0 }
+          : s === 'canceled' ? { q: 0, r: 0 }
+          : { q: 0, r: qty }; // held / paid / completed держат резерв без движения остатков
+        // Проверки остатков до смены статуса
+        for (const it of r.items) {
+          const from = effect(r.status, it.quantity);
+          const to = effect(status, it.quantity);
+          const dq = to.q - from.q;
+          const dr = to.r - from.r;
+          if (dq < 0) {
             const stock = await tx.stockBalance.findFirst({ where: { productId: it.productId, warehouseId: r.warehouseId } });
             if (it.quantity > (stock?.quantity ?? 0)) {
               const p = await tx.product.findUnique({ where: { id: it.productId } });
               throw new Error(`Недостаточно остатка для выдачи: ${p?.name}`);
             }
           }
-          await flipStatus('held', { status: 'issued', issuedAt: new Date() });
-          for (const it of r.items) {
-            await tx.stockBalance.updateMany({
-              where: { productId: it.productId, warehouseId: r.warehouseId },
-              data: { quantity: { decrement: it.quantity }, reserved: { decrement: it.quantity } },
-            });
-            await tx.stockMovement.create({
-              data: { type: 'outcome', productId: it.productId, warehouseId: r.warehouseId, quantity: it.quantity, price: it.price, comment: `Резерв №${r.number}`, userId: req.user?.id },
-            });
-          }
-          return tx.reservation.findUnique({ where: { id: r.id }, include: withItems });
-        }
-        if (status === 'canceled') {
-          if (r.status !== 'held') throw new Error('Отменить можно только отложенный резерв');
-          await flipStatus('held', { status: 'canceled' });
-          for (const it of r.items) {
-            await tx.stockBalance.updateMany({
-              where: { productId: it.productId, warehouseId: r.warehouseId },
-              data: { reserved: { decrement: it.quantity } },
-            });
-          }
-          return tx.reservation.findUnique({ where: { id: r.id }, include: withItems });
-        }
-        if (status === 'held') {
-          if (r.status !== 'canceled') throw new Error('Вернуть в резерв можно только отменённый резерв');
-          for (const it of r.items) {
+          if (dr > 0) {
             const stock = await tx.stockBalance.findFirst({ where: { productId: it.productId, warehouseId: r.warehouseId } });
             const free = (stock?.quantity ?? 0) - (stock?.reserved ?? 0);
             if (it.quantity > free) {
@@ -330,16 +311,33 @@ router.patch('/:id', async (req: any, res) => {
               throw new Error(`Недостаточно остатка: ${p?.name} (свободно ${free} ${p?.unit || ''})`);
             }
           }
-          await flipStatus('canceled', { status: 'held', issuedAt: null });
-          for (const it of r.items) {
-            await tx.stockBalance.updateMany({
-              where: { productId: it.productId, warehouseId: r.warehouseId },
-              data: { reserved: { increment: it.quantity } },
+        }
+        await flipStatus(r.status, { status, issuedAt: status === 'issued' ? (r.issuedAt ?? new Date()) : null });
+        // Пересчёт остатков и движения товара по разнице вкладов статусов
+        for (const it of r.items) {
+          const from = effect(r.status, it.quantity);
+          const to = effect(status, it.quantity);
+          const dq = to.q - from.q;
+          const dr = to.r - from.r;
+          if (!dq && !dr) continue;
+          await tx.stockBalance.updateMany({
+            where: { productId: it.productId, warehouseId: r.warehouseId },
+            data: {
+              ...(dq ? { quantity: { [dq < 0 ? 'decrement' : 'increment']: Math.abs(dq) } } : {}),
+              ...(dr ? { reserved: { [dr < 0 ? 'decrement' : 'increment']: Math.abs(dr) } } : {}),
+            },
+          });
+          if (dq < 0) {
+            await tx.stockMovement.create({
+              data: { type: 'outcome', productId: it.productId, warehouseId: r.warehouseId, quantity: it.quantity, price: it.price, comment: `Резерв №${r.number}`, userId: req.user?.id },
+            });
+          } else if (dq > 0) {
+            await tx.stockMovement.create({
+              data: { type: 'income', productId: it.productId, warehouseId: r.warehouseId, quantity: it.quantity, price: it.price, comment: `Возврат из резерва №${r.number}`, userId: req.user?.id },
             });
           }
-          return tx.reservation.findUnique({ where: { id: r.id }, include: withItems });
         }
-        throw new Error('Неизвестный статус');
+        return tx.reservation.findUnique({ where: { id: r.id }, include: withItems });
       }
 
       // Редактирование состава — только отложенный резерв
