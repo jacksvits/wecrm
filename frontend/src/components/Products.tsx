@@ -141,6 +141,19 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
     } finally { setOzonBusy(false); }
   };
 
+  // Импорт из OZON: привязка товаров CRM к карточкам OZON по артикулу
+  const importFromOzon = async () => {
+    if (!confirm('Импортировать каталог OZON и привязать товары CRM по артикулу?')) return;
+    setOzonBusy(true);
+    try {
+      const r = await api.ozonPlugin.import();
+      alert(`Импорт завершён: привязано ${r.linked}, пропущено ${r.skipped}, создано ${r.created}, ошибок ${r.errors.length}${r.errors.length ? '\n' + r.errors.slice(0, 10).join('\n') : ''}`);
+      await load();
+    } catch (e: any) {
+      alert(e.message || 'Ошибка импорта из OZON');
+    } finally { setOzonBusy(false); }
+  };
+
   // Переключение опции «Показывать на витрине» у вида цены
   const toggleVitrine = async (t: PriceType) => {
     try {
@@ -567,6 +580,10 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
             <button onClick={syncToOzon} disabled={ozonBusy} title="Выгрузить позиции с отметкой «OZON Seller» в маркетплейс OZON"
               style={{ ...btnGhost, borderColor: '#005BFF', color: '#005BFF' }}>
               {ozonBusy ? 'Синхронизация...' : '↑ Синхронизация OZON'}
+            </button>
+            <button onClick={importFromOzon} disabled={ozonBusy} title="Привязать товары CRM к карточкам OZON по артикулу"
+              style={{ ...btnGhost, borderColor: '#005BFF', color: '#005BFF' }}>
+              {ozonBusy ? 'Импорт...' : '↓ Импорт из OZON'}
             </button>
             <button onClick={() => setProductModal('new')} style={btnPrimary}>+ Позиция</button>
           </div>

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { testOzonConnection, syncProductsToOzon, fetchOzonCategoryTree } from '../lib/ozon.js';
+import { testOzonConnection, syncProductsToOzon, fetchOzonCategoryTree, importOzonProducts } from '../lib/ozon.js';
 
 const router = Router();
 
@@ -91,6 +91,17 @@ router.get('/categories', authMiddleware, async (_req, res) => {
     res.json({ items: tree });
   } catch (err: any) {
     console.error('[ozon-plugin] categories error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/ozon-plugin/import — привязка каталога OZON к товарам CRM (по артикулу)
+router.post('/import', authMiddleware, async (_req, res) => {
+  try {
+    const summary = await importOzonProducts();
+    res.json(summary);
+  } catch (err: any) {
+    console.error('[ozon-plugin] import error:', err.message);
     res.status(400).json({ error: err.message });
   }
 });

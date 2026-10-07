@@ -183,6 +183,69 @@ export interface OzonSyncSummary {
   errors: string[];
 }
 
+/** Выкачать весь каталог товаров из OZON (курсорная пагинация /v3/product/list) */
+export async function fetchAllOzonProducts(): Promise<any[]> {
+  const all: any[] = [];
+  let lastId = '';
+  for (let page = 0; page < 50; page++) {
+    const data = await ozonApi('POST', '/v3/product/list', {
+      filter: { visibility: 'ALL' },
+      limit: 100,
+      last_id: lastId || undefined,
+    });
+    const items = data?.result?.items || [];
+    all.push(...items);
+    const next = data?.result?.last_id;
+    if (!items.length || !next || next === lastId) break;
+    lastId = next;
+  }
+  return all;
+}
+
+/**
+ * Импорт каталога из OZON в CRM:
+ * чтение названий/цен товаров недоступно в текущем API (методы info/prices отдают 404),
+ * поэтому импорт работает как ПРИВЯЗКА — товары CRM сопоставляются с OZON по артикулу (offer_id),
+ * привязывается ozonProductId и ставится отметка «OZON Seller». Цены и остатки после привязки
+ * обновляются обычной синхронизацией CRM → OZON.
+ */
+export async function importOzonProducts(): Promise<{ created: number; linked: number; skipped: number; errors: string[] }> {
+  const settings = await getOzonSettings();
+  if (!settings) throw new Error('OZON Seller не подключён: укажите Client-Id и API-ключ в настройках интеграции');
+  const summary = { created: 0, linked: 0, skipped: 0, errors: [] as string[] };
+
+  const items = await fetchAllOzonProducts();
+
+  for (const it of items) {
+    try {
+      const productId = Number(it.product_id);
+      const offerId = String(it.offer_id ?? '').trim();
+      if (!offerId) { summary.skipped++; continue; }
+
+      // уже привязана?
+      const byOzon = await prisma.product.findFirst({ where: { ozonProductId: BigInt(productId) } });
+      if (byOzon) {
+        await prisma.product.update({ where: { id: byOzon.id }, data: { syncToOzon: true } });
+        summary.linked++;
+        continue;
+      }
+      // сопоставление по артикулу / внутреннему артикулу
+      const byArticle = await prisma.product.findFirst({
+        where: { OR: [{ article: offerId }, { sku: offerId }] },
+      });
+      if (byArticle) {
+        await prisma.product.update({ where: { id: byArticle.id }, data: { ozonProductId: BigInt(productId), syncToOzon: true } });
+        summary.linked++;
+        continue;
+      }
+      summary.skipped++;
+    } catch (err: any) {
+      summary.errors.push(`${it.offer_id || it.product_id}: ${err.message}`);
+    }
+  }
+  return summary;
+}
+
 /**
  * Выгрузить все позиции с отметкой «OZON Seller» в маркетплейс OZON.
  * Новые товары создаются через импорт каталога, существующие (по ozonProductId) обновляются (цена/остаток).

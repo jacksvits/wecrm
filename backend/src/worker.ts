@@ -6,6 +6,7 @@ import { AccountingWorker } from './accounting-worker/index.js';
 import { VkGroupWorker } from './vk-worker/index.js';
 import { prisma } from './lib/prisma.js';
 import { runOneCSync } from './lib/onec-sync.js';
+import { syncProductsToOzon } from './lib/ozon.js';
 
 /**
  * Entry-point для worker-контейнера.
@@ -98,7 +99,26 @@ async function main() {
       console.log('[Worker] 1C sync disabled (no active settings)');
     }
 
-    if (workers.length === 0 && !onecTimer) {
+    // --- OZON Seller sync (выгрузка отмеченных товаров по расписанию) ---
+    const ozonSettings = await prisma.ozonSellerSettings.findFirst();
+    let ozonTimer: NodeJS.Timeout | null = null;
+    if (ozonSettings?.isActive) {
+      const runOzonSyncJob = async () => {
+        try {
+          const summary = await syncProductsToOzon();
+          console.log(`[Worker] OZON sync done: created=${summary.created} updated=${summary.updated} failed=${summary.failed}`);
+        } catch (e: any) {
+          console.error('[Worker] OZON sync error:', e.message);
+        }
+      };
+      ozonTimer = setInterval(runOzonSyncJob, Math.max(5, ozonSettings.updateIntervalMinutes || 60) * 60 * 1000);
+      timers.push(ozonTimer);
+      console.log(`[Worker] OZON sync scheduled every ${Math.max(5, ozonSettings.updateIntervalMinutes || 60)} min`);
+    } else {
+      console.log('[Worker] OZON sync disabled (no active settings)');
+    }
+
+    if (workers.length === 0 && !onecTimer && !ozonTimer) {
       console.log('[Worker] No active workers found. Exiting gracefully.');
       process.exit(0);
     }
