@@ -302,11 +302,16 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
     : [];
   const pathById = new Map(attachments.map((a) => [a.id, a.path]));
 
-  // Розничный вид цен (как для ВК: сначала с флагом for_vk, потом 'retail', потом любой активный)
+  // Розничный вид цен: флаг for_vk → retail/«розничный» → «(фз)» (прайс для физлиц) → первый активный
   const flaggedVkRows = await prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vk = true AND is_active = true LIMIT 1`) as any[];
   let retailType = flaggedVkRows[0] ? { id: flaggedVkRows[0].id } : null;
-  if (!retailType) retailType = await prisma.priceType.findFirst({ where: { name: 'retail', isActive: true } });
-  if (!retailType) retailType = await prisma.priceType.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'desc' } });
+  if (!retailType) {
+    retailType = await prisma.priceType.findFirst({
+      where: { isActive: true, OR: [{ name: { contains: 'retail', mode: 'insensitive' } }, { name: { contains: 'розничн', mode: 'insensitive' } }, { name: { contains: '(фз)', mode: 'insensitive' } }] },
+      orderBy: { sortOrder: 'asc' },
+    });
+  }
+  if (!retailType) retailType = await prisma.priceType.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } });
 
   // Остатки в OZON обязательно привязаны к складу — берём первый склад продавца
   const warehouseIds = await getOzonWarehouseIds();
