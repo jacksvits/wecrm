@@ -4,6 +4,7 @@ import path from 'path';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { importMarketItems, syncProductsToVk, getVkSettings } from '../lib/vk-market.js';
+import { syncProductsToOzon } from '../lib/ozon.js';
 import { generateUniqueArticle } from '../lib/article.js';
 
 const router = Router();
@@ -683,7 +684,7 @@ router.get('/:id', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind, syncToVk, onVitrine, isSubscription, categoryId, tags } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
     const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Товар не найден' });
     const data: any = {};
@@ -697,6 +698,8 @@ router.patch('/:id', async (req, res) => {
     if (barcode !== undefined) data.barcode = barcode?.trim() || null;
     if (isActive !== undefined) data.isActive = !!isActive;
     if (syncToVk !== undefined) data.syncToVk = !!syncToVk;
+    // «OZON Seller» актуально только для товаров, не для услуг
+    if (syncToOzon !== undefined) data.syncToOzon = (data.kind ?? existing.kind) === 'product' && !!syncToOzon;
     if (onVitrine !== undefined) data.onVitrine = !!onVitrine;
     if (isSubscription !== undefined) data.isSubscription = (data.kind ?? existing.kind) === 'service' && !!isSubscription;
     if (tags !== undefined) data.tags = normalizeTags(tags);

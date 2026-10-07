@@ -20,10 +20,11 @@ import TochkaSettings from "./TochkaSettings";
 import TochkaAcquiringSettings from "./TochkaAcquiringSettings";
 import OneCSettings from "./OneCSettings";
 import DiadocSettings from "./DiadocSettings";
+import OzonSellerSettings from "./OzonSellerSettings";
 import { SystemSettings } from "./SystemSettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "integrations" | "system";
-type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "vpn";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "vpn";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
 const PLUGINS: { key: PluginKey; label: string; group: string; description: string }[] = [
@@ -41,6 +42,7 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "tochkaAcquiring", label: "Эквайринг от Точки", group: "Финансы", description: "Онлайн-оплата заказов на витрине банковской картой и через СБП" },
   { key: "onec", label: "1С УТ 8.3", group: "Учётные системы", description: "Двусторонняя синхронизация номенклатуры и контрагентов" },
   { key: "diadoc", label: "Контур.Диадок", group: "Учётные системы", description: "ЭДО: получение, отправка и подписание документов" },
+  { key: "ozon", label: "OZON Seller", group: "Маркетплейсы", description: "Двусторонняя синхронизация каталога товаров с маркетплейсом OZON" },
   { key: "vpn", label: "Прокси через VPN", group: "Сервисы", description: "Локальный VPN-прокси для Telegram API (sing-box)" },
 ];
 
@@ -60,6 +62,7 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
     tochkaAcquiring: "M3 10h18M7 15h4m-8 4h18a2 2 0 002-2V7a2 2 0 00-2-2H3a2 2 0 00-2 2v10a2 2 0 002 2z",
     onec: "M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 006.5 22H20V2H6.5A2.5 2.5 0 004 4.5v15z",
     diadoc: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM14 2v6h6M8.5 17l3-3 1.5 1.5 3.5-3.5",
+    ozon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 8v6M9 11h6",
     vpn: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
   };
   return (
@@ -103,6 +106,8 @@ function renderPluginSettings(pluginKey: PluginKey) {
       return <OneCSettings />;
     case "diadoc":
       return <DiadocSettings />;
+    case "ozon":
+      return <OzonSellerSettings />;
     case "vpn":
       return <VpnSettings />;
     default:
@@ -129,6 +134,7 @@ export function Settings() {
     tochkaAcquiring: false,
     onec: false,
     diadoc: false,
+    ozon: false,
     vpn: false,
   });
 

@@ -98,6 +98,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   const [hoverCat, setHoverCat] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ productId: string; priceTypeId: string; value: string; priceFrom: boolean } | null>(null);
   const [vkBusy, setVkBusy] = useState<'import' | 'sync' | null>(null);
+  const [ozonBusy, setOzonBusy] = useState(false);
 
   // Массовый выбор позиций (удаление / перенос в категорию)
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -126,6 +127,18 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
     } catch (e: any) {
       alert(e.message || 'Ошибка синхронизации с ВК');
     } finally { setVkBusy(null); }
+  };
+
+  const syncToOzon = async () => {
+    if (!confirm('Выгрузить все позиции с отметкой «OZON Seller» в маркетплейс OZON?')) return;
+    setOzonBusy(true);
+    try {
+      const r = await api.products.ozonSync();
+      alert(`Синхронизация завершена: создано ${r.created}, обновлено ${r.updated}, ошибок ${r.failed}${r.errors.length ? '\n' + r.errors.slice(0, 10).join('\n') : ''}`);
+      await load();
+    } catch (e: any) {
+      alert(e.message || 'Ошибка синхронизации с OZON');
+    } finally { setOzonBusy(false); }
   };
 
   // Переключение опции «Показывать на витрине» у вида цены
@@ -550,6 +563,10 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
             <button onClick={syncToVk} disabled={!!vkBusy} title="Выгрузить позиции с отметкой «ВК» в маркет группы"
               style={{ ...btnGhost, borderColor: '#0077FF', color: '#0077FF' }}>
               {vkBusy === 'sync' ? 'Синхронизация...' : '↑ Синхронизация ВК'}
+            </button>
+            <button onClick={syncToOzon} disabled={ozonBusy} title="Выгрузить позиции с отметкой «OZON Seller» в маркетплейс OZON"
+              style={{ ...btnGhost, borderColor: '#005BFF', color: '#005BFF' }}>
+              {ozonBusy ? 'Синхронизация...' : '↑ Синхронизация OZON'}
             </button>
             <button onClick={() => setProductModal('new')} style={btnPrimary}>+ Позиция</button>
           </div>
@@ -1146,6 +1163,12 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
             ВК
           </span>
         )}
+        {p.syncToOzon && (
+          <span title={p.ozonProductId ? `Выгружается в OZON Seller (product_id: ${p.ozonProductId})` : 'Будет выгружен в OZON Seller при синхронизации'}
+            style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#005BFF', color: '#fff' }}>
+            OZON
+          </span>
+        )}
         {p.onVitrine && (
           <span title="Показывается на витрине магазина"
             style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#16a34a', color: '#fff' }}>
@@ -1259,13 +1282,14 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; syncToVk: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : product.kind,
     sku: isNew ? '' : product.sku || '',
     unit: isNew ? 'шт' : product.unit,
     barcode: isNew ? '' : product.barcode || '',
     syncToVk: isNew ? false : product.syncToVk,
+    syncToOzon: isNew ? false : product.syncToOzon,
     onVitrine: isNew ? false : product.onVitrine,
     isSubscription: isNew ? false : product.isSubscription,
     description: isNew ? '' : product.description || '',
@@ -1387,6 +1411,12 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
             <input type="checkbox" checked={form.syncToVk} onChange={e => setForm({ ...form, syncToVk: e.target.checked })} style={{ width: 16, height: 16 }} />
             Синхронизировать с ВКонтакте
           </label>
+          {form.kind === 'product' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.syncToOzon} onChange={e => setForm({ ...form, syncToOzon: e.target.checked })} style={{ width: 16, height: 16 }} />
+              OZON Seller
+            </label>
+          )}
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
             <input type="checkbox" checked={form.onVitrine} onChange={e => setForm({ ...form, onVitrine: e.target.checked })} style={{ width: 16, height: 16 }} />
             На витрине

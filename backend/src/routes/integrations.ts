@@ -25,6 +25,7 @@ router.get('/status', async (_req, res) => {
       prisma.vpnSettings.findFirst({ select: { isActive: true } }),
       prisma.diadocPluginSettings.findFirst({ select: { isActive: true } }),
       prisma.tochkaAcquiringSettings.findFirst({ select: { isActive: true } }),
+      prisma.ozonSellerSettings.findFirst({ select: { isActive: true } }),
     ]);
     res.json({
       email: email?.isActive ?? false,
@@ -43,6 +44,7 @@ router.get('/status', async (_req, res) => {
       vpn: vpn?.isActive ?? false,
       diadoc: diadoc?.isActive ?? false,
       tochkaAcquiring: tochkaAcquiring?.isActive ?? false,
+      ozon: ozon?.isActive ?? false,
     });
   } catch (err: any) {
     console.error('[integrations] status error:', err.message);

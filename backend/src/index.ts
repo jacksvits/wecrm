@@ -167,6 +167,7 @@ app.use('/api/tochka-plugin', tochkaPluginRoutes);
 app.use('/api/tochka-acquiring', tochkaAcquiringRoutes);
 app.use('/api/onec-plugin', onecPluginRoutes);
 app.use('/api/diadoc-plugin', diadocPluginRoutes);
+app.use('/api/ozon-plugin', ozonPluginRoutes);
 app.use('/api/handler-settings', handlerSettingsRoutes);
 app.use('/api/auto-reply-settings', autoReplySettingsRoutes);
 app.use('/api/legal', legalRoutes);

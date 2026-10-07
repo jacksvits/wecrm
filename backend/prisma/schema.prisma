@@ -1488,6 +1488,20 @@ model OneCPluginSettings {
 }
 
 // Настройки плагина «Контур.Диадок» (ЭДО): подключение по API-ключу разработчика + логин/пароль
+// === Плагин «OZON Seller»: подключение и синхронизация каталога товаров с OZON ===
+model OzonSellerSettings {
+  id                    Int       @id @default(1)
+  clientId              String    @default("") @map("client_id")
+  apiKey                String    @default("") @map("api_key")
+  isActive              Boolean   @default(false) @map("is_active")
+  updateIntervalMinutes Int       @default(60) @map("update_interval_minutes")
+  lastSyncAt            DateTime? @map("last_sync_at")
+  lastSyncResult        String?   @map("last_sync_result") // JSON {created, updated, failed, errors}
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("ozon_seller_settings")
+}
+
 model DiadocPluginSettings {
   id                    Int      @id @default(1)
   login                 String   @default("")

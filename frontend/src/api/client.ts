@@ -76,6 +76,11 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     get: () => fetchApi('/api/pskovline-plugin'),
     save: (data: any) => fetchApi('/api/pskovline-plugin', { method: 'POST', body: JSON.stringify(data) }),
   },
+  ozonPlugin: {
+    get: (): Promise<any> => fetchApi('/api/ozon-plugin'),
+    save: (data: any) => fetchApi('/api/ozon-plugin', { method: 'POST', body: JSON.stringify(data) }),
+    sync: (): Promise<{ created: number; updated: number; failed: number; errors: string[] }> => fetchApi('/api/ozon-plugin/sync', { method: 'POST' }),
+  },
   diadocPlugin: {
     get: (): Promise<any> => fetchApi('/api/diadoc-plugin'),
     save: (data: any) => fetchApi('/api/diadoc-plugin', { method: 'POST', body: JSON.stringify(data) }),
@@ -223,6 +228,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     vkStatus: (): Promise<{ configured: boolean; groupId: number | null; hasMarketToken: boolean }> => fetchApi('/api/products/meta/vk-status'),
     vkImport: (): Promise<{ created: number; linked: number; skipped: number; errors: string[] }> => fetchApi('/api/products/meta/vk-import', { method: 'POST' }),
     vkSync: (): Promise<{ created: number; updated: number; failed: number; errors: string[] }> => fetchApi('/api/products/meta/vk-sync', { method: 'POST' }),
+    ozonSync: (): Promise<{ created: number; updated: number; failed: number; errors: string[] }> => fetchApi('/api/products/meta/ozon-sync', { method: 'POST' }),
     addImage: (id: string, attachmentId: string): Promise<ProductImage> => fetchApi(`/api/products/${id}/images`, { method: 'POST', body: JSON.stringify({ attachmentId }) }),
     deleteImage: (id: string, imageId: string) => fetchApi(`/api/products/${id}/images/${imageId}`, { method: 'DELETE' }),
     movements: (params?: { productId?: string; warehouseId?: string }): Promise<StockMovement[]> => {
