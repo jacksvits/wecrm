@@ -194,9 +194,22 @@ export interface OzonSyncSummary {
   errors: string[];
 }
 
-/** Выкачать весь каталог товаров из OZON (курсорная пагинация /v3/product/list) */
-export async function fetchAllOzonProducts(): Promise<any[]> {
-  const all: any[] = [];
+/** Розничный вид цен: флаг for_vk → retail/«розничный» → «(фз)» (прайс для физлиц) → первый активный */
+export async function resolveRetailType(): Promise<{ id: string } | null> {
+  const flaggedVkRows = await prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vk = true AND is_active = true LIMIT 1`) as any[];
+  if (flaggedVkRows[0]?.id) return { id: flaggedVkRows[0].id };
+  const named = await prisma.priceType.findFirst({
+    where: { isActive: true, OR: [{ name: { contains: 'retail', mode: 'insensitive' } }, { name: { contains: 'розничн', mode: 'insensitive' } }, { name: { contains: '(фз)', mode: 'insensitive' } }] },
+    orderBy: { sortOrder: 'asc' },
+  });
+  if (named) return { id: named.id };
+  const any = await prisma.priceType.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } });
+  return any ? { id: any.id } : null;
+}
+
+/** ID товаров из OZON (product_id + offer_id) через /v3/product/list */
+export async function fetchOzonProductIds(): Promise<{ productId: number; offerId: string }[]> {
+  const out: { productId: number; offerId: string }[] = [];
   let lastId = '';
   for (let page = 0; page < 50; page++) {
     const data = await ozonApi('POST', '/v3/product/list', {
@@ -205,27 +218,59 @@ export async function fetchAllOzonProducts(): Promise<any[]> {
       last_id: lastId || undefined,
     });
     const items = data?.result?.items || [];
-    all.push(...items);
+    for (const it of items) out.push({ productId: Number(it.product_id), offerId: String(it.offer_id ?? '') });
     const next = data?.result?.last_id;
     if (!items.length || !next || next === lastId) break;
     lastId = next;
   }
-  return all;
+  return out;
 }
 
 /**
- * Импорт каталога из OZON в CRM (двусторонняя синхронизация):
- * 1. Товары CRM сопоставляются с OZON по артикулу (offer_id) → привязка ozonProductId + отметка «OZON Seller».
- * 2. Товаров в CRM нет → СОЗДАЮТСЯ автоматически (название = артикул, т.к. API OZON не отдаёт названия)
- *    в категории «OZON Seller» (создаётся при первом импорте).
- * Цены и остатки после импорта обновляются обычной синхронизацией CRM → OZON.
+ * Полная информация о товарах (/v3/product/info/list): название, цены, штрихкоды, архивность, SKU.
+ * ВАЖНО по документации: offer_id / product_id / sku передаются на ВЕРХНЕМ уровне тела запроса.
+ */
+export async function fetchOzonProductInfos(productIds: number[]): Promise<any[]> {
+  const all: any[] = [];
+  for (let i = 0; i < productIds.length; i += 100) {
+    const chunk = productIds.slice(i, i + 100);
+    const data = await ozonApi('POST', '/v3/product/info/list', { product_id: chunk, limit: 100 });
+    all.push(...(data?.items || []));
+  }
+  return all;
+}
+
+/** Характеристики товаров: вес (г), габариты (мм), штрихкод (/v4/product/info/attributes) */
+export async function fetchOzonAttributes(offerIds: string[]): Promise<Map<string, any>> {
+  const map = new Map<string, any>();
+  for (let i = 0; i < offerIds.length; i += 100) {
+    const chunk = offerIds.slice(i, i + 100);
+    const data = await ozonApi('POST', '/v4/product/info/attributes', { filter: { offer_id: chunk }, limit: 100 });
+    for (const it of data?.result || []) map.set(String(it.offer_id), it);
+  }
+  return map;
+}
+
+/**
+ * Импорт каталога из OZON в CRM по документации api-seller.ozon.ru:
+ * 1. /v3/product/list → список product_id + offer_id.
+ * 2. /v3/product/info/list (product_id на верхнем уровне тела!) → реальные названия, цены, штрихкоды.
+ * 3. /v4/product/info/attributes → вес, габариты, штрихкод.
+ * 4. Товары CRM сопоставляются по артикулу/offer_id → привязка + ДОЗАПОЛНЕНИЕ пустых полей
+ *    (название-заглушка → реальное, штрихкод, вес, габариты, цена).
+ * 5. Товара нет в CRM → СОЗДАЁТСЯ автоматически с реальным названием и характеристиками.
  */
 export async function importOzonProducts(): Promise<{ created: number; linked: number; skipped: number; errors: string[] }> {
   const settings = await getOzonSettings();
   if (!settings) throw new Error('OZON Seller не подключён: укажите Client-Id и API-ключ в настройках интеграции');
   const summary = { created: 0, linked: 0, skipped: 0, errors: [] as string[] };
 
-  const items = await fetchAllOzonProducts();
+  const ids = await fetchOzonProductIds();
+  const infos = await fetchOzonProductInfos(ids.map((x) => x.productId));
+  const attrs = await fetchOzonAttributes(infos.map((i) => String(i.offer_id ?? '')));
+
+  // Розничный вид цен (цена из OZON ставится только если в CRM нет своей)
+  const retailType = await resolveRetailType();
 
   // Категория для автосозданных товаров (создаётся один раз)
   let ozonCategory = await prisma.productCategory.findFirst({ where: { name: 'OZON Seller', parentId: null } });
@@ -233,15 +278,26 @@ export async function importOzonProducts(): Promise<{ created: number; linked: n
     ozonCategory = await prisma.productCategory.create({ data: { name: 'OZON Seller', isGroup: false } });
   }
 
-  for (const it of items) {
+  for (const info of infos) {
     try {
-      const productId = Number(it.product_id);
-      const offerId = String(it.offer_id ?? '').trim();
+      const productId = Number(info.id);
+      const offerId = String(info.offer_id ?? '').trim();
       if (!offerId) { summary.skipped++; continue; }
+
+      const name = String(info.name ?? '').trim() || offerId;
+      const price = parseFloat(String(info.price ?? '').replace(',', '.')) || null;
+      const a = attrs.get(offerId);
+      const barcode = info.barcodes?.[0] || a?.barcode || null;
+      // OZON отдаёт вес в граммах, габариты в миллиметрах → CRM: кг и см
+      const weightKg = a?.weight ? Number(a.weight) / 1000 : null;
+      const widthCm = a?.width ? Number(a.width) / 10 : null;
+      const heightCm = a?.height ? Number(a.height) / 10 : null;
+      const depthCm = a?.depth ? Number(a.depth) / 10 : null;
 
       // уже привязана?
       const byOzon = await prisma.product.findFirst({ where: { ozonProductId: BigInt(productId) } });
       if (byOzon) {
+        await fillFromOzon(byOzon.id, { name, placeholder: byOzon.article, barcode, weightKg, widthCm, heightCm, depthCm, price, retailTypeId: retailType?.id });
         await prisma.product.update({ where: { id: byOzon.id }, data: { syncToOzon: true } });
         summary.linked++;
         continue;
@@ -252,28 +308,59 @@ export async function importOzonProducts(): Promise<{ created: number; linked: n
       });
       if (byArticle) {
         await prisma.product.update({ where: { id: byArticle.id }, data: { ozonProductId: BigInt(productId), syncToOzon: true } });
+        await fillFromOzon(byArticle.id, { name, placeholder: byArticle.article, barcode, weightKg, widthCm, heightCm, depthCm, price, retailTypeId: retailType?.id });
         summary.linked++;
         continue;
       }
-      // товара нет в CRM — создаём автоматически.
-      // ВНИМАНИЕ: API OZON не отдаёт названий — подставляем артикул как заглушку,
-      // точное название возьмите со страницы товара (ссылка «OZON ↗» в карточке).
-      await prisma.product.create({
+      // товара нет в CRM — создаём автоматически с реальным названием и характеристиками
+      const product = await prisma.product.create({
         data: {
           article: offerId,
-          name: offerId,
+          name,
           kind: 'product',
           categoryId: ozonCategory.id,
+          barcode,
+          weight: weightKg,
+          width: widthCm,
+          height: heightCm,
+          depth: depthCm,
           syncToOzon: true,
           ozonProductId: BigInt(productId),
         },
       });
+      if (price != null && retailType) {
+        await prisma.productPrice.create({ data: { productId: product.id, priceTypeId: retailType.id, price } }).catch(() => {});
+      }
       summary.created++;
     } catch (err: any) {
-      summary.errors.push(`${it.offer_id || it.product_id}: ${err.message}`);
+      summary.errors.push(`${info.offer_id || info.id}: ${err.message}`);
     }
   }
   return summary;
+}
+
+/** Дозаполнение пустых полей карточки CRM данными из OZON (без перезаписи заполненных пользователем) */
+async function fillFromOzon(productId: string, d: {
+  name: string; placeholder: string | null; barcode: string | null;
+  weightKg: number | null; widthCm: number | null; heightCm: number | null; depthCm: number | null;
+  price: number | null; retailTypeId: string | null | undefined;
+}) {
+  const p = await prisma.product.findUnique({ where: { id: productId } });
+  if (!p) return;
+  const data: any = {};
+  // переименовываем только заглушку (название = артикул)
+  if (d.placeholder && p.name === d.placeholder && d.name && d.name !== p.name) data.name = d.name;
+  if (!p.barcode && d.barcode) data.barcode = d.barcode;
+  if (p.weight == null && d.weightKg != null) data.weight = d.weightKg;
+  if (p.width == null && d.widthCm != null) data.width = d.widthCm;
+  if (p.height == null && d.heightCm != null) data.height = d.heightCm;
+  if (p.depth == null && d.depthCm != null) data.depth = d.depthCm;
+  if (Object.keys(data).length) await prisma.product.update({ where: { id: productId }, data });
+  // розничная цена из OZON — только если в CRM своей нет
+  if (d.price != null && d.retailTypeId) {
+    const has = await prisma.productPrice.findFirst({ where: { productId, priceTypeId: d.retailTypeId } });
+    if (!has) await prisma.productPrice.create({ data: { productId, priceTypeId: d.retailTypeId, price: d.price } }).catch(() => {});
+  }
 }
 
 /**
@@ -302,16 +389,8 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
     : [];
   const pathById = new Map(attachments.map((a) => [a.id, a.path]));
 
-  // Розничный вид цен: флаг for_vk → retail/«розничный» → «(фз)» (прайс для физлиц) → первый активный
-  const flaggedVkRows = await prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vk = true AND is_active = true LIMIT 1`) as any[];
-  let retailType = flaggedVkRows[0] ? { id: flaggedVkRows[0].id } : null;
-  if (!retailType) {
-    retailType = await prisma.priceType.findFirst({
-      where: { isActive: true, OR: [{ name: { contains: 'retail', mode: 'insensitive' } }, { name: { contains: 'розничн', mode: 'insensitive' } }, { name: { contains: '(фз)', mode: 'insensitive' } }] },
-      orderBy: { sortOrder: 'asc' },
-    });
-  }
-  if (!retailType) retailType = await prisma.priceType.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } });
+  // Розничный вид цен (как для ВК и для импорта)
+  const retailType = await resolveRetailType();
 
   // Остатки в OZON обязательно привязаны к складу — берём первый склад продавца
   const warehouseIds = await getOzonWarehouseIds();
