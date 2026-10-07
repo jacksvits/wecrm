@@ -1181,8 +1181,8 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
           </span>
         )}
         {p.syncToOzon && (p.ozonProductId ? (
-          <a href={`https://www.ozon.ru/product/${p.ozonProductId}/`} target="_blank" rel="noreferrer"
-            title={`Карточка в OZON Seller (product_id: ${p.ozonProductId}) — откроется страница товара, откуда можно скопировать ссылку на картинку`}
+          <a href={`https://seller.ozon.ru/app/products/product/${p.ozonProductId}/`} target="_blank" rel="noreferrer"
+            title={`Карточка в кабинете OZON Seller (product_id: ${p.ozonProductId}) — откроется карточка товара, откуда можно скопировать ссылку на картинку`}
             style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#005BFF', color: '#fff', textDecoration: 'none' }}>
             OZON ↗
           </a>
@@ -1479,8 +1479,8 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
               <input type="checkbox" checked={form.syncToOzon} onChange={e => setForm({ ...form, syncToOzon: e.target.checked })} style={{ width: 16, height: 16 }} />
               OZON Seller
               {!isNew && product.ozonProductId && (
-                <a href={`https://www.ozon.ru/product/${product.ozonProductId}/`} target="_blank" rel="noreferrer"
-                  title="Открыть карточку товара в OZON"
+                <a href={`https://seller.ozon.ru/app/products/product/${product.ozonProductId}/`} target="_blank" rel="noreferrer"
+                  title="Открыть карточку товара в кабинете OZON Seller"
                   style={{ marginLeft: 6, fontSize: 12, color: '#005BFF', textDecoration: 'none', fontWeight: 600 }}>
                   Открыть в OZON ↗
                 </a>
