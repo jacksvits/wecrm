@@ -66,12 +66,12 @@ export default function OzonSellerSettings() {
     api.ozonPlugin.categories().then((r: any) => {
       const tree = r.items || [];
       setCatTree(tree);
-      // восстанавливаем путь уже сохранённой категории
+      // восстанавливаем путь уже сохранённой категории — ищем лист с type_id
       if (settings?.defaultTypeId) {
         const walk = (nodes: any[], trail: number[]): boolean => {
           for (const n of nodes) {
-            const t = [...trail, n.description_category_id];
-            if (n.description_category_id === settings.defaultTypeId) { setCatPath(t); return true; }
+            const t = [...trail, n.type_id ?? n.description_category_id];
+            if (n.type_id && n.type_id === settings.defaultTypeId) { setCatPath(t); return true; }
             if (n.children?.length && walk(n.children, t)) return true;
           }
           return false;
@@ -81,22 +81,28 @@ export default function OzonSellerSettings() {
     }).catch(() => {});
   }, [settings?.isActive]);
 
-  // Варианты селекта уровня idx: дети узла, выбранного на предыдущем уровне (корень — всё дерево)
+  // Варианты селекта уровня idx: дети узла, выбранного на предыдущем уровне (корень — всё дерево).
+  // Группы имеют description_category_id и children; конечные типы — type_id (именно он нужен для создания товара в OZON).
   const catLevelOptions = (idx: number): any[] => {
     let nodes = catTree;
     for (let i = 0; i < idx; i++) {
-      const cur = nodes.find((n) => n.description_category_id === catPath[i]);
+      const cur = nodes.find((n) => (n.type_id ?? n.description_category_id) === catPath[i]);
       nodes = cur?.children || [];
     }
     return nodes;
   };
 
-  const pickCatLevel = (idx: number, id: number | '') => {
+  const pickCatLevel = (idx: number, raw: string) => {
     const next = catPath.slice(0, idx);
-    if (id !== '') next.push(id);
+    let leafId: number | null = null;
+    if (raw.startsWith('g:')) {
+      next.push(Number(raw.slice(2))); // группа — только навигация, не значение
+    } else if (raw !== '') {
+      leafId = Number(raw); // лист — type_id
+      next.push(leafId);
+    }
     setCatPath(next);
-    // type_id = последний выбранный узел, у которого есть дети — не финальный; берём последний выбранный
-    setForm({ ...form, defaultTypeId: next.length ? next[next.length - 1] : null });
+    setForm({ ...form, defaultTypeId: leafId });
   };
 
   const save = async () => {
@@ -183,14 +189,14 @@ export default function OzonSellerSettings() {
             {catPath.map((sel, idx) => (
               <select
                 key={idx}
-                value={sel}
-                onChange={e => pickCatLevel(idx, e.target.value === '' ? '' : Number(e.target.value))}
+                value={String(sel)}
+                onChange={e => pickCatLevel(idx, e.target.value)}
                 style={inputStyle}
               >
                 <option value="">— Выберите —</option>
                 {catLevelOptions(idx).map((n: any) => (
-                  <option key={n.description_category_id} value={n.description_category_id} disabled={n.disabled}>
-                    {n.category_name}
+                  <option key={n.type_id ?? n.description_category_id} value={n.type_id ? String(n.type_id) : `g:${n.description_category_id}`} disabled={n.disabled}>
+                    {n.type_name ?? n.category_name}
                   </option>
                 ))}
               </select>
@@ -198,13 +204,13 @@ export default function OzonSellerSettings() {
             {catLevelOptions(catPath.length).length > 0 && (
               <select
                 value=""
-                onChange={e => pickCatLevel(catPath.length, e.target.value === '' ? '' : Number(e.target.value))}
+                onChange={e => pickCatLevel(catPath.length, e.target.value)}
                 style={inputStyle}
               >
                 <option value="">— Выберите —</option>
                 {catLevelOptions(catPath.length).map((n: any) => (
-                  <option key={n.description_category_id} value={n.description_category_id} disabled={n.disabled}>
-                    {n.category_name}
+                  <option key={n.type_id ?? n.description_category_id} value={n.type_id ? String(n.type_id) : `g:${n.description_category_id}`} disabled={n.disabled}>
+                    {n.type_name ?? n.category_name}
                   </option>
                 ))}
               </select>

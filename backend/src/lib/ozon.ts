@@ -76,6 +76,30 @@ export async function ozonImportTaskResult(taskId: number): Promise<string[]> {
   }
 }
 
+/**
+ * Дождаться завершения задачи импорта (до ~60 c) и вернуть ошибки по конкретному offer_id.
+ * Импорт в OZON асинхронный: сразу после вызова статус может быть pending без ошибок.
+ */
+export async function waitOzonImportTask(taskId: number, offerId: string): Promise<string[]> {
+  for (let i = 0; i < 15; i++) {
+    await new Promise((r) => setTimeout(r, 4000));
+    try {
+      const data = await ozonApi('POST', '/v1/product/import/info', { task_id: taskId });
+      const items = data?.result?.items || [];
+      const own = items.filter((it: any) => it.offer_id === offerId);
+      if (!own.length) continue;
+      if (own.every((it: any) => it.status && it.status !== 'pending')) {
+        return own
+          .filter((it: any) => it.errors && it.errors.length)
+          .map((it: any) => `${it.offer_id}: ${it.errors.map((e: any) => e.message).join('; ')}`);
+      }
+    } catch {
+      /* задача ещё не готова — повторяем */
+    }
+  }
+  return [];
+}
+
 /** Обновить цены существующих товаров */
 export async function ozonUpdatePrices(items: { product_id: number; price: number }[]): Promise<void> {
   await ozonApi('POST', '/v1/product/import/prices', {
@@ -200,12 +224,10 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         price: price != null ? Math.round(price) : undefined,
         quantity: Math.max(0, Math.round(quantity)),
       }]);
-      // результат импорта асинхронный: проверяем задачу и достаём ошибки по товару
+      // результат импорта асинхронный: ждём завершения задачи и достаём ошибки по товару
       if (taskId) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const taskErrors = await ozonImportTaskResult(taskId);
-        const own = taskErrors.filter((e) => e.startsWith(`${offerId}:`));
-        if (own.length) throw new Error(own.join('; '));
+        const taskErrors = await waitOzonImportTask(taskId, offerId);
+        if (taskErrors.length) throw new Error(taskErrors.join('; '));
       }
       // product_id появится в OZON позже — пробуем найти сразу
       const newId = await ozonFindProductId(offerId);
