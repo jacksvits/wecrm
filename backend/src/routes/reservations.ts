@@ -88,6 +88,8 @@ router.post('/', async (req: any, res) => {
   }
   if (!whId) return res.status(400).json({ error: 'Склад не найден' });
 
+  // Админ/менеджер могут резервировать в минус — без проверки свободного остатка
+  const canMinus = ['admin', 'manager'].includes(req.user?.role) || !!req.user?.stockAccess;
   try {
     const result = await prisma.$transaction(async (tx) => {
       // Услуги нельзя резервировать — резерв только для товаров
@@ -104,7 +106,7 @@ router.post('/', async (req: any, res) => {
           where: { productId: it.productId, warehouseId: whId },
         });
         const free = (stock?.quantity ?? 0) - (stock?.reserved ?? 0);
-        if (it.quantity > free) {
+        if (!canMinus && it.quantity > free) {
           const p = productsById.get(it.productId);
           throw new Error(`Недостаточно остатка: ${p?.name} (свободно ${free} ${p?.unit || ''})`);
         }
@@ -177,11 +179,13 @@ router.post('/:id/issue', async (req: any, res) => {
         data: { status: 'issued', issuedAt: new Date() },
       });
       if (flip.count === 0) throw new Error('Резерв уже выдан или отменён — обновите страницу');
+      // Админ/менеджер могут выдавать в минус
+      const canMinus = ['admin', 'manager'].includes(req.user?.role) || !!req.user?.stockAccess;
       for (const it of r.items) {
         const stock = await tx.stockBalance.findFirst({
           where: { productId: it.productId, warehouseId: r.warehouseId },
         });
-        if (it.quantity > (stock?.quantity ?? 0)) {
+        if (!canMinus && it.quantity > (stock?.quantity ?? 0)) {
           const p = await tx.product.findUnique({ where: { id: it.productId } });
           throw new Error(`Недостаточно остатка для выдачи: ${p?.name}`);
         }
@@ -257,6 +261,8 @@ router.patch('/:id', async (req: any, res) => {
       const r = await tx.reservation.findUnique({ where: { id: req.params.id }, include: { items: true } });
       if (!r) throw new Error('Резерв не найден');
       const { contactId, userId, number, comment, items, status } = req.body || {};
+      // Админ/менеджер могут резервировать в минус — без проверки свободного остатка
+      const canMinus = ['admin', 'manager'].includes(req.user?.role) || !!req.user?.stockAccess;
       // Смена автора или номера резерва — только администратор и менеджер
       if ((userId || number !== undefined) && !['admin', 'manager'].includes(req.user?.role) && !req.user?.stockAccess) {
         throw new Error('Только администратор или менеджер может менять автора или номер резерва');
@@ -290,8 +296,8 @@ router.patch('/:id', async (req: any, res) => {
           s === 'issued' ? { q: -qty, r: 0 }
           : s === 'canceled' ? { q: 0, r: 0 }
           : { q: 0, r: qty }; // held / paid / completed держат резерв без движения остатков
-        // Проверки остатков до смены статуса
-        for (const it of r.items) {
+        // Проверки остатков до смены статуса (админ/менеджер — в том числе в минус)
+        for (const it of canMinus ? [] : r.items) {
           const from = effect(r.status, it.quantity);
           const to = effect(status, it.quantity);
           const dq = to.q - from.q;
@@ -373,7 +379,7 @@ router.patch('/:id', async (req: any, res) => {
           if (delta > 0) {
             const stock = await tx.stockBalance.findFirst({ where: { productId: pid, warehouseId: r.warehouseId } });
             const free = (stock?.quantity ?? 0) - (stock?.reserved ?? 0);
-            if (delta > free) {
+            if (!canMinus && delta > free) {
               const p = await tx.product.findUnique({ where: { id: pid } });
               throw new Error(`Недостаточно остатка: ${p?.name} (свободно ${free} ${p?.unit || ''})`);
             }
