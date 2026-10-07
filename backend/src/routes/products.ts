@@ -620,7 +620,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, kind, syncToVk, onVitrine, isSubscription, categoryId, tags } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
     const productKind = kind === 'service' ? 'service' : 'product';
     // Категория из дерева 1С (группы/виды номенклатуры)
@@ -646,7 +646,13 @@ router.post('/', async (req, res) => {
         subcategory: subcategory?.trim() || null,
         unit: unit?.trim() || 'шт',
         barcode: barcode?.trim() || null,
+        weight: weight != null && weight !== '' ? Number(weight) : null,
+        width: width != null && width !== '' ? Number(width) : null,
+        height: height != null && height !== '' ? Number(height) : null,
+        depth: depth != null && depth !== '' ? Number(depth) : null,
         syncToVk: !!syncToVk,
+        // «OZON Seller» актуально только для товаров, не для услуг
+        syncToOzon: productKind === 'product' && !!syncToOzon,
         onVitrine: !!onVitrine,
         // «Подписка» актуальна только для услуг
         isSubscription: productKind === 'service' && !!isSubscription,
@@ -705,7 +711,7 @@ router.get('/:id', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, isActive, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
     const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Товар не найден' });
     const data: any = {};
@@ -721,6 +727,10 @@ router.patch('/:id', async (req, res) => {
     if (syncToVk !== undefined) data.syncToVk = !!syncToVk;
     // «OZON Seller» актуально только для товаров, не для услуг
     if (syncToOzon !== undefined) data.syncToOzon = (data.kind ?? existing.kind) === 'product' && !!syncToOzon;
+    for (const f of ['weight', 'width', 'height', 'depth'] as const) {
+      const v = (req.body as any)[f];
+      if (v !== undefined) (data as any)[f] = v === null || v === '' ? null : Number(v);
+    }
     if (onVitrine !== undefined) data.onVitrine = !!onVitrine;
     if (isSubscription !== undefined) data.isSubscription = (data.kind ?? existing.kind) === 'service' && !!isSubscription;
     if (tags !== undefined) data.tags = normalizeTags(tags);

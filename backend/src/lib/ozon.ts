@@ -70,7 +70,7 @@ async function resolveOzonDescriptionCategoryId(typeId: number): Promise<number 
 
 /** Создать товары в OZON (актуальный метод /v3/product/import; /v1 и /v2 удалены из API).
  *  Важно: OZON требует ОБА идентификатора — type_id (листовой тип) и description_category_id (родительская группа типа). */
-export async function ozonImportProducts(items: { offer_id: string; name: string; typeId: number; descriptionCategoryId: number; barcode?: string; price?: number; quantity?: number; images?: string[] }[]): Promise<number> {
+export async function ozonImportProducts(items: { offer_id: string; name: string; typeId: number; descriptionCategoryId: number; barcode?: string; price?: number; quantity?: number; images?: string[]; weight?: number | null; width?: number | null; height?: number | null; depth?: number | null }[]): Promise<number> {
   const data = await ozonApi('POST', '/v3/product/import', {
     items: items.map((it) => ({
       offer_id: it.offer_id,
@@ -81,6 +81,13 @@ export async function ozonImportProducts(items: { offer_id: string; name: string
       price: it.price != null ? String(it.price) : undefined,
       quantity: it.quantity != null ? String(it.quantity) : undefined,
       images: it.images?.length ? it.images : undefined,
+      // характеристики из карточки CRM: вес кг → граммы, габариты см → миллиметры
+      weight: it.weight ? String(Math.round(it.weight * 1000)) : undefined,
+      weight_unit: it.weight ? 'g' : undefined,
+      width: it.width ? String(Math.round(it.width * 10)) : undefined,
+      height: it.height ? String(Math.round(it.height * 10)) : undefined,
+      depth: it.depth ? String(Math.round(it.depth * 10)) : undefined,
+      dimension_unit: (it.width || it.height || it.depth) ? 'mm' : undefined,
       currency_code: 'RUB',
       vat: '0',
       attributes: [],
@@ -359,6 +366,11 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         quantity: Math.max(0, Math.round(quantity)),
         // картинка из карточки CRM → OZON забирает её по публичному URL
         images: product.images?.[0]?.attachment?.path ? [`${PUBLIC_BASE_URL}${product.images[0].attachment.path}`] : undefined,
+        // характеристики из карточки CRM (вес, габариты, штрихкод)
+        weight: product.weight,
+        width: product.width,
+        height: product.height,
+        depth: product.depth,
       }]);
       // результат импорта асинхронный: ждём завершения задачи; предупреждения (например, бренд) не считаем падением
       if (taskId) {

@@ -1180,12 +1180,18 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
             ВК
           </span>
         )}
-        {p.syncToOzon && (
-          <span title={p.ozonProductId ? `Выгружается в OZON Seller (product_id: ${p.ozonProductId})` : 'Будет выгружен в OZON Seller при синхронизации'}
+        {p.syncToOzon && (p.ozonProductId ? (
+          <a href={`https://www.ozon.ru/product/${p.ozonProductId}/`} target="_blank" rel="noreferrer"
+            title={`Карточка в OZON Seller (product_id: ${p.ozonProductId}) — откроется страница товара, откуда можно скопировать ссылку на картинку`}
+            style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#005BFF', color: '#fff', textDecoration: 'none' }}>
+            OZON ↗
+          </a>
+        ) : (
+          <span title="Будет выгружен в OZON Seller при синхронизации"
             style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#005BFF', color: '#fff' }}>
             OZON
           </span>
-        )}
+        ))}
         {p.onVitrine && (
           <span title="Показывается на витрине магазина"
             style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#16a34a', color: '#fff' }}>
@@ -1299,12 +1305,16 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : product.kind,
     sku: isNew ? '' : product.sku || '',
     unit: isNew ? 'шт' : product.unit,
     barcode: isNew ? '' : product.barcode || '',
+    weight: isNew ? '' : (product.weight != null ? String(product.weight) : ''),
+    width: isNew ? '' : (product.width != null ? String(product.width) : ''),
+    height: isNew ? '' : (product.height != null ? String(product.height) : ''),
+    depth: isNew ? '' : (product.depth != null ? String(product.depth) : ''),
     syncToVk: isNew ? false : product.syncToVk,
     syncToOzon: isNew ? false : product.syncToOzon,
     onVitrine: isNew ? false : product.onVitrine,
@@ -1439,6 +1449,26 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
               <input value={form.barcode} onChange={e => setForm({ ...form, barcode: e.target.value })} style={inputStyle} />
             </div>
           </div>
+          {form.kind === 'product' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 14, fontWeight: 500 }}>Вес, кг</label>
+                <input type="number" step="0.001" min="0" value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 14, fontWeight: 500 }}>Ширина, см</label>
+                <input type="number" step="0.1" min="0" value={form.width} onChange={e => setForm({ ...form, width: e.target.value })} style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 14, fontWeight: 500 }}>Высота, см</label>
+                <input type="number" step="0.1" min="0" value={form.height} onChange={e => setForm({ ...form, height: e.target.value })} style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 14, fontWeight: 500 }}>Глубина, см</label>
+                <input type="number" step="0.1" min="0" value={form.depth} onChange={e => setForm({ ...form, depth: e.target.value })} style={inputStyle} />
+              </div>
+            </div>
+          )}
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
             <input type="checkbox" checked={form.syncToVk} onChange={e => setForm({ ...form, syncToVk: e.target.checked })} style={{ width: 16, height: 16 }} />
             Синхронизировать с ВКонтакте
@@ -1447,6 +1477,13 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
               <input type="checkbox" checked={form.syncToOzon} onChange={e => setForm({ ...form, syncToOzon: e.target.checked })} style={{ width: 16, height: 16 }} />
               OZON Seller
+              {!isNew && product.ozonProductId && (
+                <a href={`https://www.ozon.ru/product/${product.ozonProductId}/`} target="_blank" rel="noreferrer"
+                  title="Открыть карточку товара в OZON"
+                  style={{ marginLeft: 6, fontSize: 12, color: '#005BFF', textDecoration: 'none', fontWeight: 600 }}>
+                  Открыть в OZON ↗
+                </a>
+              )}
             </label>
           )}
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>

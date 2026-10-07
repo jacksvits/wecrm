@@ -1152,6 +1152,11 @@ model Product {
   subcategory String?
   unit        String   @default("шт")
   barcode     String?
+  // Характеристики для выгрузки в OZON (вес в кг, габариты в см)
+  weight      Float?
+  width       Float?
+  height      Float?
+  depth       Float?
   syncToVk    Boolean  @default(false) @map("sync_to_vk")
   vkItemId    Int?     @unique @map("vk_item_id")
   // «OZON Seller»: выгружать позицию в маркетплейс OZON
