@@ -1,8 +1,11 @@
 import { prisma } from './prisma.js';
+import fs from 'fs';
+import path from 'path';
 
 const OZON_API = 'https://api-seller.ozon.ru';
 // Публичный адрес CRM — картинки товаров отдаются по нему, OZON заберёт их при импорте
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || 'https://welans.cc').replace(/\/$/, '');
+const UPLOAD_ROOT = process.env.UPLOAD_ROOT || '/app/uploads';
 
 export interface OzonCredentials {
   clientId: string;
@@ -260,7 +263,7 @@ export async function fetchOzonAttributes(offerIds: string[]): Promise<Map<strin
  *    (название-заглушка → реальное, штрихкод, вес, габариты, цена).
  * 5. Товара нет в CRM → СОЗДАЁТСЯ автоматически с реальным названием и характеристиками.
  */
-export async function importOzonProducts(): Promise<{ created: number; linked: number; skipped: number; errors: string[] }> {
+export async function importOzonProducts(authorId?: string): Promise<{ created: number; linked: number; skipped: number; errors: string[] }> {
   const settings = await getOzonSettings();
   if (!settings) throw new Error('OZON Seller не подключён: укажите Client-Id и API-ключ в настройках интеграции');
   const summary = { created: 0, linked: 0, skipped: 0, errors: [] as string[] };
@@ -286,6 +289,8 @@ export async function importOzonProducts(): Promise<{ created: number; linked: n
 
       const name = String(info.name ?? '').trim() || offerId;
       const price = parseFloat(String(info.price ?? '').replace(',', '.')) || null;
+      // картинка товара из OZON (primary_image приоритетнее images)
+      const imageUrl = info.primary_image?.[0] || info.images?.[0] || null;
       const a = attrs.get(offerId);
       const barcode = info.barcodes?.[0] || a?.barcode || null;
       // OZON отдаёт вес в граммах, габариты в миллиметрах → CRM: кг и см
@@ -299,6 +304,7 @@ export async function importOzonProducts(): Promise<{ created: number; linked: n
       if (byOzon) {
         await fillFromOzon(byOzon.id, { name, placeholder: byOzon.article, barcode, weightKg, widthCm, heightCm, depthCm, price, retailTypeId: retailType?.id });
         await prisma.product.update({ where: { id: byOzon.id }, data: { syncToOzon: true } });
+        if (imageUrl && authorId) await attachOzonImage(byOzon.id, imageUrl, authorId);
         summary.linked++;
         continue;
       }
@@ -309,6 +315,7 @@ export async function importOzonProducts(): Promise<{ created: number; linked: n
       if (byArticle) {
         await prisma.product.update({ where: { id: byArticle.id }, data: { ozonProductId: BigInt(productId), syncToOzon: true } });
         await fillFromOzon(byArticle.id, { name, placeholder: byArticle.article, barcode, weightKg, widthCm, heightCm, depthCm, price, retailTypeId: retailType?.id });
+        if (imageUrl && authorId) await attachOzonImage(byArticle.id, imageUrl, authorId);
         summary.linked++;
         continue;
       }
@@ -331,12 +338,48 @@ export async function importOzonProducts(): Promise<{ created: number; linked: n
       if (price != null && retailType) {
         await prisma.productPrice.create({ data: { productId: product.id, priceTypeId: retailType.id, price } }).catch(() => {});
       }
+      if (imageUrl && authorId) await attachOzonImage(product.id, imageUrl, authorId);
       summary.created++;
     } catch (err: any) {
       summary.errors.push(`${info.offer_id || info.id}: ${err.message}`);
     }
   }
   return summary;
+}
+
+/** Скачать картинку товара с CDN OZON (ir.ozone.ru доступен с сервера) и прикрепить к карточке CRM */
+export async function attachOzonImage(productId: string, url: string, authorId: string): Promise<boolean> {
+  try {
+    const has = await prisma.productImage.count({ where: { productId } });
+    if (has > 0) return false; // не затираем существующие изображения
+    const r = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!r.ok) return false;
+    const mime = r.headers.get('content-type')?.split(';')[0] || '';
+    if (!mime.startsWith('image/')) return false;
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (!buf.length || buf.length > 10 * 1024 * 1024) return false;
+    const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[mime] || 'jpg';
+    const filename = `product-${productId}-${Date.now()}.${ext}`;
+    fs.writeFileSync(path.join(UPLOAD_ROOT, filename), buf);
+    const attachment = await prisma.fileAttachment.create({
+      data: {
+        entityType: 'product',
+        entityId: productId,
+        filename: url.split('/').pop()?.split('?')[0] || filename,
+        originalName: url.split('/').pop()?.split('?')[0] || filename,
+        mimeType: mime,
+        size: buf.length,
+        path: `/uploads/${filename}`,
+        authorId,
+      },
+    });
+    await prisma.productImage.create({
+      data: { productId, attachmentId: attachment.id, url: attachment.path, sortOrder: 0 },
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Дозаполнение пустых полей карточки CRM данными из OZON (без перезаписи заполненных пользователем) */

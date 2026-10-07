@@ -96,9 +96,9 @@ router.get('/categories', authMiddleware, async (_req, res) => {
 });
 
 // POST /api/ozon-plugin/import — привязка каталога OZON к товарам CRM (по артикулу)
-router.post('/import', authMiddleware, async (_req, res) => {
+router.post('/import', authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const summary = await importOzonProducts();
+    const summary = await importOzonProducts(req.user?.id);
     res.json(summary);
   } catch (err: any) {
     console.error('[ozon-plugin] import error:', err.message);
