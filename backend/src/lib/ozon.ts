@@ -56,7 +56,7 @@ export async function testOzonConnection(creds?: OzonCredentials): Promise<{ ok:
  * поэтому значение ищется в справочнике (/v1/description-category/attribute/values).
  * Автозаполняемые обязательные: «Название модели» = артикул, «Нужен код маркировки» = нет.
  */
-async function buildOzonAttributes(product: { brand?: string | null; tnved?: string | null; article?: string | null; name?: string; description?: string | null }, typeId: number, descriptionCategoryId: number): Promise<any[]> {
+async function buildOzonAttributes(product: { brand?: string | null; tnved?: string | null; article?: string | null; name?: string; description?: string | null; tags?: string[] | null }, typeId: number, descriptionCategoryId: number): Promise<any[]> {
   const attrs: any[] = [];
   const brand = product.brand?.trim();
   if (brand) {
@@ -73,11 +73,23 @@ async function buildOzonAttributes(product: { brand?: string | null; tnved?: str
       attrs.push({ id: tnAttrId, values: [{ value: code, ...(dv ? { dictionary_value_id: dv } : {}) }] });
     }
   }
-  // Обязательные «Название модели (для объединения в одну карточку)» → артикул из CRM
-  const article = product.article?.trim();
-  if (article) {
+  // «Название модели (для объединения в одну карточку)» = название карточки CRM
+  const modelName = product.name?.trim();
+  if (modelName) {
     const modelAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'название модели');
-    if (modelAttrId) attrs.push({ id: modelAttrId, values: [{ value: article }] });
+    if (modelAttrId) attrs.push({ id: modelAttrId, values: [{ value: modelName }] });
+  }
+  // Аннотация OZON = описание карточки CRM
+  const desc = product.description?.trim();
+  if (desc) {
+    const descAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'описание');
+    if (descAttrId) attrs.push({ id: descAttrId, values: [{ value: desc }] });
+  }
+  // Хештеги OZON = теги карточки CRM (#тег через пробел)
+  const tagList = (product.tags || []).map((t) => String(t).trim()).filter(Boolean);
+  if (tagList.length) {
+    const hashAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'хештег');
+    if (hashAttrId) attrs.push({ id: hashAttrId, values: [{ value: tagList.map((t) => (t.startsWith('#') ? t : `#${t}`)).join(' ') }] });
   }
   // Обязательный булев «Нужен код маркировки» → по умолчанию «нет»
   const markingAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'код маркировки');
@@ -129,12 +141,12 @@ export async function ozonImportProducts(items: { offer_id: string; name: string
       price: it.price != null ? String(it.price) : undefined,
       quantity: it.quantity != null ? String(it.quantity) : undefined,
       images: it.images?.length ? it.images : undefined,
-      // характеристики из карточки CRM: вес кг → граммы, габариты см → миллиметры
-      weight: it.weight ? String(Math.round(it.weight * 1000)) : undefined,
+      // характеристики из карточки CRM: вес в граммах, габариты в миллиметрах (как в OZON)
+      weight: it.weight ? String(Math.round(it.weight)) : undefined,
       weight_unit: it.weight ? 'g' : undefined,
-      width: it.width ? String(Math.round(it.width * 10)) : undefined,
-      height: it.height ? String(Math.round(it.height * 10)) : undefined,
-      depth: it.depth ? String(Math.round(it.depth * 10)) : undefined,
+      width: it.width ? String(Math.round(it.width)) : undefined,
+      height: it.height ? String(Math.round(it.height)) : undefined,
+      depth: it.depth ? String(Math.round(it.depth)) : undefined,
       dimension_unit: (it.width || it.height || it.depth) ? 'mm' : undefined,
       // атрибуты (бренд, ТН ВЭД) — с dictionary_value_id для справочных
       attributes: it.attributes ?? [],
@@ -482,11 +494,11 @@ export async function importOzonProducts(authorId?: string): Promise<{ created: 
           ozonCatId = cat.id;
         }
       }
-      // OZON отдаёт вес в граммах, габариты в миллиметрах → CRM: кг и см
-      const weightKg = a?.weight ? Number(a.weight) / 1000 : null;
-      const widthCm = a?.width ? Number(a.width) / 10 : null;
-      const heightCm = a?.height ? Number(a.height) / 10 : null;
-      const depthCm = a?.depth ? Number(a.depth) / 10 : null;
+      // OZON и CRM хранят одни единицы: вес в граммах, габариты в миллиметрах
+      const weightKg = a?.weight ? Number(a.weight) : null;
+      const widthCm = a?.width ? Number(a.width) : null;
+      const heightCm = a?.height ? Number(a.height) : null;
+      const depthCm = a?.depth ? Number(a.depth) : null;
 
       // уже привязана?
       const byOzon = await prisma.product.findFirst({ where: { ozonProductId: BigInt(productId) } });

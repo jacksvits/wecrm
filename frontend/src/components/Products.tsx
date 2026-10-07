@@ -1463,19 +1463,19 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
           {form.kind === 'product' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
               <div>
-                <label style={{ fontSize: 14, fontWeight: 500 }}>Вес, кг</label>
+                <label style={{ fontSize: 14, fontWeight: 500 }}>Вес, г</label>
                 <input type="number" step="0.001" min="0" value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} style={inputStyle} />
               </div>
               <div>
-                <label style={{ fontSize: 14, fontWeight: 500 }}>Ширина, см</label>
+                <label style={{ fontSize: 14, fontWeight: 500 }}>Ширина, мм</label>
                 <input type="number" step="0.1" min="0" value={form.width} onChange={e => setForm({ ...form, width: e.target.value })} style={inputStyle} />
               </div>
               <div>
-                <label style={{ fontSize: 14, fontWeight: 500 }}>Высота, см</label>
+                <label style={{ fontSize: 14, fontWeight: 500 }}>Высота, мм</label>
                 <input type="number" step="0.1" min="0" value={form.height} onChange={e => setForm({ ...form, height: e.target.value })} style={inputStyle} />
               </div>
               <div>
-                <label style={{ fontSize: 14, fontWeight: 500 }}>Глубина, см</label>
+                <label style={{ fontSize: 14, fontWeight: 500 }}>Глубина, мм</label>
                 <input type="number" step="0.1" min="0" value={form.depth} onChange={e => setForm({ ...form, depth: e.target.value })} style={inputStyle} />
               </div>
             </div>

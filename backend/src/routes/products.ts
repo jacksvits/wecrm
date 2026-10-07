@@ -745,6 +745,7 @@ router.patch('/:id', async (req, res) => {
     // «OZON Seller» актуально только для товаров, не для услуг
     if (syncToOzon !== undefined) data.syncToOzon = (data.kind ?? existing.kind) === 'product' && !!syncToOzon;
     if (brand !== undefined) data.brand = brand?.trim() || null;
+    if (tnved !== undefined) data.tnved = tnved?.trim() || null;
     for (const f of ['weight', 'width', 'height', 'depth'] as const) {
       const v = (req.body as any)[f];
       if (v !== undefined) (data as any)[f] = v === null || v === '' ? null : Number(v);
