@@ -285,12 +285,19 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
   const products = await prisma.product.findMany({
     where: { syncToOzon: true, isActive: true, kind: 'product' },
     include: {
-      images: { orderBy: { sortOrder: 'asc' }, take: 1, include: { attachment: true } },
+      images: { orderBy: { sortOrder: 'asc' }, take: 1 },
       stocks: true,
       prices: true,
     },
     orderBy: { name: 'asc' },
   });
+
+  // Пути вложений для первых картинок (relation у ProductImage к FileAttachment не объявлен)
+  const attachmentIds = products.map((p) => p.images[0]?.attachmentId).filter(Boolean) as string[];
+  const attachments = attachmentIds.length
+    ? await prisma.fileAttachment.findMany({ where: { id: { in: attachmentIds } } })
+    : [];
+  const pathById = new Map(attachments.map((a) => [a.id, a.path]));
 
   // Розничный вид цен (как для ВК: сначала с флагом for_vk, потом 'retail', потом любой активный)
   const flaggedVkRows = await prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vk = true AND is_active = true LIMIT 1`) as any[];
@@ -365,7 +372,10 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         price: price != null ? Math.round(price) : undefined,
         quantity: Math.max(0, Math.round(quantity)),
         // картинка из карточки CRM → OZON забирает её по публичному URL
-        images: product.images?.[0]?.attachment?.path ? [`${PUBLIC_BASE_URL}${product.images[0].attachment.path}`] : undefined,
+        images: (() => {
+          const p0 = product.images?.[0]?.attachmentId ? pathById.get(product.images[0].attachmentId) : undefined;
+          return p0 ? [`${PUBLIC_BASE_URL}${p0}`] : undefined;
+        })(),
         // характеристики из карточки CRM (вес, габариты, штрихкод)
         weight: product.weight,
         width: product.width,
