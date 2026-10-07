@@ -421,6 +421,20 @@ router.post('/meta/vk-sync', async (_req, res) => {
 });
 
 /**
+ * POST /api/products/meta/ozon-sync
+ * Синхронизация: все позиции с отметкой «OZON Seller» → маркетплейс OZON
+ */
+router.post('/meta/ozon-sync', async (_req, res) => {
+  try {
+    const summary = await syncProductsToOzon();
+    res.json(summary);
+  } catch (err: any) {
+    console.error('[products:ozon-sync]', err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/products/meta/categories
  * Дерево категорий (группы и виды номенклатуры): из 1С + созданные вручную. Плоский список — дерево строит фронтенд
  */
