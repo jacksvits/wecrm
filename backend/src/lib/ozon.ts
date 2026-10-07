@@ -500,9 +500,13 @@ export async function importOzonProducts(authorId?: string): Promise<{ created: 
 
       const name = String(info.name ?? '').trim() || offerId;
       const price = parseFloat(String(info.price ?? '').replace(',', '.')) || null;
-      // картинка товара из OZON (primary_image — массив массивов URL: [["..."]])
-      const imageUrl: string | null =
-        info.primary_image?.[0]?.[0] || info.images?.[0]?.[0] || info.primary_image?.[0] || info.images?.[0] || null;
+      // все картинки товара из OZON (primary_image и images — массивы массивов URL)
+      const imageUrls: string[] = [
+        ...(Array.isArray(info.primary_image?.[0]) ? info.primary_image[0] : [info.primary_image?.[0]].filter(Boolean)),
+        ...(Array.isArray(info.images?.[0]) ? info.images[0] : [info.images?.[0]].filter(Boolean)),
+      ].filter((u): u is string => typeof u === 'string' && !!u);
+      const seen = new Set<string>();
+      const uniqueImageUrls = imageUrls.filter((u) => (seen.has(u) ? false : (seen.add(u), true))).slice(0, 10);
       const a = attrs.get(offerId);
       const barcode = info.barcodes?.[0] || a?.barcode || null;
 
@@ -537,7 +541,7 @@ export async function importOzonProducts(authorId?: string): Promise<{ created: 
       if (byOzon) {
         await fillFromOzon(byOzon.id, { name, placeholder: byOzon.article, barcode, weightKg, widthCm, heightCm, depthCm, price, retailTypeId: retailType?.id, brand: brandVal, tnved: tnvedVal, hashtags, description, ozonCatId });
         await prisma.product.update({ where: { id: byOzon.id }, data: { syncToOzon: true } });
-        if (imageUrl && authorId) await attachOzonImage(byOzon.id, imageUrl, authorId);
+        if (authorId) for (const u of uniqueImageUrls) await attachOzonImage(byOzon.id, u, authorId);
         summary.linked++;
         continue;
       }
@@ -548,7 +552,7 @@ export async function importOzonProducts(authorId?: string): Promise<{ created: 
       if (byArticle) {
         await prisma.product.update({ where: { id: byArticle.id }, data: { ozonProductId: BigInt(productId), syncToOzon: true } });
         await fillFromOzon(byArticle.id, { name, placeholder: byArticle.article, barcode, weightKg, widthCm, heightCm, depthCm, price, retailTypeId: retailType?.id, brand: brandVal, tnved: tnvedVal, hashtags, description, ozonCatId });
-        if (imageUrl && authorId) await attachOzonImage(byArticle.id, imageUrl, authorId);
+        if (authorId) for (const u of uniqueImageUrls) await attachOzonImage(byArticle.id, u, authorId);
         summary.linked++;
         continue;
       }
@@ -575,7 +579,7 @@ export async function importOzonProducts(authorId?: string): Promise<{ created: 
       if (price != null && retailType) {
         await prisma.productPrice.create({ data: { productId: product.id, priceTypeId: retailType.id, price } }).catch(() => {});
       }
-      if (imageUrl && authorId) await attachOzonImage(product.id, imageUrl, authorId);
+      if (authorId) for (const u of uniqueImageUrls) await attachOzonImage(product.id, u, authorId);
       summary.created++;
     } catch (err: any) {
       summary.errors.push(`${info.offer_id || info.id}: ${err.message}`);
@@ -584,11 +588,15 @@ export async function importOzonProducts(authorId?: string): Promise<{ created: 
   return summary;
 }
 
-/** Скачать картинку товара с CDN OZON (ir.ozone.ru доступен с сервера) и прикрепить к карточке CRM */
+/** Скачать картинку товара с CDN OZON (ir.ozone.ru доступен с сервера) и прикрепить к карточке CRM.
+ *  Дубли по имени файла не прикрепляются; порядок сохраняется через sortOrder. */
 export async function attachOzonImage(productId: string, url: string, authorId: string): Promise<boolean> {
   try {
-    const has = await prisma.productImage.count({ where: { productId } });
-    if (has > 0) return false; // не затираем существующие изображения
+    const origName = url.split('/').pop()?.split('?')[0] || '';
+    if (origName) {
+      const dup = await prisma.fileAttachment.findFirst({ where: { entityType: 'product', entityId: productId, filename: origName } });
+      if (dup) return false;
+    }
     const r = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'User-Agent': 'Mozilla/5.0' } });
     if (!r.ok) return false;
     const mime = r.headers.get('content-type')?.split(';')[0] || '';
@@ -596,14 +604,15 @@ export async function attachOzonImage(productId: string, url: string, authorId: 
     const buf = Buffer.from(await r.arrayBuffer());
     if (!buf.length || buf.length > 10 * 1024 * 1024) return false;
     const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[mime] || 'jpg';
-    const filename = `product-${productId}-${Date.now()}.${ext}`;
+    const filename = `product-${productId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
     fs.writeFileSync(path.join(UPLOAD_ROOT, filename), buf);
+    const maxSort = await prisma.productImage.aggregate({ where: { productId }, _max: { sortOrder: true } });
     const attachment = await prisma.fileAttachment.create({
       data: {
         entityType: 'product',
         entityId: productId,
-        filename: url.split('/').pop()?.split('?')[0] || filename,
-        originalName: url.split('/').pop()?.split('?')[0] || filename,
+        filename: origName || filename,
+        originalName: origName || filename,
         mimeType: mime,
         size: buf.length,
         path: `/uploads/${filename}`,
@@ -611,7 +620,7 @@ export async function attachOzonImage(productId: string, url: string, authorId: 
       },
     });
     await prisma.productImage.create({
-      data: { productId, attachmentId: attachment.id, url: attachment.path, sortOrder: 0 },
+      data: { productId, attachmentId: attachment.id, url: attachment.path, sortOrder: (maxSort._max.sortOrder ?? -1) + 1 },
     });
     return true;
   } catch {
@@ -667,7 +676,7 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
   const products = await prisma.product.findMany({
     where: { syncToOzon: true, isActive: true, kind: 'product' },
     include: {
-      images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+      images: { orderBy: { sortOrder: 'asc' }, take: 10 },
       stocks: true,
       prices: true,
     },
@@ -712,10 +721,14 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
       const retail = retailType ? product.prices.find((p) => p.priceTypeId === retailType!.id) : null;
       const price = retail?.price ?? null;
       const quantity = product.stocks.reduce((sum, s) => sum + s.quantity, 0);
-      // публичный URL первой картинки — OZON забирает файл сам при импорте
+      // публичные URL всех картинок (до 10) — OZON забирает файлы сам при импорте
       const firstImageUrl = (() => {
-        const p0 = product.images?.[0]?.attachmentId ? pathById.get(product.images[0].attachmentId) : undefined;
-        return p0 ? [`${PUBLIC_BASE_URL}${p0}`] : undefined;
+        const urls = (product.images || [])
+          .map((im) => (im.attachmentId ? pathById.get(im.attachmentId) : undefined))
+          .filter((p): p is string => !!p)
+          .slice(0, 10)
+          .map((p) => `${PUBLIC_BASE_URL}${p}`);
+        return urls.length ? urls : undefined;
       })();
 
       if (product.ozonProductId) {
