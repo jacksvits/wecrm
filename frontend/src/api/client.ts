@@ -80,6 +80,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     get: (): Promise<any> => fetchApi('/api/ozon-plugin'),
     save: (data: any) => fetchApi('/api/ozon-plugin', { method: 'POST', body: JSON.stringify(data) }),
     sync: (): Promise<{ created: number; updated: number; failed: number; errors: string[] }> => fetchApi('/api/ozon-plugin/sync', { method: 'POST' }),
+    categories: (): Promise<{ items: any[] }> => fetchApi('/api/ozon-plugin/categories'),
   },
   diadocPlugin: {
     get: (): Promise<any> => fetchApi('/api/diadoc-plugin'),

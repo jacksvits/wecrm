@@ -45,20 +45,35 @@ export async function testOzonConnection(creds?: OzonCredentials): Promise<{ ok:
   }
 }
 
-/** Создать товары в OZON (метод импорта каталога) */
-export async function ozonImportProducts(items: { offer_id: string; name: string; barcode?: string; price?: number; quantity?: number }[]): Promise<number> {
-  const data = await ozonApi('POST', '/v1/product/import', {
+/** Создать товары в OZON (актуальный метод /v3/product/import; /v1 и /v2 удалены из API) */
+export async function ozonImportProducts(items: { offer_id: string; name: string; typeId: number; barcode?: string; price?: number; quantity?: number }[]): Promise<number> {
+  const data = await ozonApi('POST', '/v3/product/import', {
     items: items.map((it) => ({
       offer_id: it.offer_id,
       name: it.name,
+      type_id: it.typeId,
       barcode: it.barcode || undefined,
       price: it.price != null ? String(it.price) : undefined,
       quantity: it.quantity != null ? String(it.quantity) : undefined,
       currency_code: 'RUB',
       vat: '0',
+      attributes: [],
     })),
   });
   return data?.result?.task_id ?? 0;
+}
+
+/** Результат задачи импорта: ошибки по товарам, если есть */
+export async function ozonImportTaskResult(taskId: number): Promise<string[]> {
+  try {
+    const data = await ozonApi('POST', '/v1/product/import/info', { task_id: taskId });
+    const items = data?.result?.items || [];
+    return items
+      .filter((it: any) => it.errors && it.errors.length)
+      .map((it: any) => `${it.offer_id}: ${it.errors.map((e: any) => e.message).join('; ')}`);
+  } catch {
+    return [];
+  }
 }
 
 /** Обновить цены существующих товаров */
@@ -73,6 +88,17 @@ export async function ozonUpdateStocks(items: { product_id: number; stock: numbe
   await ozonApi('POST', '/v2/products/stocks', {
     stocks: items.map((it) => ({ product_id: it.product_id, stock: it.stock })),
   });
+}
+
+let categoryTreeCache: { at: number; tree: any[] } | null = null;
+
+/** Дерево категорий OZON (кэш 24 ч) — для выбора категории по умолчанию в настройках плагина */
+export async function fetchOzonCategoryTree(): Promise<any[]> {
+  if (categoryTreeCache && Date.now() - categoryTreeCache.at < 24 * 60 * 60 * 1000) return categoryTreeCache.tree;
+  const data = await ozonApi('POST', '/v1/description-category/tree', { category_id: 0, language: 'RU' });
+  const tree = data?.result || [];
+  categoryTreeCache = { at: Date.now(), tree };
+  return tree;
 }
 
 /** Найти товар в OZON по offer_id (внутренний артикул/артикул из CRM) */
@@ -147,15 +173,26 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         continue;
       }
 
-      // создаём новый товар в OZON
-      await ozonImportProducts([{
+      // создаём новый товар в OZON (нужна категория type_id)
+      if (!settings.defaultTypeId) {
+        throw new Error('Не задана категория OZON по умолчанию (Настройки → OZON Seller → Категория по умолчанию)');
+      }
+      const taskId = await ozonImportProducts([{
         offer_id: offerId,
         name: product.name,
+        typeId: settings.defaultTypeId,
         barcode: product.barcode || undefined,
         price: price != null ? Math.round(price) : undefined,
         quantity: Math.max(0, Math.round(quantity)),
       }]);
-      // импорт в OZON асинхронный: product_id появится позже — пробуем найти сразу
+      // результат импорта асинхронный: проверяем задачу и достаём ошибки по товару
+      if (taskId) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const taskErrors = await ozonImportTaskResult(taskId);
+        const own = taskErrors.filter((e) => e.startsWith(`${offerId}:`));
+        if (own.length) throw new Error(own.join('; '));
+      }
+      // product_id появится в OZON позже — пробуем найти сразу
       const newId = await ozonFindProductId(offerId);
       await prisma.product.update({
         where: { id: product.id },

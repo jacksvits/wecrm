@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { testOzonConnection, syncProductsToOzon } from '../lib/ozon.js';
+import { testOzonConnection, syncProductsToOzon, fetchOzonCategoryTree } from '../lib/ozon.js';
 
 const router = Router();
 
@@ -22,6 +22,7 @@ router.get('/', authMiddleware, async (_req, res) => {
       clientId: s?.clientId ?? '',
       apiKeySet: !!s?.apiKey,
       updateIntervalMinutes: s?.updateIntervalMinutes ?? 60,
+      defaultTypeId: s?.defaultTypeId ?? null,
       lastSyncAt: s?.lastSyncAt ?? null,
       lastSync,
       flagged,
@@ -39,7 +40,7 @@ router.get('/', authMiddleware, async (_req, res) => {
 router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
-    const { clientId, apiKey, updateIntervalMinutes } = req.body || {};
+    const { clientId, apiKey, updateIntervalMinutes, defaultTypeId } = req.body || {};
     if (clientId !== undefined && typeof clientId !== 'string') return res.status(400).json({ error: 'Некорректный Client-Id' });
 
     const existing = await prisma.ozonSellerSettings.findUnique({ where: { id: 1 } });
@@ -50,6 +51,10 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
         updateIntervalMinutes !== undefined
           ? Math.max(5, Math.min(1440, Number(updateIntervalMinutes) || 60))
           : (existing?.updateIntervalMinutes ?? 60),
+      defaultTypeId:
+        defaultTypeId !== undefined
+          ? (defaultTypeId === null || defaultTypeId === '' ? null : Math.max(1, Number(defaultTypeId)))
+          : (existing?.defaultTypeId ?? null),
     };
 
     // Проверка подключения при сохранении
@@ -76,6 +81,17 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   } catch (err: any) {
     console.error('[ozon-plugin] POST error:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/ozon-plugin/categories — дерево категорий OZON (для выбора категории по умолчанию)
+router.get('/categories', authMiddleware, async (_req, res) => {
+  try {
+    const tree = await fetchOzonCategoryTree();
+    res.json({ items: tree });
+  } catch (err: any) {
+    console.error('[ozon-plugin] categories error:', err.message);
+    res.status(400).json({ error: err.message });
   }
 });
 

@@ -1500,6 +1500,8 @@ model OzonSellerSettings {
   apiKey                String    @default("") @map("api_key")
   isActive              Boolean   @default(false) @map("is_active")
   updateIntervalMinutes Int       @default(60) @map("update_interval_minutes")
+  // Категория OZON (type_id) по умолчанию для новых товаров — выбирается из дерева категорий OZON
+  defaultTypeId         Int?      @map("default_type_id")
   lastSyncAt            DateTime? @map("last_sync_at")
   lastSyncResult        String?   @map("last_sync_result") // JSON {created, updated, failed, errors}
   updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")

@@ -33,11 +33,14 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
 
 export default function OzonSellerSettings() {
   const [settings, setSettings] = useState<any>(null);
-  const [form, setForm] = useState({ clientId: '', apiKey: '', updateIntervalMinutes: 60 });
+  const [form, setForm] = useState({ clientId: '', apiKey: '', updateIntervalMinutes: 60, defaultTypeId: null as number | null });
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState('');
   const [isError, setIsError] = useState(false);
+  // Дерево категорий OZON (категория → подкатегория → тип) — для выбора defaultTypeId
+  const [catTree, setCatTree] = useState<any[]>([]);
+  const [catPath, setCatPath] = useState<number[]>([]); // выбранные description_category_id по уровням
 
   const flash = (text: string, error = false) => {
     setMsg(text);
@@ -49,13 +52,52 @@ export default function OzonSellerSettings() {
     try {
       const s = await api.ozonPlugin.get();
       setSettings(s);
-      setForm({ clientId: s.clientId || '', apiKey: '', updateIntervalMinutes: s.updateIntervalMinutes || 60 });
+      setForm({ clientId: s.clientId || '', apiKey: '', updateIntervalMinutes: s.updateIntervalMinutes || 60, defaultTypeId: s.defaultTypeId ?? null });
     } catch (e: any) {
       flash(e.message || 'Ошибка загрузки настроек', true);
     }
   };
 
   useEffect(() => { load(); }, []);
+
+  // Дерево категорий OZON: грузим только когда плагин подключён (нужен API-ключ)
+  useEffect(() => {
+    if (!settings?.isActive) return;
+    api.ozonPlugin.categories().then((r: any) => {
+      const tree = r.items || [];
+      setCatTree(tree);
+      // восстанавливаем путь уже сохранённой категории
+      if (settings?.defaultTypeId) {
+        const walk = (nodes: any[], trail: number[]): boolean => {
+          for (const n of nodes) {
+            const t = [...trail, n.description_category_id];
+            if (n.description_category_id === settings.defaultTypeId) { setCatPath(t); return true; }
+            if (n.children?.length && walk(n.children, t)) return true;
+          }
+          return false;
+        };
+        walk(tree, []);
+      }
+    }).catch(() => {});
+  }, [settings?.isActive]);
+
+  // Варианты селекта уровня idx: дети узла, выбранного на предыдущем уровне (корень — всё дерево)
+  const catLevelOptions = (idx: number): any[] => {
+    let nodes = catTree;
+    for (let i = 0; i < idx; i++) {
+      const cur = nodes.find((n) => n.description_category_id === catPath[i]);
+      nodes = cur?.children || [];
+    }
+    return nodes;
+  };
+
+  const pickCatLevel = (idx: number, id: number | '') => {
+    const next = catPath.slice(0, idx);
+    if (id !== '') next.push(id);
+    setCatPath(next);
+    // type_id = последний выбранный узел, у которого есть дети — не финальный; берём последний выбранный
+    setForm({ ...form, defaultTypeId: next.length ? next[next.length - 1] : null });
+  };
 
   const save = async () => {
     if (!form.clientId.trim()) { flash('Укажите Client-Id', true); return; }
@@ -65,6 +107,7 @@ export default function OzonSellerSettings() {
         clientId: form.clientId.trim(),
         apiKey: form.apiKey || undefined,
         updateIntervalMinutes: Number(form.updateIntervalMinutes) || 60,
+        defaultTypeId: form.defaultTypeId,
       });
       setSettings((prev: any) => ({ ...prev, ...res }));
       flash(res.isActive
@@ -125,6 +168,49 @@ export default function OzonSellerSettings() {
           placeholder={settings?.apiKeySet ? '••••••••' : 'API-ключ из кабинета OZON Seller'}
           style={inputStyle}
         />
+      </div>
+
+      <div>
+        <label style={labelStyle}>
+          Категория OZON по умолчанию <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(обязательна для создания новых товаров)</span>
+        </label>
+        {!settings?.isActive ? (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Сначала подключите интеграцию — категории загружаются из OZON</div>
+        ) : catTree.length === 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Загрузка категорий...</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {catPath.map((sel, idx) => (
+              <select
+                key={idx}
+                value={sel}
+                onChange={e => pickCatLevel(idx, e.target.value === '' ? '' : Number(e.target.value))}
+                style={inputStyle}
+              >
+                <option value="">— Выберите —</option>
+                {catLevelOptions(idx).map((n: any) => (
+                  <option key={n.description_category_id} value={n.description_category_id} disabled={n.disabled}>
+                    {n.category_name}
+                  </option>
+                ))}
+              </select>
+            ))}
+            {catLevelOptions(catPath.length).length > 0 && (
+              <select
+                value=""
+                onChange={e => pickCatLevel(catPath.length, e.target.value === '' ? '' : Number(e.target.value))}
+                style={inputStyle}
+              >
+                <option value="">— Выберите —</option>
+                {catLevelOptions(catPath.length).map((n: any) => (
+                  <option key={n.description_category_id} value={n.description_category_id} disabled={n.disabled}>
+                    {n.category_name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
       </div>
 
       <div>
