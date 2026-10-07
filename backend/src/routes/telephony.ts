@@ -585,19 +585,16 @@ router.get("/webrtc/key", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const settings = await prisma.telephonySettings.findFirst();
     if (!settings?.isActive || !settings.webRtcEnabled) {
-      return res
-        .status(400)
-        .json({ error: "WebRTC-звонки не включены в настройках телефонии" });
+      // 200 с пустым ключом — виджет просто не загружается (иначе шумная ошибка 400 в консоли)
+      return res.json({ key: null, sip: null });
     }
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
       select: { novofonExtension: true },
     });
     if (!user?.novofonExtension) {
-      return res.status(400).json({
-        error:
-          "Вам не сопоставлен внутренний номер АТС (раздел Пользователи → колонка «Внутренний номер Novofon»)",
-      });
+      // Нет внутреннего номера — виджет звонков недоступен для этого пользователя
+      return res.json({ key: null, sip: null });
     }
     // SIP-логин сотрудника: ищем по внутреннему номеру среди номеров сотрудников АТС
     let sipLogin = user.novofonExtension;

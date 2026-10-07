@@ -44,9 +44,9 @@ send({ type: 'connected', userId });
 const onNotification = (event: { userId: string; notification: any }) => { if (event.userId === userId) { send({ type: 'notification', notification: event.notification });
 } };
 notificationEmitter.on('notification', onNotification);
-const interval = setInterval(() => { try { res.write(':ping\n\n');
+const interval = setInterval(() => { try { res.write(':ping\n\n'); // каждые 15 с — чтобы внешние прокси (NAS) не рвали соединение по таймауту
 } catch (e) { clearInterval(interval);
-} }, 30000);
+} }, 15000);
 req.on('close', () => { clearInterval(interval);
 notificationEmitter.off('notification', onNotification);
 res.end();
