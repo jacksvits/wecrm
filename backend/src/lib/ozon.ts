@@ -54,8 +54,9 @@ export async function testOzonConnection(creds?: OzonCredentials): Promise<{ ok:
  * Атрибуты карточки CRM для передачи в OZON.
  * Бренд и ТН ВЭД — справочные атрибуты: без dictionary_value_id OZON игнорирует значение,
  * поэтому значение ищется в справочнике (/v1/description-category/attribute/values).
+ * Автозаполняемые обязательные: «Название модели» = артикул, «Нужен код маркировки» = нет.
  */
-async function buildOzonAttributes(product: { brand?: string | null; tnved?: string | null }, typeId: number, descriptionCategoryId: number): Promise<any[]> {
+async function buildOzonAttributes(product: { brand?: string | null; tnved?: string | null; article?: string | null }, typeId: number, descriptionCategoryId: number): Promise<any[]> {
   const attrs: any[] = [];
   const brand = product.brand?.trim();
   if (brand) {
@@ -72,6 +73,15 @@ async function buildOzonAttributes(product: { brand?: string | null; tnved?: str
       attrs.push({ id: tnAttrId, values: [{ value: code, ...(dv ? { dictionary_value_id: dv } : {}) }] });
     }
   }
+  // Обязательные «Название модели (для объединения в одну карточку)» → артикул из CRM
+  const article = product.article?.trim();
+  if (article) {
+    const modelAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'название модели');
+    if (modelAttrId) attrs.push({ id: modelAttrId, values: [{ value: article }] });
+  }
+  // Обязательный булев «Нужен код маркировки» → по умолчанию «нет»
+  const markingAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'код маркировки');
+  if (markingAttrId) attrs.push({ id: markingAttrId, values: [{ value: 'false' }] });
   return attrs;
 }
 
