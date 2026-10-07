@@ -4,24 +4,9 @@ import path from 'path';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { importMarketItems, syncProductsToVk, getVkSettings } from '../lib/vk-market.js';
-import { syncProductsToOzon } from '../lib/ozon.js';
 import { generateUniqueArticle } from '../lib/article.js';
 
 const router = Router();
-
-// Нормализация тегов карточки: обрезка пробелов, без дубликатов и пустых значений
-function normalizeTags(input: unknown): string[] {
-  if (!Array.isArray(input)) return [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const item of input) {
-    const tag = String(item ?? '').trim().slice(0, 50);
-    if (!tag || seen.has(tag)) continue;
-    seen.add(tag);
-    out.push(tag);
-  }
-  return out;
-}
 
 /**
  * GET /api/products/vitrine
@@ -377,38 +362,6 @@ router.get('/meta/vk-status', async (_req, res) => {
 });
 
 /**
- * GET /api/products/meta/tags
- * Все существующие теги карточек (алфавит) — для автоподстановки при вводе
- */
-router.get('/meta/tags', async (_req, res) => {
-  try {
-    const rows = await prisma.$queryRawUnsafe(
-      `SELECT DISTINCT unnest(tags) AS tag FROM products WHERE tags IS NOT NULL ORDER BY tag`
-    ) as any[];
-    res.json((rows as any[]).map((r: any) => r.tag).filter(Boolean));
-  } catch (err: any) {
-    console.error('[products:meta:tags]', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * GET /api/products/meta/brands
- * Все существующие бренды карточек (алфавит) — для автоподстановки при вводе
- */
-router.get('/meta/brands', async (_req, res) => {
-  try {
-    const rows = await prisma.$queryRawUnsafe(
-      `SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL AND brand <> '' ORDER BY brand`
-    ) as any[];
-    res.json((rows as any[]).map((r: any) => r.brand).filter(Boolean));
-  } catch (err: any) {
-    console.error('[products:meta:brands]', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
  * POST /api/products/meta/vk-import
  * Первый импорт: все товары маркета группы ВК → проект
  */
@@ -437,20 +390,6 @@ router.post('/meta/vk-sync', async (_req, res) => {
 });
 
 /**
- * POST /api/products/meta/ozon-sync
- * Синхронизация: все позиции с отметкой «OZON Seller» → маркетплейс OZON
- */
-router.post('/meta/ozon-sync', async (_req, res) => {
-  try {
-    const summary = await syncProductsToOzon();
-    res.json(summary);
-  } catch (err: any) {
-    console.error('[products:ozon-sync]', err);
-    res.status(400).json({ error: err.message });
-  }
-});
-
-/**
  * GET /api/products/meta/categories
  * Дерево категорий (группы и виды номенклатуры): из 1С + созданные вручную. Плоский список — дерево строит фронтенд
  */
@@ -458,7 +397,7 @@ router.get('/meta/categories', async (_req, res) => {
   try {
     const categories = await prisma.productCategory.findMany({
       orderBy: { name: 'asc' },
-      select: { id: true, onecId: true, name: true, isGroup: true, parentId: true, ozonTypeId: true },
+      select: { id: true, onecId: true, name: true, isGroup: true, parentId: true },
     });
     res.json(categories);
   } catch (err: any) {
@@ -473,19 +412,14 @@ router.get('/meta/categories', async (_req, res) => {
  */
 router.post('/meta/categories', async (req, res) => {
   try {
-    const { name, parentId, isGroup, ozonTypeId } = req.body;
+    const { name, parentId, isGroup } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
     if (parentId) {
       const parent = await prisma.productCategory.findUnique({ where: { id: parentId } });
       if (!parent) return res.status(400).json({ error: 'Родительская категория не найдена' });
     }
     const category = await prisma.productCategory.create({
-      data: {
-        name: name.trim(),
-        parentId: parentId || null,
-        isGroup: !!isGroup,
-        ozonTypeId: ozonTypeId ? Math.max(1, Number(ozonTypeId)) : null,
-      },
+      data: { name: name.trim(), parentId: parentId || null, isGroup: !!isGroup },
     });
     res.status(201).json(category);
   } catch (err: any) {
@@ -500,7 +434,7 @@ router.post('/meta/categories', async (req, res) => {
  */
 router.patch('/meta/categories/:id', async (req, res) => {
   try {
-    const { name, parentId, isGroup, ozonTypeId } = req.body;
+    const { name, parentId, isGroup } = req.body;
     const existing = await prisma.productCategory.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Категория не найдена' });
     const data: any = {};
@@ -509,8 +443,6 @@ router.patch('/meta/categories/:id', async (req, res) => {
       data.name = name.trim();
     }
     if (isGroup !== undefined) data.isGroup = !!isGroup;
-    // Привязка к категории OZON: число или null (сброс — тогда наследуется от родителя)
-    if (ozonTypeId !== undefined) data.ozonTypeId = ozonTypeId === null || ozonTypeId === '' ? null : Math.max(1, Number(ozonTypeId));
     if (parentId !== undefined) {
       if (parentId) {
         if (parentId === req.params.id) return res.status(400).json({ error: 'Категория не может быть родителем самой себя' });
@@ -636,7 +568,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, brand, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, kind, syncToVk, onVitrine, isSubscription, categoryId } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
     const productKind = kind === 'service' ? 'service' : 'product';
     // Категория из дерева 1С (группы/виды номенклатуры)
@@ -662,18 +594,10 @@ router.post('/', async (req, res) => {
         subcategory: subcategory?.trim() || null,
         unit: unit?.trim() || 'шт',
         barcode: barcode?.trim() || null,
-        brand: brand?.trim() || null,
-        weight: weight != null && weight !== '' ? Number(weight) : null,
-        width: width != null && width !== '' ? Number(width) : null,
-        height: height != null && height !== '' ? Number(height) : null,
-        depth: depth != null && depth !== '' ? Number(depth) : null,
         syncToVk: !!syncToVk,
-        // «OZON Seller» актуально только для товаров, не для услуг
-        syncToOzon: productKind === 'product' && !!syncToOzon,
         onVitrine: !!onVitrine,
         // «Подписка» актуальна только для услуг
         isSubscription: productKind === 'service' && !!isSubscription,
-        tags: normalizeTags(tags),
       },
       include: { stocks: true, prices: true, images: { orderBy: { sortOrder: 'asc' } } },
     });
@@ -728,7 +652,7 @@ router.get('/:id', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, brand, isActive, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind, syncToVk, onVitrine, isSubscription, categoryId } = req.body;
     const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Товар не найден' });
     const data: any = {};
@@ -742,16 +666,8 @@ router.patch('/:id', async (req, res) => {
     if (barcode !== undefined) data.barcode = barcode?.trim() || null;
     if (isActive !== undefined) data.isActive = !!isActive;
     if (syncToVk !== undefined) data.syncToVk = !!syncToVk;
-    // «OZON Seller» актуально только для товаров, не для услуг
-    if (syncToOzon !== undefined) data.syncToOzon = (data.kind ?? existing.kind) === 'product' && !!syncToOzon;
-    if (brand !== undefined) data.brand = brand?.trim() || null;
-    for (const f of ['weight', 'width', 'height', 'depth'] as const) {
-      const v = (req.body as any)[f];
-      if (v !== undefined) (data as any)[f] = v === null || v === '' ? null : Number(v);
-    }
     if (onVitrine !== undefined) data.onVitrine = !!onVitrine;
     if (isSubscription !== undefined) data.isSubscription = (data.kind ?? existing.kind) === 'service' && !!isSubscription;
-    if (tags !== undefined) data.tags = normalizeTags(tags);
     // Категория из дерева 1С: обновляем привязку и строковый путь (для выгрузки в 1С)
     if (categoryId !== undefined) {
       if (categoryId) {
@@ -884,52 +800,6 @@ router.post('/:id/images', async (req, res) => {
     res.status(201).json(image);
   } catch (err: any) {
     console.error('[products:image:add]', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * POST /api/products/:id/images/url
- * Скачать изображение по внешней ссылке (например, из кабинета OZON: ir.ozone.ru) и прикрепить к товару
- */
-router.post('/:id/images/url', async (req, res) => {
-  try {
-    const product = await prisma.product.findUnique({ where: { id: req.params.id } });
-    if (!product) return res.status(404).json({ error: 'Товар не найден' });
-    const { url } = req.body || {};
-    if (!url || typeof url !== 'string' || !/^https:\/\//i.test(url)) {
-      return res.status(400).json({ error: 'Укажите корректный URL изображения (https://)' });
-    }
-    const resp = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(20000) });
-    if (!resp.ok) return res.status(400).json({ error: `Не удалось скачать изображение: HTTP ${resp.status}` });
-    const mime = resp.headers.get('content-type')?.split(';')[0] || '';
-    if (!mime.startsWith('image/')) return res.status(400).json({ error: 'По ссылке не изображение' });
-    const buf = Buffer.from(await resp.arrayBuffer());
-    if (!buf.length || buf.length > 10 * 1024 * 1024) return res.status(400).json({ error: 'Изображение пустое или больше 10 МБ' });
-
-    const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[mime] || 'jpg';
-    const filename = `product-${product.id}-${Date.now()}.${ext}`;
-    fs.writeFileSync(path.join(UPLOAD_ROOT, filename), buf);
-
-    const attachment = await prisma.fileAttachment.create({
-      data: {
-        entityType: 'product',
-        entityId: product.id,
-        filename: url.split('/').pop()?.split('?')[0] || filename,
-        originalName: url.split('/').pop()?.split('?')[0] || filename,
-        mimeType: mime,
-        size: buf.length,
-        path: `/uploads/${filename}`,
-        authorId: (req as AuthRequest).user!.id,
-      },
-    });
-    const maxSort = await prisma.productImage.aggregate({ where: { productId: product.id }, _max: { sortOrder: true } });
-    const image = await prisma.productImage.create({
-      data: { productId: product.id, attachmentId: attachment.id, url: attachment.path, sortOrder: (maxSort._max.sortOrder ?? -1) + 1 },
-    });
-    res.json({ id: image.id, productId: product.id, attachmentId: attachment.id, sortOrder: image.sortOrder, url: attachment.path, attachment });
-  } catch (err: any) {
-    console.error('[products:images:url]', err);
     res.status(500).json({ error: err.message });
   }
 });

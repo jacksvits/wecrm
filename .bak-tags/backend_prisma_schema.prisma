@@ -1152,19 +1152,8 @@ model Product {
   subcategory String?
   unit        String   @default("шт")
   barcode     String?
-  // Характеристики для выгрузки в OZON (вес в кг, габариты в см)
-  weight      Float?
-  width       Float?
-  height      Float?
-  depth       Float?
-  brand       String?  @map("brand") // Бренд товара (единое значение, как тег)
   syncToVk    Boolean  @default(false) @map("sync_to_vk")
   vkItemId    Int?     @unique @map("vk_item_id")
-  // «OZON Seller»: выгружать позицию в маркетплейс OZON
-  syncToOzon    Boolean   @default(false) @map("sync_to_ozon")
-  // product_id товара в OZON Seller (BigInt: значения больше 2^31)
-  ozonProductId BigInt?   @unique @map("ozon_product_id")
-  ozonSyncedAt  DateTime? @map("ozon_synced_at")
   onecId      String?  @unique @map("onec_id")
   onecSyncedAt DateTime? @map("onec_synced_at")
   isActive    Boolean  @default(true) @map("is_active")
@@ -1172,8 +1161,6 @@ model Product {
   onVitrine   Boolean  @default(false) @map("on_vitrine")
   // «Подписка»: услуга доступна для оформления подписки (кнопка «Подписаться» на витрине)
   isSubscription Boolean @default(false) @map("is_subscription")
-  // Теги карточки товара: свободный ввод с автоподстановкой существующих, фильтр на витрине
-  tags        String[] @default([]) @map("tags")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -1235,8 +1222,6 @@ model ProductCategory {
   onecId    String?  @unique @map("onec_id") // Ref_Key вида/группы в 1С
   name      String
   isGroup   Boolean  @default(true) @map("is_group") // true = группа (папка), false = вид номенклатуры
-  // Привязка к категории OZON (type_id): если пусто — наследуется от родительской категории
-  ozonTypeId Int?     @map("ozon_type_id")
   parentId  String?  @map("parent_id")
   parent    ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   children  ProductCategory[] @relation("CategoryTree")
@@ -1501,22 +1486,6 @@ model OneCPluginSettings {
 }
 
 // Настройки плагина «Контур.Диадок» (ЭДО): подключение по API-ключу разработчика + логин/пароль
-// === Плагин «OZON Seller»: подключение и синхронизация каталога товаров с OZON ===
-model OzonSellerSettings {
-  id                    Int       @id @default(1)
-  clientId              String    @default("") @map("client_id")
-  apiKey                String    @default("") @map("api_key")
-  isActive              Boolean   @default(false) @map("is_active")
-  updateIntervalMinutes Int       @default(60) @map("update_interval_minutes")
-  // Категория OZON (type_id) по умолчанию для новых товаров — выбирается из дерева категорий OZON
-  defaultTypeId         Int?      @map("default_type_id")
-  lastSyncAt            DateTime? @map("last_sync_at")
-  lastSyncResult        String?   @map("last_sync_result") // JSON {created, updated, failed, errors}
-  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
-
-  @@map("ozon_seller_settings")
-}
-
 model DiadocPluginSettings {
   id                    Int      @id @default(1)
   login                 String   @default("")

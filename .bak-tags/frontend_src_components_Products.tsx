@@ -66,8 +66,6 @@ export function Products() {
     return true;
   });
   const [products, setProducts] = useState<Product[]>([]);
-  // Все существующие теги (для автоподстановки в таблице и модалке позиции)
-  const [allTags, setAllTags] = useState<string[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
@@ -98,7 +96,6 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   const [hoverCat, setHoverCat] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ productId: string; priceTypeId: string; value: string; priceFrom: boolean } | null>(null);
   const [vkBusy, setVkBusy] = useState<'import' | 'sync' | null>(null);
-  const [ozonBusy, setOzonBusy] = useState(false);
 
   // Массовый выбор позиций (удаление / перенос в категорию)
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -129,31 +126,6 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
     } finally { setVkBusy(null); }
   };
 
-  const syncToOzon = async () => {
-    if (!confirm('Выгрузить все позиции с отметкой «OZON Seller» в маркетплейс OZON?')) return;
-    setOzonBusy(true);
-    try {
-      const r = await api.products.ozonSync();
-      alert(`Синхронизация завершена: создано ${r.created}, обновлено ${r.updated}, ошибок ${r.failed}${r.errors.length ? '\n' + r.errors.slice(0, 10).join('\n') : ''}`);
-      await load();
-    } catch (e: any) {
-      alert(e.message || 'Ошибка синхронизации с OZON');
-    } finally { setOzonBusy(false); }
-  };
-
-  // Импорт из OZON: привязка товаров CRM к карточкам OZON по артикулу
-  const importFromOzon = async () => {
-    if (!confirm('Импортировать каталог OZON и привязать товары CRM по артикулу?')) return;
-    setOzonBusy(true);
-    try {
-      const r = await api.ozonPlugin.import();
-      alert(`Импорт завершён: привязано ${r.linked}, пропущено ${r.skipped}, создано ${r.created}, ошибок ${r.errors.length}${r.errors.length ? '\n' + r.errors.slice(0, 10).join('\n') : ''}`);
-      await load();
-    } catch (e: any) {
-      alert(e.message || 'Ошибка импорта из OZON');
-    } finally { setOzonBusy(false); }
-  };
-
   // Переключение опции «Показывать на витрине» у вида цены
   const toggleVitrine = async (t: PriceType) => {
     try {
@@ -172,20 +144,18 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
 
   const load = async () => {
     try {
-      const [p, w, t, m, c, tg] = await Promise.all([
+      const [p, w, t, m, c] = await Promise.all([
         api.products.list(),
         api.products.warehouses.list(),
         api.products.priceTypes.list(),
         api.products.movements(),
         api.products.categories.list(),
-        api.products.tags(),
       ]);
       setProducts(p);
       setWarehouses(w);
       setPriceTypes(t);
       setMovements(m);
       setCategories(c);
-      setAllTags(tg);
     } catch (e: any) {
       alert(e.message || 'Ошибка загрузки');
     } finally {
@@ -434,7 +404,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
     const collapsed = isCollapsed(key);
     const rows: ReactNode[] = [
       <tr key={key} style={{ background: depth === 0 ? 'var(--bg-hover)' : 'transparent', cursor: 'pointer' }} onClick={() => toggleGroup(key)}>
-        <td colSpan={6 + activePriceTypes.length} style={{
+        <td colSpan={5 + activePriceTypes.length} style={{
           ...tdStyle,
           fontWeight: depth === 0 ? 600 : 400,
           fontSize: depth === 0 ? 14 : 13,
@@ -464,10 +434,6 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
           }}
           selected={selected.has(p.id)}
           onToggle={() => toggleSelect(p.id)}
-          allTags={allTags}
-          onSaveTags={async (tags) => {
-            try { await api.products.update(p.id, { tags }); await load(); } catch (e: any) { alert(e.message || 'Ошибка сохранения тегов'); }
-          }}
         />
       )));
     }
@@ -576,14 +542,6 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
             <button onClick={syncToVk} disabled={!!vkBusy} title="Выгрузить позиции с отметкой «ВК» в маркет группы"
               style={{ ...btnGhost, borderColor: '#0077FF', color: '#0077FF' }}>
               {vkBusy === 'sync' ? 'Синхронизация...' : '↑ Синхронизация ВК'}
-            </button>
-            <button onClick={syncToOzon} disabled={ozonBusy} title="Выгрузить позиции с отметкой «OZON Seller» в маркетплейс OZON"
-              style={{ ...btnGhost, borderColor: '#005BFF', color: '#005BFF' }}>
-              {ozonBusy ? 'Синхронизация...' : '↑ Синхронизация OZON'}
-            </button>
-            <button onClick={importFromOzon} disabled={ozonBusy} title="Привязать товары CRM к карточкам OZON по артикулу"
-              style={{ ...btnGhost, borderColor: '#005BFF', color: '#005BFF' }}>
-              {ozonBusy ? 'Импорт...' : '↓ Импорт из OZON'}
             </button>
             <button onClick={() => setProductModal('new')} style={btnPrimary}>+ Позиция</button>
           </div>
@@ -731,7 +689,6 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
                     />
                   </th>
                   <th style={thStyle}>Позиция</th>
-                  <th style={thStyle}>Теги</th>
                   <th style={thStyle}>Вид</th>
                   <th style={thStyle}>Ед.</th>
                   <th style={thStyle}>Остаток</th>
@@ -755,15 +712,11 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
                     }}
                     selected={selected.has(p.id)}
                     onToggle={() => toggleSelect(p.id)}
-                    allTags={allTags}
-                    onSaveTags={async (tags) => {
-                      try { await api.products.update(p.id, { tags }); await load(); } catch (e: any) { alert(e.message || 'Ошибка сохранения тегов'); }
-                    }}
                   />
                 ))}
                 {visible.length === 0 && (
                   <tr>
-                    <td colSpan={6 + activePriceTypes.length} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <td colSpan={5 + activePriceTypes.length} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
                       Позиции не найдены
                     </td>
                   </tr>
@@ -1138,13 +1091,12 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
 }
 
 /* ---------- Строка позиции в номенклатуре ---------- */
-function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDelete, selected, onToggle, allTags, onSaveTags }: {
+function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDelete, selected, onToggle }: {
   p: Product; indent: number; priceTypes: PriceType[];
   totalStock: number;
   priceOf: (p: Product, ptId: string) => number | undefined;
   onOpen: () => void; onDelete: () => void;
   selected: boolean; onToggle: () => void;
-  allTags: string[]; onSaveTags: (tags: string[]) => void;
 }) {
   const origin = window.location.origin;
   const mainImage = (p.images || [])[0];
@@ -1167,9 +1119,6 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
           </div>
         </div>
       </td>
-      <td style={{ ...tdStyle, minWidth: 140 }} onClick={e => e.stopPropagation()}>
-        <TagsCell tags={p.tags || []} suggestions={allTags} brand={p.brand} onSave={onSaveTags} />
-      </td>
       <td style={tdStyle}>
         <span style={{ padding: '2px 10px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: KIND_COLORS[p.kind] || '#f0f0f0' }}>
           {KIND_LABELS[p.kind] || p.kind}
@@ -1180,18 +1129,6 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
             ВК
           </span>
         )}
-        {p.syncToOzon && (p.ozonProductId ? (
-          <a href={`https://seller.ozon.ru/app/products/product/${p.ozonProductId}/`} target="_blank" rel="noreferrer"
-            title={`Карточка в кабинете OZON Seller (product_id: ${p.ozonProductId}) — откроется карточка товара, откуда можно скопировать ссылку на картинку`}
-            style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#005BFF', color: '#fff', textDecoration: 'none' }}>
-            OZON ↗
-          </a>
-        ) : (
-          <span title="Будет выгружен в OZON Seller при синхронизации"
-            style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#005BFF', color: '#fff' }}>
-            OZON
-          </span>
-        ))}
         {p.onVitrine && (
           <span title="Показывается на витрине магазина"
             style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#16a34a', color: '#fff' }}>
@@ -1212,130 +1149,20 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
   );
 }
 
-/* ---------- Ячейка «Теги» таблицы номенклатуры: просмотр + быстрое добавление ---------- */
-function TagsCell({ tags, suggestions, brand, onSave }: { tags: string[]; suggestions: string[]; brand?: string | null; onSave: (tags: string[]) => void }) {
-  const [editing, setEditing] = useState(false);
-  const chipStyle: React.CSSProperties = { padding: '1px 8px', borderRadius: 10, fontSize: 11, background: 'var(--bg-hover)', color: 'var(--text-muted)', border: 'none' };
-  // Все теги позиции доступны по наведению на «+N»
-  const overflowTitle = tags.join(', ');
-  if (editing) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 220 }}>
-        <TagInput value={tags} onChange={onSave} suggestions={suggestions} />
-        <button type="button" onClick={() => setEditing(false)} style={{ ...btnGhost, alignSelf: 'flex-start', fontSize: 12, padding: '3px 10px' }}>Готово</button>
-      </div>
-    );
-  }
-  return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-      {brand && (
-        <span title="Бренд" style={{ ...chipStyle, fontWeight: 700, background: 'var(--accent)', color: '#fff' }}>{brand}</span>
-      )}
-      {tags.slice(0, 3).map(t => <span key={t} style={chipStyle}>{t}</span>)}
-      {tags.length > 3 && (
-        <span title={overflowTitle} style={{ ...chipStyle, cursor: 'help' }}>+{tags.length - 3}</span>
-      )}
-      <button type="button" onClick={() => setEditing(true)} title="Добавить тег"
-        style={{ width: 20, height: 20, borderRadius: 6, border: '1px dashed var(--border-color)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13, lineHeight: 1, flexShrink: 0 }}>
-        +
-      </button>
-    </div>
-  );
-}
-
-/* ---------- Ввод тегов: свободный ввод + автоподстановка существующих ---------- */
-function TagInput({ value, onChange, suggestions }: { value: string[]; onChange: (tags: string[]) => void; suggestions: string[] }) {
-  const [input, setInput] = useState('');
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const s = input.trim().toLowerCase();
-  // Автоподстановка: существующие теги, ещё не добавленные в карточку, фильтр по вводу
-  const matches = useMemo(
-    () => suggestions.filter(t => !value.includes(t) && (!s || t.toLowerCase().includes(s))).slice(0, 8),
-    [suggestions, value, s]
-  );
-  // Закрытие выпадающего списка по клику вне поля
-  useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, []);
-  const add = (tag: string) => {
-    const t = tag.trim();
-    if (t && !value.includes(t)) onChange([...value, t]);
-    setInput('');
-    setOpen(false);
-  };
-  const remove = (tag: string) => onChange(value.filter(t => t !== tag));
-  return (
-    <div ref={wrapRef} style={{ position: 'relative' }}>
-      <div style={{ ...inputStyle, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', cursor: 'text', minHeight: 40, height: 'auto' }}
-        onClick={() => { setOpen(true); (wrapRef.current?.querySelector('input') as HTMLInputElement | null)?.focus(); }}>
-        {value.map(t => (
-          <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: 'var(--bg-hover)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
-            {t}
-            <button type="button" onClick={(e) => { e.stopPropagation(); remove(t); }} title="Убрать тег"
-              style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', padding: 0, lineHeight: 1 }}>×</button>
-          </span>
-        ))}
-        <input value={input} style={{ border: 'none', outline: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: 14, flex: 1, minWidth: 140, padding: '4px 0' }}
-          placeholder={value.length ? '' : 'Введите тег и нажмите Enter'}
-          onChange={e => { setInput(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(input); }
-            else if (e.key === 'Backspace' && !input && value.length) remove(value[value.length - 1]);
-          }} />
-      </div>
-      {open && matches.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 8, marginTop: 4, boxShadow: '0 6px 18px rgba(0,0,0,.12)', maxHeight: 180, overflowY: 'auto' }}>
-          {matches.map(t => (
-            <button key={t} type="button" onClick={() => add(t)}
-              style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-              {t}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; syncToVk: boolean; onVitrine: boolean; isSubscription: boolean; description: string }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : product.kind,
     sku: isNew ? '' : product.sku || '',
     unit: isNew ? 'шт' : product.unit,
     barcode: isNew ? '' : product.barcode || '',
-    brand: isNew ? '' : product.brand || '',
-    weight: isNew ? '' : (product.weight != null ? String(product.weight) : ''),
-    width: isNew ? '' : (product.width != null ? String(product.width) : ''),
-    height: isNew ? '' : (product.height != null ? String(product.height) : ''),
-    depth: isNew ? '' : (product.depth != null ? String(product.depth) : ''),
     syncToVk: isNew ? false : product.syncToVk,
-    syncToOzon: isNew ? false : product.syncToOzon,
     onVitrine: isNew ? false : product.onVitrine,
     isSubscription: isNew ? false : product.isSubscription,
     description: isNew ? '' : product.description || '',
-    tags: isNew ? [] : (product.tags || []),
   });
-  // Существующие теги всех карточек — для автоподстановки при вводе
-  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
-  useEffect(() => {
-    api.products.tags().then(setTagSuggestions).catch(() => {});
-  }, []);
-  // Автоподстановка существующих брендов (как у тегов)
-  const [brandSuggestions, setBrandSuggestions] = useState<string[]>([]);
-  useEffect(() => {
-    api.products.brands().then(setBrandSuggestions).catch(() => {});
-  }, []);
   const [categoryId, setCategoryId] = useState(isNew ? '' : product.categoryId || '');
   // Опции селекта категории: группы и виды номенклатуры с отступами по глубине
   const categoryOptions = useMemo(() => {
@@ -1359,9 +1186,6 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  // Загрузка изображения по внешней ссылке (например, из кабинета OZON)
-  const [imageUrl, setImageUrl] = useState('');
-  const [urlBusy, setUrlBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const origin = window.location.origin;
 
@@ -1369,8 +1193,7 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     if (!form.name.trim()) { setError('Название обязательно'); return; }
     setSaving(true); setError('');
     try {
-      const num = (v: string) => (v === '' ? null : Number(v));
-      const payload = { ...form, categoryId: categoryId || null, weight: num(form.weight), width: num(form.width), height: num(form.height), depth: num(form.depth), brand: form.brand.trim() || null };
+      const payload = { ...form, categoryId: categoryId || null };
       if (isNew) await api.products.create(payload);
       else await api.products.update(product.id, payload);
       onSaved();
@@ -1401,18 +1224,6 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     if (isNew) return;
     try { await api.products.deleteImage(product.id, imageId); onSaved(); }
     catch (e: any) { setError(e.message || 'Ошибка удаления изображения'); }
-  };
-
-  // Скачать изображение по ссылке (например, из кабинета OZON) и прикрепить к товару
-  const addImageByUrl = async () => {
-    if (isNew || !imageUrl.trim()) return;
-    setUrlBusy(true); setError('');
-    try {
-      await api.products.addImageByUrl(product.id, imageUrl.trim());
-      setImageUrl('');
-      onSaved();
-    } catch (e: any) { setError(e.message || 'Ошибка загрузки по ссылке'); }
-    finally { setUrlBusy(false); }
   };
 
   const images = isNew ? [] : (product.images || []);
@@ -1459,60 +1270,14 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
               <input value={form.barcode} onChange={e => setForm({ ...form, barcode: e.target.value })} style={inputStyle} />
             </div>
           </div>
-          {form.kind === 'product' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-              <div>
-                <label style={{ fontSize: 14, fontWeight: 500 }}>Вес, кг</label>
-                <input type="number" step="0.001" min="0" value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} style={inputStyle} />
-              </div>
-              <div>
-                <label style={{ fontSize: 14, fontWeight: 500 }}>Ширина, см</label>
-                <input type="number" step="0.1" min="0" value={form.width} onChange={e => setForm({ ...form, width: e.target.value })} style={inputStyle} />
-              </div>
-              <div>
-                <label style={{ fontSize: 14, fontWeight: 500 }}>Высота, см</label>
-                <input type="number" step="0.1" min="0" value={form.height} onChange={e => setForm({ ...form, height: e.target.value })} style={inputStyle} />
-              </div>
-              <div>
-                <label style={{ fontSize: 14, fontWeight: 500 }}>Глубина, см</label>
-                <input type="number" step="0.1" min="0" value={form.depth} onChange={e => setForm({ ...form, depth: e.target.value })} style={inputStyle} />
-              </div>
-            </div>
-          )}
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
             <input type="checkbox" checked={form.syncToVk} onChange={e => setForm({ ...form, syncToVk: e.target.checked })} style={{ width: 16, height: 16 }} />
             Синхронизировать с ВКонтакте
           </label>
-          {form.kind === 'product' && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-              <input type="checkbox" checked={form.syncToOzon} onChange={e => setForm({ ...form, syncToOzon: e.target.checked })} style={{ width: 16, height: 16 }} />
-              OZON Seller
-              {!isNew && product.ozonProductId && (
-                <a href={`https://seller.ozon.ru/app/products/product/${product.ozonProductId}/`} target="_blank" rel="noreferrer"
-                  title="Открыть карточку товара в кабинете OZON Seller"
-                  style={{ marginLeft: 6, fontSize: 12, color: '#005BFF', textDecoration: 'none', fontWeight: 600 }}>
-                  Открыть в OZON ↗
-                </a>
-              )}
-            </label>
-          )}
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
             <input type="checkbox" checked={form.onVitrine} onChange={e => setForm({ ...form, onVitrine: e.target.checked })} style={{ width: 16, height: 16 }} />
             На витрине
           </label>
-          <label style={{ fontSize: 14, fontWeight: 500 }}>Теги</label>
-          <TagInput value={form.tags} onChange={tags => setForm({ ...form, tags })} suggestions={tagSuggestions} />
-          <label style={{ fontSize: 14, fontWeight: 500 }}>Бренд</label>
-          <input
-            list="product-brand-suggestions"
-            value={form.brand}
-            onChange={e => setForm({ ...form, brand: e.target.value })}
-            placeholder="Начните вводить бренд — будет подсказка из существующих"
-            style={inputStyle}
-          />
-          <datalist id="product-brand-suggestions">
-            {brandSuggestions.map(b => <option key={b} value={b} />)}
-          </datalist>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Описание</label>
           <ReactQuill theme="snow" value={form.description} onChange={v => setForm({ ...form, description: v })}
             modules={quillModules} formats={quillFormats} />
@@ -1554,19 +1319,6 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
               <button onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{ ...btnGhost, alignSelf: 'flex-start' }}>
                 {uploading ? 'Загрузка...' : '+ Добавить изображения'}
               </button>
-              {!isNew && (
-                <span style={{ display: 'flex', gap: 8, alignItems: 'center', alignSelf: 'flex-start', flexWrap: 'wrap' }}>
-                  <input
-                    value={imageUrl}
-                    onChange={e => setImageUrl(e.target.value)}
-                    placeholder="или URL картинки (например, из OZON)"
-                    style={{ ...inputStyle, width: 280, padding: '6px 10px', fontSize: 13 }}
-                  />
-                  <button type="button" onClick={addImageByUrl} disabled={urlBusy || !imageUrl.trim()} style={{ ...btnGhost, opacity: (urlBusy || !imageUrl.trim()) ? 0.5 : 1 }}>
-                    {urlBusy ? 'Загрузка...' : 'По ссылке'}
-                  </button>
-                </span>
-              )}
             </div>
           )}
 
@@ -2525,49 +2277,6 @@ function SalesTab() {
 }
 
 /* ---------- Модалка категории (создание / редактирование) ---------- */
-/* ---------- Каскадный выбор категории OZON (дерево из /api/ozon-plugin/categories) ---------- */
-function OzonCategoryPicker({ tree, path, onChange }: {
-  tree: any[];
-  path: number[];
-  onChange: (id: number | null, path: number[]) => void;
-}) {
-  // Группы имеют description_category_id и children; конечные типы — type_id (именно он нужен для создания товара в OZON)
-  const levelOptions = (idx: number): any[] => {
-    let nodes = tree;
-    for (let i = 0; i < idx; i++) {
-      const cur = nodes.find((n) => (n.type_id ?? n.description_category_id) === path[i]);
-      nodes = cur?.children || [];
-    }
-    return nodes;
-  };
-  const pick = (idx: number, val: string) => {
-    const next = path.slice(0, idx);
-    let id: number | null = null;
-    if (val.startsWith('g:')) {
-      next.push(Number(val.slice(2))); // группа — только навигация
-    } else if (val !== '') {
-      id = Number(val); // лист — type_id
-      next.push(id);
-    }
-    onChange(id, next);
-  };
-  const levels = Math.max(path.length + (levelOptions(path.length).length > 0 ? 1 : 0), 1);
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {Array.from({ length: levels }).map((_, idx) => (
-        <select key={idx} value={path[idx] != null ? String(path[idx]) : ''} onChange={e => pick(idx, e.target.value)} style={inputStyle}>
-          <option value="">{idx === 0 ? '— Не привязано —' : '— Выберите —'}</option>
-          {levelOptions(idx).map((n: any) => (
-            <option key={n.type_id ?? n.description_category_id} value={n.type_id ? String(n.type_id) : `g:${n.description_category_id}`} disabled={n.disabled}>
-              {n.type_name ?? n.category_name}
-            </option>
-          ))}
-        </select>
-      ))}
-    </div>
-  );
-}
-
 function CategoryModal({ modal, categories, onClose, onSaved }: {
   modal: { category: ProductCategory | 'new'; parentId?: string | null };
   categories: ProductCategory[];
@@ -2580,33 +2289,6 @@ function CategoryModal({ modal, categories, onClose, onSaved }: {
   const [isGroup, setIsGroup] = useState(isNew ? false : editing!.isGroup);
   const [parentId, setParentId] = useState<string>(isNew ? (modal.parentId || '') : (editing!.parentId || ''));
   const [error, setError] = useState('');
-  // Привязка категории OZON (показываем, только если плагин подключён)
-  const [ozonActive, setOzonActive] = useState(false);
-  const [ozonTree, setOzonTree] = useState<any[]>([]);
-  const [ozonPath, setOzonPath] = useState<number[]>([]);
-  const [ozonTypeId, setOzonTypeId] = useState<number | null>(isNew ? null : (editing!.ozonTypeId ?? null));
-
-  useEffect(() => {
-    api.ozonPlugin.get().then(async (s: any) => {
-      if (!s?.isActive) return;
-      setOzonActive(true);
-      try {
-        const r = await api.ozonPlugin.categories();
-        const tree = r.items || [];
-        setOzonTree(tree);
-        // восстанавливаем путь привязанной категории OZON — ищем лист с type_id
-        const walk = (nodes: any[], trail: number[]): boolean => {
-          for (const n of nodes) {
-            const t = [...trail, n.type_id ?? n.description_category_id];
-            if (n.type_id && n.type_id === (editing?.ozonTypeId ?? null)) { setOzonPath(t); return true; }
-            if (n.children?.length && walk(n.children, t)) return true;
-          }
-          return false;
-        };
-        if (editing?.ozonTypeId) walk(tree, []);
-      } catch { /* категории недоступны — оставляем пустым */ }
-    }).catch(() => {});
-  }, []);
 
   // Недопустимые родители при редактировании: сама категория и все её потомки
   const excluded = useMemo(() => {
@@ -2645,8 +2327,8 @@ function CategoryModal({ modal, categories, onClose, onSaved }: {
   const save = async () => {
     if (!name.trim()) { setError('Название обязательно'); return; }
     try {
-      if (isNew) await api.products.categories.create({ name, isGroup, parentId: parentId || null, ozonTypeId });
-      else await api.products.categories.update(editing!.id, { name, isGroup, parentId: parentId || null, ozonTypeId });
+      if (isNew) await api.products.categories.create({ name, isGroup, parentId: parentId || null });
+      else await api.products.categories.update(editing!.id, { name, isGroup, parentId: parentId || null });
       onSaved();
     } catch (e: any) { setError(e.message || 'Ошибка'); }
   };
@@ -2669,21 +2351,6 @@ function CategoryModal({ modal, categories, onClose, onSaved }: {
             <option value="item">Вид номенклатуры</option>
             <option value="group">Папка (группа)</option>
           </select>
-          {ozonActive && (
-            <>
-              <label style={{ fontSize: 14, fontWeight: 500 }}>
-                Категория OZON{' '}
-                <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 12 }}>
-                  (пусто — наследовать от родительской; товары попадут в OZON в эту категорию)
-                </span>
-              </label>
-              <OzonCategoryPicker
-                tree={ozonTree}
-                path={ozonPath}
-                onChange={(id, p) => { setOzonTypeId(id); setOzonPath(p); }}
-              />
-            </>
-          )}
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={save} style={btnPrimary}>Сохранить</button>
             <button onClick={onClose} style={btnGhost}>Отмена</button>

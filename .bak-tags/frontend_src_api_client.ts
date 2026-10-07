@@ -76,13 +76,6 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     get: () => fetchApi('/api/pskovline-plugin'),
     save: (data: any) => fetchApi('/api/pskovline-plugin', { method: 'POST', body: JSON.stringify(data) }),
   },
-  ozonPlugin: {
-    get: (): Promise<any> => fetchApi('/api/ozon-plugin'),
-    save: (data: any) => fetchApi('/api/ozon-plugin', { method: 'POST', body: JSON.stringify(data) }),
-    sync: (): Promise<{ created: number; updated: number; failed: number; errors: string[] }> => fetchApi('/api/ozon-plugin/sync', { method: 'POST' }),
-    import: (): Promise<{ created: number; linked: number; skipped: number; errors: string[] }> => fetchApi('/api/ozon-plugin/import', { method: 'POST' }),
-    categories: (): Promise<{ items: any[] }> => fetchApi('/api/ozon-plugin/categories'),
-  },
   diadocPlugin: {
     get: (): Promise<any> => fetchApi('/api/diadoc-plugin'),
     save: (data: any) => fetchApi('/api/diadoc-plugin', { method: 'POST', body: JSON.stringify(data) }),
@@ -217,8 +210,6 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     },
     vitrine: (): Promise<Product[]> => fetchApi('/api/products/vitrine'),
     vitrineCategories: (): Promise<ProductCategory[]> => fetchApi('/api/products/vitrine/categories'),
-    tags: (): Promise<string[]> => fetchApi('/api/products/meta/tags'),
-    brands: (): Promise<string[]> => fetchApi('/api/products/meta/brands'),
     get: (id: string): Promise<Product> => fetchApi(`/api/products/${id}`),
     create: (data: Partial<Product>) => fetchApi('/api/products', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Product>) => fetchApi(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
@@ -231,9 +222,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     vkStatus: (): Promise<{ configured: boolean; groupId: number | null; hasMarketToken: boolean }> => fetchApi('/api/products/meta/vk-status'),
     vkImport: (): Promise<{ created: number; linked: number; skipped: number; errors: string[] }> => fetchApi('/api/products/meta/vk-import', { method: 'POST' }),
     vkSync: (): Promise<{ created: number; updated: number; failed: number; errors: string[] }> => fetchApi('/api/products/meta/vk-sync', { method: 'POST' }),
-    ozonSync: (): Promise<{ created: number; updated: number; failed: number; errors: string[] }> => fetchApi('/api/products/meta/ozon-sync', { method: 'POST' }),
     addImage: (id: string, attachmentId: string): Promise<ProductImage> => fetchApi(`/api/products/${id}/images`, { method: 'POST', body: JSON.stringify({ attachmentId }) }),
-    addImageByUrl: (id: string, url: string): Promise<ProductImage> => fetchApi(`/api/products/${id}/images/url`, { method: 'POST', body: JSON.stringify({ url }) }),
     deleteImage: (id: string, imageId: string) => fetchApi(`/api/products/${id}/images/${imageId}`, { method: 'DELETE' }),
     movements: (params?: { productId?: string; warehouseId?: string }): Promise<StockMovement[]> => {
       const qs = new URLSearchParams();
