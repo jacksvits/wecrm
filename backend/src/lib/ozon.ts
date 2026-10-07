@@ -133,10 +133,22 @@ export async function ozonUpdatePrices(items: { product_id: number; price: numbe
   });
 }
 
-/** Обновить остатки существующих товаров */
-export async function ozonUpdateStocks(items: { product_id: number; stock: number }[]): Promise<void> {
+let warehousesCache: { at: number; ids: number[] } | null = null;
+
+/** Список складов продавца (кэш 1 ч); остатки в OZON обязательно привязаны к складу */
+export async function getOzonWarehouseIds(): Promise<number[]> {
+  if (warehousesCache && Date.now() - warehousesCache.at < 60 * 60 * 1000) return warehousesCache.ids;
+  const data = await ozonApi('POST', '/v2/warehouse/list', {});
+  const ids = (data?.warehouses || []).map((w: any) => Number(w.warehouse_id));
+  warehousesCache = { at: Date.now(), ids };
+  return ids;
+}
+
+/** Обновить остатки существующих товаров (на первом складе продавца) */
+export async function ozonUpdateStocks(items: { product_id: number; stock: number }[], warehouseId: number): Promise<void> {
   await ozonApi('POST', '/v2/products/stocks', {
     stocks: items.map((it) => ({ product_id: it.product_id, stock: it.stock })),
+    warehouse_id: warehouseId,
   });
 }
 
@@ -197,6 +209,14 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
   if (!retailType) retailType = await prisma.priceType.findFirst({ where: { name: 'retail', isActive: true } });
   if (!retailType) retailType = await prisma.priceType.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'desc' } });
 
+  // Остатки в OZON обязательно привязаны к складу — берём первый склад продавца
+  const warehouseIds = await getOzonWarehouseIds();
+  const warehouseId = warehouseIds[0] ?? null;
+  const requireWarehouse = () => {
+    if (!warehouseId) throw new Error('В кабинете OZON нет складов — создайте склад, чтобы выгружать остатки');
+    return warehouseId;
+  };
+
   // Карта категорий для наследования привязки к OZON: вид → группа → ... → корень → настройка по умолчанию
   const allCategories = await prisma.productCategory.findMany({ select: { id: true, parentId: true, ozonTypeId: true } });
   const catById = new Map(allCategories.map((c) => [c.id, c]));
@@ -222,7 +242,7 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         // существующий товар в OZON — обновляем цену и остаток
         const pid = Number(product.ozonProductId);
         if (price != null) await ozonUpdatePrices([{ product_id: pid, price: Math.round(price) }]);
-        await ozonUpdateStocks([{ product_id: pid, stock: Math.max(0, Math.round(quantity)) }]);
+        await ozonUpdateStocks([{ product_id: pid, stock: Math.max(0, Math.round(quantity)) }], requireWarehouse());
         await prisma.product.update({ where: { id: product.id }, data: { ozonSyncedAt: new Date() } });
         summary.updated++;
         continue;
@@ -233,7 +253,7 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
       if (existingId) {
         await prisma.product.update({ where: { id: product.id }, data: { ozonProductId: BigInt(existingId), ozonSyncedAt: new Date() } });
         if (price != null) await ozonUpdatePrices([{ product_id: existingId, price: Math.round(price) }]);
-        await ozonUpdateStocks([{ product_id: existingId, stock: Math.max(0, Math.round(quantity)) }]);
+        await ozonUpdateStocks([{ product_id: existingId, stock: Math.max(0, Math.round(quantity)) }], requireWarehouse());
         summary.updated++;
         continue;
       }
