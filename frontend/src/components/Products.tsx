@@ -66,6 +66,8 @@ export function Products() {
     return true;
   });
   const [products, setProducts] = useState<Product[]>([]);
+  // Все существующие теги (для автоподстановки в таблице и модалке позиции)
+  const [allTags, setAllTags] = useState<string[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
@@ -144,18 +146,20 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
 
   const load = async () => {
     try {
-      const [p, w, t, m, c] = await Promise.all([
+      const [p, w, t, m, c, tg] = await Promise.all([
         api.products.list(),
         api.products.warehouses.list(),
         api.products.priceTypes.list(),
         api.products.movements(),
         api.products.categories.list(),
+        api.products.tags(),
       ]);
       setProducts(p);
       setWarehouses(w);
       setPriceTypes(t);
       setMovements(m);
       setCategories(c);
+      setAllTags(tg);
     } catch (e: any) {
       alert(e.message || 'Ошибка загрузки');
     } finally {
@@ -404,7 +408,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
     const collapsed = isCollapsed(key);
     const rows: ReactNode[] = [
       <tr key={key} style={{ background: depth === 0 ? 'var(--bg-hover)' : 'transparent', cursor: 'pointer' }} onClick={() => toggleGroup(key)}>
-        <td colSpan={5 + activePriceTypes.length} style={{
+        <td colSpan={6 + activePriceTypes.length} style={{
           ...tdStyle,
           fontWeight: depth === 0 ? 600 : 400,
           fontSize: depth === 0 ? 14 : 13,
@@ -434,6 +438,10 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
           }}
           selected={selected.has(p.id)}
           onToggle={() => toggleSelect(p.id)}
+          allTags={allTags}
+          onSaveTags={async (tags) => {
+            try { await api.products.update(p.id, { tags }); await load(); } catch (e: any) { alert(e.message || 'Ошибка сохранения тегов'); }
+          }}
         />
       )));
     }
@@ -689,6 +697,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
                     />
                   </th>
                   <th style={thStyle}>Позиция</th>
+                  <th style={thStyle}>Теги</th>
                   <th style={thStyle}>Вид</th>
                   <th style={thStyle}>Ед.</th>
                   <th style={thStyle}>Остаток</th>
@@ -712,11 +721,15 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
                     }}
                     selected={selected.has(p.id)}
                     onToggle={() => toggleSelect(p.id)}
+                    allTags={allTags}
+                    onSaveTags={async (tags) => {
+                      try { await api.products.update(p.id, { tags }); await load(); } catch (e: any) { alert(e.message || 'Ошибка сохранения тегов'); }
+                    }}
                   />
                 ))}
                 {visible.length === 0 && (
                   <tr>
-                    <td colSpan={5 + activePriceTypes.length} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <td colSpan={6 + activePriceTypes.length} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
                       Позиции не найдены
                     </td>
                   </tr>
@@ -1091,12 +1104,13 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
 }
 
 /* ---------- Строка позиции в номенклатуре ---------- */
-function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDelete, selected, onToggle }: {
+function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDelete, selected, onToggle, allTags, onSaveTags }: {
   p: Product; indent: number; priceTypes: PriceType[];
   totalStock: number;
   priceOf: (p: Product, ptId: string) => number | undefined;
   onOpen: () => void; onDelete: () => void;
   selected: boolean; onToggle: () => void;
+  allTags: string[]; onSaveTags: (tags: string[]) => void;
 }) {
   const origin = window.location.origin;
   const mainImage = (p.images || [])[0];
@@ -1118,6 +1132,9 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
             {p.sku && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.sku}</div>}
           </div>
         </div>
+      </td>
+      <td style={{ ...tdStyle, minWidth: 140 }} onClick={e => e.stopPropagation()}>
+        <TagsCell tags={p.tags || []} suggestions={allTags} onSave={onSaveTags} />
       </td>
       <td style={tdStyle}>
         <span style={{ padding: '2px 10px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: KIND_COLORS[p.kind] || '#f0f0f0' }}>
@@ -1146,6 +1163,34 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
         <button style={{ ...btnGhost, color: '#dc2626' }} onClick={onDelete}>Удалить</button>
       </td>
     </tr>
+  );
+}
+
+/* ---------- Ячейка «Теги» таблицы номенклатуры: просмотр + быстрое добавление ---------- */
+function TagsCell({ tags, suggestions, onSave }: { tags: string[]; suggestions: string[]; onSave: (tags: string[]) => void }) {
+  const [editing, setEditing] = useState(false);
+  const chipStyle: React.CSSProperties = { padding: '1px 8px', borderRadius: 10, fontSize: 11, background: 'var(--bg-hover)', color: 'var(--text-muted)', border: 'none' };
+  // Все теги позиции доступны по наведению на «+N»
+  const overflowTitle = tags.join(', ');
+  if (editing) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 220 }}>
+        <TagInput value={tags} onChange={onSave} suggestions={suggestions} />
+        <button type="button" onClick={() => setEditing(false)} style={{ ...btnGhost, alignSelf: 'flex-start', fontSize: 12, padding: '3px 10px' }}>Готово</button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+      {tags.slice(0, 3).map(t => <span key={t} style={chipStyle}>{t}</span>)}
+      {tags.length > 3 && (
+        <span title={overflowTitle} style={{ ...chipStyle, cursor: 'help' }}>+{tags.length - 3}</span>
+      )}
+      <button type="button" onClick={() => setEditing(true)} title="Добавить тег"
+        style={{ width: 20, height: 20, borderRadius: 6, border: '1px dashed var(--border-color)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13, lineHeight: 1, flexShrink: 0 }}>
+        +
+      </button>
+    </div>
   );
 }
 
