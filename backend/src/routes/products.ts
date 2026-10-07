@@ -897,7 +897,7 @@ router.post('/:id/images/url', async (req, res) => {
     });
     const maxSort = await prisma.productImage.aggregate({ where: { productId: product.id }, _max: { sortOrder: true } });
     const image = await prisma.productImage.create({
-      data: { productId: product.id, attachmentId: attachment.id, sortOrder: (maxSort._max.sortOrder ?? -1) + 1 },
+      data: { productId: product.id, attachmentId: attachment.id, url: attachment.path, sortOrder: (maxSort._max.sortOrder ?? -1) + 1 },
     });
     res.json({ id: image.id, productId: product.id, attachmentId: attachment.id, sortOrder: image.sortOrder, url: attachment.path, attachment });
   } catch (err: any) {
