@@ -70,7 +70,7 @@ async function resolveOzonDescriptionCategoryId(typeId: number): Promise<number 
 
 /** Создать товары в OZON (актуальный метод /v3/product/import; /v1 и /v2 удалены из API).
  *  Важно: OZON требует ОБА идентификатора — type_id (листовой тип) и description_category_id (родительская группа типа). */
-export async function ozonImportProducts(items: { offer_id: string; name: string; typeId: number; descriptionCategoryId: number; barcode?: string; price?: number; quantity?: number; images?: string[]; weight?: number | null; width?: number | null; height?: number | null; depth?: number | null }[]): Promise<number> {
+export async function ozonImportProducts(items: { offer_id: string; name: string; typeId: number; descriptionCategoryId: number; barcode?: string; price?: number; quantity?: number; images?: string[]; weight?: number | null; width?: number | null; height?: number | null; depth?: number | null; brand?: string | null }[]): Promise<number> {
   const data = await ozonApi('POST', '/v3/product/import', {
     items: items.map((it) => ({
       offer_id: it.offer_id,
@@ -88,9 +88,10 @@ export async function ozonImportProducts(items: { offer_id: string; name: string
       height: it.height ? String(Math.round(it.height * 10)) : undefined,
       depth: it.depth ? String(Math.round(it.depth * 10)) : undefined,
       dimension_unit: (it.width || it.height || it.depth) ? 'mm' : undefined,
+      // бренд из карточки CRM → атрибут «Бренд» (id 85)
+      attributes: it.brand ? [{ id: 85, value: it.brand }] : [],
       currency_code: 'RUB',
       vat: '0',
-      attributes: [],
     })),
   });
   return data?.result?.task_id ?? 0;
@@ -378,11 +379,12 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
           const p0 = product.images?.[0]?.attachmentId ? pathById.get(product.images[0].attachmentId) : undefined;
           return p0 ? [`${PUBLIC_BASE_URL}${p0}`] : undefined;
         })(),
-        // характеристики из карточки CRM (вес, габариты, штрихкод)
+        // характеристики из карточки CRM (вес, габариты, штрихкод, бренд)
         weight: product.weight,
         width: product.width,
         height: product.height,
         depth: product.depth,
+        brand: product.brand,
       }]);
       // результат импорта асинхронный: ждём завершения задачи; предупреждения (например, бренд) не считаем падением
       if (taskId) {
