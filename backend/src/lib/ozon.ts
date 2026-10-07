@@ -311,24 +311,39 @@ async function findOzonAttributeIdByName(descriptionCategoryId: number, typeId: 
 
 const dictCache = new Map<string, Promise<number | null>>();
 
-/** dictionary_value_id значения справочника OZON по поисковой строке (для бренда, ТН ВЭД и др.) */
+/**
+ * dictionary_value_id значения справочника OZON (для бренда, ТН ВЭД и др.).
+ * search_value в API не фильтрует — листаем справочник курсором last_value_id до точного совпадения.
+ * Никогда не возвращает «первое попавшееся» значение — лучше отправить текст без ID, чем неверный ID.
+ */
 function findOzonDictionaryValueId(attributeId: number, descriptionCategoryId: number, typeId: number, search: string): Promise<number | null> {
   const key = `${attributeId}:${descriptionCategoryId}:${typeId}:${search.toLowerCase()}`;
   if (!dictCache.has(key)) {
     dictCache.set(key, (async () => {
       try {
-        const data = await ozonApi('POST', '/v1/description-category/attribute/values', {
-          attribute_id: attributeId,
-          description_category_id: descriptionCategoryId,
-          type_id: typeId,
-          language: 'RU',
-          limit: 20,
-          search_value: search,
-        });
-        const vals = data?.result || [];
-        const s = search.toLowerCase();
-        const hit = vals.find((v: any) => String(v.value).toLowerCase().includes(s)) || vals[0];
-        return hit ? Number(hit.id) : null;
+        const target = search.toLowerCase().trim();
+        let lastId = 0;
+        for (let page = 0; page < 30; page++) {
+          const body: any = {
+            attribute_id: attributeId,
+            description_category_id: descriptionCategoryId,
+            type_id: typeId,
+            language: 'RU',
+            limit: 200,
+          };
+          if (lastId) body.last_value_id = lastId;
+          const data = await ozonApi('POST', '/v1/description-category/attribute/values', body);
+          const vals = data?.result || [];
+          if (!vals.length) return null;
+          // точное совпадение (для ТН ВЭД — по коду, для бренда — по названию)
+          const exact = vals.find((v: any) => String(v.value).toLowerCase().trim() === target)
+            || vals.find((v: any) => String(v.value).toLowerCase().startsWith(target));
+          if (exact) return Number(exact.id);
+          const next = Number(vals[vals.length - 1]?.id ?? 0);
+          if (!next || next === lastId) return null;
+          lastId = next;
+        }
+        return null;
       } catch {
         return null;
       }
