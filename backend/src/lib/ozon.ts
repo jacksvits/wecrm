@@ -336,12 +336,41 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
       const retail = retailType ? product.prices.find((p) => p.priceTypeId === retailType!.id) : null;
       const price = retail?.price ?? null;
       const quantity = product.stocks.reduce((sum, s) => sum + s.quantity, 0);
+      // публичный URL первой картинки — OZON забирает файл сам при импорте
+      const firstImageUrl = (() => {
+        const p0 = product.images?.[0]?.attachmentId ? pathById.get(product.images[0].attachmentId) : undefined;
+        return p0 ? [`${PUBLIC_BASE_URL}${p0}`] : undefined;
+      })();
 
       if (product.ozonProductId) {
-        // существующий товар в OZON — обновляем цену и остаток
-        const pid = Number(product.ozonProductId);
-        if (price != null) await ozonUpdatePrices([{ product_id: pid, price: Math.round(price) }]);
-        await ozonUpdateStocks([{ product_id: pid, stock: Math.max(0, Math.round(quantity)) }], requireWarehouse());
+        // существующий товар в OZON — повторный полный импорт (картинка, бренд, габариты, штрихкод, цена),
+        // т.к. отдельных методов обновления атрибутов в API нет; остаток обновляем отдельно по складу
+        const typeIdUpd = resolveOzonTypeId(product.categoryId);
+        const descCatIdUpd = typeIdUpd ? await resolveOzonDescriptionCategoryId(typeIdUpd) : null;
+        if (typeIdUpd && descCatIdUpd) {
+          const taskIdUpd = await ozonImportProducts([{
+            offer_id: offerId,
+            name: product.name,
+            typeId: typeIdUpd,
+            descriptionCategoryId: descCatIdUpd,
+            barcode: product.barcode || undefined,
+            price: price != null ? Math.round(price) : undefined,
+            images: firstImageUrl,
+            weight: product.weight,
+            width: product.width,
+            height: product.height,
+            depth: product.depth,
+            brand: product.brand,
+          }]);
+          if (taskIdUpd) {
+            const t = await waitOzonImportTask(taskIdUpd, offerId);
+            for (const w of t.errors) summary.errors.push(`⚠ ${w}`);
+          }
+        } else if (price != null) {
+          // категория не определена — старое поведение: только цена
+          await ozonUpdatePrices([{ product_id: Number(product.ozonProductId), price: Math.round(price) }]);
+        }
+        await ozonUpdateStocks([{ product_id: Number(product.ozonProductId), stock: Math.max(0, Math.round(quantity)) }], requireWarehouse());
         await prisma.product.update({ where: { id: product.id }, data: { ozonSyncedAt: new Date() } });
         summary.updated++;
         continue;
@@ -375,10 +404,7 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         price: price != null ? Math.round(price) : undefined,
         quantity: Math.max(0, Math.round(quantity)),
         // картинка из карточки CRM → OZON забирает её по публичному URL
-        images: (() => {
-          const p0 = product.images?.[0]?.attachmentId ? pathById.get(product.images[0].attachmentId) : undefined;
-          return p0 ? [`${PUBLIC_BASE_URL}${p0}`] : undefined;
-        })(),
+        images: firstImageUrl,
         // характеристики из карточки CRM (вес, габариты, штрихкод, бренд)
         weight: product.weight,
         width: product.width,
