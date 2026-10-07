@@ -150,13 +150,13 @@ export async function notifyRoleUsers(
 // кто написал, номер задачи и текст сообщения
 export function formatExternalMessageNotifyBody(
   authorName: string,
-  task: { ticketNumber?: number | null; title: string },
+  task: { ticketNumber?: number | null },
   messageText: string
 ): string {
   const num = task.ticketNumber ? '#' + task.ticketNumber + ' ' : '';
   const trimmed = (messageText || '').trim();
   const preview = trimmed.length > 280 ? trimmed.slice(0, 280) + '...' : trimmed;
-  return `${authorName} написал в обсуждение задачи ${num}"${task.title}"${preview ? ': ' + preview : ''}`;
+  return `${authorName} написал в обсуждение задачи ${num}${preview ? ': ' + preview : ''}`;
 }
 
 // Единый формат уведомлений о задаче, созданной из сообщения внешнего канала:
