@@ -61,6 +61,7 @@ import tochkaPluginRoutes from './routes/tochka-plugin.js';
 import tochkaAcquiringRoutes from './routes/tochka-acquiring.js';
 import onecPluginRoutes from './routes/onec-plugin.js';
 import diadocPluginRoutes from './routes/diadoc-plugin.js';
+import ozonPluginRoutes from './routes/ozon-plugin.js';
 import handlerSettingsRoutes from './routes/handler-settings.js';
 import autoReplySettingsRoutes from './routes/auto-reply-settings.js';
 import legalRoutes from './routes/legal.js';
