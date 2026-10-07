@@ -145,3 +145,26 @@ export async function notifyRoleUsers(
     )
   );
 }
+
+// Единый формат уведомлений о сообщениях из внешних каналов (MAX, группа ВКонтакте, Telegram):
+// кто написал, номер задачи и текст сообщения
+export function formatExternalMessageNotifyBody(
+  authorName: string,
+  task: { ticketNumber?: number | null; title: string },
+  messageText: string
+): string {
+  const num = task.ticketNumber ? '#' + task.ticketNumber + ' ' : '';
+  const trimmed = (messageText || '').trim();
+  const preview = trimmed.length > 280 ? trimmed.slice(0, 280) + '...' : trimmed;
+  return `${authorName} написал в обсуждение задачи ${num}"${task.title}"${preview ? ': ' + preview : ''}`;
+}
+
+// Единый формат уведомлений о задаче, созданной из сообщения внешнего канала:
+// кто создал и номер задачи
+export function formatExternalNewTaskNotifyBody(
+  authorName: string,
+  task: { ticketNumber?: number | null; title: string }
+): string {
+  const num = task.ticketNumber ? '#' + task.ticketNumber + ' ' : '';
+  return `${authorName} создал задачу ${num}"${task.title}"`;
+}

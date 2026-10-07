@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma.js';
 import { processAutoReply } from '../lib/auto-reply.js';
 import { postHandlerGreeting } from '../lib/handler-messages.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
-import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
+import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers, formatExternalMessageNotifyBody, formatExternalNewTaskNotifyBody } from '../lib/notifications.js';
 import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js';
 import fs from 'fs';
 import path from 'path';
@@ -305,7 +305,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
         const authorName = contact?.name || `VK ${fromId}`;
         const notifyPayload = {
           title: 'Новое сообщение из ВК',
-          body: `${authorName} написал в обсуждение задачи "${taskForNotify.title}"`,
+          body: formatExternalMessageNotifyBody(authorName, taskForNotify, commentText),
           url: '/tasks/' + taskForNotify.id,
         };
         const excludeUserId = settings.defaultCreatorId || latestTask.creatorId;
@@ -421,7 +421,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
           const authorName = contact?.name || `VK ${fromId}`;
           const notifyPayload = {
             title: 'Новая задача из ВК',
-            body: `${authorName} создал задачу "${taskForNotify.title}"`,
+            body: formatExternalNewTaskNotifyBody(authorName, taskForNotify),
             url: '/tasks/' + taskForNotify.id,
           };
 

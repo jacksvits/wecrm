@@ -1,4 +1,4 @@
-import { prisma } from '../lib/prisma.js' ; import { telegramFetch, TELEGRAM_API_BASE } from '../lib/telegram-api.js' ; import { processAutoReply } from '../lib/auto-reply.js' ; import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js' ; import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js' ; import { broadcast, CHANNELS } from '../lib/events.js' ; import { postHandlerGreeting } from '../lib/handler-messages.js' ; import fs from 'fs' ; import path from 'path' ; import { randomUUID } from 'crypto' ; const UPLOAD_DIR = '/app/uploads' ; const TASKS_DIR = path.join(UPLOAD_DIR, 'tasks') ; if (!fs.existsSync(TASKS_DIR)) { fs.mkdirSync(TASKS_DIR, { recursive: true }) ; } export interface TelegramMessage { id: string ; chat_id: string ; user_id: string ; text: string ; sender_name?: string ; sender_username?: string ; sender_avatar?: string ; sender_description?: string ; attachments?: TelegramAttachment[] ; } export interface TelegramAttachment { type: 'photo' | 'document' | 'voice' | 'video' | 'audio' | 'sticker' ; file_id: string ; file_name?: string ; mime_type?: string ; } // Скачивание аватарки профиля Telegram в /app/uploads/avatars (общий NFS-том,
+import { prisma } from '../lib/prisma.js' ; import { telegramFetch, TELEGRAM_API_BASE } from '../lib/telegram-api.js' ; import { processAutoReply } from '../lib/auto-reply.js' ; import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers, formatExternalMessageNotifyBody, formatExternalNewTaskNotifyBody } from '../lib/notifications.js' ; import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js' ; import { broadcast, CHANNELS } from '../lib/events.js' ; import { postHandlerGreeting } from '../lib/handler-messages.js' ; import fs from 'fs' ; import path from 'path' ; import { randomUUID } from 'crypto' ; const UPLOAD_DIR = '/app/uploads' ; const TASKS_DIR = path.join(UPLOAD_DIR, 'tasks') ; if (!fs.existsSync(TASKS_DIR)) { fs.mkdirSync(TASKS_DIR, { recursive: true }) ; } export interface TelegramMessage { id: string ; chat_id: string ; user_id: string ; text: string ; sender_name?: string ; sender_username?: string ; sender_avatar?: string ; sender_description?: string ; attachments?: TelegramAttachment[] ; } export interface TelegramAttachment { type: 'photo' | 'document' | 'voice' | 'video' | 'audio' | 'sticker' ; file_id: string ; file_name?: string ; mime_type?: string ; } // Скачивание аватарки профиля Telegram в /app/uploads/avatars (общий NFS-том,
 // отдаётся статикой как /uploads/avatars/<file>)
 async function fetchTelegramAvatar(botToken: string, telegramUserId: string): Promise<string | null> {
   try {
@@ -29,7 +29,7 @@ export async function processTelegramMessage(msg: TelegramMessage, settings: any
         const taskWithRelations = await prisma.task.findUnique({ where: { id: latestTask.id }, include: { assignees: { include: { user: true } }, curators: { include: { user: true } }, creator: true } }) ;
         if (taskWithRelations) {
           const senderName = msg.sender_name || 'Клиент' ;
-          const notifyPayload = { title: 'Новое сообщение из Telegram', body: `${senderName} написал в обсуждение задачи "${taskWithRelations.title}"`, url: '/tasks/' + taskWithRelations.id } ;
+          const notifyPayload = { title: 'Новое сообщение из Telegram', body: formatExternalMessageNotifyBody(senderName, taskWithRelations, commentText), url: '/tasks/' + taskWithRelations.id } ;
           const excludeId = taskWithRelations.creatorId ;
           await notifyTaskAssignees(taskWithRelations.id, notifyPayload, excludeId) ;
           await notifyTaskCurators(taskWithRelations.id, notifyPayload, excludeId) ;
@@ -60,7 +60,7 @@ const taskDir = path.join(TASKS_DIR, String(task.ticketNumber || task.id)) ; if 
           const taskForNotify = await prisma.task.findUnique({ where: { id: task.id }, include: { assignees: { include: { user: true } }, curators: { include: { user: true } }, creator: true } }) ;
           if (taskForNotify) {
             const authorName = msg.sender_name || 'Клиент' ;
-            const notifyPayload = { title: 'Новая задача из Telegram', body: `${authorName} создал задачу "${taskForNotify.title}"`, url: '/tasks/' + taskForNotify.id } ;
+            const notifyPayload = { title: 'Новая задача из Telegram', body: formatExternalNewTaskNotifyBody(authorName, taskForNotify), url: '/tasks/' + taskForNotify.id } ;
             await notifyTaskAssignees(taskForNotify.id, notifyPayload, creatorId) ;
             await notifyTaskCurators(taskForNotify.id, notifyPayload, creatorId) ;
             await notifyTaskCreator(taskForNotify.id, notifyPayload) ;

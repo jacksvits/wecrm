@@ -3,7 +3,7 @@ import { processAutoReply } from '../lib/auto-reply.js';
 import { postHandlerGreeting } from '../lib/handler-messages.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { resolveContactAuto } from '../lib/contact-dedup.js';
-import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
+import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers, formatExternalMessageNotifyBody, formatExternalNewTaskNotifyBody } from '../lib/notifications.js';
 import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js';
 import fs from 'fs';
 import path from 'path';
@@ -254,7 +254,7 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
         const authorName = msg.sender_name || 'Клиент';
         const notifyPayload = {
           title: 'Новое сообщение из MAX',
-          body: `${authorName} написал в обсуждение задачи "${taskForNotify.title}"`,
+          body: formatExternalMessageNotifyBody(authorName, taskForNotify, commentText),
           url: '/tasks/' + taskForNotify.id,
         };
         const excludeUserId = settings.defaultCreatorId || latestTask.creatorId;
@@ -372,7 +372,7 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
           const authorName = msg.sender_name || 'Клиент';
           const notifyPayload = {
             title: 'Новая задача из MAX',
-            body: `${authorName} создал задачу "${taskForNotify.title}"`,
+            body: formatExternalNewTaskNotifyBody(authorName, taskForNotify),
             url: '/tasks/' + taskForNotify.id,
           };
 
