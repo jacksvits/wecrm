@@ -50,6 +50,31 @@ export async function testOzonConnection(creds?: OzonCredentials): Promise<{ ok:
   }
 }
 
+/**
+ * Атрибуты карточки CRM для передачи в OZON.
+ * Бренд и ТН ВЭД — справочные атрибуты: без dictionary_value_id OZON игнорирует значение,
+ * поэтому значение ищется в справочнике (/v1/description-category/attribute/values).
+ */
+async function buildOzonAttributes(product: { brand?: string | null; tnved?: string | null }, typeId: number, descriptionCategoryId: number): Promise<any[]> {
+  const attrs: any[] = [];
+  const brand = product.brand?.trim();
+  if (brand) {
+    const brandAttrId = (await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'бренд')) ?? 85;
+    const dv = await findOzonDictionaryValueId(brandAttrId, descriptionCategoryId, typeId, brand);
+    attrs.push({ id: brandAttrId, values: [{ value: brand, ...(dv ? { dictionary_value_id: dv } : {}) }] });
+  }
+  const tn = product.tnved?.trim();
+  if (tn) {
+    const tnAttrId = await findOzonAttributeIdByName(descriptionCategoryId, typeId, 'тн вэд');
+    if (tnAttrId) {
+      const code = tn.split(/\s+/)[0];
+      const dv = await findOzonDictionaryValueId(tnAttrId, descriptionCategoryId, typeId, code);
+      attrs.push({ id: tnAttrId, values: [{ value: code, ...(dv ? { dictionary_value_id: dv } : {}) }] });
+    }
+  }
+  return attrs;
+}
+
 /** Найти в дереве OZON родительскую description_category_id для листового type_id */
 async function resolveOzonDescriptionCategoryId(typeId: number): Promise<number | null> {
   try {
@@ -73,7 +98,7 @@ async function resolveOzonDescriptionCategoryId(typeId: number): Promise<number 
 
 /** Создать товары в OZON (актуальный метод /v3/product/import; /v1 и /v2 удалены из API).
  *  Важно: OZON требует ОБА идентификатора — type_id (листовой тип) и description_category_id (родительская группа типа). */
-export async function ozonImportProducts(items: { offer_id: string; name: string; typeId: number; descriptionCategoryId: number; barcode?: string; price?: number; quantity?: number; images?: string[]; weight?: number | null; width?: number | null; height?: number | null; depth?: number | null; brand?: string | null }[]): Promise<number> {
+export async function ozonImportProducts(items: { offer_id: string; name: string; typeId: number; descriptionCategoryId: number; barcode?: string; price?: number; quantity?: number; images?: string[]; weight?: number | null; width?: number | null; height?: number | null; depth?: number | null; brand?: string | null; attributes?: any[] }[]): Promise<number> {
   const data = await ozonApi('POST', '/v3/product/import', {
     items: items.map((it) => ({
       offer_id: it.offer_id,
@@ -91,8 +116,8 @@ export async function ozonImportProducts(items: { offer_id: string; name: string
       height: it.height ? String(Math.round(it.height * 10)) : undefined,
       depth: it.depth ? String(Math.round(it.depth * 10)) : undefined,
       dimension_unit: (it.width || it.height || it.depth) ? 'mm' : undefined,
-      // бренд из карточки CRM → атрибут «Бренд» (id 85)
-      attributes: it.brand ? [{ id: 85, value: it.brand }] : [],
+      // атрибуты (бренд, ТН ВЭД) — с dictionary_value_id для справочных
+      attributes: it.attributes ?? [],
       currency_code: 'RUB',
       vat: '0',
     })),
@@ -272,6 +297,44 @@ function fetchOzonCategoryAttributes(descriptionCategoryId: number, typeId: numb
     })());
   }
   return catAttrCache.get(key)!;
+}
+
+/** ID атрибута категории по названию (регистронезависимо) */
+async function findOzonAttributeIdByName(descriptionCategoryId: number, typeId: number, needle: string): Promise<number | null> {
+  const map = await fetchOzonCategoryAttributes(descriptionCategoryId, typeId);
+  const n = needle.toLowerCase();
+  for (const [id, name] of map) {
+    if (name.toLowerCase().includes(n)) return id;
+  }
+  return null;
+}
+
+const dictCache = new Map<string, Promise<number | null>>();
+
+/** dictionary_value_id значения справочника OZON по поисковой строке (для бренда, ТН ВЭД и др.) */
+function findOzonDictionaryValueId(attributeId: number, descriptionCategoryId: number, typeId: number, search: string): Promise<number | null> {
+  const key = `${attributeId}:${descriptionCategoryId}:${typeId}:${search.toLowerCase()}`;
+  if (!dictCache.has(key)) {
+    dictCache.set(key, (async () => {
+      try {
+        const data = await ozonApi('POST', '/v1/description-category/attribute/values', {
+          attribute_id: attributeId,
+          description_category_id: descriptionCategoryId,
+          type_id: typeId,
+          language: 'RU',
+          limit: 20,
+          search_value: search,
+        });
+        const vals = data?.result || [];
+        const s = search.toLowerCase();
+        const hit = vals.find((v: any) => String(v.value).toLowerCase().includes(s)) || vals[0];
+        return hit ? Number(hit.id) : null;
+      } catch {
+        return null;
+      }
+    })());
+  }
+  return dictCache.get(key)!;
 }
 
 /** Извлечь значение атрибута по имени (регистронезависимо, по подстроке) */
@@ -590,6 +653,7 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
             height: product.height,
             depth: product.depth,
             brand: product.brand,
+            attributes: await buildOzonAttributes(product, typeIdUpd, descCatIdUpd),
           }]);
           if (taskIdUpd) {
             const t = await waitOzonImportTask(taskIdUpd, offerId);
@@ -640,6 +704,7 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         height: product.height,
         depth: product.depth,
         brand: product.brand,
+        attributes: await buildOzonAttributes(product, typeId, descriptionCategoryId),
       }]);
       // результат импорта асинхронный: ждём завершения задачи; предупреждения (например, бренд) не считаем падением
       if (taskId) {
