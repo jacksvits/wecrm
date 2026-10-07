@@ -45,13 +45,36 @@ export async function testOzonConnection(creds?: OzonCredentials): Promise<{ ok:
   }
 }
 
-/** Создать товары в OZON (актуальный метод /v3/product/import; /v1 и /v2 удалены из API) */
-export async function ozonImportProducts(items: { offer_id: string; name: string; typeId: number; barcode?: string; price?: number; quantity?: number }[]): Promise<number> {
+/** Найти в дереве OZON родительскую description_category_id для листового type_id */
+async function resolveOzonDescriptionCategoryId(typeId: number): Promise<number | null> {
+  try {
+    const tree = await fetchOzonCategoryTree();
+    const walk = (nodes: any[], parentDescId: number | null): number | null => {
+      for (const n of nodes) {
+        const descId = n.description_category_id ?? parentDescId;
+        if (n.type_id === typeId) return parentDescId;
+        if (n.children?.length) {
+          const f = walk(n.children, n.description_category_id != null ? n.description_category_id : parentDescId);
+          if (f) return f;
+        }
+      }
+      return null;
+    };
+    return walk(tree, null);
+  } catch {
+    return null;
+  }
+}
+
+/** Создать товары в OZON (актуальный метод /v3/product/import; /v1 и /v2 удалены из API).
+ *  Важно: OZON требует ОБА идентификатора — type_id (листовой тип) и description_category_id (родительская группа типа). */
+export async function ozonImportProducts(items: { offer_id: string; name: string; typeId: number; descriptionCategoryId: number; barcode?: string; price?: number; quantity?: number }[]): Promise<number> {
   const data = await ozonApi('POST', '/v3/product/import', {
     items: items.map((it) => ({
       offer_id: it.offer_id,
       name: it.name,
       type_id: it.typeId,
+      description_category_id: it.descriptionCategoryId,
       barcode: it.barcode || undefined,
       price: it.price != null ? String(it.price) : undefined,
       quantity: it.quantity != null ? String(it.quantity) : undefined,
@@ -77,10 +100,10 @@ export async function ozonImportTaskResult(taskId: number): Promise<string[]> {
 }
 
 /**
- * Дождаться завершения задачи импорта (до ~60 c) и вернуть ошибки по конкретному offer_id.
+ * Дождаться завершения задачи импорта (до ~60 c) и вернуть статус + ошибки по конкретному offer_id.
  * Импорт в OZON асинхронный: сразу после вызова статус может быть pending без ошибок.
  */
-export async function waitOzonImportTask(taskId: number, offerId: string): Promise<string[]> {
+export async function waitOzonImportTask(taskId: number, offerId: string): Promise<{ status: string; errors: string[] }> {
   for (let i = 0; i < 15; i++) {
     await new Promise((r) => setTimeout(r, 4000));
     try {
@@ -89,15 +112,18 @@ export async function waitOzonImportTask(taskId: number, offerId: string): Promi
       const own = items.filter((it: any) => it.offer_id === offerId);
       if (!own.length) continue;
       if (own.every((it: any) => it.status && it.status !== 'pending')) {
-        return own
-          .filter((it: any) => it.errors && it.errors.length)
-          .map((it: any) => `${it.offer_id}: ${it.errors.map((e: any) => e.message).join('; ')}`);
+        return {
+          status: own[0].status,
+          errors: own
+            .filter((it: any) => it.errors && it.errors.length)
+            .map((it: any) => `${it.offer_id}: ${it.errors.map((e: any) => e.message).join('; ')}`),
+        };
       }
     } catch {
       /* задача ещё не готова — повторяем */
     }
   }
-  return [];
+  return { status: 'timeout', errors: [] };
 }
 
 /** Обновить цены существующих товаров */
@@ -216,18 +242,26 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
       if (!typeId) {
         throw new Error('Не задана категория OZON: привяжите категорию в карточке категории или задайте категорию по умолчанию в настройках плагина');
       }
+      const descriptionCategoryId = await resolveOzonDescriptionCategoryId(typeId);
+      if (!descriptionCategoryId) {
+        throw new Error(`Не удалось определить description_category_id для категории OZON type_id=${typeId}`);
+      }
       const taskId = await ozonImportProducts([{
         offer_id: offerId,
         name: product.name,
         typeId,
+        descriptionCategoryId,
         barcode: product.barcode || undefined,
         price: price != null ? Math.round(price) : undefined,
         quantity: Math.max(0, Math.round(quantity)),
       }]);
-      // результат импорта асинхронный: ждём завершения задачи и достаём ошибки по товару
+      // результат импорта асинхронный: ждём завершения задачи; предупреждения (например, бренд) не считаем падением
       if (taskId) {
-        const taskErrors = await waitOzonImportTask(taskId, offerId);
-        if (taskErrors.length) throw new Error(taskErrors.join('; '));
+        const task = await waitOzonImportTask(taskId, offerId);
+        if (task.status === 'failed' || task.status === 'timeout') {
+          throw new Error(task.errors.join('; ') || `Импорт в OZON завершился со статусом ${task.status}`);
+        }
+        for (const w of task.errors) summary.errors.push(`⚠ ${w}`);
       }
       // product_id появится в OZON позже — пробуем найти сразу
       const newId = await ozonFindProductId(offerId);
