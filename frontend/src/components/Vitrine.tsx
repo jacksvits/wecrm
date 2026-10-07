@@ -503,27 +503,28 @@ export function Vitrine({ search = '' }: { search?: string }) {
           <PromoMosaic onOpenCategory={(id) => setActiveCategoryId(id)} />
         ) : (
         <div className="vitrine-grid">
-          {activeCategoryId && (
-            // Кнопка «Назад» — возврат на общий вид «Каталог»
-            <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" onClick={() => setActiveCategoryId(null)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 13 }}>
-                <span aria-hidden="true">←</span> Назад
-              </button>
-              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                {categories.find(c => c.id === activeCategoryId)?.name || ''}
-              </span>
+          <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {activeCategoryId && (
+              <>
+                {/* Кнопка «Назад» — возврат на общий вид «Каталог» */}
+                <button type="button" onClick={() => setActiveCategoryId(null)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 13 }}>
+                  <span aria-hidden="true">←</span> Назад
+                </button>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {categories.find(c => c.id === activeCategoryId)?.name || ''}
+                </span>
+              </>
+            )}
+            <div style={{ marginLeft: 'auto' }}>
+              <select id="vitrine-sort" value={sort} onChange={e => setSort(e.target.value as typeof sort)} title="Сортировка каталога"
+                style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}>
+                <option value="name-asc">Название А→Я</option>
+                <option value="name-desc">Название Я→А</option>
+                <option value="price-asc">Цена ↑</option>
+                <option value="price-desc">Цена ↓</option>
+              </select>
             </div>
-          )}
-          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6 }}>
-            <label htmlFor="vitrine-sort" style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Сортировка:</label>
-            <select id="vitrine-sort" value={sort} onChange={e => setSort(e.target.value as typeof sort)}
-              style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}>
-              <option value="name-asc">Название А→Я</option>
-              <option value="name-desc">Название Я→А</option>
-              <option value="price-asc">Цена ↑</option>
-              <option value="price-desc">Цена ↓</option>
-            </select>
           </div>
           {(availableTags.length > 0 || activeTags.length > 0) && (
             // Фильтр по тегам: собирается из тегов показанных карточек, мультивыбор
