@@ -210,6 +210,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     },
     vitrine: (): Promise<Product[]> => fetchApi('/api/products/vitrine'),
     vitrineCategories: (): Promise<ProductCategory[]> => fetchApi('/api/products/vitrine/categories'),
+    tags: (): Promise<string[]> => fetchApi('/api/products/meta/tags'),
     get: (id: string): Promise<Product> => fetchApi(`/api/products/${id}`),
     create: (data: Partial<Product>) => fetchApi('/api/products', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Product>) => fetchApi(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),

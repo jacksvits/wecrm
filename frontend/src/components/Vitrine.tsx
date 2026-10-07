@@ -17,6 +17,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  // Выбранные теги — фильтр показа витрины (мультивыбор: товар подходит по любому из тегов)
+  const [activeTags, setActiveTags] = useState<string[]>([]);
   const [inStockOnly, setInStockOnly] = useState(true);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -153,7 +155,9 @@ export function Vitrine({ search = '' }: { search?: string }) {
     return cards.filter((c) => c.product.categoryId && ids.has(c.product.categoryId)).length;
   };
 
-  const filteredCards = useMemo(() => {
+  // Карточки после фильтров категории/наличия/поиска — без учёта тегов:
+  // именно из них собирается список тегов для фильтра
+  const baseCards = useMemo(() => {
     let list = cards;
     if (activeCategoryId) {
       const ids = collectSubtree(activeCategoryId);
@@ -172,6 +176,26 @@ export function Vitrine({ search = '' }: { search?: string }) {
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards, activeCategoryId, inStockOnly, categories, search]);
+
+  // Теги, указанные в показанных карточках (алфавит) — источник фильтра на витрине
+  const availableTags = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of baseCards) {
+      for (const t of c.product.tags || []) counts.set(t, (counts.get(t) || 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0], 'ru'));
+  }, [baseCards]);
+
+  const toggleTag = (tag: string) => {
+    setActiveTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  const filteredCards = useMemo(() => {
+    if (!activeTags.length) return baseCards;
+    const sel = new Set(activeTags);
+    // Мультивыбор: остаются карточки с любым из выбранных тегов
+    return baseCards.filter((c) => (c.product.tags || []).some(t => sel.has(t)));
+  }, [baseCards, activeTags]);
 
   const toggleExpand = (id: string) => {
     const next = new Set(expanded);
@@ -469,6 +493,30 @@ export function Vitrine({ search = '' }: { search?: string }) {
               </span>
             </div>
           )}
+          {(availableTags.length > 0 || activeTags.length > 0) && (
+            // Фильтр по тегам: собирается из тегов показанных карточек, мультивыбор
+            <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>Теги:</span>
+              {activeTags.map(t => (
+                <button key={t} type="button" onClick={() => toggleTag(t)} title="Снять фильтр по тегу"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 500, border: '1px solid #007AFF', background: '#007AFF', color: '#fff', cursor: 'pointer' }}>
+                  {t} <span style={{ fontSize: 12, lineHeight: 1 }}>×</span>
+                </button>
+              ))}
+              {availableTags.filter(([t]) => !activeTags.includes(t)).map(([t, n]) => (
+                <button key={t} type="button" onClick={() => toggleTag(t)} title="Фильтровать по тегу"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 500, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                  {t} <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{n}</span>
+                </button>
+              ))}
+              {activeTags.length > 0 && (
+                <button type="button" onClick={() => setActiveTags([])}
+                  style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer', padding: '3px 6px' }}>
+                  Сбросить
+                </button>
+              )}
+            </div>
+          )}
           {filteredCards.length === 0 && (
             <div style={{ gridColumn: '1 / -1', padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
               По запросу «{search.trim()}» ничего не найдено
@@ -486,6 +534,19 @@ export function Vitrine({ search = '' }: { search?: string }) {
             </div>
             <div className="vitrine-card-body" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
               <div className="vitrine-name" style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>{p.name}</div>
+              {(p.tags || []).length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {p.tags!.slice(0, 3).map(t => (
+                    <button key={t} type="button" onClick={(e) => { e.stopPropagation(); toggleTag(t); }} title="Фильтровать по тегу"
+                      style={{ padding: '1px 8px', borderRadius: 10, fontSize: 11, border: 'none', background: 'var(--bg-hover)', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                      {t}
+                    </button>
+                  ))}
+                  {p.tags!.length > 3 && (
+                    <span style={{ padding: '1px 6px', borderRadius: 10, fontSize: 11, background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>+{p.tags!.length - 3}</span>
+                  )}
+                </div>
+              )}
               <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <div className="vitrine-price" style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
                   {price && Number(price.price) > 0 ? `${price.priceFrom ? 'от ' : ''}${fmtMoney(price.price)} ₽` : 'Договорная'}
@@ -595,6 +656,13 @@ export function Vitrine({ search = '' }: { search?: string }) {
                       {d.sku && <div>Артикул: <span style={{ color: 'var(--text-primary)' }}>{d.sku}</span></div>}
                       {d.barcode && <div>Штрихкод: <span style={{ color: 'var(--text-primary)' }}>{d.barcode}</span></div>}
                       {dCategory && <div>Категория: <span style={{ color: 'var(--text-primary)' }}>{dCategory.name}</span></div>}
+                    </div>
+                  )}
+                  {(d.tags || []).length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {d.tags!.map(t => (
+                        <span key={t} style={{ padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 500, background: 'var(--bg-hover)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>{t}</span>
+                      ))}
                     </div>
                   )}
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>

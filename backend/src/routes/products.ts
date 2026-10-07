@@ -8,6 +8,20 @@ import { generateUniqueArticle } from '../lib/article.js';
 
 const router = Router();
 
+// Нормализация тегов карточки: обрезка пробелов, без дубликатов и пустых значений
+function normalizeTags(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of input) {
+    const tag = String(item ?? '').trim().slice(0, 50);
+    if (!tag || seen.has(tag)) continue;
+    seen.add(tag);
+    out.push(tag);
+  }
+  return out;
+}
+
 /**
  * GET /api/products/vitrine
  * Витрина магазина: активные позиции с отметкой «На витрине», с ценами, остатками и фото.
@@ -362,6 +376,22 @@ router.get('/meta/vk-status', async (_req, res) => {
 });
 
 /**
+ * GET /api/products/meta/tags
+ * Все существующие теги карточек (алфавит) — для автоподстановки при вводе
+ */
+router.get('/meta/tags', async (_req, res) => {
+  try {
+    const rows = await prisma.$queryRawUnsafe(
+      `SELECT DISTINCT unnest(tags) AS tag FROM products WHERE tags IS NOT NULL ORDER BY tag`
+    ) as any[];
+    res.json((rows as any[]).map((r: any) => r.tag).filter(Boolean));
+  } catch (err: any) {
+    console.error('[products:meta:tags]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/products/meta/vk-import
  * Первый импорт: все товары маркета группы ВК → проект
  */
@@ -568,7 +598,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, kind, syncToVk, onVitrine, isSubscription, categoryId } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, kind, syncToVk, onVitrine, isSubscription, categoryId, tags } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
     const productKind = kind === 'service' ? 'service' : 'product';
     // Категория из дерева 1С (группы/виды номенклатуры)
@@ -598,6 +628,7 @@ router.post('/', async (req, res) => {
         onVitrine: !!onVitrine,
         // «Подписка» актуальна только для услуг
         isSubscription: productKind === 'service' && !!isSubscription,
+        tags: normalizeTags(tags),
       },
       include: { stocks: true, prices: true, images: { orderBy: { sortOrder: 'asc' } } },
     });
@@ -652,7 +683,7 @@ router.get('/:id', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind, syncToVk, onVitrine, isSubscription, categoryId } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, isActive, kind, syncToVk, onVitrine, isSubscription, categoryId, tags } = req.body;
     const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Товар не найден' });
     const data: any = {};
@@ -668,6 +699,7 @@ router.patch('/:id', async (req, res) => {
     if (syncToVk !== undefined) data.syncToVk = !!syncToVk;
     if (onVitrine !== undefined) data.onVitrine = !!onVitrine;
     if (isSubscription !== undefined) data.isSubscription = (data.kind ?? existing.kind) === 'service' && !!isSubscription;
+    if (tags !== undefined) data.tags = normalizeTags(tags);
     // Категория из дерева 1С: обновляем привязку и строковый путь (для выгрузки в 1С)
     if (categoryId !== undefined) {
       if (categoryId) {

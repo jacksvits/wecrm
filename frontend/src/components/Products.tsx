@@ -1149,10 +1149,72 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
   );
 }
 
+/* ---------- Ввод тегов: свободный ввод + автоподстановка существующих ---------- */
+function TagInput({ value, onChange, suggestions }: { value: string[]; onChange: (tags: string[]) => void; suggestions: string[] }) {
+  const [input, setInput] = useState('');
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const s = input.trim().toLowerCase();
+  // Автоподстановка: существующие теги, ещё не добавленные в карточку, фильтр по вводу
+  const matches = useMemo(
+    () => suggestions.filter(t => !value.includes(t) && (!s || t.toLowerCase().includes(s))).slice(0, 8),
+    [suggestions, value, s]
+  );
+  // Закрытие выпадающего списка по клику вне поля
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+  const add = (tag: string) => {
+    const t = tag.trim();
+    if (t && !value.includes(t)) onChange([...value, t]);
+    setInput('');
+    setOpen(false);
+  };
+  const remove = (tag: string) => onChange(value.filter(t => t !== tag));
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <div style={{ ...inputStyle, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', cursor: 'text', minHeight: 40, height: 'auto' }}
+        onClick={() => { setOpen(true); (wrapRef.current?.querySelector('input') as HTMLInputElement | null)?.focus(); }}>
+        {value.map(t => (
+          <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: 'var(--bg-hover)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
+            {t}
+            <button type="button" onClick={(e) => { e.stopPropagation(); remove(t); }} title="Убрать тег"
+              style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', padding: 0, lineHeight: 1 }}>×</button>
+          </span>
+        ))}
+        <input value={input} style={{ border: 'none', outline: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: 14, flex: 1, minWidth: 140, padding: '4px 0' }}
+          placeholder={value.length ? '' : 'Введите тег и нажмите Enter'}
+          onChange={e => { setInput(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(input); }
+            else if (e.key === 'Backspace' && !input && value.length) remove(value[value.length - 1]);
+          }} />
+      </div>
+      {open && matches.length > 0 && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 8, marginTop: 4, boxShadow: '0 6px 18px rgba(0,0,0,.12)', maxHeight: 180, overflowY: 'auto' }}>
+          {matches.map(t => (
+            <button key={t} type="button" onClick={() => add(t)}
+              style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; syncToVk: boolean; onVitrine: boolean; isSubscription: boolean; description: string }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; syncToVk: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : product.kind,
     sku: isNew ? '' : product.sku || '',
@@ -1162,7 +1224,13 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     onVitrine: isNew ? false : product.onVitrine,
     isSubscription: isNew ? false : product.isSubscription,
     description: isNew ? '' : product.description || '',
+    tags: isNew ? [] : (product.tags || []),
   });
+  // Существующие теги всех карточек — для автоподстановки при вводе
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
+  useEffect(() => {
+    api.products.tags().then(setTagSuggestions).catch(() => {});
+  }, []);
   const [categoryId, setCategoryId] = useState(isNew ? '' : product.categoryId || '');
   // Опции селекта категории: группы и виды номенклатуры с отступами по глубине
   const categoryOptions = useMemo(() => {
@@ -1278,6 +1346,8 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
             <input type="checkbox" checked={form.onVitrine} onChange={e => setForm({ ...form, onVitrine: e.target.checked })} style={{ width: 16, height: 16 }} />
             На витрине
           </label>
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Теги</label>
+          <TagInput value={form.tags} onChange={tags => setForm({ ...form, tags })} suggestions={tagSuggestions} />
           <label style={{ fontSize: 14, fontWeight: 500 }}>Описание</label>
           <ReactQuill theme="snow" value={form.description} onChange={v => setForm({ ...form, description: v })}
             modules={quillModules} formats={quillFormats} />

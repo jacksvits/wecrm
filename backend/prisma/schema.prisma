@@ -1161,6 +1161,8 @@ model Product {
   onVitrine   Boolean  @default(false) @map("on_vitrine")
   // «Подписка»: услуга доступна для оформления подписки (кнопка «Подписаться» на витрине)
   isSubscription Boolean @default(false) @map("is_subscription")
+  // Теги карточки товара: свободный ввод с автоподстановкой существующих, фильтр на витрине
+  tags        String[] @default([]) @map("tags")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
