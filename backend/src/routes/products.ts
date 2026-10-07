@@ -889,6 +889,7 @@ router.post('/:id/images/url', async (req, res) => {
         entityId: product.id,
         field: 'image',
         filename: url.split('/').pop()?.split('?')[0] || filename,
+        originalName: url.split('/').pop()?.split('?')[0] || filename,
         mimeType: mime,
         size: buf.length,
         path: `/uploads/${filename}`,
