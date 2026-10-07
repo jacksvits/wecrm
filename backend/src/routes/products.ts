@@ -428,7 +428,7 @@ router.get('/meta/categories', async (_req, res) => {
   try {
     const categories = await prisma.productCategory.findMany({
       orderBy: { name: 'asc' },
-      select: { id: true, onecId: true, name: true, isGroup: true, parentId: true },
+      select: { id: true, onecId: true, name: true, isGroup: true, parentId: true, ozonTypeId: true },
     });
     res.json(categories);
   } catch (err: any) {
@@ -443,14 +443,19 @@ router.get('/meta/categories', async (_req, res) => {
  */
 router.post('/meta/categories', async (req, res) => {
   try {
-    const { name, parentId, isGroup } = req.body;
+    const { name, parentId, isGroup, ozonTypeId } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
     if (parentId) {
       const parent = await prisma.productCategory.findUnique({ where: { id: parentId } });
       if (!parent) return res.status(400).json({ error: 'Родительская категория не найдена' });
     }
     const category = await prisma.productCategory.create({
-      data: { name: name.trim(), parentId: parentId || null, isGroup: !!isGroup },
+      data: {
+        name: name.trim(),
+        parentId: parentId || null,
+        isGroup: !!isGroup,
+        ozonTypeId: ozonTypeId ? Math.max(1, Number(ozonTypeId)) : null,
+      },
     });
     res.status(201).json(category);
   } catch (err: any) {
@@ -465,7 +470,7 @@ router.post('/meta/categories', async (req, res) => {
  */
 router.patch('/meta/categories/:id', async (req, res) => {
   try {
-    const { name, parentId, isGroup } = req.body;
+    const { name, parentId, isGroup, ozonTypeId } = req.body;
     const existing = await prisma.productCategory.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Категория не найдена' });
     const data: any = {};
@@ -474,6 +479,8 @@ router.patch('/meta/categories/:id', async (req, res) => {
       data.name = name.trim();
     }
     if (isGroup !== undefined) data.isGroup = !!isGroup;
+    // Привязка к категории OZON: число или null (сброс — тогда наследуется от родителя)
+    if (ozonTypeId !== undefined) data.ozonTypeId = ozonTypeId === null || ozonTypeId === '' ? null : Math.max(1, Number(ozonTypeId));
     if (parentId !== undefined) {
       if (parentId) {
         if (parentId === req.params.id) return res.status(400).json({ error: 'Категория не может быть родителем самой себя' });

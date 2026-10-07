@@ -147,6 +147,20 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
   if (!retailType) retailType = await prisma.priceType.findFirst({ where: { name: 'retail', isActive: true } });
   if (!retailType) retailType = await prisma.priceType.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'desc' } });
 
+  // Карта категорий для наследования привязки к OZON: вид → группа → ... → корень → настройка по умолчанию
+  const allCategories = await prisma.productCategory.findMany({ select: { id: true, parentId: true, ozonTypeId: true } });
+  const catById = new Map(allCategories.map((c) => [c.id, c]));
+  const resolveOzonTypeId = (categoryId: string | null): number | null => {
+    let cur = categoryId ? catById.get(categoryId) : undefined;
+    const guard = new Set<string>();
+    while (cur && !guard.has(cur.id)) {
+      guard.add(cur.id);
+      if (cur.ozonTypeId) return cur.ozonTypeId;
+      cur = cur.parentId ? catById.get(cur.parentId) : undefined;
+    }
+    return settings.defaultTypeId ?? null;
+  };
+
   for (const product of products) {
     try {
       const offerId = product.article || product.sku || product.id;
@@ -173,14 +187,15 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         continue;
       }
 
-      // создаём новый товар в OZON (нужна категория type_id)
-      if (!settings.defaultTypeId) {
-        throw new Error('Не задана категория OZON по умолчанию (Настройки → OZON Seller → Категория по умолчанию)');
+      // создаём новый товар в OZON: категория из привязки категории CRM (с наследованием) либо из настроек плагина
+      const typeId = resolveOzonTypeId(product.categoryId);
+      if (!typeId) {
+        throw new Error('Не задана категория OZON: привяжите категорию в карточке категории или задайте категорию по умолчанию в настройках плагина');
       }
       const taskId = await ozonImportProducts([{
         offer_id: offerId,
         name: product.name,
-        typeId: settings.defaultTypeId,
+        typeId,
         barcode: product.barcode || undefined,
         price: price != null ? Math.round(price) : undefined,
         quantity: Math.max(0, Math.round(quantity)),

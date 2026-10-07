@@ -1229,6 +1229,8 @@ model ProductCategory {
   onecId    String?  @unique @map("onec_id") // Ref_Key вида/группы в 1С
   name      String
   isGroup   Boolean  @default(true) @map("is_group") // true = группа (папка), false = вид номенклатуры
+  // Привязка к категории OZON (type_id): если пусто — наследуется от родительской категории
+  ozonTypeId Int?     @map("ozon_type_id")
   parentId  String?  @map("parent_id")
   parent    ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   children  ProductCategory[] @relation("CategoryTree")

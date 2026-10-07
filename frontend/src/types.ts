@@ -98,7 +98,7 @@ export interface ProductImage { id: string; productId: string; attachmentId: str
 export interface Product { id: string; sku?: string | null; article?: string | null; name: string; kind: 'product' | 'service'; description?: string | null; category?: string | null; subcategory?: string | null; categoryId?: string | null; unit: string; barcode?: string | null; syncToVk: boolean; vkItemId?: number | null; syncToOzon: boolean; ozonProductId?: number | null; ozonSyncedAt?: string | null; isActive: boolean; onVitrine: boolean; isSubscription: boolean; tags?: string[]; createdAt: string; updatedAt: string; stocks?: StockBalance[]; prices?: ProductPrice[]; images?: ProductImage[]; }
 
 // Категория товара: группа/вид номенклатуры из 1С (дерево, как в «Виды и свойства»)
-export interface ProductCategory { id: string; onecId?: string | null; name: string; isGroup: boolean; parentId?: string | null; }
+export interface ProductCategory { id: string; onecId?: string | null; name: string; isGroup: boolean; parentId?: string | null; ozonTypeId?: number | null; }
 
 // «Автоответчик»: триггеры и ответы в обсуждениях задач
 export interface AutoReplyTrigger {

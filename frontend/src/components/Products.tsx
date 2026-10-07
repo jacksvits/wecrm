@@ -2422,6 +2422,43 @@ function SalesTab() {
 }
 
 /* ---------- Модалка категории (создание / редактирование) ---------- */
+/* ---------- Каскадный выбор категории OZON (дерево из /api/ozon-plugin/categories) ---------- */
+function OzonCategoryPicker({ tree, path, onChange }: {
+  tree: any[];
+  path: number[];
+  onChange: (id: number | null, path: number[]) => void;
+}) {
+  const levelOptions = (idx: number): any[] => {
+    let nodes = tree;
+    for (let i = 0; i < idx; i++) {
+      const cur = nodes.find((n) => n.description_category_id === path[i]);
+      nodes = cur?.children || [];
+    }
+    return nodes;
+  };
+  const pick = (idx: number, val: string) => {
+    const next = path.slice(0, idx);
+    let id: number | null = null;
+    if (val !== '') { const v = Number(val); next.push(v); id = v; }
+    onChange(id, next);
+  };
+  const levels = Math.max(path.length + (levelOptions(path.length).length > 0 ? 1 : 0), 1);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {Array.from({ length: levels }).map((_, idx) => (
+        <select key={idx} value={path[idx] ?? ''} onChange={e => pick(idx, e.target.value)} style={inputStyle}>
+          <option value="">{idx === 0 ? '— Не привязано —' : '— Выберите —'}</option>
+          {levelOptions(idx).map((n: any) => (
+            <option key={n.description_category_id} value={n.description_category_id} disabled={n.disabled}>
+              {n.category_name}
+            </option>
+          ))}
+        </select>
+      ))}
+    </div>
+  );
+}
+
 function CategoryModal({ modal, categories, onClose, onSaved }: {
   modal: { category: ProductCategory | 'new'; parentId?: string | null };
   categories: ProductCategory[];
@@ -2434,6 +2471,33 @@ function CategoryModal({ modal, categories, onClose, onSaved }: {
   const [isGroup, setIsGroup] = useState(isNew ? false : editing!.isGroup);
   const [parentId, setParentId] = useState<string>(isNew ? (modal.parentId || '') : (editing!.parentId || ''));
   const [error, setError] = useState('');
+  // Привязка категории OZON (показываем, только если плагин подключён)
+  const [ozonActive, setOzonActive] = useState(false);
+  const [ozonTree, setOzonTree] = useState<any[]>([]);
+  const [ozonPath, setOzonPath] = useState<number[]>([]);
+  const [ozonTypeId, setOzonTypeId] = useState<number | null>(isNew ? null : (editing!.ozonTypeId ?? null));
+
+  useEffect(() => {
+    api.ozonPlugin.get().then(async (s: any) => {
+      if (!s?.isActive) return;
+      setOzonActive(true);
+      try {
+        const r = await api.ozonPlugin.categories();
+        const tree = r.items || [];
+        setOzonTree(tree);
+        // восстанавливаем путь привязанной категории OZON
+        const walk = (nodes: any[], trail: number[]): boolean => {
+          for (const n of nodes) {
+            const t = [...trail, n.description_category_id];
+            if (n.description_category_id === (editing?.ozonTypeId ?? null)) { setOzonPath(t); return true; }
+            if (n.children?.length && walk(n.children, t)) return true;
+          }
+          return false;
+        };
+        if (editing?.ozonTypeId) walk(tree, []);
+      } catch { /* категории недоступны — оставляем пустым */ }
+    }).catch(() => {});
+  }, []);
 
   // Недопустимые родители при редактировании: сама категория и все её потомки
   const excluded = useMemo(() => {
@@ -2472,8 +2536,8 @@ function CategoryModal({ modal, categories, onClose, onSaved }: {
   const save = async () => {
     if (!name.trim()) { setError('Название обязательно'); return; }
     try {
-      if (isNew) await api.products.categories.create({ name, isGroup, parentId: parentId || null });
-      else await api.products.categories.update(editing!.id, { name, isGroup, parentId: parentId || null });
+      if (isNew) await api.products.categories.create({ name, isGroup, parentId: parentId || null, ozonTypeId });
+      else await api.products.categories.update(editing!.id, { name, isGroup, parentId: parentId || null, ozonTypeId });
       onSaved();
     } catch (e: any) { setError(e.message || 'Ошибка'); }
   };
@@ -2496,6 +2560,21 @@ function CategoryModal({ modal, categories, onClose, onSaved }: {
             <option value="item">Вид номенклатуры</option>
             <option value="group">Папка (группа)</option>
           </select>
+          {ozonActive && (
+            <>
+              <label style={{ fontSize: 14, fontWeight: 500 }}>
+                Категория OZON{' '}
+                <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 12 }}>
+                  (пусто — наследовать от родительской; товары попадут в OZON в эту категорию)
+                </span>
+              </label>
+              <OzonCategoryPicker
+                tree={ozonTree}
+                path={ozonPath}
+                onChange={(id, p) => { setOzonTypeId(id); setOzonPath(p); }}
+              />
+            </>
+          )}
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={save} style={btnPrimary}>Сохранить</button>
             <button onClick={onClose} style={btnGhost}>Отмена</button>
