@@ -10,7 +10,7 @@ router.use(authMiddleware);
 // GET /api/integrations/status — статус активности интеграций («плагинов»)
 router.get('/status', async (_req, res) => {
   try {
-    const [email, telephony, max, telegram, vk, yandex, dgis, beget, pskovline, onec, tochka, vpn, diadoc, tochkaAcquiring] = await Promise.all([
+    const [email, telephony, max, telegram, vk, yandex, dgis, beget, pskovline, onec, tochka, vpn, diadoc, tochkaAcquiring, ozon] = await Promise.all([
       prisma.emailSettings.findFirst({ select: { isActive: true } }),
       prisma.telephonySettings.findFirst({ select: { isActive: true } }),
       prisma.maxSettings.findFirst({ select: { isActive: true } }),
