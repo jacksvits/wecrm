@@ -728,7 +728,7 @@ router.get('/:id', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, brand, isActive, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, brand, tnved, isActive, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
     const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Товар не найден' });
     const data: any = {};
