@@ -1156,8 +1156,8 @@ model Product {
   vkItemId    Int?     @unique @map("vk_item_id")
   // «OZON Seller»: выгружать позицию в маркетплейс OZON
   syncToOzon    Boolean   @default(false) @map("sync_to_ozon")
-  // product_id товара в OZON Seller (заполняется после первой выгрузки)
-  ozonProductId Int?      @unique @map("ozon_product_id")
+  // product_id товара в OZON Seller (BigInt: значения больше 2^31)
+  ozonProductId BigInt?   @unique @map("ozon_product_id")
   ozonSyncedAt  DateTime? @map("ozon_synced_at")
   onecId      String?  @unique @map("onec_id")
   onecSyncedAt DateTime? @map("onec_synced_at")

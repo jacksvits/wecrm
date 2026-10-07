@@ -1,4 +1,6 @@
 import express from 'express';
+// BigInt (ozonProductId) должен сериализоваться в JSON как строка
+(BigInt.prototype as any).toJSON = function () { return this.toString(); };
 import cors from 'cors';
 import compression from 'compression';
 import dotenv from 'dotenv';

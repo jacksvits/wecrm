@@ -220,8 +220,9 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
 
       if (product.ozonProductId) {
         // существующий товар в OZON — обновляем цену и остаток
-        if (price != null) await ozonUpdatePrices([{ product_id: product.ozonProductId, price: Math.round(price) }]);
-        await ozonUpdateStocks([{ product_id: product.ozonProductId, stock: Math.max(0, Math.round(quantity)) }]);
+        const pid = Number(product.ozonProductId);
+        if (price != null) await ozonUpdatePrices([{ product_id: pid, price: Math.round(price) }]);
+        await ozonUpdateStocks([{ product_id: pid, stock: Math.max(0, Math.round(quantity)) }]);
         await prisma.product.update({ where: { id: product.id }, data: { ozonSyncedAt: new Date() } });
         summary.updated++;
         continue;
@@ -230,7 +231,7 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
       // пробуем найти уже созданный в OZON товар по offer_id (например, создан вручную)
       const existingId = await ozonFindProductId(offerId);
       if (existingId) {
-        await prisma.product.update({ where: { id: product.id }, data: { ozonProductId: existingId, ozonSyncedAt: new Date() } });
+        await prisma.product.update({ where: { id: product.id }, data: { ozonProductId: BigInt(existingId), ozonSyncedAt: new Date() } });
         if (price != null) await ozonUpdatePrices([{ product_id: existingId, price: Math.round(price) }]);
         await ozonUpdateStocks([{ product_id: existingId, stock: Math.max(0, Math.round(quantity)) }]);
         summary.updated++;
@@ -267,7 +268,7 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
       const newId = await ozonFindProductId(offerId);
       await prisma.product.update({
         where: { id: product.id },
-        data: { ozonProductId: newId, ozonSyncedAt: new Date() },
+        data: { ozonProductId: newId != null ? BigInt(newId) : null, ozonSyncedAt: new Date() },
       });
       summary.created++;
     } catch (err: any) {
