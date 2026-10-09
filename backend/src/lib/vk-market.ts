@@ -12,6 +12,9 @@ interface VkSettings {
   groupId: number;
   accessToken: string;
   marketToken?: string | null;
+  marketRefreshToken?: string | null;
+  marketDeviceId?: string | null;
+  marketTokenExpiresAt?: Date | null;
 }
 
 /** Настройки первой подключённой группы ВК */
@@ -20,7 +23,58 @@ export async function getVkSettings(): Promise<VkSettings | null> {
     orderBy: { createdAt: 'asc' },
   });
   if (!settings?.accessToken || !settings.groupId) return null;
-  return { groupId: settings.groupId, accessToken: settings.accessToken, marketToken: settings.marketToken };
+  return {
+    groupId: settings.groupId,
+    accessToken: settings.accessToken,
+    marketToken: settings.marketToken,
+    marketRefreshToken: settings.marketRefreshToken,
+    marketDeviceId: settings.marketDeviceId,
+    marketTokenExpiresAt: settings.marketTokenExpiresAt,
+  };
+}
+
+/** За сколько до истечения обновляем токен маркета (access_token VK ID живёт ~1 час) */
+const MARKET_TOKEN_REFRESH_AHEAD_MS = 5 * 60 * 1000;
+
+/**
+ * Пользовательский токен маркета с автообновлением по refresh_token (VK ID).
+ * force=true — принудительный рефреш (после VK Error 5 «User authorization failed»).
+ */
+async function getFreshMarketToken(force = false): Promise<string | null> {
+  const settings = await prisma.vkGroupSettings.findFirst({ orderBy: { createdAt: 'asc' } });
+  if (!settings?.marketToken) return null;
+  const expiresAt = settings.marketTokenExpiresAt?.getTime() || 0;
+  const fresh = expiresAt - MARKET_TOKEN_REFRESH_AHEAD_MS > Date.now();
+  if (fresh && !force) return settings.marketToken;
+  if (!settings.marketRefreshToken || !settings.marketDeviceId || !settings.marketAppId) {
+    if (fresh) return settings.marketToken;
+    throw new Error('Токен маркета истёк, а refresh_token отсутствует — получите токен заново (Настройки → ВКонтакте → «Получить токен маркета»)');
+  }
+  const res = await fetch('https://id.vk.ru/oauth2/auth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: settings.marketRefreshToken,
+      client_id: String(settings.marketAppId),
+      device_id: settings.marketDeviceId,
+      state: randomUUID(),
+    }),
+  });
+  const data: any = await res.json();
+  if (data.error || !data.access_token) {
+    throw new Error(`VK ID refresh токена маркета: ${data.error || 'unknown'}: ${data.error_description || 'нет описания'}`);
+  }
+  const expiresIn = Number(data.expires_in) || 3600;
+  await prisma.vkGroupSettings.update({
+    where: { id: settings.id },
+    data: {
+      marketToken: data.access_token,
+      marketRefreshToken: data.refresh_token || settings.marketRefreshToken,
+      marketTokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
+    },
+  });
+  return data.access_token;
 }
 
 /** Базовый вызов VK API */
@@ -28,16 +82,27 @@ async function vkApi(method: string, params: Record<string, string | number> = {
   const settings = token ? null : await getVkSettings();
   // методы маркета недоступны с токеном сообщества (VK Error 27) — нужен пользовательский токен с scope market
   if (method.startsWith('market.') && !token && !settings?.marketToken) {
-    throw new Error('Для работы с маркетом нужен пользовательский токен с правом market (Настройки → ВКонтакте → «Токен маркета»)');
+    throw new Error('Для работы с маркетом нужен пользовательский токен с правом market (Настройки → ВКонтакте → «Получить токен маркета»)');
   }
-  const accessToken = token || (method.startsWith('market.') ? settings?.marketToken : settings?.marketToken || settings?.accessToken);
+  let accessToken = token || (method.startsWith('market.') ? await getFreshMarketToken() : settings?.marketToken || settings?.accessToken);
   if (!accessToken) throw new Error('ВКонтакте не подключён (нет токена)');
-  const url = new URL(`${VK_API}/${method}`);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
-  url.searchParams.set('access_token', accessToken);
-  url.searchParams.set('v', VK_API_VERSION);
-  const res = await fetch(url.toString());
-  const data: any = await res.json();
+  const doCall = async (t: string): Promise<any> => {
+    const url = new URL(`${VK_API}/${method}`);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
+    url.searchParams.set('access_token', t);
+    url.searchParams.set('v', VK_API_VERSION);
+    const res = await fetch(url.toString());
+    return res.json();
+  };
+  let data: any = await doCall(accessToken);
+  // VK Error 5 «User authorization failed» — токен отозван/просрочен: принудительный рефреш и один повтор
+  if (data.error?.error_code === 5 && method.startsWith('market.') && !token) {
+    const refreshed = await getFreshMarketToken(true);
+    if (refreshed && refreshed !== accessToken) {
+      accessToken = refreshed;
+      data = await doCall(accessToken);
+    }
+  }
   if (data.error) {
     const e = data.error;
     throw new Error(`VK ${e.error_code}: ${e.error_msg}`);

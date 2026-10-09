@@ -1078,6 +1078,9 @@ model VkGroupSettings {
   groupId           Int      @map("group_id")
   accessToken       String   @map("access_token")
   marketToken       String?  @map("market_token") // пользовательский токен с scope market (импорт/синхронизация товаров)
+  marketRefreshToken String? @map("market_refresh_token") // refresh_token VK ID для автообновления токена маркета
+  marketDeviceId    String?  @map("market_device_id") // device_id VK ID (обязателен для refresh_token)
+  marketTokenExpiresAt DateTime? @map("market_token_expires_at") // срок жизни access_token маркета
   marketAppId       Int?     @map("market_app_id")
   marketAppSecret   String?  @map("market_app_secret")
   defaultCreatorId  String?  @map("default_creator_id")

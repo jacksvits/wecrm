@@ -32,7 +32,7 @@ const settingsSchema = z.object({
 router.get('/', async (_req, res) => {
   const s = await prisma.vkGroupSettings.findFirst();
   if (!s) return res.json(null);
-  const { accessToken, marketToken, marketAppSecret, ...rest } = s;
+  const { accessToken, marketToken, marketAppSecret, marketRefreshToken, ...rest } = s;
   res.json({ ...rest, hasToken: !!accessToken, hasMarketToken: !!marketToken, hasMarketApp: !!(s.marketAppId && marketAppSecret) });
 });
 
@@ -43,12 +43,15 @@ router.post('/', async (req: AuthRequest, res) => {
     let s;
     if (existing) {
       const payload: any = { ...data };
+      // Пустые секреты не затирают сохранённые значения (UI очищает поля после загрузки)
       if (!payload.accessToken && existing.accessToken) delete payload.accessToken;
+      if (!payload.marketToken && existing.marketToken) delete payload.marketToken;
+      if (!payload.marketAppSecret && existing.marketAppSecret) delete payload.marketAppSecret;
       s = await prisma.vkGroupSettings.update({ where: { id: existing.id }, data: payload });
     } else {
       s = await prisma.vkGroupSettings.create({ data: data as any });
     }
-    const { accessToken, marketToken, marketAppSecret, ...rest } = s;
+    const { accessToken, marketToken, marketAppSecret, marketRefreshToken, ...rest } = s;
     res.json({ ...rest, hasToken: !!accessToken, hasMarketToken: !!marketToken, hasMarketApp: !!(s.marketAppId && marketAppSecret) });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
