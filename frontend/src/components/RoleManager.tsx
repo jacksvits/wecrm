@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react' ; import { api } from '../api/client' ; import { Role, Status } from '../types' ; import { useAuth } from '../hooks/useAuth' ; import { navItems } from '../lib/navItems' ; const AVAILABLE_PAGES = [ { path: '/', label: 'Дашборд' }, { path: '/tasks', label: 'Задачи' }, { path: '/deals', label: 'Сделки' }, { path: '/contacts', label: 'Контакты' }, { path: '/products', label: 'Каталог' }, { path: '/projects', label: 'Проекты' }, { path: '/users', label: 'Пользователи' }, { path: '/news', label: 'Новости' },
   { path: '/notes', label: 'Заметки' },
-  { path: '/reminders', label: 'Напоминания' }, { path: '/files', label: 'Файлы' }, { path: '/chat', label: 'Чат' }, { path: '/browser', label: 'Браузер' }, { path: '/director', label: 'Директор' }, ] ; const getMobileNavItems = (allowedPages: string[]) => {
+  { path: '/reminders', label: 'Напоминания' }, { path: '/files', label: 'Файлы' }, { path: '/chat', label: 'Чат' }, { path: '/support', label: 'Поддержка' }, { path: '/browser', label: 'Браузер' }, { path: '/director', label: 'Директор' }, ] ; const getMobileNavItems = (allowedPages: string[]) => {
   const filtered = navItems.filter(item => item.path === '/news' || allowedPages.includes(item.path)) ;
   return [...filtered].sort((a, b) => {
     const idxA = allowedPages.indexOf(a.path) ;
