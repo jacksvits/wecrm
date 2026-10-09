@@ -29,6 +29,9 @@ const isStaff = (req: AuthRequest) => ['admin', 'developer'].includes(req.user?.
 // Доступ к странице поддержки: флаг роли «Чат тех. поддержки» (у admin и developer — всегда)
 const canUseSupport = (req: AuthRequest) => isStaff(req) || req.user?.canAccessSupportChat === true;
 
+// Видит все запросы: admin/developer или роль с опцией «Видит все запросы тех. поддержки»
+const canSeeAllTickets = (req: AuthRequest) => isStaff(req) || req.user?.canSeeAllSupportTickets === true;
+
 // Доступ к задаче — как в routes/tasks.ts (+ владелец обращения)
 const canAccessTask = async (taskId: string, userId: string, role: string) => {
   if (role === 'admin' || role === 'developer') return true;
@@ -191,7 +194,7 @@ router.post('/', async (req: AuthRequest, res) => {
 // Список обращений (только для staff: admin/developer)
 router.get('/tickets', async (req: AuthRequest, res) => {
   try {
-    if (!isStaff(req)) return res.status(403).json({ error: 'Требуются права администратора' });
+    if (!canSeeAllTickets(req)) return res.status(403).json({ error: 'Нет права на просмотр всех запросов тех. поддержки' });
     const tickets = await prisma.task.findMany({
       where: { supportOwnerId: { not: null } },
       include: {
@@ -211,7 +214,7 @@ router.get('/task/:taskId', async (req: AuthRequest, res) => {
     if (!canUseSupport(req)) return res.status(403).json({ error: 'Доступ к чату тех. поддержки запрещён' });
     const task = await prisma.task.findUnique({ where: { id: req.params.taskId } });
     if (!task || !task.supportOwnerId) return res.status(404).json({ error: 'Обращение не найдено' });
-    const hasAccess = await canAccessTask(task.id, req.user!.id, req.user!.role);
+    const hasAccess = (await canAccessTask(task.id, req.user!.id, req.user!.role)) || canSeeAllTickets(req);
     if (!hasAccess) return res.status(403).json({ error: 'Доступ запрещен' });
     const messages = await loadMessages(task.id, isStaff(req));
     res.json({ task, messages });
@@ -224,7 +227,7 @@ router.post('/task/:taskId', async (req: AuthRequest, res) => {
     if (!canUseSupport(req)) return res.status(403).json({ error: 'Доступ к чату тех. поддержки запрещён' });
     const task = await prisma.task.findUnique({ where: { id: req.params.taskId } });
     if (!task || !task.supportOwnerId) return res.status(404).json({ error: 'Обращение не найдено' });
-    const hasAccess = await canAccessTask(task.id, req.user!.id, req.user!.role);
+    const hasAccess = (await canAccessTask(task.id, req.user!.id, req.user!.role)) || canSeeAllTickets(req);
     if (!hasAccess) return res.status(403).json({ error: 'Доступ запрещен' });
     const { content, attachmentIds } = createMessageSchema.parse(req.body);
     const message = await createDiscussionMessage(task.id, req.user!.id, req.user!.name, content, attachmentIds);

@@ -15,11 +15,13 @@ export function SupportChat() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isStaff = user?.role === 'admin' || user?.role === 'developer';
+  // Просмотр и ответы на все запросы: admin/developer или роль с опцией «Видит все запросы тех. поддержки»
+  const seesAllTickets = isStaff || user?.canSeeAllSupportTickets === true;
   // Ссылка на задачу-обращение — только для staff и менеджеров (не для обычных пользователей поддержки)
   const canSeeTaskLink = isStaff || user?.role === 'manager';
   const canAccess = isStaff || user?.canAccessSupportChat === true;
 
-  const [view, setView] = useState<'list' | 'chat'>(isStaff ? 'list' : 'chat');
+  const [view, setView] = useState<'list' | 'chat'>(seesAllTickets ? 'list' : 'chat');
   const [task, setTask] = useState<Task | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [tickets, setTickets] = useState<Task[]>([]);
@@ -74,7 +76,7 @@ export function SupportChat() {
   useEffect(() => {
     setIsDark(localStorage.getItem('darkTheme') === 'true');
     if (!canAccess) return;
-    if (isStaff) { loadTickets(); setLoading(false); } else { loadMy(); }
+    if (seesAllTickets) { loadTickets(); setLoading(false); } else { loadMy(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -82,7 +84,7 @@ export function SupportChat() {
   useEffect(() => {
     if (!canAccess) return;
     const timer = setInterval(() => {
-      if (isStaff) {
+      if (seesAllTickets) {
         if (view === 'list') loadTickets();
         else if (task?.id) {
           api.supportChat.taskMessages(task.id).then(res => setMessages(res.messages)).catch(() => {});
@@ -93,7 +95,7 @@ export function SupportChat() {
     }, 5000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isStaff, view, task?.id]);
+  }, [seesAllTickets, view, task?.id]);
 
   // Скролл: держим низ чата при новых сообщениях
   useEffect(() => {
@@ -122,7 +124,7 @@ export function SupportChat() {
     setSending(true);
     try {
       stickToBottomRef.current = true;
-      const res = isStaff && task
+      const res = seesAllTickets && task
         ? await api.supportChat.reply(task.id, content, attachmentIds)
         : await api.supportChat.send(content, attachmentIds);
       setTask(res.task);
@@ -147,7 +149,7 @@ export function SupportChat() {
   }
 
   // ── Список обращений (staff) ──
-  if (isStaff && view === 'list') {
+  if (seesAllTickets && view === 'list') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
         <div
@@ -205,7 +207,7 @@ export function SupportChat() {
         borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
         flexShrink: 0,
       }}>
-        {isStaff && (
+        {seesAllTickets && (
           <button onClick={() => { setView('list'); setTask(null); setMessages([]); loadTickets(); }} style={{
             border: 'none', background: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)',
             borderRadius: 10, padding: '5px 10px', cursor: 'pointer',

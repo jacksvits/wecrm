@@ -29,6 +29,7 @@ model Role {
   canHandleSpam      Boolean @default(false) @map("can_handle_spam") // «Обработка СПАМА»: кнопка черепа на задачах из писем
   canAccessProjects  Boolean @default(false) @map("can_access_projects") // «Доступ к проектам»: пользователи роли видны в списке участников проекта
   canAccessSupportChat Boolean @default(false) @map("can_access_support_chat") // «Чат тех. поддержки»: роль видит страницу /support
+  canSeeAllSupportTickets Boolean @default(false) @map("can_see_all_support_tickets") // «Видит все запросы тех. поддержки»: роль видит и отвечает на все обращения
   notifyOnNewTask    Boolean @default(true)  @map("notify_on_new_task")
   notifyOnNewDeal    Boolean @default(false) @map("notify_on_new_deal")
   notifyOnNewComment Boolean @default(false) @map("notify_on_new_comment")
