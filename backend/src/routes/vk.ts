@@ -368,6 +368,9 @@ router.get('/market-auth', async (_req, res) => {
       scope: MARKET_SCOPE,
       code_challenge: challenge,
       code_challenge_method: 'S256',
+      // принудительно показываем форму согласия: без неё VK ID в цикле редиректит
+      // уже авторизованного пользователя при повторном запросе (страница обновляется бесконечно)
+      prompt: 'consent',
     });
     res.redirect(`https://id.vk.ru/authorize?${params.toString()}`);
   } catch (err: any) {
