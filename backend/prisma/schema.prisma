@@ -28,6 +28,7 @@ model Role {
   canEditNews        Boolean @default(true) @map("can_edit_news")
   canHandleSpam      Boolean @default(false) @map("can_handle_spam") // «Обработка СПАМА»: кнопка черепа на задачах из писем
   canAccessProjects  Boolean @default(false) @map("can_access_projects") // «Доступ к проектам»: пользователи роли видны в списке участников проекта
+  canAccessSupportChat Boolean @default(false) @map("can_access_support_chat") // «Чат тех. поддержки»: роль видит страницу /support
   notifyOnNewTask    Boolean @default(true)  @map("notify_on_new_task")
   notifyOnNewDeal    Boolean @default(false) @map("notify_on_new_deal")
   notifyOnNewComment Boolean @default(false) @map("notify_on_new_comment")
@@ -82,6 +83,7 @@ model User {
   taskCurations   TaskCurator[]
   projectUsers    ProjectUser[]
   createdTasks    Task[]         @relation("CreatedTasks")
+  supportTickets  Task[]         @relation("SupportTickets")
   comments        Comment[]
   activities      Activity[]
   pushSubscriptions PushSubscription[]
@@ -403,6 +405,8 @@ model Task {
 
   creatorId     String
   creator       User     @relation("CreatedTasks", fields: [creatorId], references: [id])
+  supportOwnerId String?   @map("support_owner_id") // владелец обращения в тех. поддержку (для задач-тикетов)
+  supportOwner   User?     @relation("SupportTickets", fields: [supportOwnerId], references: [id])
   projectId     String?
   project       Project? @relation(fields: [projectId], references: [id])
   contactId     String?

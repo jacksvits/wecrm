@@ -168,7 +168,7 @@ router.get('/me', async (req, res) => {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, canAccessSupportChat: true } } },
     });
     if (!user) return res.status(401).json({ error: 'User not found' });
 
@@ -196,6 +196,7 @@ router.get('/me', async (req, res) => {
       allowedTaskStatuses: user.role?.allowedTaskStatuses ?? [],
       canCreateNews: user.email === GUEST_EMAIL ? false : (user.role?.canCreateNews ?? true),
     canHandleSpam: user.role?.canHandleSpam ?? false,
+      canAccessSupportChat: user.role?.canAccessSupportChat ?? false,
       canEditNews: user.email === GUEST_EMAIL ? false : (user.role?.canEditNews ?? true),
       lastActiveAt: user.lastActiveAt,
       impersonatorId: decoded.imp || null,

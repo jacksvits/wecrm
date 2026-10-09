@@ -11,6 +11,7 @@ export interface AuthRequest extends Request {
     role: string;
     allowedPages?: string[];
     canAccessChat?: boolean;
+    canAccessSupportChat?: boolean;
     showFinancesTab?: boolean;
     stockAccess?: boolean;
     impersonatorId?: string;
@@ -44,7 +45,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
     // Always load fresh user data from DB to get current role and name
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      include: { role: { select: { name: true, allowedPages: true, canAccessChat: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
+      include: { role: { select: { name: true, allowedPages: true, canAccessChat: true, canAccessSupportChat: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
     });
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
@@ -58,6 +59,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       role: user.role?.name || 'user',
       allowedPages: user.role?.allowedPages || [],
       canAccessChat: user.role?.canAccessChat ?? true,
+      canAccessSupportChat: user.role?.canAccessSupportChat ?? false,
       showFinancesTab: user.role?.showFinancesTab ?? false,
       isGuest,
       // Складской учёт: персональный флаг пользователя ИЛИ флаг его роли
