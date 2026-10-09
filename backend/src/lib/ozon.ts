@@ -348,7 +348,9 @@ function fetchOzonCategoryAttributes(descriptionCategoryId: number, typeId: numb
   const key = `${descriptionCategoryId}:${typeId}`;
   const cached = catAttrCache.get(key);
   if (cached && Date.now() - cached.at < 60 * 60 * 1000) return cached.promise;
-  const promise = (async () => {
+  // definite assignment: IIFE ссылается на promise после первого await — в рантайме присвоен уже выполнился
+  let promise!: Promise<Map<number, string>>;
+  promise = (async () => {
     const map = new Map<number, string>();
     try {
       const data = await ozonApi('POST', '/v1/description-category/attribute', { description_category_id: descriptionCategoryId, type_id: typeId, language: 'RU' });

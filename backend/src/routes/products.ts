@@ -2,7 +2,7 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { importMarketItems, syncProductsToVk, getVkSettings } from '../lib/vk-market.js';
 import { syncProductsToOzon } from '../lib/ozon.js';
 import { generateUniqueArticle } from '../lib/article.js';
