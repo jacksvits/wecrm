@@ -332,7 +332,7 @@ router.get('/status', (_req, res) => {
 // access_token VK ID живёт ~1 час, refresh_token сохраняем для автообновления.
 const marketOAuthStates = new Map<string, { verifier: string; expires: number }>();
 const MARKET_REDIRECT_URI = 'https://welans.cc/api/vk/market-callback';
-const MARKET_SCOPE = 'market';
+const MARKET_SCOPE = 'market photos'; // photos — VK удалил методы загрузки фото маркета, фото грузим через upload-методы стены
 const MARKET_OAUTH_TTL = 10 * 60 * 1000; // 10 минут
 
 function marketErrorPage(title: string, detail: string): string {

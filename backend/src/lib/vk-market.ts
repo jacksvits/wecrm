@@ -140,11 +140,16 @@ async function downloadToUploads(url: string): Promise<string | null> {
   }
 }
 
-/** Загрузить фото в ВК для маркета, вернуть main_photo_id (owner_id_id) */
+/**
+ * Загрузить фото в ВК для маркета, вернуть photo_id (owner_id_id).
+ * VK удалил методы загрузки фото маркета (photos.getMarketUploadServer/saveMarketPhoto
+ * → Error 3 «Unknown method passed»), поэтому грузим через upload-методы стены
+ * (нужен scope photos в токене маркета).
+ */
 async function uploadMarketPhoto(imageUrl: string, groupId: number): Promise<string | null> {
   try {
     // 1. URL для загрузки
-    const server = await vkApi('photos.getMarketUploadServer', { group_id: groupId, main_photo: 1 });
+    const server = await vkApi('photos.getWallUploadServer', { group_id: groupId });
     if (!server.upload_url) return null;
     // 2. Скачиваем локальный файл и шлём multipart
     const fileRes = await fetch(`${process.env.BACKEND_ORIGIN || 'https://welans.cc'}${imageUrl}`);
@@ -154,15 +159,13 @@ async function uploadMarketPhoto(imageUrl: string, groupId: number): Promise<str
     form.append('file', new Blob([arrayBuffer], { type: 'image/jpeg' }), `photo${ext}`);
     const upRes = await fetch(server.upload_url, { method: 'POST', body: form });
     const upData: any = await upRes.json();
-    if (upData.error) return null;
+    if (upData.error || !upData.photo) return null;
     // 3. Сохраняем
-    const saved = await vkApi('photos.saveMarketPhoto', {
+    const saved = await vkApi('photos.saveWallPhoto', {
       group_id: groupId,
       photo: upData.photo,
       server: upData.server,
       hash: upData.hash,
-      crop_data: upData.crop_data || '',
-      crop_hash: upData.crop_hash || '',
     });
     const photo = Array.isArray(saved) ? saved[0] : saved;
     if (!photo?.id || !photo?.owner_id) return null;
