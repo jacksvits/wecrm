@@ -86,13 +86,21 @@ async function vkApi(method: string, params: Record<string, string | number> = {
   }
   let accessToken = token || (method.startsWith('market.') ? await getFreshMarketToken() : settings?.marketToken || settings?.accessToken);
   if (!accessToken) throw new Error('ВКонтакте не подключён (нет токена)');
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const doCall = async (t: string): Promise<any> => {
     const url = new URL(`${VK_API}/${method}`);
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
     url.searchParams.set('access_token', t);
     url.searchParams.set('v', VK_API_VERSION);
-    const res = await fetch(url.toString());
-    return res.json();
+    let data: any;
+    for (let attempt = 0; ; attempt++) {
+      const res = await fetch(url.toString());
+      data = await res.json();
+      // VK Error 6 «Too many requests per second» — ретраим с бэкоффом (макс. 4 попытки)
+      if (data.error?.error_code !== 6 || attempt >= 3) break;
+      await sleep(1000 * 2 ** attempt);
+    }
+    return data;
   };
   let data: any = await doCall(accessToken);
   // VK Error 5 «User authorization failed» — токен отозван/просрочен: принудительный рефреш и один повтор
@@ -313,17 +321,29 @@ export async function syncProductsToVk(): Promise<SyncSummary> {
   for (const product of products) {
     try {
       const price = await getRetailPrice(product.id);
+      // VK требует минимум 10 букв в описании
+      let description = (product.description || '').replace(/<[^>]+>/g, ' ').trim();
+      if (description.replace(/[^a-zA-Zа-яА-ЯёЁ]/g, '').length < 10) {
+        description = `Товар «${product.name}». Артикул: ${product.article}`;
+      }
       const params: Record<string, string | number> = {
         owner_id: -settings.groupId,
         name: product.name.slice(0, 100),
-        description: product.description?.replace(/<[^>]+>/g, ' ').slice(0, 16384) || ' ',
+        description: description.slice(0, 16384),
         price: price != null ? String(Math.round(price)) : '0',
         category_id: 1, // «Всё для дома» — обязательный параметр; уточняется вручную в ВК
       };
       const photoId = product.images[0]
         ? await uploadMarketPhoto(product.images[0].url, settings.groupId)
         : null;
-      if (photoId) params.main_photo_id = photoId;
+      if (photoId) {
+        params.main_photo_id = photoId;
+      } else if (!product.vkItemId) {
+        // у нового товара в маркете ВК обязательно главное фото
+        throw new Error(product.images[0]
+          ? 'фото не загружено в ВК (загрузка фото требует права photos у приложения VK ID — см. Настройки → ВКонтакте)'
+          : 'нет изображения у товара — у маркета ВК обязательно главное фото');
+      }
 
       if (product.vkItemId) {
         await vkApi('market.edit', { item_id: product.vkItemId, ...params });
@@ -340,6 +360,8 @@ export async function syncProductsToVk(): Promise<SyncSummary> {
       summary.failed++;
       summary.errors.push(`${product.name}: ${err.message}`);
     }
+    // пауза между товарами: у VK лимит ~3 запроса/сек на методы маркета
+    await new Promise((r) => setTimeout(r, 400));
   }
   return summary;
 }
