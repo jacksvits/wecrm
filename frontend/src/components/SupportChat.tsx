@@ -17,8 +17,8 @@ export function SupportChat() {
   const isStaff = user?.role === 'admin' || user?.role === 'developer';
   // Просмотр и ответы на все запросы: admin/developer или роль с опцией «Видит все запросы тех. поддержки»
   const seesAllTickets = isStaff || user?.canSeeAllSupportTickets === true;
-  // Ссылка на задачу-обращение — только для staff и менеджеров (не для обычных пользователей поддержки)
-  const canSeeTaskLink = isStaff || user?.role === 'manager';
+  // Ссылка на задачу-обращение — только у кого включена опция «Видит все запросы тех. поддержки»
+  // (admin/developer видят все запросы всегда — кнопка у них остаётся)
   const canAccess = isStaff || user?.canAccessSupportChat === true;
 
   const [view, setView] = useState<'list' | 'chat'>(seesAllTickets ? 'list' : 'chat');
@@ -215,7 +215,7 @@ export function SupportChat() {
           }}>←</button>
         )}
         <div style={{ fontSize: 15, fontWeight: 700 }}>Тех. поддержка</div>
-        {task && canSeeTaskLink && (
+        {task && seesAllTickets && (
           <>
             <span style={{
               fontSize: 11, padding: '2px 8px', borderRadius: 10, marginLeft: 4,
