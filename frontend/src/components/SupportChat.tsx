@@ -15,6 +15,8 @@ export function SupportChat() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isStaff = user?.role === 'admin' || user?.role === 'developer';
+  // Ссылка на задачу-обращение — только для staff и менеджеров (не для обычных пользователей поддержки)
+  const canSeeTaskLink = isStaff || user?.role === 'manager';
   const canAccess = isStaff || user?.canAccessSupportChat === true;
 
   const [view, setView] = useState<'list' | 'chat'>(isStaff ? 'list' : 'chat');
@@ -211,7 +213,7 @@ export function SupportChat() {
           }}>←</button>
         )}
         <div style={{ fontSize: 15, fontWeight: 700 }}>Тех. поддержка</div>
-        {task && (
+        {task && canSeeTaskLink && (
           <>
             <span style={{
               fontSize: 11, padding: '2px 8px', borderRadius: 10, marginLeft: 4,
