@@ -1071,30 +1071,3 @@ html, body { overflow-x: hidden; }
 .legal-content ul, .legal-content ol { margin: 0 0 14px 22px; }
 .legal-content a { color: #5eb21f; }
 @media (max-width: 700px) { .legal-page { padding: 22px 12px 40px; } .legal-card { padding: 22px; border-radius: 18px; } .legal-card h1 { font-size: 24px; } }
-
-/* Компактный WYSIWYG-ввод в чате тех. поддержки (как поле ввода общего чата) */
-.support-chat-quill .ql-toolbar {
-  border: none !important;
-  border-bottom: 1px solid var(--border-color) !important;
-  border-radius: 0;
-  background: transparent;
-  padding: 4px 8px;
-}
-.support-chat-quill .ql-toolbar .ql-formats {
-  margin-right: 8px;
-}
-.support-chat-quill .ql-container {
-  border: none !important;
-  border-radius: 0;
-  background: transparent;
-  font-size: 15px;
-}
-.support-chat-quill .ql-editor {
-  min-height: 24px;
-  max-height: 140px;
-  padding: 8px 14px;
-}
-.support-chat-quill .ql-editor.ql-blank::before {
-  color: var(--text-muted);
-  font-style: normal;
-}

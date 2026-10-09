@@ -1,21 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api/client';
 import { Task, FileAttachment } from '../types';
 import { Avatar } from './Avatar';
 import { FileUpload, AttachmentList } from './FileUpload';
-
-const quillModules = {
-  toolbar: [
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ list: 'ordered' }, { list: 'bullet' }],
-    ['link'],
-  ],
-};
-const quillFormats = ['bold', 'italic', 'underline', 'strike', 'list', 'bullet', 'link'];
 
 const stripHtml = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -116,10 +105,17 @@ export function SupportChat() {
     stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   const handleSend = async () => {
     const plain = stripHtml(text);
     if ((!plain && pendingAttachments.length === 0) || sending) return;
-    const content = plain ? text : `📎 ${pendingAttachments.length} файл(ов)`;
+    const content = plain ? text.trim() : `📎 ${pendingAttachments.length} файл(ов)`;
     const attachmentIds = pendingAttachments.length ? pendingAttachments.map(a => a.id) : undefined;
     setSending(true);
     try {
@@ -369,20 +365,24 @@ export function SupportChat() {
       {/* Панель ввода */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', padding: '0 0 env(safe-area-inset-bottom, 0)', flexShrink: 0 }}>
         <FileUpload entityType="comment" entityId="pending" onUpload={a => setPendingAttachments(prev => [...prev, a])} isDark={isDark} variant="button" multiple={true} />
-        <div className="support-chat-quill" style={{
-          flex: 1, minWidth: 0, borderRadius: 22,
-          background: isDark ? 'rgba(0,0,0,0.20)' : 'rgba(0,0,0,0.03)',
-          overflow: 'hidden',
-        }}>
-          <ReactQuill
-            theme="snow"
-            value={text}
-            onChange={setText}
-            modules={quillModules}
-            formats={quillFormats}
-            placeholder="Сообщение..."
-          />
-        </div>
+        <input
+          type="text"
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Сообщение..."
+          style={{
+            flex: 1,
+            padding: '12px 18px',
+            borderRadius: 22,
+            border: 'none',
+            background: isDark ? 'rgba(0,0,0,0.20)' : 'rgba(0,0,0,0.03)',
+            color: 'var(--text-primary)',
+            fontSize: 15,
+            outline: 'none',
+            minWidth: 0,
+          }}
+        />
         <button
           onClick={handleSend}
           disabled={sending || (!stripHtml(text) && pendingAttachments.length === 0)}
