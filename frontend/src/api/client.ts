@@ -21,7 +21,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     getEmployees: (): Promise<NovofonEmployee[]> => fetchApi('/api/telephony/employees'),
     downloadRecord: (callId: string) => `${API_URL}/api/telephony/records/${callId}/download`,
     getSms: (params?: string): Promise<{ items: SmsMessage[]; total: number }> => fetchApi(`/api/telephony/sms${params ? `?${params}` : ''}`),
-    getWebRtcKey: (): Promise<{ key: string; sip: string }> => fetchApi('/api/telephony/webrtc/key'),
+    getWebRtcKey: (): Promise<{ key: string | null; sip: string | null }> => fetchApi('/api/telephony/webrtc/key'),
     testConnection: (): Promise<{ ok: boolean; employees?: number; error?: string }> => fetchApi('/api/telephony/test', { method: 'POST' }),
   },
   notifications: {
