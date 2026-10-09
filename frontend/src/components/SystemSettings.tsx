@@ -8,6 +8,7 @@ import { User, AutoReplyTrigger } from "../types";
 import PromoBlocks from "./PromoBlocks";
 import LoginSlides from "./LoginSlides";
 import { CallHistory } from "./CallHistory";
+import { SeoSettings } from "./SeoSettings";
 
 // WYSIWYG-редактор — та же конфигурация, что и в остальных текстовых полях проекта
 const quillModules = {
@@ -33,7 +34,7 @@ const TAB_CONFIGS = [
   { key: "games", label: "Игры", defaultPath: "/volume3/GAME" },
 ];
 
-type SystemSubTab = "design" | "themes" | "storage" | "promo" | "slides" | "calls" | "handler" | "autoreply" | "legal";
+type SystemSubTab = "design" | "themes" | "storage" | "promo" | "slides" | "calls" | "handler" | "autoreply" | "legal" | "seo";
 
 export function SystemSettings() {
   // По умолчанию открываем под-вкладку «Дизайн»
@@ -1375,9 +1376,12 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "legal")} onClick={() => setSubTab("legal")}>
           Документы
         </button>
+        <button style={subTabStyle(subTab === "seo")} onClick={() => setSubTab("seo")}>
+          SEO
+        </button>
       </div>
 
-      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "slides" ? <LoginSlides /> : subTab === "calls" ? <CallHistory /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : renderLegal()}
+      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "slides" ? <LoginSlides /> : subTab === "calls" ? <CallHistory /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : subTab === "seo" ? <SeoSettings /> : renderLegal()}
     </div>
   );
 }

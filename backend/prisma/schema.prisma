@@ -1454,6 +1454,22 @@ model HandlerSettings {
   @@map("handler_settings")
 }
 
+// SEO-настройки сайта: метатеги title, description, canonical, robots, lang, viewport, keywords
+model SeoSettings {
+  id          String   @id @default(cuid())
+  title       String   @default("")
+  description String   @default("")
+  canonical   String   @default("")
+  robots      String   @default("")
+  lang        String   @default("")
+  viewport    String   @default("")
+  keywords    String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("seo_settings")
+}
+
 // «Автоответчик»: триггеры и ответы в обсуждениях задач
 model AutoReplySettings {
   id        String   @id @default(cuid())

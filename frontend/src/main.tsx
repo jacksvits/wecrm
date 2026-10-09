@@ -6,9 +6,13 @@ import App from './App';
 import './index.css';
 import { loadBranding } from './lib/branding';
 import { initNativePush } from './lib/nativePush';
+import { initSeo } from './lib/seo';
 
 // Загружаем кастомный брендинг (иконка PWA/favicon, логотип) до первого рендера
 loadBranding();
+
+// Применяем SEO-метатеги из настроек (title, description, canonical и др.) до первого рендера
+initSeo();
 
 // Защита от ошибок performance-метрик сторонних расширений (gosuslugi и др.)
 // Фикс: TypeError: Cannot read properties of undefined (reading 'startTime')

@@ -182,6 +182,10 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     get: (): Promise<{ greeting: string; completion: string; userId: string | null; user?: { id: string; name: string } | null }> => fetchApi("/api/handler-settings"),
     save: (data: { greeting: string; completion: string; userId: string | null }) => fetchApi("/api/handler-settings", { method: "PUT", body: JSON.stringify(data) }),
   },
+  seoSettings: {
+    get: (): Promise<{ title: string; description: string; canonical: string; robots: string; lang: string; viewport: string; keywords: string }> => fetchApi("/api/seo-settings"),
+    save: (data: { title: string; description: string; canonical: string; robots: string; lang: string; viewport: string; keywords: string }) => fetchApi("/api/seo-settings", { method: "PUT", body: JSON.stringify(data) }),
+  },
   autoReplySettings: {
     get: (): Promise<{ userId: string | null; user?: { id: string; name: string } | null; triggers: AutoReplyTrigger[] }> => fetchApi("/api/auto-reply-settings"),
     saveUser: (userId: string | null) => fetchApi("/api/auto-reply-settings", { method: "PUT", body: JSON.stringify({ userId }) }),
