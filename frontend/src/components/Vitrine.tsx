@@ -542,6 +542,13 @@ export function Vitrine({ search = '' }: { search?: string }) {
               </>
             )}
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <select id="vitrine-sort" value={sort} onChange={e => setSort(e.target.value as typeof sort)} title="Сортировка каталога"
+                style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}>
+                <option value="name-asc">Название А→Я</option>
+                <option value="name-desc">Название Я→А</option>
+                <option value="price-asc">Цена ↑</option>
+                <option value="price-desc">Цена ↓</option>
+              </select>
               {/* Переключатель вида каталога: карточки / список */}
               <div role="group" aria-label="Вид каталога" style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
                 <button type="button" onClick={() => setViewMode('cards')} title="Показать карточками" aria-pressed={viewMode === 'cards'}
@@ -559,13 +566,6 @@ export function Vitrine({ search = '' }: { search?: string }) {
                   </svg>
                 </button>
               </div>
-              <select id="vitrine-sort" value={sort} onChange={e => setSort(e.target.value as typeof sort)} title="Сортировка каталога"
-                style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}>
-                <option value="name-asc">Название А→Я</option>
-                <option value="name-desc">Название Я→А</option>
-                <option value="price-asc">Цена ↑</option>
-                <option value="price-desc">Цена ↓</option>
-              </select>
             </div>
           </div>
           {(availableTags.length > 0 || activeTags.length > 0) && (
