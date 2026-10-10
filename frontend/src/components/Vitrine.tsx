@@ -21,6 +21,10 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const [activeTags, setActiveTags] = useState<string[]>([]);
   // Сортировка каталога: по названию / по цене, по возрастанию / убыванию
   const [sort, setSort] = useState<'name-asc' | 'name-desc' | 'price-asc' | 'price-desc'>('name-asc');
+  // Вид каталога: карточки (как раньше) / список — выбор сохраняется в localStorage
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>(() => {
+    try { return localStorage.getItem('wecrm_vitrine_view') === 'list' ? 'list' : 'cards'; } catch { return 'cards'; }
+  });
   const [inStockOnly, setInStockOnly] = useState(true);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -59,6 +63,11 @@ export function Vitrine({ search = '' }: { search?: string }) {
     try { localStorage.setItem('wecrm_vitrine_cart', JSON.stringify(cart)); } catch { /* ignore */ }
     try { window.dispatchEvent(new CustomEvent('wecrm:cart')); } catch { /* ignore */ }
   }, [cart]);
+
+  // Запоминаем выбранный вид каталога (карточки/список) между визитами
+  useEffect(() => {
+    try { localStorage.setItem('wecrm_vitrine_view', viewMode); } catch { /* ignore */ }
+  }, [viewMode]);
 
   // Открытие корзины по событию из шапки страницы «Товары»
   useEffect(() => {
@@ -443,6 +452,22 @@ export function Vitrine({ search = '' }: { search?: string }) {
           .vitrine-btn { padding: 9px 10px !important; font-size: 13px !important; width: 100%; }
         }
         @media (max-width: 400px) { .vitrine-grid { grid-template-columns: 1fr; } }
+        /* Вид «Список»: компактные строки — артикул, название, цена, кнопка действия */
+        .vitrine-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 2px; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .vitrine-list-head { display: grid; grid-template-columns: minmax(90px, 150px) minmax(0, 1fr) minmax(110px, auto) auto; gap: 12px; align-items: center; padding: 2px 12px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+        .vitrine-list-row { display: grid; grid-template-columns: minmax(90px, 150px) minmax(0, 1fr) minmax(110px, auto) auto; gap: 12px; align-items: center; padding: 8px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; cursor: pointer; transition: box-shadow .15s ease; }
+        .vitrine-list-row:hover { box-shadow: 0 3px 10px rgba(0,0,0,.08); }
+        .vitrine-list-sku { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .vitrine-list-name { font-size: 14px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .vitrine-list-price { font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: nowrap; text-align: right; }
+        @media (max-width: 640px) {
+          .vitrine-list-head { display: none; }
+          .vitrine-list-row { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; }
+          .vitrine-list-sku { grid-column: 1; grid-row: 1; }
+          .vitrine-list-name { grid-column: 1; grid-row: 2; }
+          .vitrine-list-price { grid-column: 2; grid-row: 1; align-self: start; }
+          .vitrine-list-row > .vitrine-list-action { grid-column: 2; grid-row: 2; justify-self: end; }
+        }
         .vitrine-catalog-head { display: none; }
         .vitrine-catalog-toggle { display: none; }
         @media (max-width: 640px) {
@@ -502,7 +527,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
         {!activeCategoryId && !search.trim() ? (
           <PromoMosaic onOpenCategory={(id) => setActiveCategoryId(id)} />
         ) : (
-        <div className="vitrine-grid">
+        <div className={viewMode === 'cards' ? 'vitrine-grid' : 'vitrine-list'}>
           <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {activeCategoryId && (
               <>
@@ -516,7 +541,24 @@ export function Vitrine({ search = '' }: { search?: string }) {
                 </span>
               </>
             )}
-            <div style={{ marginLeft: 'auto' }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Переключатель вида каталога: карточки / список */}
+              <div role="group" aria-label="Вид каталога" style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
+                <button type="button" onClick={() => setViewMode('cards')} title="Показать карточками" aria-pressed={viewMode === 'cards'}
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '5px 9px', border: 'none', cursor: 'pointer', background: viewMode === 'cards' ? 'var(--accent, #007AFF)' : 'transparent', color: viewMode === 'cards' ? '#fff' : 'var(--text-primary)' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+                  </svg>
+                </button>
+                <button type="button" onClick={() => setViewMode('list')} title="Показать списком" aria-pressed={viewMode === 'list'}
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '5px 9px', border: 'none', cursor: 'pointer', background: viewMode === 'list' ? 'var(--accent, #007AFF)' : 'transparent', color: viewMode === 'list' ? '#fff' : 'var(--text-primary)' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+                    <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                  </svg>
+                </button>
+              </div>
               <select id="vitrine-sort" value={sort} onChange={e => setSort(e.target.value as typeof sort)} title="Сортировка каталога"
                 style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}>
                 <option value="name-asc">Название А→Я</option>
@@ -555,7 +597,43 @@ export function Vitrine({ search = '' }: { search?: string }) {
               По запросу «{search.trim()}» ничего не найдено
             </div>
           )}
-          {filteredCards.map(({ product: p, price, inStock, image }) => (
+          {viewMode === 'list' && filteredCards.length > 0 && (
+            // Вид «Список»: артикул, название, цена, кнопка действия
+            <>
+              <div className="vitrine-list-head">
+                <span>Артикул</span>
+                <span>Название</span>
+                <span style={{ textAlign: 'right' }}>Цена</span>
+                <span />
+              </div>
+              {filteredCards.map(({ product: p, price, inStock }) => (
+                <div key={p.id} className="vitrine-list-row" onClick={() => openDetails(p)} title={p.name}>
+                  <span className="vitrine-list-sku">{p.sku || '—'}</span>
+                  <span className="vitrine-list-name">{p.name}</span>
+                  <span className="vitrine-list-price">
+                    {price && Number(price.price) > 0 ? `${price.priceFrom ? 'от ' : ''}${fmtMoney(price.price)} ₽` : 'Договорная'}
+                  </span>
+                  {p.kind === 'service' && p.isSubscription ? (
+                    <button type="button" className="vitrine-list-action btn-reserve" style={{ whiteSpace: 'nowrap' }}
+                      title="Оформить подписку" onClick={(e) => { e.stopPropagation(); openSubscribe(p); }}>
+                      Подписаться
+                    </button>
+                  ) : (
+                    <button type="button" className="vitrine-list-action btn-cart" disabled={p.kind !== 'service' && inStock <= 0}
+                      title="В корзину" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+                      onClick={(e) => { e.stopPropagation(); addToCart(p); }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                      </svg>
+                      В корзину
+                    </button>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
+          {viewMode === 'cards' && filteredCards.map(({ product: p, price, inStock, image }) => (
           <div key={p.id} className="vitrine-card" onClick={() => openDetails(p)}
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
             <div style={{ position: 'relative', width: '100%', paddingTop: '100%', background: 'var(--bg-hover)' }}>
