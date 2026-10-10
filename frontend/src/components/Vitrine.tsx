@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { Product, ProductCategory, PromoBlock } from '../types';
+import { useBrandProductDefaultImage } from '../lib/branding';
 
 const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
 const fmtQty = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
@@ -26,6 +27,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
     try { return localStorage.getItem('wecrm_vitrine_view') === 'list' ? 'list' : 'cards'; } catch { return 'cards'; }
   });
   const [inStockOnly, setInStockOnly] = useState(true);
+  // Изображение товара по умолчанию из настроек дизайна (у товаров без фото)
+  const defaultProductImage = useBrandProductDefaultImage();
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -139,8 +142,9 @@ export function Vitrine({ search = '' }: { search?: string }) {
     const flaggedPrices = visiblePrices.filter((x: any) => x.priceType?.forVitrine);
     const price = (flaggedPrices.length ? flaggedPrices : visiblePrices)[0] as any;
     const inStock = (p.stocks || []).reduce((s, x) => s + Math.max(x.quantity - (x.reserved || 0), 0), 0);
-    return { product: p, price, inStock, image: (p.images || [])[0] as any };
-  }), [products]);
+    // Товар без фото показываем с изображением по умолчанию из настроек дизайна
+    return { product: p, price, inStock, image: ((p.images || [])[0] || (defaultProductImage ? { url: defaultProductImage } : undefined)) as any };
+  }), [products, defaultProductImage]);
 
   const freeQty = (p: Product) =>
     (p.stocks || []).reduce((s, x) => s + Math.max(x.quantity - (x.reserved || 0), 0), 0);
@@ -299,7 +303,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
     setReserveList(prev => {
       const ex = prev.find(i => i.productId === p.id);
       if (ex) return prev.map(i => (i.productId === p.id ? { ...i, quantity: Math.min(i.quantity + 1, i.maxQty) } : i));
-      return [...prev, { productId: p.id, name: p.name, unit: p.unit, imageUrl: p.images?.[0]?.url || '', price: priceObj?.price ?? 0, quantity: 1, maxQty }];
+      return [...prev, { productId: p.id, name: p.name, unit: p.unit, imageUrl: p.images?.[0]?.url || defaultProductImage || '', price: priceObj?.price ?? 0, quantity: 1, maxQty }];
     });
   };
 
@@ -319,7 +323,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
     setCart(prev => {
       const ex = prev.find(i => i.productId === p.id);
       if (ex) return prev.map(i => (i.productId === p.id ? { ...i, quantity: Math.min(i.quantity + 1, i.maxQty) } : i));
-      return [...prev, { productId: p.id, name: p.name, unit: p.unit, imageUrl: p.images?.[0]?.url || '', price: priceObj?.price ?? 0, quantity: 1, maxQty }];
+      return [...prev, { productId: p.id, name: p.name, unit: p.unit, imageUrl: p.images?.[0]?.url || defaultProductImage || '', price: priceObj?.price ?? 0, quantity: 1, maxQty }];
     });
   };
 
@@ -766,7 +770,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
       {details && (() => {
         const d = details;
         const dImages = d.images || [];
-        const dImage = dImages[detailsImage] || dImages[0];
+        const dImage = dImages[detailsImage] || dImages[0] || (defaultProductImage ? { url: defaultProductImage } : undefined);
         // На витрине показываем только цены с включённой опцией «на витрине»;
         // если ни одна не отмечена — показываем все (обратная совместимость)
         const dPricesFlagged = (d.prices || []).filter((x: any) => x.priceType?.forVitrine);

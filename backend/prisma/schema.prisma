@@ -1376,6 +1376,8 @@ model Branding {
   darkLogoPath String?  @map("dark_logo_path")
   accentColor  String?  @map("accent_color")
   newsCoverPath String? @map("news_cover_path")
+  // Изображение товара по умолчанию: показывается у товаров без фото
+  productDefaultImagePath String? @map("product_default_image_path")
   splashEnabled Boolean  @default(true) @map("splash_enabled")
   splashPath    String?  @map("splash_path")
   defaultTheme  String?  @map("default_theme")

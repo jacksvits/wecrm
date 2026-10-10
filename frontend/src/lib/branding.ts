@@ -10,6 +10,8 @@ export interface Branding {
   accentColor: string | null;
   defaultTheme: string | null;
   newsCoverUrl: string | null;
+  // Изображение товара по умолчанию: показывается у товаров без фото (null — пустая подложка)
+  productDefaultImageUrl: string | null;
   updatedAt: string | null;
 }
 
@@ -22,6 +24,7 @@ let current: Branding = {
   accentColor: null,
   defaultTheme: null,
   newsCoverUrl: null,
+  productDefaultImageUrl: null,
   updatedAt: null,
 };
 
@@ -136,4 +139,15 @@ export function useBrandNewsCover(): string | null {
     return () => window.removeEventListener('brandingchange', handler);
   }, []);
   return cover;
+}
+
+// Хук: изображение товара по умолчанию (null — у товара без фото пустая подложка)
+export function useBrandProductDefaultImage(): string | null {
+  const [img, setImg] = useState<string | null>(current.productDefaultImageUrl);
+  useEffect(() => {
+    const handler = () => setImg(current.productDefaultImageUrl);
+    window.addEventListener('brandingchange', handler);
+    return () => window.removeEventListener('brandingchange', handler);
+  }, []);
+  return img;
 }

@@ -51,6 +51,12 @@ router.get('/', async (_req, res) => {
             ? fileUrl('news-cover.jpg', branding.updatedAt)
             : branding.newsCoverPath)
         : null,
+      // Изображение товара по умолчанию: показывается у товаров без фото (null — пустая подложка)
+      productDefaultImageUrl: branding?.productDefaultImagePath
+        ? (branding.productDefaultImagePath.startsWith('/uploads/branding/')
+            ? fileUrl('product-default-image.png', branding.updatedAt)
+            : branding.productDefaultImagePath)
+        : null,
       // Заставка при запуске: опция показа и кастомное видео (null — дефолт /splash.mp4)
       splashEnabled: branding?.splashEnabled ?? true,
       splashUrl: branding?.splashPath
@@ -164,6 +170,108 @@ router.post('/dark-logo', authMiddleware, upload.single('file'), async (req: Aut
     res.json({ darkLogoUrl: fileUrl('logo-dark.png', branding.updatedAt) });
   } catch (err: any) {
     console.error('[branding] dark logo upload error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/branding/news-cover — загрузка обложки новостей по умолчанию
+router.post('/news-cover', authMiddleware, upload.single('file'), async (req: AuthRequest, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Только администратор' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл не загружен' });
+    }
+
+    await sharp(req.file.buffer)
+      .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toFile(path.join(BRANDING_DIR, 'news-cover.jpg'));
+
+    const branding = await prisma.branding.upsert({
+      where: { id: 1 },
+      create: { id: 1, newsCoverPath: '/uploads/branding/news-cover.jpg', updatedAt: new Date() },
+      update: { newsCoverPath: '/uploads/branding/news-cover.jpg', updatedAt: new Date() },
+    });
+
+    console.log(`[branding] news cover updated: ${req.file.size} bytes`);
+    res.json({ newsCoverUrl: fileUrl('news-cover.jpg', branding.updatedAt) });
+  } catch (err: any) {
+    console.error('[branding] news cover upload error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/branding/news-cover — сброс обложки новостей к дефолту (без картинки)
+router.delete('/news-cover', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Только администратор' });
+    }
+
+    await prisma.branding.upsert({
+      where: { id: 1 },
+      create: { id: 1, newsCoverPath: null, updatedAt: new Date() },
+      update: { newsCoverPath: null, updatedAt: new Date() },
+    });
+
+    console.log('[branding] news cover reset');
+    res.json({ newsCoverUrl: null });
+  } catch (err: any) {
+    console.error('[branding] news cover reset error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/branding/product-default-image — изображение товара по умолчанию
+// (показывается у товаров без фото в номенклатуре и на витрине)
+router.post('/product-default-image', authMiddleware, upload.single('file'), async (req: AuthRequest, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Только администратор' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл не загружен' });
+    }
+
+    // Сохраняем PNG с прозрачностью: картинка может ложиться на подложки разных тем
+    await sharp(req.file.buffer)
+      .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+      .png()
+      .toFile(path.join(BRANDING_DIR, 'product-default-image.png'));
+
+    const branding = await prisma.branding.upsert({
+      where: { id: 1 },
+      create: { id: 1, productDefaultImagePath: '/uploads/branding/product-default-image.png', updatedAt: new Date() },
+      update: { productDefaultImagePath: '/uploads/branding/product-default-image.png', updatedAt: new Date() },
+    });
+
+    console.log(`[branding] product default image updated: ${req.file.size} bytes`);
+    res.json({ productDefaultImageUrl: fileUrl('product-default-image.png', branding.updatedAt) });
+  } catch (err: any) {
+    console.error('[branding] product default image upload error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/branding/product-default-image — сброс изображения товара по умолчанию
+router.delete('/product-default-image', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Только администратор' });
+    }
+
+    await prisma.branding.upsert({
+      where: { id: 1 },
+      create: { id: 1, productDefaultImagePath: null, updatedAt: new Date() },
+      update: { productDefaultImagePath: null, updatedAt: new Date() },
+    });
+
+    console.log('[branding] product default image reset');
+    res.json({ productDefaultImageUrl: null });
+  } catch (err: any) {
+    console.error('[branding] product default image reset error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

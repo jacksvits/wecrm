@@ -6,6 +6,7 @@ import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { Vitrine } from './Vitrine';
 import { Product, ProductCategory, Warehouse, PriceType, StockMovement, PriceHistory } from '../types';
+import { useBrandProductDefaultImage } from '../lib/branding';
 
 const quillModules = {
   toolbar: [
@@ -1147,7 +1148,9 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
   allTags: string[]; onSaveTags: (tags: string[]) => void;
 }) {
   const origin = window.location.origin;
-  const mainImage = (p.images || [])[0];
+  // Товар без фото показываем с изображением по умолчанию из настроек дизайна
+  const defaultProductImage = useBrandProductDefaultImage();
+  const mainImage = (p.images || [])[0] || (defaultProductImage ? { url: defaultProductImage } : undefined);
   return (
     <tr style={{ opacity: p.isActive ? 1 : 0.5, cursor: 'pointer' }} onClick={onOpen}>
       <td style={{ ...tdStyle, paddingLeft: indent }}>

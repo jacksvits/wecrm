@@ -44,9 +44,10 @@ export function SystemSettings() {
   const [saving, setSaving] = useState<string | null>(null);
 
   // === Брендинг: иконка приложения, логотип компании, логотип тёмной темы, цвет акцента ===
-  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null; defaultTheme: string | null; newsCoverUrl: string | null; splashEnabled: boolean; splashUrl: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null, newsCoverUrl: null, defaultTheme: null, splashEnabled: true, splashUrl: null });
+  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null; defaultTheme: string | null; newsCoverUrl: string | null; productDefaultImageUrl: string | null; splashEnabled: boolean; splashUrl: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null, newsCoverUrl: null, productDefaultImageUrl: null, defaultTheme: null, splashEnabled: true, splashUrl: null });
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [newsCoverFile, setNewsCoverFile] = useState<File | null>(null);
+  const [productDefaultImageFile, setProductDefaultImageFile] = useState<File | null>(null);
   const [splashVideoFile, setSplashVideoFile] = useState<File | null>(null);
   const [splashToggling, setSplashToggling] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -204,13 +205,13 @@ export function SystemSettings() {
       .then((r) => (r.ok ? r.json() : null))
       .then((b) => {
         if (!b) return;
-        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor, defaultTheme: b.defaultTheme || null, newsCoverUrl: b.newsCoverUrl, splashEnabled: b.splashEnabled ?? true, splashUrl: b.splashUrl || null });
+        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor, defaultTheme: b.defaultTheme || null, newsCoverUrl: b.newsCoverUrl, productDefaultImageUrl: b.productDefaultImageUrl || null, splashEnabled: b.splashEnabled ?? true, splashUrl: b.splashUrl || null });
         setAccentInput(b.accentColor || "");
       })
       .catch(() => {});
   }, []);
 
-  const uploadBranding = async (kind: "icon" | "logo" | "dark-logo" | "news-cover", file: File) => {
+  const uploadBranding = async (kind: "icon" | "logo" | "dark-logo" | "news-cover" | "product-default-image", file: File) => {
     setUploading(kind);
     try {
       const fd = new FormData();
@@ -225,12 +226,13 @@ export function SystemSettings() {
       if (!res.ok) throw new Error(data.error || "Ошибка загрузки");
       setBranding((prev) => ({
         ...prev,
-        ...(kind === "icon" ? { iconUrl: data.iconUrl } : kind === "logo" ? { logoUrl: data.logoUrl } : kind === "news-cover" ? { newsCoverUrl: data.newsCoverUrl } : { darkLogoUrl: data.darkLogoUrl }),
+        ...(kind === "icon" ? { iconUrl: data.iconUrl } : kind === "logo" ? { logoUrl: data.logoUrl } : kind === "news-cover" ? { newsCoverUrl: data.newsCoverUrl } : kind === "product-default-image" ? { productDefaultImageUrl: data.productDefaultImageUrl } : { darkLogoUrl: data.darkLogoUrl }),
       }));
       await loadBranding(); // применить сразу: favicon, manifest PWA, логотип, цвет акцента
       if (kind === "icon") setIconFile(null);
       else if (kind === "logo") setLogoFile(null);
       else if (kind === "news-cover") setNewsCoverFile(null);
+      else if (kind === "product-default-image") setProductDefaultImageFile(null);
       else setDarkLogoFile(null);
       alert("Сохранено");
     } catch (e: any) {
@@ -251,6 +253,24 @@ export function SystemSettings() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Ошибка сброса");
       setBranding((prev) => ({ ...prev, newsCoverUrl: null }));
+      await loadBranding();
+      alert("Сброшено");
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    }
+  };
+
+  // Сброс изображения товара по умолчанию (пустая подложка у товаров без фото)
+  const resetProductDefaultImage = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/branding/product-default-image", {
+        method: "DELETE",
+        headers: token ? { 'X-Auth-Token': token as string } : undefined,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Ошибка сброса");
+      setBranding((prev) => ({ ...prev, productDefaultImageUrl: null }));
       await loadBranding();
       alert("Сброшено");
     } catch (e: any) {
@@ -859,6 +879,64 @@ export function SystemSettings() {
           {branding.newsCoverUrl && (
             <button
               onClick={resetNewsCover}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 10,
+                background: "transparent",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border-color)",
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+            >
+              Сбросить
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Изображение товара по умолчанию */}
+      <div style={{ marginBottom: 20, padding: 20, borderRadius: 12, border: "1px solid var(--border-color)", background: "var(--bg-card)" }}>
+        <h4 style={{ margin: "0 0 8px 0", fontSize: 15 }}>Изображение товара по умолчанию</h4>
+        <p style={{ margin: "0 0 14px 0", fontSize: 13, color: "var(--text-muted)" }}>
+          Показывается у товаров без фото: в номенклатуре и на витрине магазина
+        </p>
+        <div
+          style={{
+            width: 90,
+            height: 90,
+            borderRadius: 8,
+            marginBottom: 14,
+            background: branding.productDefaultImageUrl ? `url(${branding.productDefaultImageUrl}) center/contain no-repeat` : "var(--bg-hover)",
+            border: "1px solid var(--border-color)",
+          }}
+        />
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setProductDefaultImageFile(e.target.files?.[0] || null)}
+            style={{ fontSize: 13, color: "var(--text-secondary)" }}
+          />
+          <button
+            onClick={() => productDefaultImageFile && uploadBranding("product-default-image", productDefaultImageFile)}
+            disabled={!productDefaultImageFile || uploading === "product-default-image"}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              background: "#007AFF",
+              color: "#fff",
+              border: "none",
+              cursor: !productDefaultImageFile || uploading === "product-default-image" ? "default" : "pointer",
+              fontSize: 14,
+              opacity: !productDefaultImageFile || uploading === "product-default-image" ? 0.7 : 1,
+            }}
+          >
+            {uploading === "product-default-image" ? "Загрузка..." : "Загрузить"}
+          </button>
+          {branding.productDefaultImageUrl && (
+            <button
+              onClick={resetProductDefaultImage}
               style={{
                 padding: "8px 16px",
                 borderRadius: 10,
