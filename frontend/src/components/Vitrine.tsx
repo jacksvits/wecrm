@@ -488,7 +488,10 @@ export function Vitrine({ search = '' }: { search?: string }) {
         .vitrine-list-name { font-size: 14px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .vitrine-list-price { font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: nowrap; text-align: right; }
         /* Вид «Список»: заголовки групп по категориям */
-        .vitrine-list-group { display: flex; align-items: baseline; gap: 8px; margin-top: 14px; padding: 0 12px; font-size: 14px; font-weight: 700; color: var(--accent, #007AFF); }
+        .vitrine-list-group { display: flex; align-items: baseline; gap: 8px; margin-top: 14px; padding: 0 12px; font-size: 14px; font-weight: 700; color: var(--accent, #007AFF); user-select: none; }
+        .vitrine-list-group:not(.static) { cursor: pointer; }
+        .vitrine-list-group:not(.static):hover > span:first-child { text-decoration: underline; }
+        .vitrine-list-group.active { color: #0056b3; }
         .vitrine-list-count { font-size: 12px; font-weight: 600; color: var(--text-muted); }
         @media (max-width: 640px) {
           .vitrine-list-head { display: none; }
@@ -638,7 +641,12 @@ export function Vitrine({ search = '' }: { search?: string }) {
               </div>
               {listGroups.map((g, gi) => (
               <Fragment key={g.key}>
-              <div className="vitrine-list-group" style={gi === 0 ? { marginTop: 4 } : undefined}>
+              {/* Клик по заголовку группы фильтрует витрину по категории (как выбор в дереве слева); повторный клик снимает фильтр */}
+              <div className={`vitrine-list-group${activeCategoryId === g.key ? ' active' : ''}${g.key === 'none' ? ' static' : ''}`}
+                style={gi === 0 ? { marginTop: 4 } : undefined}
+                role={g.key === 'none' ? undefined : 'button'}
+                title={g.key === 'none' ? undefined : 'Показать только эту категорию'}
+                onClick={g.key === 'none' ? undefined : () => setActiveCategoryId(activeCategoryId === g.key ? null : g.key)}>
                 <span>{g.name}</span>
                 <span className="vitrine-list-count">{g.items.length}</span>
               </div>
