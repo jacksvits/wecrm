@@ -1378,6 +1378,8 @@ model Branding {
   newsCoverPath String? @map("news_cover_path")
   // Изображение товара по умолчанию: показывается у товаров без фото
   productDefaultImagePath String? @map("product_default_image_path")
+  // Стиль карточек товаров на витрине: gloss (глянец) | flat (классика) | neomorph
+  productCardStyle String?  @map("product_card_style")
   splashEnabled Boolean  @default(true) @map("splash_enabled")
   splashPath    String?  @map("splash_path")
   defaultTheme  String?  @map("default_theme")

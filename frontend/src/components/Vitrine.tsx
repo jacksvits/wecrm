@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { Product, ProductCategory, PromoBlock } from '../types';
-import { useBrandProductDefaultImage } from '../lib/branding';
+import { useBrandProductDefaultImage, useBrandProductCardStyle } from '../lib/branding';
 
 const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
 const fmtQty = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
@@ -29,6 +29,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const [inStockOnly, setInStockOnly] = useState(true);
   // Изображение товара по умолчанию из настроек дизайна (у товаров без фото)
   const defaultProductImage = useBrandProductDefaultImage();
+  // Стиль карточек из настроек дизайна: gloss (глянец) | flat (классика) | neomorph
+  const cardStyle = useBrandProductCardStyle();
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -515,11 +517,21 @@ export function Vitrine({ search = '' }: { search?: string }) {
           .vitrine-catalog-toggle { display: flex !important; align-items: center; justify-content: center; position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 61; width: 58px; height: 27px; padding: 0; border-radius: 0 0 13px 13px; border: 1px solid var(--border-color); border-top: none; background: var(--bg-card); color: var(--text-primary); cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,.14); }
           @keyframes vitrineDrop { from { transform: translateY(-100%); } to { transform: translateY(0); } }
         }
-        /* Карточки «глянец»: блик на фото, лёгкая перспектива, акцентная зелёная тень */
-        .vitrine-card { border: none; border-radius: 20px; transform: perspective(900px) rotateX(2deg); box-shadow: 0 20px 44px rgba(0, 179, 0, .22), 0 4px 12px rgba(16, 24, 40, .10); transition: box-shadow .25s ease, transform .25s ease; }
+        /* Карточки «глянец» (по умолчанию): блик на фото, лёгкая перспектива, акцентная зелёная тень */
+        .vitrine-card { background: var(--bg-card); border: none; border-radius: 20px; transform: perspective(900px) rotateX(2deg); box-shadow: 0 20px 44px rgba(0, 179, 0, .22), 0 4px 12px rgba(16, 24, 40, .10); transition: box-shadow .25s ease, transform .25s ease; }
         .vitrine-card:hover { transform: perspective(900px) rotateX(0deg) translateY(-4px) scale(1.015); box-shadow: 0 28px 56px rgba(0, 179, 0, .30), 0 6px 16px rgba(16, 24, 40, .12); }
         /* Блик на фото карточки */
         .vitrine-card .vitrine-card-img::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(160deg, rgba(255, 255, 255, .55) 0%, rgba(255, 255, 255, 0) 38%); }
+        /* «Классика»: как раньше — рамка, без перспективы, лёгкий подъём при наведении */
+        .vitrine-card--flat { transform: none; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: none; transition: box-shadow .15s ease, transform .15s ease; }
+        .vitrine-card--flat:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0, 0, 0, .10); }
+        .vitrine-card--flat .vitrine-card-img::after { display: none; }
+        /* «Неоморфизм»: мягкие двойные тени, подложка цвета фона */
+        .vitrine-card--neomorph { background: var(--bg-hover); transform: none; border: none; border-radius: 20px; box-shadow: 9px 9px 18px rgba(0, 0, 0, .12), -9px -9px 18px rgba(255, 255, 255, .55); transition: box-shadow .2s ease, transform .2s ease; }
+        .vitrine-card--neomorph:hover { transform: translateY(-3px); box-shadow: 12px 12px 24px rgba(0, 0, 0, .14), -12px -12px 24px rgba(255, 255, 255, .65); }
+        .vitrine-card--neomorph .vitrine-card-img::after { display: none; }
+        [data-theme="dark"] .vitrine-card--neomorph { background: var(--bg-card); box-shadow: 9px 9px 18px rgba(0, 0, 0, .5), -9px -9px 18px rgba(255, 255, 255, .05); }
+        [data-theme="dark"] .vitrine-card--neomorph:hover { box-shadow: 12px 12px 24px rgba(0, 0, 0, .55), -12px -12px 24px rgba(255, 255, 255, .07); }
         .btn-reserve { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 1px solid rgba(120, 255, 122, 0.4); border-radius: 10px; background: linear-gradient(135deg, rgb(10, 136, 0) 0%, rgb(51, 194, 120) 50%, rgb(4, 110, 0) 100%); color: #ffffff; font: 500 14px/1.4 system-ui, sans-serif; cursor: pointer; box-shadow: rgba(8, 255, 0, 0.35) 0 4px 20px, rgba(255, 255, 255, 0.25) 0 1px 0 inset; transition: opacity .15s ease-out, transform .15s ease-out; }
         .btn-reserve:hover { opacity: .9; }
         .btn-reserve:active { transform: scale(.97); }
@@ -687,8 +699,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
             </>
           )}
           {viewMode === 'cards' && filteredCards.map(({ product: p, price, inStock, image }) => (
-          <div key={p.id} className="vitrine-card" onClick={() => openDetails(p)}
-            style={{ background: 'var(--bg-card)', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
+          <div key={p.id} className={`vitrine-card vitrine-card--${cardStyle}`} onClick={() => openDetails(p)}
+            style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
             <div className="vitrine-card-img" style={{ position: 'relative', width: '100%', paddingTop: '100%', background: 'var(--bg-hover)' }}>
               {image ? (
                 <img src={`${origin}${image.url}`} alt={p.name} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />

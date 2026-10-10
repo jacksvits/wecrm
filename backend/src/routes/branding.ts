@@ -57,6 +57,8 @@ router.get('/', async (_req, res) => {
             ? fileUrl('product-default-image.png', branding.updatedAt)
             : branding.productDefaultImagePath)
         : null,
+      // Стиль карточек товаров на витрине (null — глянец)
+      productCardStyle: branding?.productCardStyle || 'gloss',
       // Заставка при запуске: опция показа и кастомное видео (null — дефолт /splash.mp4)
       splashEnabled: branding?.splashEnabled ?? true,
       splashUrl: branding?.splashPath
@@ -272,6 +274,32 @@ router.delete('/product-default-image', authMiddleware, async (req: AuthRequest,
     res.json({ productDefaultImageUrl: null });
   } catch (err: any) {
     console.error('[branding] product default image reset error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Допустимые стили карточек товаров на витрине
+const ALLOWED_CARD_STYLES = ['gloss', 'flat', 'neomorph'];
+
+// POST /api/branding/product-card-style — стиль карточек товаров (gloss — глянец по умолчанию)
+router.post('/product-card-style', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Только администратор' });
+    }
+    const style = req.body?.style ?? null;
+    const value = style && ALLOWED_CARD_STYLES.includes(String(style)) ? String(style) : null;
+
+    const branding = await prisma.branding.upsert({
+      where: { id: 1 },
+      create: { id: 1, productCardStyle: value, updatedAt: new Date() },
+      update: { productCardStyle: value, updatedAt: new Date() },
+    });
+
+    console.log(`[branding] product card style updated: ${value || 'gloss'}`);
+    res.json({ productCardStyle: branding.productCardStyle || 'gloss' });
+  } catch (err: any) {
+    console.error('[branding] product card style error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

@@ -44,7 +44,7 @@ export function SystemSettings() {
   const [saving, setSaving] = useState<string | null>(null);
 
   // === Брендинг: иконка приложения, логотип компании, логотип тёмной темы, цвет акцента ===
-  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null; defaultTheme: string | null; newsCoverUrl: string | null; productDefaultImageUrl: string | null; splashEnabled: boolean; splashUrl: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null, newsCoverUrl: null, productDefaultImageUrl: null, defaultTheme: null, splashEnabled: true, splashUrl: null });
+  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null; defaultTheme: string | null; newsCoverUrl: string | null; productDefaultImageUrl: string | null; productCardStyle: string | null; splashEnabled: boolean; splashUrl: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null, newsCoverUrl: null, productDefaultImageUrl: null, productCardStyle: null, defaultTheme: null, splashEnabled: true, splashUrl: null });
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [newsCoverFile, setNewsCoverFile] = useState<File | null>(null);
   const [productDefaultImageFile, setProductDefaultImageFile] = useState<File | null>(null);
@@ -205,7 +205,7 @@ export function SystemSettings() {
       .then((r) => (r.ok ? r.json() : null))
       .then((b) => {
         if (!b) return;
-        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor, defaultTheme: b.defaultTheme || null, newsCoverUrl: b.newsCoverUrl, productDefaultImageUrl: b.productDefaultImageUrl || null, splashEnabled: b.splashEnabled ?? true, splashUrl: b.splashUrl || null });
+        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor, defaultTheme: b.defaultTheme || null, newsCoverUrl: b.newsCoverUrl, productDefaultImageUrl: b.productDefaultImageUrl || null, productCardStyle: b.productCardStyle || null, splashEnabled: b.splashEnabled ?? true, splashUrl: b.splashUrl || null });
         setAccentInput(b.accentColor || "");
       })
       .catch(() => {});
@@ -388,6 +388,31 @@ export function SystemSettings() {
       alert("Ошибка: " + e.message);
     } finally {
       setThemeSaving(false);
+    }
+  };
+
+  // Стиль карточек товаров на витрине: gloss (глянец) | flat (классика) | neomorph
+  const [cardStyleSaving, setCardStyleSaving] = useState(false);
+  const saveProductCardStyle = async (style: string) => {
+    setCardStyleSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/branding/product-card-style", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { 'X-Auth-Token': token as string } : {}),
+        },
+        body: JSON.stringify({ style }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка сохранения");
+      setBranding((prev) => ({ ...prev, productCardStyle: data.productCardStyle }));
+      await loadBranding(); // применить стиль сразу
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    } finally {
+      setCardStyleSaving(false);
     }
   };
 
@@ -950,6 +975,44 @@ export function SystemSettings() {
               Сбросить
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Стиль карточек товаров на витрине */}
+      <div style={{ marginBottom: 20, padding: 20, borderRadius: 12, border: "1px solid var(--border-color)", background: "var(--bg-card)" }}>
+        <h4 style={{ margin: "0 0 8px 0", fontSize: 15 }}>Стиль карточек товаров</h4>
+        <p style={{ margin: "0 0 14px 0", fontSize: 13, color: "var(--text-muted)" }}>
+          Оформление карточек на витрине магазина
+        </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {([
+            { key: "gloss", label: "Глянец", hint: "перспектива, блик, акцентная тень" },
+            { key: "flat", label: "Классика", hint: "рамка, лёгкий подъём при наведении" },
+            { key: "neomorph", label: "Неоморфизм", hint: "мягкие двойные тени" },
+          ] as const).map((cs) => {
+            const selected = (branding.productCardStyle || "gloss") === cs.key;
+            return (
+              <button
+                key={cs.key}
+                onClick={() => saveProductCardStyle(cs.key)}
+                disabled={cardStyleSaving}
+                style={{
+                  textAlign: "left",
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  border: selected ? "2px solid var(--accent-color)" : "1px solid var(--border-color)",
+                  background: "var(--bg-card)",
+                  color: "var(--text-primary)",
+                  cursor: cardStyleSaving ? "default" : "pointer",
+                  minWidth: 150,
+                  opacity: cardStyleSaving ? 0.7 : 1,
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{cs.label}</div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{cs.hint}</div>
+              </button>
+            );
+          })}
         </div>
       </div>
 

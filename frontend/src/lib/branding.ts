@@ -12,6 +12,8 @@ export interface Branding {
   newsCoverUrl: string | null;
   // Изображение товара по умолчанию: показывается у товаров без фото (null — пустая подложка)
   productDefaultImageUrl: string | null;
+  // Стиль карточек товаров на витрине: gloss | flat | neomorph
+  productCardStyle: string | null;
   updatedAt: string | null;
 }
 
@@ -25,6 +27,7 @@ let current: Branding = {
   defaultTheme: null,
   newsCoverUrl: null,
   productDefaultImageUrl: null,
+  productCardStyle: null,
   updatedAt: null,
 };
 
@@ -150,4 +153,15 @@ export function useBrandProductDefaultImage(): string | null {
     return () => window.removeEventListener('brandingchange', handler);
   }, []);
   return img;
+}
+
+// Хук: стиль карточек товаров на витрине ('gloss' — по умолчанию)
+export function useBrandProductCardStyle(): string {
+  const [style, setStyle] = useState<string>(current.productCardStyle || 'gloss');
+  useEffect(() => {
+    const handler = () => setStyle(current.productCardStyle || 'gloss');
+    window.addEventListener('brandingchange', handler);
+    return () => window.removeEventListener('brandingchange', handler);
+  }, []);
+  return style;
 }
