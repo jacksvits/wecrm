@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { Product, ProductCategory, PromoBlock } from '../types';
@@ -227,6 +227,33 @@ export function Vitrine({ search = '' }: { search?: string }) {
     }
     return list;
   }, [baseCards, activeTags, sort]);
+
+  // ===== Вид «Список»: группировка строк по категориям (в порядке дерева) =====
+  const listGroups = useMemo(() => {
+    const byId = new Map(categories.map((c) => [c.id, c]));
+    // Порядок обхода дерева в глубину — группы в списке идут как в сайдбаре
+    const order = new Map<string, number>();
+    let seq = 0;
+    const walk = (parentId: string | null) => {
+      for (const c of categories) {
+        if ((c.parentId ?? null) === parentId && !order.has(c.id)) {
+          order.set(c.id, seq++);
+          walk(c.id);
+        }
+      }
+    };
+    walk(null);
+    const groups = new Map<string, { key: string; name: string; order: number; items: VitrineCard[] }>();
+    for (const card of filteredCards) {
+      const cid = card.product.categoryId;
+      const name = (cid && byId.get(cid)?.name) || 'Без категории';
+      const ord = cid && order.has(cid) ? (order.get(cid) as number) : Number.MAX_SAFE_INTEGER;
+      const key = cid || 'none';
+      if (!groups.has(key)) groups.set(key, { key, name, order: ord, items: [] });
+      groups.get(key)!.items.push(card);
+    }
+    return [...groups.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'ru'));
+  }, [filteredCards, categories]);
 
   const toggleExpand = (id: string) => {
     const next = new Set(expanded);
@@ -460,6 +487,9 @@ export function Vitrine({ search = '' }: { search?: string }) {
         .vitrine-list-sku { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .vitrine-list-name { font-size: 14px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .vitrine-list-price { font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: nowrap; text-align: right; }
+        /* Вид «Список»: заголовки групп по категориям */
+        .vitrine-list-group { display: flex; align-items: baseline; gap: 8px; margin-top: 14px; padding: 0 12px; font-size: 14px; font-weight: 700; color: var(--accent, #007AFF); }
+        .vitrine-list-count { font-size: 12px; font-weight: 600; color: var(--text-muted); }
         @media (max-width: 640px) {
           .vitrine-list-head { display: none; }
           .vitrine-list-row { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; }
@@ -598,7 +628,7 @@ export function Vitrine({ search = '' }: { search?: string }) {
             </div>
           )}
           {viewMode === 'list' && filteredCards.length > 0 && (
-            // Вид «Список»: артикул, название, цена, кнопка действия
+            // Вид «Список»: группы по категориям; в строке — артикул, название, цена, кнопка действия
             <>
               <div className="vitrine-list-head">
                 <span>Артикул</span>
@@ -606,7 +636,13 @@ export function Vitrine({ search = '' }: { search?: string }) {
                 <span style={{ textAlign: 'right' }}>Цена</span>
                 <span />
               </div>
-              {filteredCards.map(({ product: p, price, inStock }) => (
+              {listGroups.map((g, gi) => (
+              <Fragment key={g.key}>
+              <div className="vitrine-list-group" style={gi === 0 ? { marginTop: 4 } : undefined}>
+                <span>{g.name}</span>
+                <span className="vitrine-list-count">{g.items.length}</span>
+              </div>
+              {g.items.map(({ product: p, price, inStock }) => (
                 <div key={p.id} className="vitrine-list-row" onClick={() => openDetails(p)} title={p.name}>
                   <span className="vitrine-list-sku">{p.sku || '—'}</span>
                   <span className="vitrine-list-name">{p.name}</span>
@@ -630,6 +666,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
                     </button>
                   )}
                 </div>
+              ))}
+              </Fragment>
               ))}
             </>
           )}
