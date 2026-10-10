@@ -18,19 +18,31 @@ import path from 'path';
  * Отправители часто кладут адрес только в href (<a href="URL">текст</a>), а текстовая
  * часть содержит лишь текст ссылки — без этого правила парсинга (toEol/toWord) не видят URL.
  */
-function inlineLinkUrls(text: string, html?: string): string {
+export function inlineLinkUrls(text: string, html?: string): string {
   if (!html) return text;
   let result = text;
   const anchorRe = /<a\b[^>]*?href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let m: RegExpExecArray | null;
   while ((m = anchorRe.exec(html)) !== null) {
-    const url = m[1].trim();
-    const anchorText = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    // href из HTML приводим к виду plain-text: раскодируем &amp; и убираем пробелы по краям
+    const url = m[1].trim().replace(/&amp;/gi, '&');
+    let anchorText = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    // Кнопка-ссылка: внутри <a> только картинка — текстом якоря берём alt картинки
+    if (!anchorText) {
+      const imgAlt = /<img\b[^>]*?alt=["']([^"']*)["']/i.exec(m[2]);
+      anchorText = (imgAlt?.[1] || '').trim();
+    }
     if (!url || /^mailto:/i.test(url) || !anchorText) continue;
     if (result.includes(url)) continue; // URL уже присутствует в тексте
-    const idx = result.indexOf(anchorText);
-    if (idx !== -1) {
-      result = result.slice(0, idx + anchorText.length) + ' ' + url + result.slice(idx + anchorText.length);
+    // Текст якоря ищем с гибкими пробелами: plain-text часть письма может
+    // отличаться от отрендеренного HTML (неразрывные пробелы, переносы
+    // вёрстки, брайль-пробелы ⠀) — из-за этого URL раньше терялся для
+    // правил парсинга (toEol/toWord), видевших только текст без ссылки
+    const escaped = anchorText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const flexibleRe = new RegExp(escaped.replace(/ /g, '[\\s\\u00a0\\u2800]+'));
+    const hit = flexibleRe.exec(result);
+    if (hit) {
+      result = result.slice(0, hit.index + hit[0].length) + ' ' + url + result.slice(hit.index + hit[0].length);
     }
   }
   return result;
