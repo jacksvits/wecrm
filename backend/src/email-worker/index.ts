@@ -14,9 +14,11 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * Вставляет URL ссылок из HTML-части письма сразу после текста якоря в plain text.
+ * Вставляет ссылки из HTML-части письма в plain text в markdown-формате
+ * [текст якоря](URL) — правила парсинга (toEol/toWord) видят и текст, и адрес.
  * Отправители часто кладут адрес только в href (<a href="URL">текст</a>), а текстовая
- * часть содержит лишь текст ссылки — без этого правила парсинга (toEol/toWord) не видят URL.
+ * часть содержит лишь текст ссылки. Перед показом значение конвертируется
+ * mdLinksToHtml обратно в кликабельный HTML-якорь.
  */
 export function inlineLinkUrls(text: string, html?: string): string {
   if (!html) return text;
@@ -42,10 +44,23 @@ export function inlineLinkUrls(text: string, html?: string): string {
     const flexibleRe = new RegExp(escaped.replace(/ /g, '[\\s\\u00a0\\u2800]+'));
     const hit = flexibleRe.exec(result);
     if (hit) {
-      result = result.slice(0, hit.index + hit[0].length) + ' ' + url + result.slice(hit.index + hit[0].length);
+      result =
+        result.slice(0, hit.index) +
+        `[${anchorText}](${url})` +
+        result.slice(hit.index + hit[0].length);
     }
   }
   return result;
+}
+
+// markdown-ссылки [текст](URL) из значений правил → кликабельный HTML-якорь,
+// чтобы в обсуждении ссылка выглядела как в письме (текст-якорь, а не сырой URL)
+function mdLinksToHtml(s: string): string {
+  return s.replace(
+    /\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g,
+    (_m, text: string, url: string) =>
+      `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`
+  );
 }
 
 interface EmailWorkerConfig {
@@ -307,9 +322,10 @@ export class EmailWorker {
             if (decision.parsed.title) updateData.title = decision.parsed.title;
             if (decision.parsed.description) {
               const current = task.description || '';
+              const parsedHtml = mdLinksToHtml(decision.parsed.description);
               updateData.description = current
-                ? `${current}\n\n${decision.parsed.description}`
-                : decision.parsed.description;
+                ? `${current}\n\n${parsedHtml}`
+                : parsedHtml;
             }
             if (decision.parsed.address) updateData.address = decision.parsed.address;
             if (decision.parsed.priority) updateData.priority = decision.parsed.priority;
@@ -334,9 +350,10 @@ export class EmailWorker {
             const parsedComments = decision.parsed.comments || [];
             for (const item of parsedComments) {
               const label = PARSED_FIELD_LABELS[item.field] || item.field;
+              const valueHtml = mdLinksToHtml(item.value);
               const content = item.prefix
-                ? `${item.prefix}\n${item.value}`
-                : `📋 ${label}: ${item.value}`;
+                ? `${item.prefix}\n${valueHtml}`
+                : `📋 ${label}: ${valueHtml}`;
               await prisma.comment.create({
                 data: {
                   content,
