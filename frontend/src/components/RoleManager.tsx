@@ -90,7 +90,7 @@ const handleSubmit = async (e: React.FormEvent) => { e.preventDefault() ; setErr
 Обработка СПАМА — кнопка «череп» на задачах из писем
 Редактирование новостей
 </label>
-            {form.canChangeTaskStatus && (
+            {form.canChangeTaskStatus && tasksAllowed && (
               <div style={{ border: '1px solid var(--border-color)', borderRadius: 8, padding: 12 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Доступные статусы задач</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Отметьте статусы, которые роль может назначать задаче. Ничего не выбрано — доступны все статусы.</div>
