@@ -2679,10 +2679,10 @@ function CategoryModal({ modal, categories, onClose, onSaved }: {
           </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Тип</label>
           <select value={isGroup ? 'group' : 'item'} onChange={e => setIsGroup(e.target.value === 'group')} style={inputStyle}>
-          {isMainHost && (<label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginTop: 4 }}><input type="checkbox" checked={isCrmTariff} onChange={(e: any) => setIsCrmTariff(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} /><span>Тарифы CRM <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>(товары категории предлагаются при регистрации организаций)</span></span></label>)}
             <option value="item">Вид номенклатуры</option>
             <option value="group">Папка (группа)</option>
           </select>
+          {isMainHost && (<label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginTop: 4 }}><input type="checkbox" checked={isCrmTariff} onChange={(e: any) => setIsCrmTariff(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} /><span>Тарифы CRM <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>(товары категории предлагаются при регистрации организаций)</span></span></label>)}
           {ozonActive && (
             <>
               <label style={{ fontSize: 14, fontWeight: 500 }}>
