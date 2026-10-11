@@ -3,7 +3,7 @@ const allowedPages = authUser?.allowedPages || [] ;
 const savedNavOrder = authUser?.mobileNav || [] ;
 const navByPath = (paths: string[]) => paths.map(p => navItems.find(i => i.path === p)).filter((i): i is (typeof navItems)[number] => !!i) ;
 const sortNavBy = (items: typeof navItems, order: string[]) => { if (!order.length) return items ; return [...items].sort((a, b) => { const idxA = order.indexOf(a.path) ; const idxB = order.indexOf(b.path) ; if (idxA === -1 && idxB === -1) return 0 ; if (idxA === -1) return 1 ; if (idxB === -1) return -1 ; return idxA - idxB ; }) ; } ;
-const pfMainHost = ['welans.cc', 'www.welans.cc'].includes(window.location.hostname) ; const availableNav = navItems.filter(item => item.path === '/news' || (item.path === '/platform-support' && !pfMainHost) || allowedPages.length === 0 || allowedPages.includes(item.path)) ;
+const pfMainHost = ['welans.cc', 'www.welans.cc'].includes(window.location.hostname) ; const pfPages: string[] = (authUser as any)?.allowedPages || [] ; const pfTasks = pfPages.length === 0 || pfPages.includes('/tasks') ; const pfDeals = pfPages.length === 0 || pfPages.includes('/deals') ; const availableNav = navItems.filter(item => item.path === '/news' || (item.path === '/platform-support' && !pfMainHost) || allowedPages.length === 0 || allowedPages.includes(item.path)) ;
 const baseNav = sortNavBy(sortNavBy(availableNav, allowedPages), savedNavOrder) ;
 const effectiveNav = localNavOrder ? [...navByPath(localNavOrder).filter(i => availableNav.some(a => a.path === i.path)), ...baseNav.filter(i => !localNavOrder.includes(i.path))] : baseNav ;
 const saveNavOrder = async (order: string[]) => { setMessage('') ; setError('') ; try { await api.profile.update({ mobileNav: order }) ; await refreshUser() ; setMessage('Порядок кнопок мобильной панели сохранён') ; } catch (err: any) { setError(err.message || 'Ошибка сохранения') ; } } ;
@@ -77,8 +77,8 @@ return (
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type='checkbox' id='hideCompleted' checked={hideCompletedTasks} onChange={e => setHideCompletedTasks(e.target.checked)} style={{ accentColor: '#0077ff' }} />
-                <label htmlFor='hideCompleted' style={{ fontSize: 13 }}>Скрывать выполненные задачи</label>
+                {pfTasks && (<><input type='checkbox' id='hideCompleted' checked={hideCompletedTasks} onChange={e => setHideCompletedTasks(e.target.checked)} style={{ accentColor: '#0077ff' }} />
+                <label htmlFor='hideCompleted' style={{ fontSize: 13 }}>Скрывать выполненные задачи</label></>)}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input type='checkbox' id='darkTheme' checked={darkTheme} onChange={e => setDarkTheme(e.target.checked)} style={{ accentColor: '#0077ff' }} />
@@ -131,11 +131,11 @@ return (
               )}
               {checkboxRow('Включить push-уведомления', pushEnabled, setPushEnabled, !subscribed)}
               <h4 style={{ fontSize: 13, fontWeight: 600, margin: '12px 0 4px', color: 'var(--text-secondary)' }}>Типы уведомлений</h4>
-              {checkboxRow('Задачи (назначение, изменения)', notifyTask, setNotifyTask, !pushEnabled)}
-              {checkboxRow('Комментарии к задачам', notifyComment, setNotifyComment, !pushEnabled)}
+              {pfTasks && checkboxRow('Задачи (назначение, изменения)', notifyTask, setNotifyTask, !pushEnabled)}
+              {pfTasks && checkboxRow('Комментарии к задачам', notifyComment, setNotifyComment, !pushEnabled)}
               {checkboxRow('Сообщения в общем чате', notifyChat, setNotifyChat, !pushEnabled)}
               {(authUser as any)?.crmCalls !== false && checkboxRow('Звонки', notifyCall, setNotifyCall, !pushEnabled)}
-              {checkboxRow('Сделки', notifyDeal, setNotifyDeal, !pushEnabled)}
+              {pfDeals && checkboxRow('Сделки', notifyDeal, setNotifyDeal, !pushEnabled)}
               {checkboxRow('Новости', notifyNews, setNotifyNews, !pushEnabled)}
               <h4 style={{ fontSize: 13, fontWeight: 600, margin: '12px 0 4px', color: 'var(--text-secondary)' }}>Звук</h4>
               {checkboxRow('Звуковое уведомление в чате', soundEnabled, setSoundEnabled)}
