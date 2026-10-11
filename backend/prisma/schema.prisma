@@ -1246,6 +1246,7 @@ model ProductCategory {
   isGroup   Boolean  @default(true) @map("is_group") // true = группа (папка), false = вид номенклатуры
   // Привязка к категории OZON (type_id): если пусто — наследуется от родительской категории
   ozonTypeId Int?     @map("ozon_type_id")
+  isCrmTariff Boolean @default(false) @map("is_crm_tariff")
   parentId  String?  @map("parent_id")
   parent    ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   children  ProductCategory[] @relation("CategoryTree")
@@ -1729,6 +1730,7 @@ model Tenant {
   adminEmail  String    @map("admin_email")
   status      String    @default("pending") // pending | active | suspended
   plan        String    @default("standard")
+  planProductId String?   @map("plan_product_id")
   pricePerMonth Int?    @map("price_per_month") // копейки
   paidUntil   DateTime? @map("paid_until")
   notes       String?

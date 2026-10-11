@@ -2596,6 +2596,8 @@ function CategoryModal({ modal, categories, onClose, onSaved }: {
   const [ozonTree, setOzonTree] = useState<any[]>([]);
   const [ozonPath, setOzonPath] = useState<number[]>([]);
   const [ozonTypeId, setOzonTypeId] = useState<number | null>(isNew ? null : (editing!.ozonTypeId ?? null));
+  const [isCrmTariff, setIsCrmTariff] = useState<boolean>((editing as any)?.isCrmTariff ?? false);
+  const isMainHost = ['welans.cc', 'www.welans.cc'].includes(window.location.hostname);
 
   useEffect(() => {
     api.ozonPlugin.get().then(async (s: any) => {
@@ -2656,8 +2658,8 @@ function CategoryModal({ modal, categories, onClose, onSaved }: {
   const save = async () => {
     if (!name.trim()) { setError('Название обязательно'); return; }
     try {
-      if (isNew) await api.products.categories.create({ name, isGroup, parentId: parentId || null, ozonTypeId });
-      else await api.products.categories.update(editing!.id, { name, isGroup, parentId: parentId || null, ozonTypeId });
+      if (isNew) await api.products.categories.create({ name, isGroup, parentId: parentId || null, isCrmTariff, ozonTypeId });
+      else await api.products.categories.update(editing!.id, { name, isGroup, parentId: parentId || null, isCrmTariff, ozonTypeId });
       onSaved();
     } catch (e: any) { setError(e.message || 'Ошибка'); }
   };
@@ -2677,6 +2679,7 @@ function CategoryModal({ modal, categories, onClose, onSaved }: {
           </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Тип</label>
           <select value={isGroup ? 'group' : 'item'} onChange={e => setIsGroup(e.target.value === 'group')} style={inputStyle}>
+          {isMainHost && (<label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginTop: 4 }}><input type="checkbox" checked={isCrmTariff} onChange={(e: any) => setIsCrmTariff(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} /><span>Тарифы CRM <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>(товары категории предлагаются при регистрации организаций)</span></span></label>)}
             <option value="item">Вид номенклатуры</option>
             <option value="group">Папка (группа)</option>
           </select>

@@ -20,6 +20,7 @@ const registerSchema = z.object({
   adminName: z.string().trim().min(2, 'Укажите имя администратора').max(80),
   adminEmail: z.string().trim().toLowerCase().email('Некорректный email'),
   adminPassword: z.string().min(8, 'Пароль — минимум 8 символов').max(100),
+  planId: z.string().trim().min(1, 'Выберите тариф'),
 });
 
 /** Простая защита от спама: не более 5 регистраций с IP за 10 минут */
@@ -48,7 +49,7 @@ router.post('/register', async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message || 'Некорректные данные' });
   }
-  const { name, slug, adminName, adminEmail, adminPassword } = parsed.data;
+  const { name, slug, adminName, adminEmail, adminPassword, planId } = parsed.data;
   if (!SLUG_PATTERN.test(slug)) {
     return res.status(400).json({ error: 'Поддомен: 3–32 символа, строчные латинские буквы, цифры и дефис' });
   }
@@ -58,6 +59,21 @@ router.post('/register', async (req, res) => {
   }
 
   // Сериализуем провижининг, чтобы два параллельных запроса не ломали друг друга
+  // Валидация тарифа: товар активен и лежит в категории с флагом Тарифы CRM
+  // (relation Product -> ProductCategory называется categoryNode)
+  let planProduct: any = null;
+  try {
+    planProduct = await (platformPrisma as any).product.findFirst({
+      where: { id: planId, isActive: true, categoryNode: { isCrmTariff: true } },
+      include: { prices: true },
+    });
+  } catch (e: any) {
+    console.error('[platform] plan validation:', e.message);
+    return res.status(500).json({ error: 'Ошибка проверки тарифа' });
+  }
+  if (!planProduct) return res.status(400).json({ error: 'Выберите тариф из списка' });
+  const planPrices = (planProduct.prices || []).map((x: any) => Number(x.price)).filter((n: number) => Number.isFinite(n));
+  const planPrice = planPrices.length ? Math.round(Math.min(...planPrices) * 100) : null;
   const provisioning: Promise<void> = (router as any)._provisioning || Promise.resolve();
   const run = provisioning.then(async () => {
     const dbName = await provisionTenantDb(slug, { name: adminName, email: adminEmail, password: adminPassword });
@@ -68,7 +84,10 @@ router.post('/register', async (req, res) => {
         dbName,
         adminEmail,
         status: 'pending',
-        plan: 'standard',
+        plan: planProduct.name,
+        planProductId: planProduct.id,
+        pricePerMonth: planPrice,
+
       },
     });
     invalidateTenantCache(slug);
@@ -122,6 +141,33 @@ router.get('/check-slug', async (req, res) => {
   res.json(tenant
     ? { exists: true, name: tenant.name, status: tenant.status }
     : { exists: false });
+});
+/** Тарифы CRM: товары категорий каталога главного проекта с флагом Тарифы CRM */
+router.get('/tariffs', async (_req, res) => {
+  if (!currentTenant()?.isMain) return res.status(404).json({ error: 'Доступно только на основном домене' });
+  try {
+    const categories = await (platformPrisma as any).productCategory.findMany({
+      where: { isCrmTariff: true },
+      include: { products: { where: { isActive: true }, include: { prices: true } } },
+    });
+    const out: any[] = [];
+    for (const cat of categories) {
+      for (const p of cat.products) {
+        const prices = (p.prices || []).map((x: any) => Number(x.price)).filter((n: number) => Number.isFinite(n));
+        out.push({
+          productId: p.id,
+          name: p.name,
+          description: p.description || '',
+          price: prices.length ? Math.min(...prices) : null,
+          categoryName: cat.name,
+        });
+      }
+    }
+    res.json(out);
+  } catch (e: any) {
+    console.error('[platform] tariffs:', e.message);
+    res.json([]);
+  }
 });
 /** Информация о текущем tenant'е — для логин-страницы (публичный) */
 router.get('/me', (_req, res) => {

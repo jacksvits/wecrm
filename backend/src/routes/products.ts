@@ -486,6 +486,7 @@ router.post('/meta/categories', async (req, res) => {
         parentId: parentId || null,
         isGroup: !!isGroup,
         ozonTypeId: ozonTypeId ? Math.max(1, Number(ozonTypeId)) : null,
+        isCrmTariff: req.body.isCrmTariff === true || req.body.isCrmTariff === 'true',
       },
     });
     res.status(201).json(category);
@@ -512,6 +513,7 @@ router.patch('/meta/categories/:id', async (req, res) => {
     if (isGroup !== undefined) data.isGroup = !!isGroup;
     // Привязка к категории OZON: число или null (сброс — тогда наследуется от родителя)
     if (ozonTypeId !== undefined) data.ozonTypeId = ozonTypeId === null || ozonTypeId === '' ? null : Math.max(1, Number(ozonTypeId));
+    if (req.body.isCrmTariff !== undefined) data.isCrmTariff = req.body.isCrmTariff === true || req.body.isCrmTariff === 'true';
     if (parentId !== undefined) {
       if (parentId) {
         if (parentId === req.params.id) return res.status(400).json({ error: 'Категория не может быть родителем самой себя' });

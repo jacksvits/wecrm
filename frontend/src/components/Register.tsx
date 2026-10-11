@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useBrandLogo } from '../lib/branding'
 
 /**
@@ -16,9 +16,19 @@ export function Register() {
   const [adminName, setAdminName] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
+  const [tariffs, setTariffs] = useState<any[]>([])
+  const [planId, setPlanId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState<{ subdomain: string; message: string } | null>(null)
+
+  useEffect(() => {
+    if (!mainHost) return
+    fetch('/api/platform/tariffs')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list) => setTariffs(Array.isArray(list) ? list : []))
+      .catch(() => {})
+  }, [mainHost])
 
   const slugValid = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/.test(slug)
 
@@ -26,12 +36,13 @@ export function Register() {
     e.preventDefault()
     setError('')
     if (!slugValid) { setError('Поддомен: 3–32 символа — строчные латинские буквы, цифры и дефис'); return }
+    if (!planId) { setError('Выберите тариф'); return }
     setLoading(true)
     try {
       const res = await fetch('/api/platform/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, slug, adminName, adminEmail, adminPassword }),
+        body: JSON.stringify({ name, slug, adminName, adminEmail, adminPassword, planId }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || `Ошибка ${res.status}`)
@@ -104,6 +115,32 @@ export function Register() {
                     <label style={labelStyle}>Email администратора</label>
                     <input style={inputStyle} type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required placeholder='admin@romashka.ru' />
                   </div>
+                  {mainHost && tariffs.length > 0 && (
+                    <div>
+                      <label style={labelStyle}>Тариф</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {tariffs.map((t) => (
+                          <label key={t.productId} style={{
+                            display: 'flex', gap: 10, alignItems: 'flex-start', padding: '11px 12px',
+                            borderRadius: 10, cursor: 'pointer', boxSizing: 'border-box',
+                            border: planId === t.productId ? '2px solid #16a34a' : '1px solid var(--border-color)',
+                            background: planId === t.productId ? 'rgba(22,163,74,0.06)' : 'transparent',
+                          }}>
+                            <input type='radio' name='tariff' checked={planId === t.productId} onChange={() => setPlanId(t.productId)} style={{ marginTop: 3 }} />
+                            <span style={{ flex: 1 }}>
+                              <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                                <b style={{ fontSize: 14 }}>{t.name}</b>
+                                <span style={{ fontSize: 14, color: '#16a34a', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                  {t.price != null ? Number(t.price).toLocaleString('ru-RU') + ' ₽' : 'по запросу'}
+                                </span>
+                              </span>
+                              {t.description && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.description}</span>}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label style={labelStyle}>Пароль администратора</label>
                     <input style={inputStyle} type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} required minLength={8} maxLength={100} placeholder='Минимум 8 символов' autoComplete="new-password" />
