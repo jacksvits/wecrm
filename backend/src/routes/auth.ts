@@ -22,7 +22,7 @@ async function getTenantIntegrations(): Promise<string[] | null> {
     const tenantRow = await (platformPrisma as any).tenant.findUnique({ where: { id: t.id } });
     if (!tenantRow?.planProductId) return null;
     const product = await (platformPrisma as any).product.findUnique({ where: { id: tenantRow.planProductId } });
-    return Array.isArray(product?.crmIntegrations) ? product.crmIntegrations : null;
+    return Array.isArray(product?.crmIntegrations) ? product.crmIntegrations : []; // не настроено = все интеграции закрыты
   } catch { return null; }
 }
 
