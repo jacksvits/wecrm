@@ -1436,6 +1436,7 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
             <option value="product">Товар</option>
             <option value="service">Услуга</option>
 {['welans.cc', 'www.welans.cc'].includes(window.location.hostname) && (<option value="crm_subscription">Подписка CRM</option>)}
+</select>
 {form.kind === 'crm_subscription' && (
   <div style={{ marginTop: 8, padding: 10, border: '1px solid var(--border-color)', borderRadius: 8 }}>
     <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Разрешённые страницы для поддоменов организаций</div>
@@ -1457,7 +1458,6 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     </div>
   </div>
 )}
-          </select>
           {form.kind === 'service' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
               <input type="checkbox" checked={form.isSubscription} onChange={e => setForm({ ...form, isSubscription: e.target.checked })} style={{ width: 16, height: 16 }} />
