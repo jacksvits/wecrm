@@ -174,6 +174,8 @@ export function Login() {
   const [guestLoading, setGuestLoading] = useState(false)
   const [showSoundPrompt, setShowSoundPrompt] = useState(false)
   const [pendingRedirect, setPendingRedirect] = useState(false)
+  // Гостевой вход (демо) — только на главном домене платформы
+  const isMainLoginHost = ['welans.cc', 'www.welans.cc'].includes(window.location.hostname)
   // Мультитенантность: название организации (tenant'а) и статус активации
   const [tenantInfo, setTenantInfo] = useState<{ name: string; isMain: boolean } | null>(null)
   const [tenantPending, setTenantPending] = useState(false)
@@ -445,11 +447,16 @@ export function Login() {
             <div className="login-vk-hint">VK ID не настроен</div>
           )}
 
-          <button onClick={handleGuestLogin} disabled={guestLoading} className="login-btn-guest">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
-            {guestLoading ? 'Вход...' : 'Войти как гость'}
-          </button>
-          <p className="login-guest-hint">Демо-режим: данные сбрасываются при каждом входе</p>
+          {/* Гостевой вход — только на главном домене платформы (демо welans.cc) */}
+          {isMainLoginHost && (
+            <>
+              <button onClick={handleGuestLogin} disabled={guestLoading} className="login-btn-guest">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+                {guestLoading ? 'Вход...' : 'Войти как гость'}
+              </button>
+              <p className="login-guest-hint">Демо-режим: данные сбрасываются при каждом входе</p>
+            </>
+          )}
 
           <p className="login-register">
             {isRegister ? (

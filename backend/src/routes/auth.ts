@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { ensureGuestUser, GUEST_EMAIL } from '../lib/guest-demo.js';
+import { currentTenant } from '../lib/tenant.js';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
@@ -136,6 +137,8 @@ router.post('/login', async (req, res) => {
 // Демо-данные не создаются — гость работает с реальными данными в рамках своих прав.
 router.post('/guest', async (req, res) => {
   try {
+    // Гостевой (демо) вход — только на главном домене платформы
+    if (!currentTenant()?.isMain) return res.status(403).json({ error: 'Гостевой вход доступен только на основном домене' });
     const guest = await ensureGuestUser();
 
     const user = await prisma.user.findUnique({
