@@ -157,6 +157,12 @@ export function uploadsRoot(): string {
   return `/app/uploads${tenantUploadPrefix()}`;
 }
 
+/** Выполняет fn в контексте главной организации (независимо от текущего)
+ * tenant'а — для операций платформы, вызываемых с поддоменов.
+ */
+export async function asMainTenant<T>(fn: () => Promise<T>): Promise<T> {
+  return tenantContext.run(MAIN_TENANT, fn);
+}
 /** Ключ tenant'а (main для главной организации) */
 export function tenantKey(): string {
   const t = currentTenant();

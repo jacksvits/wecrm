@@ -8,9 +8,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { currentTenant, platformPrisma, invalidateTenantCache, getTenantPrisma } from '../lib/tenant.js';
+import { currentTenant, platformPrisma, invalidateTenantCache, getTenantPrisma, asMainTenant } from '../lib/tenant.js';
 import { dbNameForSlug, provisionTenantDb, dropTenantDb, slugTaken, SLUG_PATTERN } from '../lib/tenant-provision.js';
 import { createTenantProxyRule, deleteTenantProxyRule } from '../lib/nas-proxy.js';
+import { createTenantPaymentLink } from './tochka-acquiring.js';
 
 const router = Router();
 
@@ -170,6 +171,25 @@ router.get('/tariffs', async (_req, res) => {
     console.error('[platform] tariffs:', e.message);
     res.json([]);
   }
+});
+/** Создание платёжной ссылки Точки для оплаты подписки (автоактивация по webhook) */
+router.post('/pay-link', async (req, res) => {
+  const cur = currentTenant();
+  const slug = cur && !cur.isMain ? cur.slug : String((req.body || {}).slug || '').toLowerCase().trim();
+  const tenant = await (platformPrisma as any).tenant.findUnique({ where: { slug } });
+  if (!tenant) return res.status(404).json({ error: 'Организация не найдена' });
+  let amount = tenant.pricePerMonth;
+  if (!amount && tenant.planProductId) {
+    const product = await (platformPrisma as any).product.findUnique({ where: { id: tenant.planProductId }, include: { prices: true } });
+    if (product) {
+      const prices = (product.prices || []).map((x: any) => Number(x.price)).filter((n: number) => Number.isFinite(n));
+      if (prices.length) amount = Math.round(Math.min(...prices) * 100);
+    }
+  }
+  if (!amount) return res.status(400).json({ error: 'Не задана сумма подписки' });
+  const result = await asMainTenant(() => createTenantPaymentLink(tenant.slug, tenant.name, tenant.plan || 'standard', amount));
+  if ('error' in result) return res.status(400).json({ error: result.error });
+  res.json(result);
 });
 /** Данные для оплаты подписки (публичный: главный домен ?slug=, поддомен - своя организация) */
 router.get('/pay-info', async (req, res) => {

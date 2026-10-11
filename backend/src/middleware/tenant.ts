@@ -10,7 +10,7 @@ import { resolveTenantByHost, tenantContext } from '../lib/tenant.js';
  * Исключение: организации со статусом pending могут обращаться к
  * pay-info / pay-notify (экран ожидания активации с кнопкой оплаты).
  */
-const PENDING_ALLOWED_PATHS = ['/platform/pay-info', '/platform/pay-notify'];
+const PENDING_ALLOWED_PATHS = ['/platform/pay-info', '/platform/pay-notify', '/platform/pay-link'];
 
 export async function tenantMiddleware(req: Request, res: Response, next: NextFunction) {
   try {

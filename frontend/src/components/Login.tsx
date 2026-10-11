@@ -360,7 +360,12 @@ export function Login() {
                     )}
                   </div>
                                     <button
-                    onClick={() => {
+                    onClick={async () => {
+                      try {
+                        const r = await fetch('/api/platform/pay-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: pay.slug }) });
+                        const d = await r.json();
+                        if (d && d.paymentUrl) { window.open(d.paymentUrl, '_blank'); return }
+                      } catch { /* fallback ниже */ }
                       if (pay.payLink) { window.open(pay.payLink, '_blank'); return }
                       setShowPayDetails(!showPayDetails)
                     }}
