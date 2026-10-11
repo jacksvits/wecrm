@@ -1209,6 +1209,10 @@ model Product {
   payLink       String?   @map("pay_link")
 
   crmCameras      Boolean  @default(false) @map("crm_cameras")
+
+  crmSubscriptions      Boolean  @default(false) @map("crm_subscriptions")
+  crmAccounting      Boolean  @default(false) @map("crm_accounting")
+  crmVideoNotes      Boolean  @default(false) @map("crm_video_notes")
 }
 
 // Дерево категорий товаров из 1С: группы (папки) и виды номенклатуры,

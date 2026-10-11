@@ -663,6 +663,9 @@ router.post('/', async (req, res) => {
         crmAllowedPages: productKind === 'crm_subscription' && Array.isArray(req.body.crmAllowedPages) ? req.body.crmAllowedPages : null,
         payLink: typeof req.body.payLink === 'string' && req.body.payLink.trim() ? req.body.payLink.trim() : null,
         crmCameras: req.body.crmCameras === true || req.body.crmCameras === 'true',
+        crmSubscriptions: req.body.crmSubscriptions === true || req.body.crmSubscriptions === 'true',
+        crmAccounting: req.body.crmAccounting === true || req.body.crmAccounting === 'true',
+        crmVideoNotes: req.body.crmVideoNotes === true || req.body.crmVideoNotes === 'true',
         categoryId: categoryIdValue,
         category: categoryValue,
         subcategory: subcategory?.trim() || null,
@@ -747,6 +750,9 @@ router.patch('/:id', async (req, res) => {
     if (req.body.crmAllowedPages !== undefined) data.crmAllowedPages = Array.isArray(req.body.crmAllowedPages) ? req.body.crmAllowedPages : null;
     if (req.body.payLink !== undefined) data.payLink = typeof req.body.payLink === 'string' && req.body.payLink.trim() ? req.body.payLink.trim() : null;
     if (req.body.crmCameras !== undefined) data.crmCameras = req.body.crmCameras === true || req.body.crmCameras === 'true';
+    if (req.body.crmSubscriptions !== undefined) data.crmSubscriptions = req.body.crmSubscriptions === true || req.body.crmSubscriptions === 'true';
+    if (req.body.crmAccounting !== undefined) data.crmAccounting = req.body.crmAccounting === true || req.body.crmAccounting === 'true';
+    if (req.body.crmVideoNotes !== undefined) data.crmVideoNotes = req.body.crmVideoNotes === true || req.body.crmVideoNotes === 'true';
     if (unit !== undefined) data.unit = unit?.trim() || 'шт';
     if (barcode !== undefined) data.barcode = barcode?.trim() || null;
     if (isActive !== undefined) data.isActive = !!isActive;

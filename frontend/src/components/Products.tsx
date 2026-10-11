@@ -1312,13 +1312,15 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages: string[]; payLink: string; crmCameras: boolean; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages: string[]; payLink: string; crmCameras: boolean; crmSubscriptions: boolean; crmAccounting: boolean; crmVideoNotes: boolean; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : (product.kind as any) || 'product',
     crmAllowedPages: isNew ? [] : (Array.isArray((product as any).crmAllowedPages) ? (product as any).crmAllowedPages : []),
     payLink: isNew ? '' : ((product as any).payLink || ''),
     crmCameras: isNew ? false : ((product as any).crmCameras === true),    sku: isNew ? '' : product.sku || '',
-    unit: isNew ? 'шт' : product.unit,
+    crmSubscriptions: isNew ? false : ((product as any).crmSubscriptions === true),
+    crmAccounting: isNew ? false : ((product as any).crmAccounting === true),
+    crmVideoNotes: isNew ? false : ((product as any).crmVideoNotes === true),    unit: isNew ? 'шт' : product.unit,
     barcode: isNew ? '' : product.barcode || '',
     brand: isNew ? '' : product.brand || '',
     tnved: isNew ? '' : product.tnved || '',
@@ -1463,6 +1465,24 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginTop: 8 }}>
     <input type="checkbox" checked={form.crmCameras} onChange={(e: any) => setForm({ ...form, crmCameras: e.target.checked })} style={{ width: 18, height: 18 }} />
     <span>Подключение камер <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>(вкладка Камеры на странице директора)</span></span>
+  </label>
+)}
+{form.kind === 'crm_subscription' && (
+  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginTop: 6 }}>
+    <input type="checkbox" checked={form.crmSubscriptions} onChange={(e: any) => setForm({ ...form, crmSubscriptions: e.target.checked })} style={{ width: 18, height: 18 }} />
+    <span>Система подписок <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>(вкладка Биллинг на странице директора)</span></span>
+  </label>
+)}
+{form.kind === 'crm_subscription' && (
+  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginTop: 6 }}>
+    <input type="checkbox" checked={form.crmAccounting} onChange={(e: any) => setForm({ ...form, crmAccounting: e.target.checked })} style={{ width: 18, height: 18 }} />
+    <span>Ведение бухгалтерии <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>(вкладка Бухгалтерия на странице директора)</span></span>
+  </label>
+)}
+{form.kind === 'crm_subscription' && (
+  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginTop: 6 }}>
+    <input type="checkbox" checked={form.crmVideoNotes} onChange={(e: any) => setForm({ ...form, crmVideoNotes: e.target.checked })} style={{ width: 18, height: 18 }} />
+    <span>Кружочки в чате <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>(отправка видеосообщений)</span></span>
   </label>
 )}
 {form.kind === 'crm_subscription' && (

@@ -271,7 +271,7 @@ export function Director() {
     return () => clearInterval(interval);
   }, []);
   const [activeTab, setActiveTab] = useState<WidgetTab>("Основное");
-  useEffect(() => { if (activeTab === 'Камеры' && (user as any)?.crmCameras === false) setActiveTab('Основное'); }, [activeTab, user]);
+  useEffect(() => { const u3 = user as any; if (activeTab === 'Камеры' && u3?.crmCameras === false) setActiveTab('Основное'); if (activeTab === 'Биллинг' && u3?.crmBilling === false) setActiveTab('Основное'); if (activeTab === 'Бухгалтерия' && u3?.crmAccounting === false) setActiveTab('Основное'); }, [activeTab, user]);
   const [showWidgetSettings, setShowWidgetSettings] = useState(false);
 
   const savedOrder = loadOrder();
@@ -1174,7 +1174,7 @@ export function Director() {
         <h2 style={{ margin: 0, fontSize: 18 }}>Директор</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ display: "flex", gap: 4, background: "var(--bg-input)", borderRadius: 10, padding: 4 }}>
-            {((user as any)?.crmCameras === false ? TABS.filter(t2 => t2 !== 'Камеры') : TABS).map((tab) => (
+            {((u2 => { let list = TABS; if (u2?.crmCameras === false) list = list.filter(t2 => t2 !== 'Камеры'); if (u2?.crmBilling === false) list = list.filter(t2 => t2 !== 'Биллинг'); if (u2?.crmAccounting === false) list = list.filter(t2 => t2 !== 'Бухгалтерия'); return list; })(user)).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}

@@ -1093,7 +1093,7 @@ export function GlobalChat() {
         </button>
       </div>
 
-      {showRecorder && (
+      {showRecorder && (user as any)?.crmVideoNotes !== false && (
         <VideoNoteRecorder isDark={isDark} onSend={handleVideoNote} onClose={() => setShowRecorder(false)} />
       )}
     </div>
