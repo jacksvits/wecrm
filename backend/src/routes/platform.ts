@@ -10,6 +10,7 @@ import bcrypt from 'bcryptjs';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { currentTenant, platformPrisma, invalidateTenantCache } from '../lib/tenant.js';
 import { dbNameForSlug, provisionTenantDb, dropTenantDb, slugTaken, SLUG_PATTERN } from '../lib/tenant-provision.js';
+import { createTenantProxyRule, deleteTenantProxyRule } from '../lib/nas-proxy.js';
 
 const router = Router();
 
@@ -71,6 +72,10 @@ router.post('/register', async (req, res) => {
       },
     });
     invalidateTenantCache(slug);
+
+    // Правило Reverse Proxy на NAS: <slug>.welans.cc -> CRM-сервер.
+    // Ошибки не прерывают регистрацию — правило можно добавить вручную.
+    createTenantProxyRule(slug).catch((e: any) => console.error('[platform] NAS proxy rule:', e.message));
 
     // Уведомляем администраторов платформы о новой регистрации
     try {
@@ -189,6 +194,7 @@ router.delete('/tenants/:id', authMiddleware, requirePlatformAdmin, async (req, 
   if (req.query.confirm !== tenant.slug) {
     return res.status(400).json({ error: `Для удаления передайте ?confirm=${tenant.slug}` });
   }
+  await deleteTenantProxyRule(tenant.slug).catch((e: any) => console.error('[platform] NAS proxy delete:', e.message));
   await dropTenantDb(tenant.dbName);
   await (platformPrisma as any).tenant.delete({ where: { id: tenant.id } });
   invalidateTenantCache(tenant.slug);
