@@ -471,6 +471,15 @@ export function Login() {
             )}
           </p>
           {tenantInfo?.isMain && (
+            <a href="/org-login" style={{
+              display: 'block', textAlign: 'center', padding: '11px', marginTop: 12,
+              border: '1px solid var(--border-color)', borderRadius: 10,
+              color: 'var(--text-primary)', textDecoration: 'none', fontSize: 14, fontWeight: 500,
+            }}>
+              Войти в свою CRM
+            </a>
+          )}
+          {tenantInfo?.isMain && (
             <p className="login-register" style={{ marginTop: 8 }}>
               Хотите свою CRM для организации? <a href="/register">Регистрация организации</a>
             </p>

@@ -113,6 +113,16 @@ router.post('/register', async (req, res) => {
   }
 });
 
+/** Проверка существования организации по поддомену (для страницы Войти в свою CRM) */
+router.get('/check-slug', async (req, res) => {
+  if (!currentTenant()?.isMain) return res.status(404).json({ error: 'Доступно только на основном домене' });
+  const slug = String(req.query.slug || '').toLowerCase().trim();
+  if (!/^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/.test(slug)) return res.json({ exists: false });
+  const tenant = await (platformPrisma as any).tenant.findUnique({ where: { slug } });
+  res.json(tenant
+    ? { exists: true, name: tenant.name, status: tenant.status }
+    : { exists: false });
+});
 /** Информация о текущем tenant'е — для логин-страницы (публичный) */
 router.get('/me', (_req, res) => {
   const t = currentTenant();
