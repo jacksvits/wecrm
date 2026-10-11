@@ -287,6 +287,17 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     deleteTenant: (id: string, slug: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}?confirm=${encodeURIComponent(slug)}`, { method: 'DELETE' }),
     resetPassword: (id: string, password: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ password }) }),
   },
+  // === Запросы организаций в поддержку платформы ===
+  tenantSupport: {
+    create: (data: { subject: string; message: string }): Promise<any> => fetchApi('/api/tenant-support', { method: 'POST', body: JSON.stringify(data) }),
+    list: (): Promise<any[]> => fetchApi('/api/tenant-support'),
+    get: (id: string): Promise<any> => fetchApi(`/api/tenant-support/${id}`),
+    reply: (id: string, body: string): Promise<any> => fetchApi(`/api/tenant-support/${id}/reply`, { method: 'POST', body: JSON.stringify({ body }) }),
+    adminList: (status?: string): Promise<any[]> => fetchApi(`/api/tenant-support/admin/list${status ? `?status=${status}` : ''}`),
+    adminGet: (id: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}`),
+    adminReply: (id: string, body: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}/reply`, { method: 'POST', body: JSON.stringify({ body }) }),
+    adminStatus: (id: string, status: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
+  },
   get: (path: string): Promise<any> => fetchApi(path),
   // === Модуль «Бухгалтерия по почте» ===
   accounting: {

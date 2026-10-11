@@ -1737,3 +1737,34 @@ model Tenant {
 
   @@map("tenants")
 }
+
+// ==== Запросы организаций в поддержку платформы ====
+// Хранятся в платформенной БД (главный проект welans.cc).
+model TenantTicket {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  tenantSlug  String   @map("tenant_slug")
+  tenantName  String   @map("tenant_name")
+  authorId    String?  @map("author_id")
+  authorName  String   @map("author_name")
+  authorEmail String   @map("author_email")
+  subject     String
+  status      String   @default("open") // open | answered | closed
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  messages    TenantTicketMessage[]
+
+  @@map("tenant_tickets")
+}
+
+model TenantTicketMessage {
+  id         String   @id @default(cuid())
+  ticketId   String   @map("ticket_id")
+  authorRole String   @map("author_role") // tenant | platform
+  authorName String   @map("author_name")
+  body       String
+  createdAt  DateTime @default(now()) @map("created_at")
+  ticket     TenantTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_ticket_messages")
+}

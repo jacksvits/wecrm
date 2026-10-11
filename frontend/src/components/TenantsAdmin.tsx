@@ -60,6 +60,7 @@ export function TenantsAdmin() {
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
         <h1 style={{ margin: 0, fontSize: 22 }}>Организации платформы</h1>
+        <a href="/platform/tickets" style={{ fontSize: 14 }}>Запросы организаций →</a>
         <button onClick={load} style={btn('var(--text-secondary)')}>Обновить</button>
       </div>
       {error && <div style={{ color: '#dc2626', marginBottom: 12 }}>{error}</div>}

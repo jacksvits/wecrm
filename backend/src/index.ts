@@ -71,6 +71,7 @@ import legalRoutes from './routes/legal.js';
 import browserRoutes from './routes/browser.js';
 import vncRoutes, { handleVncUpgrade, isVncUpgradePath } from './routes/browser-vnc.js';
 import platformRoutes from './routes/platform.js';
+import tenantSupportRoutes from './routes/tenant-support.js';
 import { tenantMiddleware } from './middleware/tenant.js';
 import { runTenantLoops } from './lib/tenant-loop.js';
 dotenv.config();
@@ -134,6 +135,7 @@ app.get('/api/events', authMiddleware, (req, res) => {
 });
 
 app.use('/api/platform', platformRoutes);
+app.use('/api/tenant-support', tenantSupportRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/contact-types', contactTypeRoutes);
 // Бухгалтерия по почте: документы, правила, сверка с банком
