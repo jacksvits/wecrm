@@ -62,10 +62,10 @@ const handleSubmit = async (e: React.FormEvent) => { e.preventDefault() ; setErr
               <input type='checkbox' checked={form.canSeeAllSupportTickets} onChange={e => setForm({ ...form, canSeeAllSupportTickets: e.target.checked })} />
               <span><strong>Видит все запросы тех. поддержки</strong> — пользователи с этой ролью видят все обращения и могут отвечать на них</span>
             </label></>)}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', padding: '8px 0' }}>
+            {(currentUser as any)?.crmAccounting !== false && (<label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', padding: '8px 0' }}>
               <input type='checkbox' checked={form.showFinancesTab} onChange={e => setForm({ ...form, showFinancesTab: e.target.checked })} />
               <span><strong>Показать вкладку финансы</strong> — пользователи с этой ролью видят вкладку «Финансы» в задачах</span>
-            </label>
+            </label>)}
 {catalogAllowed && (<label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', padding: '8px 0' }}>
               <input type='checkbox' checked={form.stockAccess} onChange={e => setForm({ ...form, stockAccess: e.target.checked })} />
               <span><strong>Доступ к складскому учёту</strong> — пользователи с этой ролью видят вкладки «Номенклатура», «Склад», «Цены» и «Резервы» на странице «Каталог»</span>
