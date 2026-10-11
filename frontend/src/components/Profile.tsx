@@ -134,7 +134,7 @@ return (
               {checkboxRow('Задачи (назначение, изменения)', notifyTask, setNotifyTask, !pushEnabled)}
               {checkboxRow('Комментарии к задачам', notifyComment, setNotifyComment, !pushEnabled)}
               {checkboxRow('Сообщения в общем чате', notifyChat, setNotifyChat, !pushEnabled)}
-              {checkboxRow('Звонки', notifyCall, setNotifyCall, !pushEnabled)}
+              {(user as any)?.crmCalls !== false && checkboxRow('Звонки', notifyCall, setNotifyCall, !pushEnabled)}
               {checkboxRow('Сделки', notifyDeal, setNotifyDeal, !pushEnabled)}
               {checkboxRow('Новости', notifyNews, setNotifyNews, !pushEnabled)}
               <h4 style={{ fontSize: 13, fontWeight: 600, margin: '12px 0 4px', color: 'var(--text-secondary)' }}>Звук</h4>

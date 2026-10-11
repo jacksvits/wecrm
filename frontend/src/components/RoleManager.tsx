@@ -114,6 +114,7 @@ const handleSubmit = async (e: React.FormEvent) => { e.preventDefault() ; setErr
               {[
                 ...((tasksAllowed ? [{ key: 'notifyOnNewTask', label: 'Новые задачи' }] : []) as any),
                 ...((dealsAllowed ? [{ key: 'notifyOnNewDeal', label: 'Новые сделки' }] : []) as any),
+                ...(((currentUser as any)?.crmCalls !== false ? [{ key: 'notifyOnNewCall', label: 'Новые звонки' }] : []) as any),
                 { key: 'notifyOnNewComment', label: 'Новые комментарии' },
                 { key: 'notifyOnNewChat', label: 'Новые сообщения в чате' },
                 { key: 'notifyOnNewCall', label: 'Новые звонки' },

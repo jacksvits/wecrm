@@ -39,7 +39,7 @@ type SystemSubTab = "design" | "themes" | "storage" | "promo" | "slides" | "call
 
 export function SystemSettings() {
   // По умолчанию открываем под-вкладку «Дизайн»
-  const [subTab, setSubTab] = useState<SystemSubTab>("design"); const { user } = useAuth() as any ; const ssPages: string[] = (user as any)?.allowedPages || [] ; const catalogAllowed = ssPages.length === 0 || ssPages.includes('/products') ; const tasksAllowedSS = ssPages.length === 0 || ssPages.includes('/tasks') ;
+  const [subTab, setSubTab] = useState<SystemSubTab>("design"); const { user } = useAuth() as any ; const ssPages: string[] = (user as any)?.allowedPages || [] ; const catalogAllowed = ssPages.length === 0 || ssPages.includes('/products') ; const callsAllowed = (user as any)?.crmCalls !== false ; const tasksAllowedSS = ssPages.length === 0 || ssPages.includes('/tasks') ;
   const [settings, setSettings] = useState<Record<string, { url: string; path: string }>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -1506,9 +1506,9 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "slides")} onClick={() => setSubTab("slides")}>
           Слайдер авторизации
         </button>
-        <button style={subTabStyle(subTab === "calls")} onClick={() => setSubTab("calls")}>
+        {callsAllowed && (<button style={subTabStyle(subTab === "calls")} onClick={() => setSubTab("calls")}>
           Звонки
-        </button>
+        </button>)}
         <button style={subTabStyle(subTab === "handler")} onClick={() => setSubTab("handler")}>
           Обработчик
         </button>

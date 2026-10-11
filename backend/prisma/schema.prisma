@@ -1213,6 +1213,8 @@ model Product {
   crmSubscriptions      Boolean  @default(false) @map("crm_subscriptions")
   crmAccounting      Boolean  @default(false) @map("crm_accounting")
   crmVideoNotes      Boolean  @default(false) @map("crm_video_notes")
+
+  crmCalls         Boolean  @default(false) @map("crm_calls")
 }
 
 // Дерево категорий товаров из 1С: группы (папки) и виды номенклатуры,

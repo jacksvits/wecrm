@@ -666,7 +666,7 @@ router.post('/', async (req, res) => {
         crmSubscriptions: req.body.crmSubscriptions === true || req.body.crmSubscriptions === 'true',
         crmAccounting: req.body.crmAccounting === true || req.body.crmAccounting === 'true',
         crmVideoNotes: req.body.crmVideoNotes === true || req.body.crmVideoNotes === 'true',
-        categoryId: categoryIdValue,
+        crmCalls: req.body.crmCalls === true || req.body.crmCalls === 'true',        categoryId: categoryIdValue,
         category: categoryValue,
         subcategory: subcategory?.trim() || null,
         unit: unit?.trim() || 'шт',
@@ -753,7 +753,7 @@ router.patch('/:id', async (req, res) => {
     if (req.body.crmSubscriptions !== undefined) data.crmSubscriptions = req.body.crmSubscriptions === true || req.body.crmSubscriptions === 'true';
     if (req.body.crmAccounting !== undefined) data.crmAccounting = req.body.crmAccounting === true || req.body.crmAccounting === 'true';
     if (req.body.crmVideoNotes !== undefined) data.crmVideoNotes = req.body.crmVideoNotes === true || req.body.crmVideoNotes === 'true';
-    if (unit !== undefined) data.unit = unit?.trim() || 'шт';
+    if (req.body.crmCalls !== undefined) data.crmCalls = req.body.crmCalls === true || req.body.crmCalls === 'true';    if (unit !== undefined) data.unit = unit?.trim() || 'шт';
     if (barcode !== undefined) data.barcode = barcode?.trim() || null;
     if (isActive !== undefined) data.isActive = !!isActive;
     if (syncToVk !== undefined) data.syncToVk = !!syncToVk;

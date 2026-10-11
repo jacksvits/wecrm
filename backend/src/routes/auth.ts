@@ -239,6 +239,7 @@ router.get('/me', async (req, res) => {
       crmBilling: await getTenantProductFlag('crmSubscriptions'),
       crmAccounting: await getTenantProductFlag('crmAccounting'),
       crmVideoNotes: await getTenantProductFlag('crmVideoNotes'),
+      crmCalls: await getTenantProductFlag('crmCalls'),
       mobileNav: user.mobileNav || [],
       showFinancesTab: user.role?.showFinancesTab ?? false,
       isGuest: user.email === GUEST_EMAIL,
