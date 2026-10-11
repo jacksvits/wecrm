@@ -369,9 +369,9 @@ export function Login() {
           <div className="login-form-content">
           <h1>{isRegister ? 'Регистрация' : 'Вход в систему'}</h1>
           {tenantInfo && !tenantInfo.isMain && (
-            <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center' }}>
-              Организация: <b>{tenantInfo.name}</b>
-            </p>
+            <h2 style={{ margin: '0 0 12px', fontSize: 22, fontWeight: 600, textAlign: 'center', color: 'var(--text-primary)' }}>
+              {tenantInfo.name}
+            </h2>
           )}
           <p className="login-subtitle">
             {isRegister ? 'Создайте аккаунт за пару минут' : 'С возвращением! Введите свои данные'}
