@@ -271,7 +271,7 @@ export function Director() {
     return () => clearInterval(interval);
   }, []);
   const [activeTab, setActiveTab] = useState<WidgetTab>("Основное");
-  useEffect(() => { const u3 = user as any; if (activeTab === 'Камеры' && u3?.crmCameras === false) setActiveTab('Основное'); if (activeTab === 'Биллинг' && u3?.crmBilling === false) setActiveTab('Основное'); if (activeTab === 'Бухгалтерия' && u3?.crmAccounting === false) setActiveTab('Основное'); }, [activeTab, user]);
+  useEffect(() => { const u3 = user as any; if (activeTab === 'Камеры' && u3?.crmCameras === false) setActiveTab('Основное'); if (activeTab === 'Биллинг' && u3?.crmBilling === false) setActiveTab('Основное'); if (activeTab === 'Бухгалтерия' && u3?.crmAccounting === false) setActiveTab('Основное'); }, [activeTab, user]); const dealsAllowed = (() => { const ap = (user as any)?.allowedPages ; return !ap || ap.length === 0 || ap.includes('/deals') })();
   const [showWidgetSettings, setShowWidgetSettings] = useState(false);
 
   const savedOrder = loadOrder();
@@ -581,7 +581,7 @@ export function Director() {
             )}
           </>
         );
-      case "widget-deals":
+      case "widget-deals": if (!dealsAllowed) return null;
         return (
           <>
             <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 12 }}>Активные сделки</div>
