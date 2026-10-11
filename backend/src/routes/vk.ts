@@ -17,8 +17,29 @@ const VK_REDIRECT_URI = process.env.VK_REDIRECT_URI || 'https://welans.cc/api/vk
 // Серверный вариант PKCE: code_verifier хранится на сервере (привязан к state),
 // поэтому вход не зависит от localStorage на устройстве (iOS Safari/PWA теряли
 // verifier после редиректа на id.vk.ru — обмен кода на токен не происходил).
-const vkIdSessions = new Map<string, { verifier: string; expires: number }>();
+// Сессии персистентны: restart бэкенда (деплой, crash) больше не убивает
+// начатые входы — verifier подгружается из файла.
+const VK_SESSIONS_FILE = '/app/data/vk_id_sessions.json';
+function loadVkIdSessions(): Map<string, { verifier: string; expires: number }> {
+  try {
+    const raw = fs.readFileSync(VK_SESSIONS_FILE, 'utf-8');
+    return new Map(JSON.parse(raw));
+  } catch { return new Map(); }
+}
+function saveVkIdSessions() {
+  try { fs.mkdirSync('/app/data', { recursive: true }); fs.writeFileSync(VK_SESSIONS_FILE, JSON.stringify(Array.from(vkIdSessions))); } catch { /* некритично */ }
+}
+const vkIdSessions = loadVkIdSessions();
 const VK_ID_SESSION_TTL = 10 * 60 * 1000; // 10 минут
+
+function setVkIdSession(state: string, verifier: string, expires: number) {
+  vkIdSessions.set(state, { verifier, expires });
+  saveVkIdSessions();
+}
+function deleteVkIdSession(state: string) {
+  vkIdSessions.delete(state);
+  saveVkIdSessions();
+}
 
 // Ensure uploads dir exists
 // Файлы текущего tenant'а (с префиксом /t-<slug>, см. lib/tenant.ts)
@@ -231,12 +252,12 @@ router.get('/login-url', (_req, res) => {
     // Чистка просроченных сессий
     const now = Date.now();
     for (const [state, session] of vkIdSessions) {
-      if (session.expires < now) vkIdSessions.delete(state);
+      if (session.expires < now) deleteVkIdSession(state);
     }
     const state = randomUUID();
     const deviceId = randomUUID();
     const verifier = randomBytes(32).toString('base64url');
-    vkIdSessions.set(state, { verifier, expires: now + VK_ID_SESSION_TTL });
+    setVkIdSession(state, verifier, now + VK_ID_SESSION_TTL);
     const challenge = createHash('sha256').update(verifier).digest('base64url');
     const params = new URLSearchParams({
       client_id: VK_CLIENT_ID,
@@ -297,7 +318,7 @@ router.get('/callback', async (req: Request, res: Response) => {
       console.error('[VK Callback] Unknown or expired state:', state);
       return res.redirect('/?vk_error=invalid_state');
     }
-    vkIdSessions.delete(state as string);
+    deleteVkIdSession(state as string);
 
     // ВАЖНО: при type=code_v2 VK возвращает СВОЙ device_id в callback
     // (длинный base64url, ~96 символов) — обмен кода на токен требует именно его,
