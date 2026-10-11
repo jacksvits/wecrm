@@ -124,6 +124,8 @@ router.post('/register', async (req, res) => {
       ok: true,
       status: 'pending',
       subdomain: slug,
+      planName: planProduct.name,
+      priceRub: planPrice != null ? planPrice / 100 : null,
       message: 'Организация создана. После оплаты подписки она будет активирована, и вы сможете войти по адресу https://' + slug + '.' + ((req.headers.host || 'welans.cc').split(':')[0].replace(/^www\./, '')),
     });
   } catch (e: any) {
@@ -168,6 +170,70 @@ router.get('/tariffs', async (_req, res) => {
     console.error('[platform] tariffs:', e.message);
     res.json([]);
   }
+});
+/** Данные для оплаты подписки (экран после регистрации, публичный, главный домен) */
+router.get('/pay-info', async (req, res) => {
+  if (!currentTenant()?.isMain) return res.status(404).json({ error: 'Доступно только на основном домене' });
+  const slug = String(req.query.slug || '').toLowerCase().trim();
+  const tenant = await (platformPrisma as any).tenant.findUnique({ where: { slug } });
+  if (!tenant) return res.status(404).json({ error: 'Организация не найдена' });
+  let planName = tenant.plan || 'standard';
+  let priceRub: number | null = tenant.pricePerMonth != null ? tenant.pricePerMonth / 100 : null;
+  let payLink: string | null = null;
+  if (tenant.planProductId) {
+    const product = await (platformPrisma as any).product.findUnique({ where: { id: tenant.planProductId } });
+    if (product) {
+      planName = product.name;
+      payLink = product.payLink || null;
+      if (priceRub == null) {
+        const prices = (product.prices || []).map((x: any) => Number(x.price)).filter((n: number) => Number.isFinite(n));
+        if (prices.length) priceRub = Math.min(...prices);
+      }
+    }
+  }
+  res.json({
+    slug: tenant.slug,
+    name: tenant.name,
+    status: tenant.status,
+    planName,
+    priceRub,
+    payLink,
+    paymentInfo: tenant.paymentInfo || '',
+    contactEmail: 'info@welans.ru',
+  });
+});
+
+/** Уведомление об оплате: создаёт запрос в поддержку платформы (публичный, главный домен) */
+router.post('/pay-notify', async (req, res) => {
+  if (!currentTenant()?.isMain) return res.status(404).json({ error: 'Доступно только на основном домене' });
+  const ip = (req.headers['x-real-ip'] as string) || req.socket.remoteAddress || '';
+  if (!rateLimitOk(ip)) return res.status(429).json({ error: 'Слишком много попыток' });
+  const { slug } = z.object({ slug: z.string().trim().min(1) }).parse(req.body || {});
+  const tenant = await (platformPrisma as any).tenant.findUnique({ where: { slug: slug.toLowerCase() } });
+  if (!tenant) return res.status(404).json({ error: 'Организация не найдена' });
+  const ticket = await (platformPrisma as any).tenantTicket.create({
+    data: {
+      tenantId: tenant.id,
+      tenantSlug: tenant.slug,
+      tenantName: tenant.name,
+      authorName: tenant.adminEmail,
+      authorEmail: tenant.adminEmail,
+      subject: `Оплата подписки: ${tenant.plan || 'standard'}`,
+      status: 'open',
+    },
+  });
+  await (platformPrisma as any).tenantTicketMessage.create({
+    data: { ticketId: ticket.id, authorRole: 'tenant', authorName: tenant.adminEmail, body: 'Организация сообщает об оплате подписки. Подтвердите платёж и активируйте доступ.' },
+  });
+  try {
+    const admins = await platformPrisma.user.findMany({ where: { role: { name: 'admin' } }, select: { id: true } });
+    for (const admin of admins) {
+      await platformPrisma.notification.create({
+        data: { userId: admin.id, title: 'Оплата подписки', body: `«${tenant.name}» (${tenant.slug}) сообщает об оплате`, type: 'system' },
+      });
+    }
+  } catch (e: any) { console.error('[platform] pay-notify notify:', e.message); }
+  res.json({ ok: true });
 });
 /** Информация о текущем tenant'е — для логин-страницы (публичный) */
 router.get('/me', (_req, res) => {
@@ -215,6 +281,7 @@ router.put('/tenants/:id', authMiddleware, requirePlatformAdmin, async (req, res
     plan: z.string().trim().max(100).optional(),
     planProductId: z.string().trim().optional(),
     paidUntil: z.string().optional(),
+    paymentInfo: z.string().max(5000).optional(),
   }).parse(req.body || {});
   const data: any = {};
   if (body.plan !== undefined) data.plan = body.plan;
@@ -233,6 +300,7 @@ router.put('/tenants/:id', authMiddleware, requirePlatformAdmin, async (req, res
       data.planProductId = null;
     }
   }
+  if (body.paymentInfo !== undefined) data.paymentInfo = body.paymentInfo;
   if (body.paidUntil !== undefined) {
     const d = new Date(body.paidUntil);
     if (Number.isNaN(d.getTime())) return res.status(400).json({ error: 'Некорректная дата окончания подписки' });

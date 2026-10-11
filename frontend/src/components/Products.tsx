@@ -1312,10 +1312,11 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages: string[]; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages: string[]; payLink: string; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : (product.kind as any) || 'product',
     crmAllowedPages: isNew ? [] : (Array.isArray((product as any).crmAllowedPages) ? (product as any).crmAllowedPages : []),
+    payLink: isNew ? '' : ((product as any).payLink || ''),
     sku: isNew ? '' : product.sku || '',
     unit: isNew ? 'шт' : product.unit,
     barcode: isNew ? '' : product.barcode || '',
@@ -1455,6 +1456,21 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
           {i.label}
         </label>
       ))}
+    </div>
+  </div>
+)}
+{form.kind === 'crm_subscription' && (
+  <div style={{ marginTop: 8 }}>
+    <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Ссылка на оплату</label>
+    <input
+      type='text'
+      value={form.payLink}
+      onChange={(e) => setForm({ ...form, payLink: e.target.value })}
+      placeholder='https://... (виджет эквайринга: ЮKassa, CloudPayments, Prodamus)'
+      style={{ width: '100%', padding: '9px 11px', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', border: '1px solid var(--border-color)', background: 'var(--bg-input, var(--bg-secondary))', color: 'var(--text-primary)' }}
+    />
+    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+      Если пусто — при оплате покажутся реквизиты из карточки организации (раздел Платформа).
     </div>
   </div>
 )}

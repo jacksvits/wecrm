@@ -661,6 +661,7 @@ router.post('/', async (req, res) => {
         kind: productKind,
         description: description || '',
         crmAllowedPages: productKind === 'crm_subscription' && Array.isArray(req.body.crmAllowedPages) ? req.body.crmAllowedPages : null,
+        payLink: typeof req.body.payLink === 'string' && req.body.payLink.trim() ? req.body.payLink.trim() : null,
         categoryId: categoryIdValue,
         category: categoryValue,
         subcategory: subcategory?.trim() || null,
@@ -743,6 +744,7 @@ router.patch('/:id', async (req, res) => {
     if (subcategory !== undefined) data.subcategory = subcategory?.trim() || null;
     if (kind !== undefined) data.kind = ['service', 'crm_subscription'].includes(kind) ? kind : 'product';
     if (req.body.crmAllowedPages !== undefined) data.crmAllowedPages = Array.isArray(req.body.crmAllowedPages) ? req.body.crmAllowedPages : null;
+    if (req.body.payLink !== undefined) data.payLink = typeof req.body.payLink === 'string' && req.body.payLink.trim() ? req.body.payLink.trim() : null;
     if (unit !== undefined) data.unit = unit?.trim() || 'шт';
     if (barcode !== undefined) data.barcode = barcode?.trim() || null;
     if (isActive !== undefined) data.isActive = !!isActive;

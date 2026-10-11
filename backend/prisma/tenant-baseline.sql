@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict EkQ2SiJvB7rl2e0u46VPQwScN071bvj31g8s7YUyJogA8seQBAJ5ZAlXnGFgPmP
+\restrict HqQ4gAF1pR8hpTExMPHSf21mj0PbtNNRSzscYByfSh3bAxGmDzISAzakMa4HdO0
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -990,7 +990,8 @@ CREATE TABLE public.products (
     depth double precision,
     brand text,
     tnved text,
-    crm_allowed_pages jsonb
+    crm_allowed_pages jsonb,
+    pay_link text
 );
 
 
@@ -1582,7 +1583,8 @@ CREATE TABLE public.tenants (
     notes text,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     activated_at timestamp(3) without time zone,
-    plan_product_id text
+    plan_product_id text,
+    payment_info text
 );
 
 
@@ -4215,13 +4217,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict EkQ2SiJvB7rl2e0u46VPQwScN071bvj31g8s7YUyJogA8seQBAJ5ZAlXnGFgPmP
+\unrestrict HqQ4gAF1pR8hpTExMPHSf21mj0PbtNNRSzscYByfSh3bAxGmDzISAzakMa4HdO0
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict vswpOcaPnwCsQMha9EeEosrCq9j9NtPwUvoecTRd3aaawfOBpi1e4RQmV4R4Xso
+\restrict 8Ttnz0z5poHsSOUSC7oIrVI3Za8JuclvETCkPDqLB3p4frlAXslyTAD6bY6zNeH
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -4544,6 +4546,7 @@ INSERT INTO public._prisma_migrations VALUES ('f5ef5ef8-8f48-448f-a84e-7a7d74e3a
 INSERT INTO public._prisma_migrations VALUES ('3eb64c25-8df7-40bd-8798-08e10fa345ed', 'dff6d952eb5f13d0623b6f02e9cf21d96d00d4e62f802f939467ade3bf217b86', '2026-10-07 21:20:05.618822+00', '20261008001000_product_brand', NULL, NULL, '2026-10-07 21:20:05.613798+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('7a890ea9-0eba-4068-b2a6-1e69f22c08dd', '13121bea85e076e53fda3bb9a8fd76ca186211e1c525e560afeec27b247b979e', '2026-10-07 22:15:31.912157+00', '20261008011000_product_tnved', NULL, NULL, '2026-10-07 22:15:31.906952+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('6e6cba46-f384-4cfd-87b6-656181a3c35c', 'daea88ee276c434ea1e29004aa54f858ac1cf8d49e21b44b54ad15a87bfd4b5b', '2026-10-07 22:55:47.456553+00', '20261008015000_product_units_g_mm', NULL, NULL, '2026-10-07 22:55:47.448386+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('9b8e6486-9839-4994-a619-21139d89f4be', 'a7580b883265be58acc5f6ec5b85a6b3e79a49573b3792b97f85061bbedff1e8', '2026-10-11 17:44:31.788799+00', '20261011203000_tenant_pay_fields', NULL, NULL, '2026-10-11 17:44:31.782886+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('c57701f7-3646-4d48-af01-eebd927be7ad', '3709d1d3ecc1d925d2cd0cf16b17d9ec636988f37d953b1ae8a0f5504977df90', '2026-10-09 11:37:46.032437+00', '20261009144000_vk_market_token_refresh', NULL, NULL, '2026-10-09 11:37:46.02527+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('7da6bf07-aeb4-4bd2-9a92-4f17a3da7379', '73b52f0179ff75fc5ee2a221717c69d66ba466f75b7e712df1ae6e6813a2aca0', '2026-10-09 17:03:42.496252+00', '20261009200000_support_chat', NULL, NULL, '2026-10-09 17:03:42.482665+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('44633cc1-876c-443a-a832-798e2eb1ef68', 'a69ee992f54bf52dc79d31249a8cd835905ff8fc898265c54441569f25d0cb6e', '2026-10-09 19:21:19.172222+00', '20261009223000_support_tickets_visibility', NULL, NULL, '2026-10-09 19:21:19.165947+00', 1);
@@ -4559,5 +4562,5 @@ INSERT INTO public._prisma_migrations VALUES ('0331f96b-ab54-47de-bbd9-41638fe1d
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vswpOcaPnwCsQMha9EeEosrCq9j9NtPwUvoecTRd3aaawfOBpi1e4RQmV4R4Xso
+\unrestrict 8Ttnz0z5poHsSOUSC7oIrVI3Za8JuclvETCkPDqLB3p4frlAXslyTAD6bY6zNeH
 

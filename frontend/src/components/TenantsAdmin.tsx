@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { Link } from 'react-router-dom'
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 interface Tenant {
   id: string
@@ -51,6 +53,7 @@ export function TenantsAdmin() {
   const [editing, setEditing] = useState<Tenant | null>(null)
   const [editPlan, setEditPlan] = useState('')
   const [editDate, setEditDate] = useState('')
+  const [editPaymentInfo, setEditPaymentInfo] = useState('')
   const baseHost = window.location.hostname.replace(/^www\./, '')
 
   const load = () => {
@@ -76,6 +79,7 @@ export function TenantsAdmin() {
     setEditing(t)
     setEditPlan(t.planProductId || '')
     setEditDate(toDateInput(t.paidUntil))
+    setEditPaymentInfo((t as any).paymentInfo || '')
     setError('')
   }
 
@@ -84,6 +88,7 @@ export function TenantsAdmin() {
     const body: any = {}
     if (editPlan !== (editing.planProductId || '')) body.planProductId = editPlan || null
     if (editDate !== toDateInput(editing.paidUntil)) body.paidUntil = editDate ? new Date(editDate + 'T23:59:59').toISOString() : null
+    if (editPaymentInfo !== ((editing as any).paymentInfo || '')) body.paymentInfo = editPaymentInfo
     if (!Object.keys(body).length) { setEditing(null); return }
     act(() => api.platform.updateTenant(editing.id, body).then(() => setEditing(null)))
   }
@@ -222,6 +227,14 @@ export function TenantsAdmin() {
                   Дата окончания подписки
                 </label>
                 <input type="date" style={inputStyle} value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  Реквизиты / инструкция оплаты (показываются организации при оплате)
+                </label>
+                <ReactQuill theme='snow' value={editPaymentInfo} onChange={setEditPaymentInfo} style={{ background: 'var(--bg-primary)' }} />
+              </div>
+              <div style={{ display: 'none' }}>
               </div>
               {error && <div style={{ color: '#dc2626', fontSize: 13 }}>{error}</div>}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

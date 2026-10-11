@@ -179,6 +179,8 @@ export function Login() {
   // Мультитенантность: название организации (tenant'а) и статус активации
   const [tenantInfo, setTenantInfo] = useState<{ name: string; isMain: boolean } | null>(null)
   const [tenantPending, setTenantPending] = useState(false)
+  const [pay, setPay] = useState<any | null>(null)
+  const [paySent, setPaySent] = useState(false)
 
   // Информация об организации (tenant'е) текущего поддомена
   useEffect(() => {
@@ -190,6 +192,17 @@ export function Login() {
       .then((data) => { if (data) setTenantInfo(data) })
       .catch(() => {})
   }, [])
+
+  // Экран ожидания активации: данные для оплаты по поддомену текущей организации
+  useEffect(() => {
+    if (!tenantPending) return
+    const host = window.location.hostname
+    const slug = host.split('.')[0]
+    fetch(`/api/platform/pay-info?slug=${encodeURIComponent(slug)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((pi) => { if (pi) setPay(pi) })
+      .catch(() => {})
+  }, [tenantPending])
 
   useEffect(() => {
     fetch(`${API_URL}/api/vk/config`)
@@ -329,8 +342,48 @@ export function Login() {
               <h1>Организация ожидает активации</h1>
               <p className="login-subtitle">
                 Регистрация завершена. Доступ будет открыт после оплаты подписки.<br />
-                По вопросам оплаты: <a href="mailto:support@welans.cc">support@welans.cc</a>
+                По вопросам оплаты: <a href="mailto:info@welans.ru">info@welans.ru</a>
               </p>
+              {pay && (
+                <div style={{
+                  margin: '16px auto 0', maxWidth: 400, textAlign: 'left',
+                  border: '1px solid var(--border-color)', borderRadius: 12, padding: '14px 16px',
+                  background: 'var(--bg-secondary)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                    <b style={{ fontSize: 15 }}>Тариф: {pay.planName}</b>
+                    {pay.priceRub != null && (
+                      <span style={{ fontSize: 15, color: '#16a34a', fontWeight: 600 }}>
+                        {Number(pay.priceRub).toLocaleString('ru-RU')} ₽
+                      </span>
+                    )}
+                  </div>
+                  {pay.payLink ? (
+                    <a href={pay.payLink} target='_blank' rel='noreferrer' className='login-btn-primary'
+                      style={{ display: 'block', textAlign: 'center', padding: '12px', borderRadius: 10, color: '#fff', textDecoration: 'none', fontSize: 15, fontWeight: 600 }}>
+                      Оплатить {pay.priceRub != null ? Number(pay.priceRub).toLocaleString('ru-RU') + ' ₽' : 'подписку'}
+                    </a>
+                  ) : (
+                    <>
+                      {pay.paymentInfo && (
+                        <div style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 10, whiteSpace: 'pre-wrap' }}>{pay.paymentInfo}</div>
+                      )}
+                      <button
+                        onClick={() => {
+                          fetch('/api/platform/pay-notify', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ slug: pay.slug }),
+                          }).then((r) => { if (r.ok) setPaySent(true) }).catch(() => {})
+                        }}
+                        disabled={paySent}
+                        className='login-btn-primary'
+                        style={{ width: '100%', padding: '11px', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 14, opacity: paySent ? 0.7 : 1 }}>
+                        {paySent ? 'Сообщение отправлено — ожидайте активации' : 'Я оплатил — сообщить поддержке'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </section>

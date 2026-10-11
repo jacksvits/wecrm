@@ -1205,6 +1205,8 @@ model Product {
   subscriptions    ProductSubscription[]
 
   crmAllowedPages Json?     @map("crm_allowed_pages")
+
+  payLink       String?   @map("pay_link")
 }
 
 // Дерево категорий товаров из 1С: группы (папки) и виды номенклатуры,
@@ -1740,6 +1742,8 @@ model Tenant {
   activatedAt DateTime? @map("activated_at")
 
   @@map("tenants")
+
+  paymentInfo   String?   @map("payment_info")
 }
 
 // ==== Запросы организаций в поддержку платформы ====

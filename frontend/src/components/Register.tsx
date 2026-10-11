@@ -21,6 +21,8 @@ export function Register() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState<{ subdomain: string; message: string } | null>(null)
+  const [pay, setPay] = useState<any | null>(null)
+  const [paySent, setPaySent] = useState(false)
 
   useEffect(() => {
     if (!mainHost) return
@@ -47,6 +49,7 @@ export function Register() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || `Ошибка ${res.status}`)
       setDone({ subdomain: data.subdomain, message: data.message || '' })
+      fetch(`/api/platform/pay-info?slug=${encodeURIComponent(data.subdomain)}`).then((r) => (r.ok ? r.json() : null)).then((pi) => { if (pi) setPay(pi) }).catch(() => {})
     } catch (err: any) {
       setError(err.message || 'Не удалось зарегистрировать организацию')
     } finally {
@@ -167,6 +170,50 @@ export function Register() {
                 <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.7 }}>
                   {done.message}
                 </p>
+                {pay && (
+                  <div style={{
+                    margin: '18px auto 0', maxWidth: 420, textAlign: 'left',
+                    border: '1px solid var(--border-color)', borderRadius: 12, padding: '14px 16px',
+                    background: 'var(--bg-secondary)',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                      <b style={{ fontSize: 15 }}>Тариф: {pay.planName}</b>
+                      {pay.priceRub != null && (
+                        <span style={{ fontSize: 15, color: '#16a34a', fontWeight: 600 }}>
+                          {Number(pay.priceRub).toLocaleString('ru-RU')} ₽
+                        </span>
+                      )}
+                    </div>
+                    {pay.payLink ? (
+                      <a href={pay.payLink} target='_blank' rel='noreferrer'
+                        className='login-btn-primary'
+                        style={{ display: 'block', textAlign: 'center', padding: '12px', borderRadius: 10, color: '#fff', textDecoration: 'none', fontSize: 15, fontWeight: 600 }}>
+                        Оплатить {pay.priceRub != null ? Number(pay.priceRub).toLocaleString('ru-RU') + ' ₽' : 'подписку'}
+                      </a>
+                    ) : (
+                      <>
+                        {pay.paymentInfo && (
+                          <div style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 10, whiteSpace: 'pre-wrap' }}>{pay.paymentInfo}</div>
+                        )}
+                        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 10 }}>
+                          Вопросы по оплате: <a href={'mailto:' + (pay.contactEmail || 'info@welans.ru')}>{pay.contactEmail || 'info@welans.ru'}</a>
+                        </div>
+                        <button
+                          onClick={() => {
+                            fetch('/api/platform/pay-notify', {
+                              method: 'POST', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ slug: pay.slug }),
+                            }).then((r) => { if (r.ok) setPaySent(true) }).catch(() => {})
+                          }}
+                          disabled={paySent}
+                          className='login-btn-primary'
+                          style={{ width: '100%', padding: '11px', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 14, opacity: paySent ? 0.7 : 1 }}>
+                          {paySent ? 'Сообщение отправлено — ожидайте активации' : 'Я оплатил — сообщить поддержке'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
                 <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
                   Адрес входа: <a href={`https://${done.subdomain}.${baseHost}`}>https://{done.subdomain}.{baseHost}</a>
                 </p>
