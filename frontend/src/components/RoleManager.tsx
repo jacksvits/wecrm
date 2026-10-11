@@ -84,11 +84,11 @@ const handleSubmit = async (e: React.FormEvent) => { e.preventDefault() ; setErr
 </label>
 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--text-primary)' }}>
 <input type="checkbox" checked={form.canEditNews} onChange={e => setForm({ ...form, canEditNews: e.target.checked })} />
+<span>Редактирование новостей</span>
 </label>
 {tasksAllowed && (<label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--text-primary)' }}>
 <input type="checkbox" checked={form.canHandleSpam ?? false} onChange={e => setForm({ ...form, canHandleSpam: e.target.checked })} />
 Обработка СПАМА — кнопка «череп» на задачах из писем
-Редактирование новостей
 </label>)}
             {form.canChangeTaskStatus && tasksAllowed && (
               <div style={{ border: '1px solid var(--border-color)', borderRadius: 8, padding: 12 }}>
