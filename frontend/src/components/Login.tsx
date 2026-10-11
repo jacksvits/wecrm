@@ -369,9 +369,14 @@ export function Login() {
           <div className="login-form-content">
           <h1>{isRegister ? 'Регистрация' : 'Вход в систему'}</h1>
           {tenantInfo && !tenantInfo.isMain && (
-            <h2 style={{ margin: '0 0 12px', fontSize: 22, fontWeight: 600, textAlign: 'center', color: 'var(--text-primary)' }}>
-              {tenantInfo.name}
-            </h2>
+            <div style={{ textAlign: 'center', margin: '0 0 12px' }}>
+              <div style={{ fontSize: 12, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: 2 }}>
+                CRM организации
+              </div>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 500, color: 'var(--text-primary)' }}>
+                {tenantInfo.name}
+              </h2>
+            </div>
           )}
           <p className="login-subtitle">
             {isRegister ? 'Создайте аккаунт за пару минут' : 'С возвращением! Введите свои данные'}
