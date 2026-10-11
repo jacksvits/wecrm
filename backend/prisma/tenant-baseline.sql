@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pzj56GsVlXfAtykkIDzaGipD5XC0N6WAb7rBKC9EzBA34nggrK1cTMg0DKlfb43
+\restrict EkQ2SiJvB7rl2e0u46VPQwScN071bvj31g8s7YUyJogA8seQBAJ5ZAlXnGFgPmP
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -901,7 +901,8 @@ CREATE TABLE public.product_categories (
     parent_id text,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp(3) without time zone NOT NULL,
-    ozon_type_id integer
+    ozon_type_id integer,
+    is_crm_tariff boolean DEFAULT false NOT NULL
 );
 
 
@@ -988,7 +989,8 @@ CREATE TABLE public.products (
     height double precision,
     depth double precision,
     brand text,
-    tnved text
+    tnved text,
+    crm_allowed_pages jsonb
 );
 
 
@@ -1531,6 +1533,39 @@ CREATE TABLE public.telephony_settings (
 
 
 --
+-- Name: tenant_ticket_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tenant_ticket_messages (
+    id text NOT NULL,
+    ticket_id text NOT NULL,
+    author_role text NOT NULL,
+    author_name text NOT NULL,
+    body text NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: tenant_tickets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tenant_tickets (
+    id text NOT NULL,
+    tenant_id text NOT NULL,
+    tenant_slug text NOT NULL,
+    tenant_name text NOT NULL,
+    author_id text,
+    author_name text NOT NULL,
+    author_email text NOT NULL,
+    subject text NOT NULL,
+    status text DEFAULT 'open'::text NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL
+);
+
+
+--
 -- Name: tenants; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1546,7 +1581,8 @@ CREATE TABLE public.tenants (
     paid_until timestamp(3) without time zone,
     notes text,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    activated_at timestamp(3) without time zone
+    activated_at timestamp(3) without time zone,
+    plan_product_id text
 );
 
 
@@ -2458,6 +2494,22 @@ ALTER TABLE ONLY public.telephony_settings
 
 
 --
+-- Name: tenant_ticket_messages tenant_ticket_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tenant_ticket_messages
+    ADD CONSTRAINT tenant_ticket_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tenant_tickets tenant_tickets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tenant_tickets
+    ADD CONSTRAINT tenant_tickets_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: tenants tenants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3315,6 +3367,27 @@ CREATE UNIQUE INDEX telegram_user_chat_chat_id_key ON public.telegram_user_chat 
 
 
 --
+-- Name: tenant_ticket_messages_ticket_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tenant_ticket_messages_ticket_id_idx ON public.tenant_ticket_messages USING btree (ticket_id);
+
+
+--
+-- Name: tenant_tickets_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tenant_tickets_status_idx ON public.tenant_tickets USING btree (status);
+
+
+--
+-- Name: tenant_tickets_tenant_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tenant_tickets_tenant_id_idx ON public.tenant_tickets USING btree (tenant_id);
+
+
+--
 -- Name: tenants_db_name_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4142,13 +4215,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pzj56GsVlXfAtykkIDzaGipD5XC0N6WAb7rBKC9EzBA34nggrK1cTMg0DKlfb43
+\unrestrict EkQ2SiJvB7rl2e0u46VPQwScN071bvj31g8s7YUyJogA8seQBAJ5ZAlXnGFgPmP
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict PfGxRL7qdWief6gldjLdfTYkwhj6Kook17RhkQlgZGLiIzcfaUZgJMSofbwJqve
+\restrict vswpOcaPnwCsQMha9EeEosrCq9j9NtPwUvoecTRd3aaawfOBpi1e4RQmV4R4Xso
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -4467,6 +4540,7 @@ INSERT INTO public._prisma_migrations VALUES ('d709bf97-7658-4775-a0fd-b2b18bd77
 INSERT INTO public._prisma_migrations VALUES ('ee427dab-8180-4a7b-bd0e-7edc39a4b050', '626b96851ed118cb112b8b356e5e1872b12cffffd64878114da5bd5146875d3e', '2026-10-07 18:57:39.275832+00', '20261007214500_ozon_category_binding', NULL, NULL, '2026-10-07 18:57:39.269871+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('dbda0f32-55b7-43b0-ab06-d1e1a281603c', 'd3006fd7abc39a802e5ae4eff7d65d7a80ac52a99e202f32fec2275874bec0ba', '2026-10-07 19:23:58.255219+00', '20261007223000_ozon_product_id_bigint', NULL, NULL, '2026-10-07 19:23:58.224393+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('93c446c8-9ab3-43bb-bb22-a74f87a88623', 'f55a22e0a0825e32cecef7e374a6dbd49f8ac38eff67e10cbbb1c4d38f4af334', '2026-10-07 20:41:58.97025+00', '20261007233000_product_weight_dims', NULL, NULL, '2026-10-07 20:41:58.963422+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('f5ef5ef8-8f48-448f-a84e-7a7d74e3ad18', 'bfd54b468f6f9b34ea3b42cce558a59f8e5818f9f7a15e893bfa03a9a1872457', '2026-10-11 16:47:14.680957+00', '20261011190000_crm_subscription_pages', NULL, NULL, '2026-10-11 16:47:14.675676+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('3eb64c25-8df7-40bd-8798-08e10fa345ed', 'dff6d952eb5f13d0623b6f02e9cf21d96d00d4e62f802f939467ade3bf217b86', '2026-10-07 21:20:05.618822+00', '20261008001000_product_brand', NULL, NULL, '2026-10-07 21:20:05.613798+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('7a890ea9-0eba-4068-b2a6-1e69f22c08dd', '13121bea85e076e53fda3bb9a8fd76ca186211e1c525e560afeec27b247b979e', '2026-10-07 22:15:31.912157+00', '20261008011000_product_tnved', NULL, NULL, '2026-10-07 22:15:31.906952+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('6e6cba46-f384-4cfd-87b6-656181a3c35c', 'daea88ee276c434ea1e29004aa54f858ac1cf8d49e21b44b54ad15a87bfd4b5b', '2026-10-07 22:55:47.456553+00', '20261008015000_product_units_g_mm', NULL, NULL, '2026-10-07 22:55:47.448386+00', 1);
@@ -4477,11 +4551,13 @@ INSERT INTO public._prisma_migrations VALUES ('9a2d7a0f-9911-46be-b66f-c3285ad81
 INSERT INTO public._prisma_migrations VALUES ('131bc505-24d7-4da7-9868-c50fb34c478b', '3d3f967e92fdf68c3af91ee56a7e903ae785440c38b1f3921acaaeb9bfce9cdb', '2026-10-10 16:26:00.295459+00', '20261010191500_add_product_default_image', NULL, NULL, '2026-10-10 16:26:00.290446+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('d0b5bd5d-762a-4946-a7b8-716994f72647', '8e59a0512b5e5de767b9d15a5849c41f3c5fa8a4399f6429e650795c660089e2', '2026-10-10 17:34:34.850066+00', '20261010195000_add_product_card_style', NULL, NULL, '2026-10-10 17:34:34.845391+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('a59ecdb5-f1a9-4a97-b5de-d0a7f1a57e1b', 'a9839d84e69a5a14e3eec786562d89bf192be7447b6b7624b07a7d4c845a9f88', '2026-10-11 11:05:53.090682+00', '20261011140000_platform_tenants', NULL, NULL, '2026-10-11 11:05:53.076102+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('8140916c-7072-49c3-8751-e818ec92e00a', '07ff4798826c48d98c62f8cfb95ef3f0e13a4cd7ff2453a44a071c29d616c49e', '2026-10-11 13:20:00.517262+00', '20261011160000_tenant_support_tickets', NULL, NULL, '2026-10-11 13:20:00.49503+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('0331f96b-ab54-47de-bbd9-41638fe1d749', '5b7c2aab3e0e490de792d3563b97ba7f4a53569e9353c3ab5298f611880fb4b2', '2026-10-11 15:08:38.288665+00', '20261011180000_crm_tariff_plans', NULL, NULL, '2026-10-11 15:08:38.278259+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PfGxRL7qdWief6gldjLdfTYkwhj6Kook17RhkQlgZGLiIzcfaUZgJMSofbwJqve
+\unrestrict vswpOcaPnwCsQMha9EeEosrCq9j9NtPwUvoecTRd3aaawfOBpi1e4RQmV4R4Xso
 

@@ -5,8 +5,30 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { ensureGuestUser, GUEST_EMAIL } from '../lib/guest-demo.js';
-import { currentTenant } from '../lib/tenant.js';
+import { currentTenant, platformPrisma } from '../lib/tenant.js';
 
+
+/**
+ * Страницы, разрешённые подписке CRM организации (kind=crm_subscription).
+ * Если у tenant'а есть тариф с ограничением страниц — права роли
+ * пересекаются со списком подписки. Главная организация не ограничивается.
+ */
+async function applyTenantSubscriptionPages(pages: string[]): Promise<string[]> {
+  try {
+    const t = currentTenant();
+    if (!t || t.isMain) return pages;
+    const tenantRow = await (platformPrisma as any).tenant.findUnique({ where: { id: t.id } });
+    const productId = tenantRow?.planProductId;
+    if (!productId) return pages;
+    const product = await (platformPrisma as any).product.findUnique({ where: { id: productId } });
+    const subPages = product?.crmAllowedPages;
+    if (!Array.isArray(subPages) || !subPages.length) return pages;
+    // Пустой список страниц роли означает все страницы - тогда ограничение
+    // подписки применяется к полному списку, иначе - пересечение.
+    if (!pages.length) return subPages as string[];
+    return pages.filter((pg: string) => (subPages as string[]).includes(pg));
+  } catch { return pages; }
+}
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
@@ -55,7 +77,7 @@ router.post('/register', async (req, res) => {
     });
 
     const roleName = user.role?.name || 'user';
-    const allowedPages = user.role?.allowedPages || [];
+    const allowedPages = await applyTenantSubscriptionPages(user.role?.allowedPages || []);
     const stockAccess = user.stockAccess || user.role?.stockAccess || false;
     const token = jwt.sign(
       { id: user.id, email: user.email, role: roleName, allowedPages, stockAccess },
@@ -105,7 +127,7 @@ router.post('/login', async (req, res) => {
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
     const roleName = user.role?.name || 'user';
-    const allowedPages = user.role?.allowedPages || [];
+    const allowedPages = await applyTenantSubscriptionPages(user.role?.allowedPages || []);
     const stockAccess = user.stockAccess || user.role?.stockAccess || false;
     const token = jwt.sign(
       { id: user.id, email: user.email, role: roleName, allowedPages, stockAccess },

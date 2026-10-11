@@ -1203,6 +1203,8 @@ model Product {
   reservationItems ReservationItem[]
   saleItems        SaleItem[]
   subscriptions    ProductSubscription[]
+
+  crmAllowedPages Json?     @map("crm_allowed_pages")
 }
 
 // Дерево категорий товаров из 1С: группы (папки) и виды номенклатуры,

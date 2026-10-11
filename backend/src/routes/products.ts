@@ -641,7 +641,7 @@ router.post('/', async (req, res) => {
   try {
     const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, brand, tnved, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
-    const productKind = kind === 'service' ? 'service' : 'product';
+    const productKind = ['service', 'crm_subscription'].includes(kind) ? kind : 'product';
     // Категория из дерева 1С (группы/виды номенклатуры)
     let categoryIdValue: string | null = null;
     if (categoryId) {
@@ -660,6 +660,7 @@ router.post('/', async (req, res) => {
         sku: sku?.trim() || null,
         kind: productKind,
         description: description || '',
+        crmAllowedPages: productKind === 'crm_subscription' && Array.isArray(req.body.crmAllowedPages) ? req.body.crmAllowedPages : null,
         categoryId: categoryIdValue,
         category: categoryValue,
         subcategory: subcategory?.trim() || null,
@@ -740,7 +741,8 @@ router.patch('/:id', async (req, res) => {
     if (description !== undefined) data.description = description;
     if (category !== undefined) data.category = category?.trim() || null;
     if (subcategory !== undefined) data.subcategory = subcategory?.trim() || null;
-    if (kind !== undefined) data.kind = kind === 'service' ? 'service' : 'product';
+    if (kind !== undefined) data.kind = ['service', 'crm_subscription'].includes(kind) ? kind : 'product';
+    if (req.body.crmAllowedPages !== undefined) data.crmAllowedPages = Array.isArray(req.body.crmAllowedPages) ? req.body.crmAllowedPages : null;
     if (unit !== undefined) data.unit = unit?.trim() || 'шт';
     if (barcode !== undefined) data.barcode = barcode?.trim() || null;
     if (isActive !== undefined) data.isActive = !!isActive;

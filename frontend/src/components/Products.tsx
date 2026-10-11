@@ -3,6 +3,7 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { format } from 'date-fns';
 import { api } from '../api/client';
+import { navItems } from '../lib/navItems';
 import { useAuth } from '../hooks/useAuth';
 import { Vitrine } from './Vitrine';
 import { Product, ProductCategory, Warehouse, PriceType, StockMovement, PriceHistory } from '../types';
@@ -1311,9 +1312,10 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service'; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages: string[]; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
     name: isNew ? '' : product.name,
-    kind: isNew ? 'product' : product.kind,
+    kind: isNew ? 'product' : (product.kind as any) || 'product',
+    crmAllowedPages: isNew ? [] : (Array.isArray((product as any).crmAllowedPages) ? (product as any).crmAllowedPages : []),
     sku: isNew ? '' : product.sku || '',
     unit: isNew ? 'шт' : product.unit,
     barcode: isNew ? '' : product.barcode || '',
@@ -1433,6 +1435,28 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
           <select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value as 'product' | 'service' })} style={inputStyle}>
             <option value="product">Товар</option>
             <option value="service">Услуга</option>
+{['welans.cc', 'www.welans.cc'].includes(window.location.hostname) && (<option value="crm_subscription">Подписка CRM</option>)}
+{form.kind === 'crm_subscription' && (
+  <div style={{ marginTop: 8, padding: 10, border: '1px solid var(--border-color)', borderRadius: 8 }}>
+    <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Разрешённые страницы для поддоменов организаций</div>
+    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+      Отметьте, какие разделы CRM будут доступны организациям с этой подпиской.
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6 }}>
+      {navItems.filter(i => !i.tenantOnly && i.path !== '/platform').map(i => (
+        <label key={i.path} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+          <input
+            type="checkbox"
+            checked={form.crmAllowedPages.includes(i.path)}
+            onChange={() => setForm({ ...form, crmAllowedPages: form.crmAllowedPages.includes(i.path) ? form.crmAllowedPages.filter(x => x !== i.path) : [...form.crmAllowedPages, i.path] })}
+            style={{ width: 15, height: 15 }}
+          />
+          {i.label}
+        </label>
+      ))}
+    </div>
+  </div>
+)}
           </select>
           {form.kind === 'service' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
