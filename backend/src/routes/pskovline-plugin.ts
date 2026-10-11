@@ -3,11 +3,12 @@ import fs from 'fs';
 import path from 'path';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { tenantDataDir } from '../lib/tenant.js';
 
 const router = Router();
 
-const DATA_DIR = '/app/data';
-const PARSER_SETTINGS_FILE = path.join(DATA_DIR, 'pskovline_settings.json');
+function dataDir() { return tenantDataDir(); }
+const PARSER_SETTINGS_FILE = path.join(dataDir(), 'pskovline_settings.json');
 
 // Синхронизация с парсером: cron на хосте читает этот файл (scripts/pskovline-parser.py)
 function syncParserFile(
@@ -16,7 +17,7 @@ function syncParserFile(
   accounts: { label: string; login: string; password: string }[]
 ) {
   try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (!fs.existsSync(dataDir())) fs.mkdirSync(dataDir(), { recursive: true });
     fs.writeFileSync(
       PARSER_SETTINGS_FILE,
       JSON.stringify({ is_active: isActive, update_time: updateTime, accounts })

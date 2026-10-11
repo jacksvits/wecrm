@@ -53,6 +53,16 @@ async function dsmPost(sid: string, params: Record<string, string>): Promise<any
 
 /** Создаёт правило Reverse Proxy для поддомена организации (идемпотентно) */
 export async function createTenantProxyRule(slug: string): Promise<void> {
+  try {
+    return await createTenantProxyRuleOnce(slug);
+  } catch (e: any) {
+    // DSM может отклонить свежий SID при конфликте сессий — одна повторная попытка
+    console.warn(`[NAS] createTenantProxyRule retry (${slug}): ${e.message}`);
+    return createTenantProxyRuleOnce(slug);
+  }
+}
+
+async function createTenantProxyRuleOnce(slug: string): Promise<void> {
   const sid = await dsmLogin();
   try {
     const entries = await dsmListEntries(sid);
@@ -84,6 +94,15 @@ export async function createTenantProxyRule(slug: string): Promise<void> {
 
 /** Удаляет правило Reverse Proxy поддомена организации (идемпотентно) */
 export async function deleteTenantProxyRule(slug: string): Promise<void> {
+  try {
+    return await deleteTenantProxyRuleOnce(slug);
+  } catch (e: any) {
+    console.warn(`[NAS] deleteTenantProxyRule retry (${slug}): ${e.message}`);
+    return deleteTenantProxyRuleOnce(slug);
+  }
+}
+
+async function deleteTenantProxyRuleOnce(slug: string): Promise<void> {
   const sid = await dsmLogin();
   try {
     const entries = await dsmListEntries(sid);

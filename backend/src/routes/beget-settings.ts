@@ -3,16 +3,17 @@ import fs from 'fs';
 import path from 'path';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { tenantDataDir } from '../lib/tenant.js';
 
 const router = Router();
 
-const DATA_DIR = '/app/data';
-const PARSER_SETTINGS_FILE = path.join(DATA_DIR, 'beget_settings.json');
+function dataDir() { return tenantDataDir(); }
+const PARSER_SETTINGS_FILE = path.join(dataDir(), 'beget_settings.json');
 
 // Синхронизация с парсером: cron на хосте читает этот файл (scripts/beget-parser.py)
 function syncParserFile(login: string, password: string, isActive: boolean, isPartner: boolean, updateTime: string) {
   try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (!fs.existsSync(dataDir())) fs.mkdirSync(dataDir(), { recursive: true });
     fs.writeFileSync(
       PARSER_SETTINGS_FILE,
       JSON.stringify({ login, password, is_active: isActive, is_partner: isPartner, update_time: updateTime })

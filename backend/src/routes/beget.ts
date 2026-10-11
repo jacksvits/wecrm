@@ -1,14 +1,16 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
+import { tenantDataDir } from '../lib/tenant.js';
 import fs from 'fs';
 
 const router = Router();
-const DATA_FILE = '/app/data/beget.json';
+// Данные хостинг-аккаунта платформы — файл в директории текущего tenant'а
+function dataFile() { return tenantDataDir() + '/beget.json'; }
 
 router.get('/', async (_req, res) => {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+    if (fs.existsSync(dataFile())) {
+      const data = JSON.parse(fs.readFileSync(dataFile(), 'utf-8'));
       return res.json(data);
     }
     res.status(404).json({ status: 'error', error: 'Данные не найдены' });
@@ -22,8 +24,8 @@ router.get('/', async (_req, res) => {
 // partner_balance / active_referrals / last_transaction_* — партнёрский кабинет (парсер)
 router.get('/account', async (_req, res) => {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const raw = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+    if (fs.existsSync(dataFile())) {
+      const raw = JSON.parse(fs.readFileSync(dataFile(), 'utf-8'));
       const account = {
         login: raw.login || 'softboeg',
         plan_name: raw.plan_name || 'Партнёрский',
@@ -54,8 +56,8 @@ router.get('/account', async (_req, res) => {
 // GET /api/beget/domains — список доменов
 router.get('/domains', async (_req, res) => {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+    if (fs.existsSync(dataFile())) {
+      const data = JSON.parse(fs.readFileSync(dataFile(), 'utf-8'));
       return res.json(data.domains || []);
     }
     res.status(404).json({ status: 'error', error: 'Данные не найдены' });

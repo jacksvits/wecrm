@@ -1,12 +1,11 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authMiddleware } from '../middleware/auth.js';
+import { prisma } from '../lib/prisma.js';
 import fs from 'fs';
 import path from 'path';
 import * as archiver from 'archiver';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Map tab keys to local directories inside Docker container
 const TAB_DIRS: Record<string, string> = {

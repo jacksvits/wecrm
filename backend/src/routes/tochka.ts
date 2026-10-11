@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { tenantDataDir, tenantKey, currentTenant } from '../lib/tenant.js';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
@@ -8,10 +9,12 @@ import { URL } from 'url';
 const router = Router();
 
 const TOCHKA_BASE = 'https://enter.tochka.com/uapi';
-const TOKEN_FILE = path.join('/app/data', 'tochka_tokens.json');
-const ACCOUNT_NAMES_FILE = path.join('/app/data', 'tochka_account_names.json');
-const ACCOUNT_ORDER_FILE = path.join('/app/data', 'tochka_account_order.json');
-const ACCOUNT_USERS_FILE = path.join('/app/data', 'tochka_account_users.json');
+// Файлы интеграции лежат в директории текущего tenant'а (изоляция
+// организаций; у главной — /app/data, как раньше). См. tenantDataDir.
+function tokenFile() { return path.join(tenantDataDir(), 'tochka_tokens.json'); }
+function accountNamesFile() { return path.join(tenantDataDir(), 'tochka_account_names.json'); }
+function accountOrderFile() { return path.join(tenantDataDir(), 'tochka_account_order.json'); }
+function accountUsersFile() { return path.join(tenantDataDir(), 'tochka_account_users.json'); }
 const TOCHKA_CLIENT_ID = process.env.TOCHKA_CLIENT_ID || '';
 const TOCHKA_CLIENT_SECRET = process.env.TOCHKA_CLIENT_SECRET || '';
 const TOCHKA_REDIRECT_URI = process.env.TOCHKA_REDIRECT_URI || 'https://welans.cc/api/tochka/callback';
@@ -35,8 +38,8 @@ function decodeJwtExp(token: string): number | null {
 
 export function loadTokens(): TochkaTokens | null {
   try {
-    if (fs.existsSync(TOKEN_FILE)) {
-      const raw = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf-8'));
+    if (fs.existsSync(tokenFile())) {
+      const raw = JSON.parse(fs.readFileSync(tokenFile(), 'utf-8'));
       // Проверяем реальный expiry JWT, а не expires_at из файла
       const jwtExp = decodeJwtExp(raw.access_token);
       if (jwtExp && Date.now() > jwtExp * 1000) {
@@ -52,15 +55,15 @@ export function loadTokens(): TochkaTokens | null {
 }
 
 function saveTokens(tokens: TochkaTokens) {
-  fs.mkdirSync(path.dirname(TOKEN_FILE), { recursive: true });
-  fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2));
+  fs.mkdirSync(path.dirname(tokenFile()), { recursive: true });
+  fs.writeFileSync(tokenFile(), JSON.stringify(tokens, null, 2));
 }
 
 // Кастомные названия счетов (accountId -> название), задаются пользователем в виджете
 function loadAccountNames(): Record<string, string> {
   try {
-    if (fs.existsSync(ACCOUNT_NAMES_FILE)) {
-      return JSON.parse(fs.readFileSync(ACCOUNT_NAMES_FILE, 'utf-8'));
+    if (fs.existsSync(accountNamesFile())) {
+      return JSON.parse(fs.readFileSync(accountNamesFile(), 'utf-8'));
     }
   } catch (e) {
     console.error('[Tochka] Failed to load account names:', e);
@@ -69,15 +72,15 @@ function loadAccountNames(): Record<string, string> {
 }
 
 function saveAccountNames(names: Record<string, string>) {
-  fs.mkdirSync(path.dirname(ACCOUNT_NAMES_FILE), { recursive: true });
-  fs.writeFileSync(ACCOUNT_NAMES_FILE, JSON.stringify(names, null, 2));
+  fs.mkdirSync(path.dirname(accountNamesFile()), { recursive: true });
+  fs.writeFileSync(accountNamesFile(), JSON.stringify(names, null, 2));
 }
 
 // Ручной порядок счетов (массив accountId в порядке отображения), задаётся в виджете
 function loadAccountOrder(): string[] {
   try {
-    if (fs.existsSync(ACCOUNT_ORDER_FILE)) {
-      const raw = JSON.parse(fs.readFileSync(ACCOUNT_ORDER_FILE, 'utf-8'));
+    if (fs.existsSync(accountOrderFile())) {
+      const raw = JSON.parse(fs.readFileSync(accountOrderFile(), 'utf-8'));
       return Array.isArray(raw) ? raw.filter((id) => typeof id === 'string') : [];
     }
   } catch (e) {
@@ -87,15 +90,15 @@ function loadAccountOrder(): string[] {
 }
 
 function saveAccountOrder(order: string[]) {
-  fs.mkdirSync(path.dirname(ACCOUNT_ORDER_FILE), { recursive: true });
-  fs.writeFileSync(ACCOUNT_ORDER_FILE, JSON.stringify(order, null, 2));
+  fs.mkdirSync(path.dirname(accountOrderFile()), { recursive: true });
+  fs.writeFileSync(accountOrderFile(), JSON.stringify(order, null, 2));
 }
 
 // Связь счётов с пользователями CRM (accountId -> userId), задаётся администратором в настройках плагина
 function loadAccountUsers(): Record<string, string> {
   try {
-    if (fs.existsSync(ACCOUNT_USERS_FILE)) {
-      return JSON.parse(fs.readFileSync(ACCOUNT_USERS_FILE, 'utf-8'));
+    if (fs.existsSync(accountUsersFile())) {
+      return JSON.parse(fs.readFileSync(accountUsersFile(), 'utf-8'));
     }
   } catch (e) {
     console.error('[Tochka] Failed to load account users:', e);
@@ -104,8 +107,8 @@ function loadAccountUsers(): Record<string, string> {
 }
 
 function saveAccountUsers(mapping: Record<string, string>) {
-  fs.mkdirSync(path.dirname(ACCOUNT_USERS_FILE), { recursive: true });
-  fs.writeFileSync(ACCOUNT_USERS_FILE, JSON.stringify(mapping, null, 2));
+  fs.mkdirSync(path.dirname(accountUsersFile()), { recursive: true });
+  fs.writeFileSync(accountUsersFile(), JSON.stringify(mapping, null, 2));
 }
 
 export { loadAccountUsers };
@@ -210,6 +213,11 @@ async function tokenRequest(body: string): Promise<any> {
 
 // GET /api/tochka/auth-url — URL для OAuth авторизации ИЛИ обработка callback (без auth — нужен для редиректа от Точки)
 router.get('/auth-url', async (req, res) => {
+  // Подключение Точки Банка — только главная организация: OAuth-callback
+  // зарегистрирован в банке под welans.cc, иначе токены tenant'а перезаписали бы подключение платформы.
+  if (!currentTenant()?.isMain) {
+    return res.status(403).json({ error: 'Подключение Точки Банка доступно только на основном домене платформы' });
+  }
   // Если пришел ?code= от Точки Банк — обрабатываем как callback
   const { code, state, error: oauthError } = req.query;
   if (oauthError) return res.status(400).json({ error: 'OAuth error', details: oauthError });
@@ -312,8 +320,9 @@ router.get('/status', authMiddleware, (_req, res) => {
   res.json({ connected: !!tokens?.access_token, expires_at: tokens?.expires_at || null, expired: false });
 });
 
-// Кэш состояния интеграции (TTL = интервал обновления из плагина)
-let tochkaStateCache: { data: any; ts: number } | null = null;
+// Кэш состояния интеграции (TTL = интервал обновления из плагина).
+// Изолирован по tenant'ам — ключ tenantKey().
+const tochkaStateCache = new Map<string, { data: any; ts: number }>();
 let tochkaStateTtlMs = 15 * 60 * 1000;
 
 export function setTochkaCacheTtl(minutes: number) {
@@ -321,17 +330,19 @@ export function setTochkaCacheTtl(minutes: number) {
 }
 
 export function invalidateTochkaCache() {
-  tochkaStateCache = null;
+  tochkaStateCache.delete(tenantKey());
 }
 
 // Состояние интеграции для виджетов и плагина
 export async function getTochkaState() {
-  if (tochkaStateCache && Date.now() - tochkaStateCache.ts < tochkaStateTtlMs) {
-    return tochkaStateCache.data;
+  const key = tenantKey();
+  const cached = tochkaStateCache.get(key);
+  if (cached && Date.now() - cached.ts < tochkaStateTtlMs) {
+    return cached.data;
   }
   const data = await fetchTochkaState();
   (data as any).__cachedAt = new Date().toISOString();
-  tochkaStateCache = { data, ts: Date.now() };
+  tochkaStateCache.set(key, { data, ts: Date.now() });
   return data;
 }
 

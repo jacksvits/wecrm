@@ -156,3 +156,15 @@ export function tenantUploadPrefix(): string {
 export function uploadsRoot(): string {
   return `/app/uploads${tenantUploadPrefix()}`;
 }
+
+/** Ключ tenant'а (main для главной организации) */
+export function tenantKey(): string {
+  const t = currentTenant();
+  return t ? (t.isMain ? 'main' : t.slug) : 'main';
+}
+
+/** Директория /app/data текущего tenant'а (изоляция файловых интеграций) */
+export function tenantDataDir(): string {
+  const t = currentTenant();
+  return t && !t.isMain ? `/app/data/t-${t.slug}` : '/app/data';
+}

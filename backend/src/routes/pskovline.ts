@@ -1,18 +1,19 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authMiddleware } from '../middleware/auth.js';
+import { prisma } from '../lib/prisma.js';
+import { tenantDataDir } from '../lib/tenant.js';
 import fs from 'fs';
 
 const router = Router();
-const prisma = new PrismaClient();
-const DATA_FILE = '/app/data/pskovline.json';
+// Файл в директории текущего tenant'а (изоляция организаций)
+function dataFile() { return tenantDataDir() + '/pskovline.json'; }
 
 // Получить данные всех аккаунтов
 router.get('/', async (_req, res) => {
   try {
     let data: any = { accounts: [], status: 'error', error: 'Данные не найдены' };
-    if (fs.existsSync(DATA_FILE)) {
-      data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+    if (fs.existsSync(dataFile())) {
+      data = JSON.parse(fs.readFileSync(dataFile(), 'utf-8'));
     }
     res.json(data);
   } catch (e: any) {
