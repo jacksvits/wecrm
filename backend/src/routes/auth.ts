@@ -212,7 +212,7 @@ router.get('/me', async (req, res) => {
       roleId: user.roleId,
       avatar: user.avatar,
       emails: user.emails,
-      allowedPages: user.role?.allowedPages || [],
+      allowedPages: await applyTenantSubscriptionPages(user.role?.allowedPages || []),
       mobileNav: user.mobileNav || [],
       showFinancesTab: user.role?.showFinancesTab ?? false,
       isGuest: user.email === GUEST_EMAIL,
