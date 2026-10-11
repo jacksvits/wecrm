@@ -171,10 +171,10 @@ router.get('/tariffs', async (_req, res) => {
     res.json([]);
   }
 });
-/** Данные для оплаты подписки (экран после регистрации, публичный, главный домен) */
+/** Данные для оплаты подписки (публичный: главный домен ?slug=, поддомен - своя организация) */
 router.get('/pay-info', async (req, res) => {
-  if (!currentTenant()?.isMain) return res.status(404).json({ error: 'Доступно только на основном домене' });
-  const slug = String(req.query.slug || '').toLowerCase().trim();
+  const cur = currentTenant();
+  const slug = cur && !cur.isMain ? cur.slug : String(req.query.slug || '').toLowerCase().trim();
   const tenant = await (platformPrisma as any).tenant.findUnique({ where: { slug } });
   if (!tenant) return res.status(404).json({ error: 'Организация не найдена' });
   let planName = tenant.plan || 'standard';
@@ -205,10 +205,12 @@ router.get('/pay-info', async (req, res) => {
 
 /** Уведомление об оплате: создаёт запрос в поддержку платформы (публичный, главный домен) */
 router.post('/pay-notify', async (req, res) => {
-  if (!currentTenant()?.isMain) return res.status(404).json({ error: 'Доступно только на основном домене' });
+  const cur2 = currentTenant();
   const ip = (req.headers['x-real-ip'] as string) || req.socket.remoteAddress || '';
   if (!rateLimitOk(ip)) return res.status(429).json({ error: 'Слишком много попыток' });
-  const { slug } = z.object({ slug: z.string().trim().min(1) }).parse(req.body || {});
+  let slug: string;
+  if (cur2 && !cur2.isMain) slug = cur2.slug;
+  else slug = z.object({ slug: z.string().trim().min(1) }).parse(req.body || {}).slug;
   const tenant = await (platformPrisma as any).tenant.findUnique({ where: { slug: slug.toLowerCase() } });
   if (!tenant) return res.status(404).json({ error: 'Организация не найдена' });
   const ticket = await (platformPrisma as any).tenantTicket.create({

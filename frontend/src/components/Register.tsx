@@ -23,6 +23,7 @@ export function Register() {
   const [done, setDone] = useState<{ subdomain: string; message: string } | null>(null)
   const [pay, setPay] = useState<any | null>(null)
   const [paySent, setPaySent] = useState(false)
+  const [showPayDetails, setShowPayDetails] = useState(false)
 
   useEffect(() => {
     if (!mainHost) return
@@ -184,19 +185,22 @@ export function Register() {
                         </span>
                       )}
                     </div>
-                    {pay.payLink ? (
-                      <a href={pay.payLink} target='_blank' rel='noreferrer'
-                        className='login-btn-primary'
-                        style={{ display: 'block', textAlign: 'center', padding: '12px', borderRadius: 10, color: '#fff', textDecoration: 'none', fontSize: 15, fontWeight: 600 }}>
-                        Оплатить {pay.priceRub != null ? Number(pay.priceRub).toLocaleString('ru-RU') + ' ₽' : 'подписку'}
-                      </a>
-                    ) : (
-                      <>
+                                        <button
+                      onClick={() => {
+                        if (pay.payLink) { window.open(pay.payLink, '_blank'); return }
+                        setShowPayDetails(!showPayDetails)
+                      }}
+                      className='login-btn-primary'
+                      style={{ width: '100%', padding: '12px', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 600 }}>
+                      Оплатить {pay.priceRub != null ? Number(pay.priceRub).toLocaleString('ru-RU') + ' ₽' : 'подписку'}
+                    </button>
+                    {showPayDetails && !pay.payLink && (
+                      <div style={{ marginTop: 10 }}>
                         {pay.paymentInfo && (
                           <div style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 10, whiteSpace: 'pre-wrap' }}>{pay.paymentInfo}</div>
                         )}
                         <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 10 }}>
-                          Вопросы по оплате: <a href={'mailto:' + (pay.contactEmail || 'info@welans.ru')}>{pay.contactEmail || 'info@welans.ru'}</a>
+                          По вопросам оплаты: <a href={'mailto:' + (pay.contactEmail || 'info@welans.ru')}>{pay.contactEmail || 'info@welans.ru'}</a>
                         </div>
                         <button
                           onClick={() => {
@@ -206,11 +210,10 @@ export function Register() {
                             }).then((r) => { if (r.ok) setPaySent(true) }).catch(() => {})
                           }}
                           disabled={paySent}
-                          className='login-btn-primary'
-                          style={{ width: '100%', padding: '11px', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 14, opacity: paySent ? 0.7 : 1 }}>
-                          {paySent ? 'Сообщение отправлено — ожидайте активации' : 'Я оплатил — сообщить поддержке'}
+                          style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: 10, cursor: 'pointer', fontSize: 13, background: 'transparent', color: 'var(--text-primary)', opacity: paySent ? 0.7 : 1 }}>
+                          {paySent ? 'Сообщение отправлено - ожидайте активации' : 'Я оплатил - сообщить поддержке'}
                         </button>
-                      </>
+                      </div>
                     )}
                   </div>
                 )}
