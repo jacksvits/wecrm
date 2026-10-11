@@ -662,6 +662,7 @@ router.post('/', async (req, res) => {
         description: description || '',
         crmAllowedPages: productKind === 'crm_subscription' && Array.isArray(req.body.crmAllowedPages) ? req.body.crmAllowedPages : null,
         payLink: typeof req.body.payLink === 'string' && req.body.payLink.trim() ? req.body.payLink.trim() : null,
+        crmCameras: req.body.crmCameras === true || req.body.crmCameras === 'true',
         categoryId: categoryIdValue,
         category: categoryValue,
         subcategory: subcategory?.trim() || null,
@@ -745,6 +746,7 @@ router.patch('/:id', async (req, res) => {
     if (kind !== undefined) data.kind = ['service', 'crm_subscription'].includes(kind) ? kind : 'product';
     if (req.body.crmAllowedPages !== undefined) data.crmAllowedPages = Array.isArray(req.body.crmAllowedPages) ? req.body.crmAllowedPages : null;
     if (req.body.payLink !== undefined) data.payLink = typeof req.body.payLink === 'string' && req.body.payLink.trim() ? req.body.payLink.trim() : null;
+    if (req.body.crmCameras !== undefined) data.crmCameras = req.body.crmCameras === true || req.body.crmCameras === 'true';
     if (unit !== undefined) data.unit = unit?.trim() || 'шт';
     if (barcode !== undefined) data.barcode = barcode?.trim() || null;
     if (isActive !== undefined) data.isActive = !!isActive;

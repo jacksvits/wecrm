@@ -271,6 +271,7 @@ export function Director() {
     return () => clearInterval(interval);
   }, []);
   const [activeTab, setActiveTab] = useState<WidgetTab>("Основное");
+  useEffect(() => { if (activeTab === 'Камеры' && (user as any)?.crmCameras === false) setActiveTab('Основное'); }, [activeTab, user]);
   const [showWidgetSettings, setShowWidgetSettings] = useState(false);
 
   const savedOrder = loadOrder();
@@ -1173,7 +1174,7 @@ export function Director() {
         <h2 style={{ margin: 0, fontSize: 18 }}>Директор</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ display: "flex", gap: 4, background: "var(--bg-input)", borderRadius: 10, padding: 4 }}>
-            {TABS.map((tab) => (
+            {((user as any)?.crmCameras === false ? TABS.filter(t2 => t2 !== 'Камеры') : TABS).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}

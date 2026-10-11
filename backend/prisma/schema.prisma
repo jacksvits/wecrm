@@ -1207,6 +1207,8 @@ model Product {
   crmAllowedPages Json?     @map("crm_allowed_pages")
 
   payLink       String?   @map("pay_link")
+
+  crmCameras      Boolean  @default(false) @map("crm_cameras")
 }
 
 // Дерево категорий товаров из 1С: группы (папки) и виды номенклатуры,

@@ -13,6 +13,17 @@ import { currentTenant, platformPrisma } from '../lib/tenant.js';
  * Если у tenant'а есть тариф с ограничением страниц — права роли
  * пересекаются со списком подписки. Главная организация не ограничивается.
  */
+/** Подключение камер разрешено подпиской CRM организации */
+async function getTenantCrmCameras(): Promise<boolean> {
+  try {
+    const t = currentTenant();
+    if (!t || t.isMain) return true;
+    const tenantRow = await (platformPrisma as any).tenant.findUnique({ where: { id: t.id } });
+    if (!tenantRow?.planProductId) return false;
+    const product = await (platformPrisma as any).product.findUnique({ where: { id: tenantRow.planProductId } });
+    return product?.crmCameras === true;
+  } catch { return false; }
+}
 async function applyTenantSubscriptionPages(pages: string[]): Promise<string[]> {
   try {
     const t = currentTenant();
@@ -213,6 +224,7 @@ router.get('/me', async (req, res) => {
       avatar: user.avatar,
       emails: user.emails,
       allowedPages: await applyTenantSubscriptionPages(user.role?.allowedPages || []),
+      crmCameras: await getTenantCrmCameras(),
       mobileNav: user.mobileNav || [],
       showFinancesTab: user.role?.showFinancesTab ?? false,
       isGuest: user.email === GUEST_EMAIL,
