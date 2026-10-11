@@ -6,6 +6,7 @@ import { RoleManager } from "./RoleManager";
 import { TelephonySettings } from "./TelephonySettings";
 import { StatusManager } from "./StatusManager";
 import { MaxSettings } from "./MaxSettings";
+import { useAuth } from "../hooks/useAuth";
 import { TelegramSettings } from "./TelegramSettings";
 import { VpnSettings } from "./VpnSettings";
 import { UserList } from "./UserList";
@@ -137,6 +138,7 @@ export function Settings() {
     ozon: false,
     vpn: false,
   });
+  const { user: stUser } = useAuth() ;
 
   // Возврат из OAuth банка: сразу открываем интеграции
   useEffect(() => {
@@ -235,18 +237,21 @@ export function Settings() {
               }}
             >
               {group.plugins.map((plugin) => {
-                const isActive = pluginStatus[plugin.key];
+                const integList: string[] | null = (stUser as any)?.crmIntegrations ?? null ;
+                const integBlocked = integList !== null && !integList.includes(plugin.key) ;
+            const isActive = pluginStatus[plugin.key];
                 return (
                   <button
                     key={plugin.key}
-                    onClick={() => setSelectedPlugin(plugin.key)}
+                    onClick={() => { if (!integBlocked) setSelectedPlugin(plugin.key) ; }}
                     style={{
                       textAlign: "left",
                       padding: 16,
                       borderRadius: 12,
                       border: "1px solid var(--border-color)",
                       background: "var(--bg-card)",
-                      cursor: "pointer",
+                      cursor: integBlocked ? "not-allowed" : "pointer",
+                      opacity: integBlocked ? 0.55 : 1,
                       transition: "all 0.2s",
                       display: "flex",
                       flexDirection: "column",
@@ -283,7 +288,7 @@ export function Settings() {
                             flexShrink: 0,
                           }}
                         />
-                        {isActive ? "Активен" : "Не активен"}
+                        {integBlocked ? "Недоступно в тарифе" : (isActive ? "Активен" : "Не активен")}
                       </span>
                     </div>
                     <span style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.4 }}>

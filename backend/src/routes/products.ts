@@ -667,7 +667,7 @@ router.post('/', async (req, res) => {
         crmAccounting: req.body.crmAccounting === true || req.body.crmAccounting === 'true',
         crmVideoNotes: req.body.crmVideoNotes === true || req.body.crmVideoNotes === 'true',
         crmCalls: req.body.crmCalls === true || req.body.crmCalls === 'true',        categoryId: categoryIdValue,
-        category: categoryValue,
+        crmIntegrations: Array.isArray(req.body.crmIntegrations) ? req.body.crmIntegrations : null,        category: categoryValue,
         subcategory: subcategory?.trim() || null,
         unit: unit?.trim() || 'шт',
         barcode: barcode?.trim() || null,
@@ -754,7 +754,7 @@ router.patch('/:id', async (req, res) => {
     if (req.body.crmAccounting !== undefined) data.crmAccounting = req.body.crmAccounting === true || req.body.crmAccounting === 'true';
     if (req.body.crmVideoNotes !== undefined) data.crmVideoNotes = req.body.crmVideoNotes === true || req.body.crmVideoNotes === 'true';
     if (req.body.crmCalls !== undefined) data.crmCalls = req.body.crmCalls === true || req.body.crmCalls === 'true';    if (unit !== undefined) data.unit = unit?.trim() || 'шт';
-    if (barcode !== undefined) data.barcode = barcode?.trim() || null;
+    if (req.body.crmIntegrations !== undefined) data.crmIntegrations = Array.isArray(req.body.crmIntegrations) ? req.body.crmIntegrations : null;    if (barcode !== undefined) data.barcode = barcode?.trim() || null;
     if (isActive !== undefined) data.isActive = !!isActive;
     if (syncToVk !== undefined) data.syncToVk = !!syncToVk;
     // «OZON Seller» актуально только для товаров, не для услуг

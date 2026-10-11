@@ -14,6 +14,18 @@ import { currentTenant, platformPrisma } from '../lib/tenant.js';
  * пересекаются со списком подписки. Главная организация не ограничивается.
  */
 /** Флаг товара-подписки CRM организации (главная организация - всегда true) */
+/** Список разрешённых интеграций подписки (null - без ограничений) */
+async function getTenantIntegrations(): Promise<string[] | null> {
+  try {
+    const t = currentTenant();
+    if (!t || t.isMain) return null;
+    const tenantRow = await (platformPrisma as any).tenant.findUnique({ where: { id: t.id } });
+    if (!tenantRow?.planProductId) return null;
+    const product = await (platformPrisma as any).product.findUnique({ where: { id: tenantRow.planProductId } });
+    return Array.isArray(product?.crmIntegrations) ? product.crmIntegrations : null;
+  } catch { return null; }
+}
+
 async function getTenantProductFlag(field: string): Promise<boolean> {
   try {
     const t = currentTenant();
@@ -240,6 +252,7 @@ router.get('/me', async (req, res) => {
       crmAccounting: await getTenantProductFlag('crmAccounting'),
       crmVideoNotes: await getTenantProductFlag('crmVideoNotes'),
       crmCalls: await getTenantProductFlag('crmCalls'),
+      crmIntegrations: await getTenantIntegrations(),
       mobileNav: user.mobileNav || [],
       showFinancesTab: user.role?.showFinancesTab ?? false,
       isGuest: user.email === GUEST_EMAIL,

@@ -1215,6 +1215,8 @@ model Product {
   crmVideoNotes      Boolean  @default(false) @map("crm_video_notes")
 
   crmCalls         Boolean  @default(false) @map("crm_calls")
+
+  crmIntegrations  Json?     @map("crm_integrations") // разрешённые интеграции для подписки CRM (null - без ограничений)
 }
 
 // Дерево категорий товаров из 1С: группы (папки) и виды номенклатуры,
