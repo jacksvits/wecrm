@@ -5,26 +5,16 @@ import path from 'path';
 import fs from 'fs';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
 
 const router = Router();
 
 const UPLOAD_DIR = '/app/uploads';
-const COMMENTS_DIR = path.join(UPLOAD_DIR, 'comments');
-const CHAT_DIR = path.join(UPLOAD_DIR, 'global_chat');
-const TASKS_DIR = path.join(UPLOAD_DIR, 'tasks');
+// Файлы tenant'ов изолированы префиксом /t-<slug> (см. uploadsRoot в lib/tenant.ts)
 
 // Create directories on startup
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-if (!fs.existsSync(COMMENTS_DIR)) {
-  fs.mkdirSync(COMMENTS_DIR, { recursive: true });
-}
-if (!fs.existsSync(CHAT_DIR)) {
-  fs.mkdirSync(CHAT_DIR, { recursive: true });
-}
-if (!fs.existsSync(TASKS_DIR)) {
-  fs.mkdirSync(TASKS_DIR, { recursive: true });
 }
 
 // Multer saves all files to temp directory (uploads root),
@@ -57,6 +47,10 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
       return res.status(400).json({ error: 'Файл не загружен' });
     }
     const { entityType, entityId } = req.body;
+    const tenantRoot = uploadsRoot();
+    const tasksRoot = path.join(tenantRoot, 'tasks');
+    const chatRoot = path.join(tenantRoot, 'global_chat');
+    const tenantPfx = tenantUploadPrefix();
     if (!entityType || !entityId) {
       console.log('[uploads] missing entityType or entityId');
       return res.status(400).json({ error: 'entityType и entityId обязательны' });
@@ -92,7 +86,7 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
         return res.status(403).json({ error: 'Доступ запрещен' });
       }
       const ticketNum = task?.ticketNumber ?? entityId;
-      const taskDir = path.join(TASKS_DIR, String(ticketNum));
+      const taskDir = path.join(tasksRoot, String(ticketNum));
       if (!fs.existsSync(taskDir)) {
         fs.mkdirSync(taskDir, { recursive: true });
       }
@@ -110,13 +104,13 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
         fs.renameSync(srcPath, destPath);
         console.log('[uploads] moved to tasks:', destPath);
       }
-      dbPath = `/uploads/tasks/${ticketNum}/${finalName}`;
+      dbPath = `/uploads${tenantPfx}/tasks/${ticketNum}/${finalName}`;
       filename = finalName;
     } else if (entityType === 'chat') {
       // Видеокружочки (как в Telegram) храним в отдельной подпапке video_notes —
       // фронтенд отличает их по path и рисует круглыми
       const isVideoNote = req.body.kind === 'video_note';
-      const targetDir = isVideoNote ? path.join(CHAT_DIR, 'video_notes') : CHAT_DIR;
+      const targetDir = isVideoNote ? path.join(chatRoot, 'video_notes') : chatRoot;
       if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });
       }
@@ -126,7 +120,7 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
         fs.renameSync(srcPath, destPath);
         console.log('[uploads] moved to', isVideoNote ? 'video_notes' : 'global_chat', ':', destPath);
       }
-      dbPath = `/uploads/global_chat${isVideoNote ? '/video_notes' : ''}/${filename}`;
+      dbPath = `/uploads${tenantPfx}/global_chat${isVideoNote ? '/video_notes' : ''}/${filename}`;
     } else {
       dbPath = `/uploads/${filename}`;
     }
@@ -187,26 +181,8 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
     if (attachment.authorId !== req.user!.id) {
       return res.status(403).json({ error: 'Нет прав на удаление' });
     }
-    // Delete file from disk (resolve path by entityType)
-    let filePath: string;
-    if (attachment.entityType === 'comment') {
-      const comment = await prisma.comment.findUnique({ where: { id: attachment.entityId }, select: { taskId: true } });
-      const task = comment ? await prisma.task.findUnique({ where: { id: comment.taskId }, select: { ticketNumber: true } }) : null;
-      const ticketNum = task?.ticketNumber;
-      if (ticketNum) {
-        filePath = path.join(TASKS_DIR, String(ticketNum), attachment.filename);
-      } else {
-        filePath = path.join(COMMENTS_DIR, attachment.filename);
-      }
-    } else if (attachment.entityType === 'chat') {
-      const notesPath = path.join(CHAT_DIR, 'video_notes', attachment.filename);
-      filePath = fs.existsSync(notesPath) ? notesPath : path.join(CHAT_DIR, attachment.filename);
-    } else if (attachment.entityType === 'finance_document') {
-      // Вложения бухгалтерии складываются воркером в /app/uploads/accounting
-      filePath = path.join(UPLOAD_DIR, 'accounting', attachment.filename);
-    } else {
-      filePath = path.join(UPLOAD_DIR, attachment.filename);
-    }
+    // Delete file from disk: URL-путь из БД содержит положение файла (с префиксом tenant'а)
+    const filePath = '/app' + attachment.path;
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
       console.log('[uploads] deleted file:', filePath);
@@ -228,22 +204,8 @@ router.get('/:id/download', async (req, res) => {
     if (!attachment) {
       return res.status(404).json({ error: 'Вложение не найдено' });
     }
-    let filePath: string;
-    if (attachment.entityType === 'comment') {
-      const comment = await prisma.comment.findUnique({ where: { id: attachment.entityId }, select: { taskId: true } });
-      const task = comment ? await prisma.task.findUnique({ where: { id: comment.taskId }, select: { ticketNumber: true } }) : null;
-      const ticketNum = task?.ticketNumber;
-      if (ticketNum) {
-        filePath = path.join(TASKS_DIR, String(ticketNum), attachment.filename);
-      } else {
-        filePath = path.join(COMMENTS_DIR, attachment.filename);
-      }
-    } else if (attachment.entityType === 'chat') {
-      const notesPath = path.join(CHAT_DIR, 'video_notes', attachment.filename);
-      filePath = fs.existsSync(notesPath) ? notesPath : path.join(CHAT_DIR, attachment.filename);
-    } else {
-      filePath = path.join(UPLOAD_DIR, attachment.filename);
-    }
+    // URL-путь из БД содержит положение файла (с префиксом tenant'а)
+    const filePath = '/app' + attachment.path;
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Файл не найден на диске' });
     }

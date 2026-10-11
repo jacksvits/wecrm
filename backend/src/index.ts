@@ -32,7 +32,7 @@ import telephonyRoutes from './routes/telephony.js';
 import vkRoutes from './routes/vk.js';
 import vkGroupSettingsRoutes from './routes/vk-group-settings.js';
 import maxRoutes from './routes/max.js';
-import telegramRoutes, { startTelegramPoller } from './routes/telegram.js';
+import telegramRoutes from './routes/telegram.js';
 import vpnRoutes, { syncVpnConfigOnStartup } from './routes/vpn.js';
 import yandexRoutes from './routes/yandex.js';
 import dgisRoutes from './routes/dgis.js';
@@ -55,7 +55,6 @@ import reminderRoutes from './routes/reminders.js';
 import { setupPushWs } from './routes/push-ws.js';
 import { setupCallsWs } from './routes/calls-ws.js';
 import callRoutes from './routes/calls.js';
-import { startReminderScheduler } from './lib/reminder-scheduler.js';
 import brandingRoutes from './routes/branding.js';
 import integrationsRoutes from './routes/integrations.js';
 import begetSettingsRoutes from './routes/beget-settings.js';
@@ -71,15 +70,31 @@ import autoReplySettingsRoutes from './routes/auto-reply-settings.js';
 import legalRoutes from './routes/legal.js';
 import browserRoutes from './routes/browser.js';
 import vncRoutes, { handleVncUpgrade, isVncUpgradePath } from './routes/browser-vnc.js';
+import platformRoutes from './routes/platform.js';
+import { tenantMiddleware } from './middleware/tenant.js';
+import { runTenantLoops } from './lib/tenant-loop.js';
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(compression());
-// CORS: только основной домен и локальные адреса для разработки
+// CORS: основной домен, все поддомены платформы (*.welans.cc) и локальные адреса для разработки
 const allowedOrigins = ['https://welans.cc', 'http://localhost:3000', 'http://localhost:5173'];
-app.use(cors({ origin: allowedOrigins }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // curl/мобильные приложения
+    try {
+      const host = new URL(origin).hostname.toLowerCase();
+      if (allowedOrigins.includes(origin) || host === 'welans.cc' || host.endsWith('.welans.cc')) {
+        return callback(null, true);
+      }
+    } catch { /* некорректный Origin — отклоняем */ }
+    callback(null, false);
+  },
+}));
+// Мультитенантность: определяем организацию по поддомену (Host) до всех /api-роутов
+app.use('/api', tenantMiddleware);
 // Отключить кэширование для всех API-ответов
 app.use('/api', (_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -118,6 +133,7 @@ app.get('/api/events', authMiddleware, (req, res) => {
   req.on('close', () => { clearInterval(pingInterval); });
 });
 
+app.use('/api/platform', platformRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/contact-types', contactTypeRoutes);
 // Бухгалтерия по почте: документы, правила, сверка с банком
@@ -151,7 +167,7 @@ app.use('/api/vpn', vpnRoutes);
 // Если плагин «Прокси через VPN» активен — синхронизируем конфиг sing-box
 syncVpnConfigOnStartup();
 // Входящие сообщения Telegram забираем опросом (webhook недоступен для DC Telegram)
-startTelegramPoller();
+// Поллер запускается per-tenant внутри tenant-циклов (см. lib/tenant-loop.ts)
 app.use('/api/beget', begetRoutes);
 app.use('/api/tochka', tochkaRoutes);
 app.use('/api/pskovline', pskovlineRoutes);
@@ -201,9 +217,12 @@ server.on('upgrade', (req, socket, head) => {
 setupPushWs(server);
 setupCallsWs(server);
 
+// Фоновые циклы платформы: Telegram-поллер и планировщик напоминаний
+// работают отдельно для главной организации и каждого активного tenant'а
+runTenantLoops();
+
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  startReminderScheduler();
   console.log(`Uploads route mounted at /api/uploads`);
   console.log(`Camera proxy mounted at /api/camera/stream`);
   console.log(`Calls WS mounted at /api/calls/ws`);

@@ -21,10 +21,13 @@ import fs from "fs";
 import path from "path";
 import { randomUUID, createHmac, createHash } from "crypto";
 const router = Router();
-const RECORDS_DIR = "/app/uploads/records";
-if (!fs.existsSync(RECORDS_DIR)) {
-  fs.mkdirSync(RECORDS_DIR, { recursive: true });
-}
+import { uploadsRoot, tenantUploadPrefix } from "../lib/tenant.js";
+// Директория записей текущего tenant'а (с префиксом /t-<slug>, см. lib/tenant.ts)
+const recordsDir = () => {
+  const dir = path.join(uploadsRoot(), "records");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+};
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function downloadRecordWithRetry(
   url: string,
@@ -1008,7 +1011,7 @@ async function attachCallRecord(
     }
     const filename = record.data?.file_name || `record_${call.pbxCallId}.mp3`;
     const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const localPath = path.join(RECORDS_DIR, `${randomUUID()}_${safeName}`);
+    const localPath = path.join(recordsDir(), `${randomUUID()}_${safeName}`);
     fs.writeFileSync(localPath, Buffer.from(buffer));
     await prisma.call.update({
       where: { id: call.id },
@@ -1017,7 +1020,7 @@ async function attachCallRecord(
         recordDownloadedAt: new Date(),
       },
     });
-    return { url: `/uploads/records/${path.basename(localPath)}`, duration };
+    return { url: `/uploads${tenantUploadPrefix()}/records/${path.basename(localPath)}`, duration };
   } catch (err) {
     await release();
     throw err;

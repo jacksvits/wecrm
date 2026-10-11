@@ -384,7 +384,7 @@ router.delete('/documents/:id', async (req: AuthRequest, res) => {
     // Файлы с диска удаляем по возможности, ошибки не роняют запрос.
     // f.path — URL-путь (/uploads/accounting/<uuid>), на диске файлы лежат в /app/uploads/accounting
     for (const f of files) {
-      const diskPath = path.join('/app/uploads/accounting', f.filename);
+      const diskPath = '/app' + f.path; // URL-путь из БД уже содержит префикс tenant'а
       try {
         if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
       } catch (e) {

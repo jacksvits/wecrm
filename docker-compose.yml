@@ -16,6 +16,7 @@ services:
 
   backend:
     build: ./backend
+    image: wecrm-backend:multitenant
     # Порт слушается только на localhost: nginx проксирует API с хоста,
     # внешний доступ (туннель) идёт напрямую по docker-сети (--local-host backend)
     ports:
@@ -67,6 +68,7 @@ services:
 
   frontend:
     build: ./frontend
+    image: wecrm-frontend:multitenant
     # Только localhost: отдачу наружу делает nginx на хосте
     ports:
       - "127.0.0.1:3000:80"
@@ -79,6 +81,7 @@ services:
 
   email-worker:
     build: ./backend
+    image: wecrm-backend:multitenant
     command: sh -c "npx prisma generate && npx tsx src/worker.ts"
     environment:
       DATABASE_URL: postgresql://crm:crm_secret_2026@db:5432/wecrm?schema=public

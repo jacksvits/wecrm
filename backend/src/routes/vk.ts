@@ -7,6 +7,7 @@ import { createHash, randomBytes, randomUUID } from 'crypto';
 import { processVkMessage } from '../vk-worker/processor.js';
 
 const router = Router();
+import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const VK_CLIENT_ID = process.env.VK_CLIENT_ID || '';
 const VK_CLIENT_SECRET = process.env.VK_CLIENT_SECRET || '';
@@ -20,10 +21,7 @@ const vkIdSessions = new Map<string, { verifier: string; expires: number }>();
 const VK_ID_SESSION_TTL = 10 * 60 * 1000; // 10 минут
 
 // Ensure uploads dir exists
-const UPLOAD_DIR = '/app/uploads';
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
+// Файлы текущего tenant'а (с префиксом /t-<slug>, см. lib/tenant.ts)
 
 // ===== VK Callback API webhook =====
 router.post('/webhook', async (req: Request, res: Response) => {
@@ -90,10 +88,10 @@ async function downloadVkAvatar(url: string): Promise<string | null> {
     const buffer = await res.arrayBuffer();
     const ext = path.extname(new URL(url).pathname) || '.jpg';
     const filename = `${randomUUID()}${ext}`;
-    const filepath = path.join(UPLOAD_DIR, filename);
+    const filepath = path.join(uploadsRoot(), filename);
     fs.writeFileSync(filepath, Buffer.from(buffer));
     console.log('[VK Avatar Download] saved to', filepath);
-    return `/uploads/${filename}`;
+    return `/uploads${tenantUploadPrefix()}/${filename}`;
   } catch (err) {
     console.error('[VK Avatar Download] Error:', err);
     return null;

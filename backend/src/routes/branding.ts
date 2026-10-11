@@ -4,15 +4,17 @@ import path from 'path';
 import fs from 'fs';
 import sharp from 'sharp';
 import { prisma } from '../lib/prisma.js';
+import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
-const BRANDING_DIR = '/app/uploads/branding';
-
-if (!fs.existsSync(BRANDING_DIR)) {
-  fs.mkdirSync(BRANDING_DIR, { recursive: true });
-}
+// Директория брендинга текущего tenant'а (с префиксом /t-<slug> для tenant'ов)
+const brandingDir = () => {
+  const dir = path.join(uploadsRoot(), 'branding');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+};
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -29,7 +31,7 @@ const isAdmin = (req: AuthRequest) => req.user?.role === 'admin';
 
 // Возвращает URL файла брендинга с версией для сброса кэша
 function fileUrl(fileName: string, updatedAt: Date): string {
-  return `/uploads/branding/${fileName}?v=${updatedAt.getTime()}`;
+  return `/uploads${tenantUploadPrefix()}/branding/${fileName}?v=${updatedAt.getTime()}`;
 }
 
 // GET /api/branding — публичный: текущие иконка и логотип (null — используются дефолтные)
@@ -92,10 +94,10 @@ router.post('/icon', authMiddleware, upload.single('file'), async (req: AuthRequ
       .resize(512, 512, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } });
 
     await Promise.all([
-      base.clone().resize(192, 192).png().toFile(path.join(BRANDING_DIR, 'icon-192x192.png')),
-      base.clone().resize(512, 512).png().toFile(path.join(BRANDING_DIR, 'icon-512x512.png')),
-      base.clone().resize(180, 180).png().toFile(path.join(BRANDING_DIR, 'apple-touch-icon.png')),
-      sharp(req.file.buffer).png().toFile(path.join(BRANDING_DIR, 'icon.png')),
+      base.clone().resize(192, 192).png().toFile(path.join(brandingDir(), 'icon-192x192.png')),
+      base.clone().resize(512, 512).png().toFile(path.join(brandingDir(), 'icon-512x512.png')),
+      base.clone().resize(180, 180).png().toFile(path.join(brandingDir(), 'apple-touch-icon.png')),
+      sharp(req.file.buffer).png().toFile(path.join(brandingDir(), 'icon.png')),
     ]);
 
     const branding = await prisma.branding.upsert({
@@ -130,7 +132,7 @@ router.post('/logo', authMiddleware, upload.single('file'), async (req: AuthRequ
     await sharp(req.file.buffer)
       .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
       .png()
-      .toFile(path.join(BRANDING_DIR, 'logo.png'));
+      .toFile(path.join(brandingDir(), 'logo.png'));
 
     const branding = await prisma.branding.upsert({
       where: { id: 1 },
@@ -160,7 +162,7 @@ router.post('/dark-logo', authMiddleware, upload.single('file'), async (req: Aut
     await sharp(req.file.buffer)
       .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
       .png()
-      .toFile(path.join(BRANDING_DIR, 'logo-dark.png'));
+      .toFile(path.join(brandingDir(), 'logo-dark.png'));
 
     const branding = await prisma.branding.upsert({
       where: { id: 1 },
@@ -189,7 +191,7 @@ router.post('/news-cover', authMiddleware, upload.single('file'), async (req: Au
     await sharp(req.file.buffer)
       .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 85 })
-      .toFile(path.join(BRANDING_DIR, 'news-cover.jpg'));
+      .toFile(path.join(brandingDir(), 'news-cover.jpg'));
 
     const branding = await prisma.branding.upsert({
       where: { id: 1 },
@@ -241,7 +243,7 @@ router.post('/product-default-image', authMiddleware, upload.single('file'), asy
     await sharp(req.file.buffer)
       .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
       .png()
-      .toFile(path.join(BRANDING_DIR, 'product-default-image.png'));
+      .toFile(path.join(brandingDir(), 'product-default-image.png'));
 
     const branding = await prisma.branding.upsert({
       where: { id: 1 },
@@ -375,7 +377,7 @@ router.post('/splash', authMiddleware, videoUpload.single('file'), async (req: A
       return res.status(400).json({ error: 'Файл не загружен' });
     }
 
-    await fs.promises.writeFile(path.join(BRANDING_DIR, 'splash.mp4'), req.file.buffer);
+    await fs.promises.writeFile(path.join(brandingDir(), 'splash.mp4'), req.file.buffer);
 
     const branding = await prisma.branding.upsert({
       where: { id: 1 },
@@ -420,7 +422,7 @@ router.delete('/splash', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(403).json({ error: 'Только администратор' });
     }
 
-    await fs.promises.rm(path.join(BRANDING_DIR, 'splash.mp4'), { force: true });
+    await fs.promises.rm(path.join(brandingDir(), 'splash.mp4'), { force: true });
 
     const branding = await prisma.branding.upsert({
       where: { id: 1 },

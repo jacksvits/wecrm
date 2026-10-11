@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
 import { processAutoReply } from '../lib/auto-reply.js';
 import { postHandlerGreeting } from '../lib/handler-messages.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
@@ -8,11 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 
-const UPLOAD_DIR = '/app/uploads';
-const TASKS_DIR = path.join(UPLOAD_DIR, 'tasks');
-if (!fs.existsSync(TASKS_DIR)) {
-  fs.mkdirSync(TASKS_DIR, { recursive: true });
-}
+// Директории текущего tenant'а (с префиксом /t-<slug>, см. lib/tenant.ts)
 
 export interface VkMessage {
   id: number;
@@ -73,10 +70,10 @@ async function downloadVkAvatar(url: string): Promise<string | null> {
     const buffer = await res.arrayBuffer();
     const ext = path.extname(new URL(url).pathname) || '.jpg';
     const filename = `${randomUUID()}${ext}`;
-    const filepath = path.join(UPLOAD_DIR, filename);
+    const filepath = path.join(uploadsRoot(), filename);
     fs.writeFileSync(filepath, Buffer.from(buffer));
     console.log('[VK Processor] Avatar saved to', filepath);
-    return `/uploads/${filename}`;
+    return `/uploads${tenantUploadPrefix()}/${filename}`;
   } catch (err) {
     console.error('[VK Processor] Avatar download error:', err);
     return null;
@@ -141,7 +138,7 @@ async function downloadVkAttachment(
     else if (ext === '.mp3') mimeType = 'audio/mpeg';
     else if (ext === '.pdf') mimeType = 'application/pdf';
 
-    return { filename, originalName, mimeType, size, path: `/uploads/tasks/${path.basename(taskDir)}/${filename}` };
+    return { filename, originalName, mimeType, size, path: `/uploads${tenantUploadPrefix()}/tasks/${path.basename(taskDir)}/${filename}` };
   } catch (err) {
     console.error('[VK Processor] downloadVkAttachment error:', err);
     return null;
@@ -243,7 +240,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
 
     const attachmentIds: string[] = [];
     if (msg.attachments && msg.attachments.length > 0) {
-      const taskDir = path.join(TASKS_DIR, String(latestTask.ticketNumber || latestTask.id));
+      const taskDir = path.join(uploadsRoot(), 'tasks', String(latestTask.ticketNumber || latestTask.id));
       if (!fs.existsSync(taskDir)) {
         fs.mkdirSync(taskDir, { recursive: true });
       }
@@ -369,7 +366,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
       });
       console.log(`[VK Processor] First message added to discussion of task ${task.id}`);
 
-      const taskDir = path.join(TASKS_DIR, String(task.ticketNumber || task.id));
+      const taskDir = path.join(uploadsRoot(), 'tasks', String(task.ticketNumber || task.id));
       if (!fs.existsSync(taskDir)) {
         fs.mkdirSync(taskDir, { recursive: true });
       }

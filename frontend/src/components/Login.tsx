@@ -174,6 +174,20 @@ export function Login() {
   const [guestLoading, setGuestLoading] = useState(false)
   const [showSoundPrompt, setShowSoundPrompt] = useState(false)
   const [pendingRedirect, setPendingRedirect] = useState(false)
+  // Мультитенантность: название организации (tenant'а) и статус активации
+  const [tenantInfo, setTenantInfo] = useState<{ name: string; isMain: boolean } | null>(null)
+  const [tenantPending, setTenantPending] = useState(false)
+
+  // Информация об организации (tenant'е) текущего поддомена
+  useEffect(() => {
+    fetch(`${API_URL}/api/platform/me`)
+      .then((r) => {
+        if (r.status === 402) { setTenantPending(true); return null }
+        return r.ok ? r.json() : null
+      })
+      .then((data) => { if (data) setTenantInfo(data) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     fetch(`${API_URL}/api/vk/config`)
@@ -303,6 +317,25 @@ export function Login() {
     }
   }
 
+  // Организация зарегистрирована, но ещё не оплачена — доступ закрыт
+  if (tenantPending) {
+    return (
+      <div className="login-split">
+        <section className="login-form-side" style={{ width: '100%' }}>
+          <div className="login-form-wrap">
+            <div className="login-form-content" style={{ textAlign: 'center' }}>
+              <h1>Организация ожидает активации</h1>
+              <p className="login-subtitle">
+                Регистрация завершена. Доступ будет открыт после оплаты подписки.<br />
+                По вопросам оплаты: <a href="mailto:support@welans.cc">support@welans.cc</a>
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div className="login-split">
       {/* Левая брендовая панель */}
@@ -333,6 +366,11 @@ export function Login() {
         <div className="login-form-wrap">
           <div className="login-form-content">
           <h1>{isRegister ? 'Регистрация' : 'Вход в систему'}</h1>
+          {tenantInfo && !tenantInfo.isMain && (
+            <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center' }}>
+              Организация: <b>{tenantInfo.name}</b>
+            </p>
+          )}
           <p className="login-subtitle">
             {isRegister ? 'Создайте аккаунт за пару минут' : 'С возвращением! Введите свои данные'}
           </p>
@@ -420,6 +458,11 @@ export function Login() {
               <>Нет аккаунта? <button type="button" onClick={() => { setIsRegister(true); setError('') }}>Регистрация</button></>
             )}
           </p>
+          {tenantInfo?.isMain && (
+            <p className="login-register" style={{ marginTop: 8 }}>
+              Хотите свою CRM для организации? <a href="/register">Регистрация организации</a>
+            </p>
+          )}
           </div>
 
           <p className="login-catalog-hint">

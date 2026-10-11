@@ -8,6 +8,7 @@ import { syncProductsToOzon } from '../lib/ozon.js';
 import { generateUniqueArticle } from '../lib/article.js';
 
 const router = Router();
+import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
 
 // Нормализация тегов карточки: обрезка пробелов, без дубликатов и пустых значений
 function normalizeTags(input: unknown): string[] {
@@ -837,7 +838,7 @@ router.post('/bulk-category', async (req, res) => {
 
 /* ============ Изображения ============ */
 
-const UPLOAD_ROOT = '/app/uploads';
+// Корень uploads текущего tenant'а (с префиксом /t-<slug>, см. lib/tenant.ts)
 
 /**
  * POST /api/products/:id/images
@@ -862,16 +863,16 @@ router.post('/:id/images', async (req, res) => {
       const ext = path.extname(attachment.filename) || '';
       const baseName = count === 0 ? product.article : `${product.article}-${count}`;
       newFilename = `${baseName}${ext}`;
-      const oldPath = path.join(UPLOAD_ROOT, attachment.filename);
-      const newPath = path.join(UPLOAD_ROOT, newFilename);
+      const oldPath = path.join(uploadsRoot(), attachment.filename);
+      const newPath = path.join(uploadsRoot(), newFilename);
       if (oldPath !== newPath) {
         if (fs.existsSync(newPath)) fs.unlinkSync(newPath);
         if (fs.existsSync(oldPath)) fs.renameSync(oldPath, newPath);
         await prisma.fileAttachment.update({
           where: { id: attachment.id },
-          data: { filename: newFilename, path: `/uploads/${newFilename}` },
+          data: { filename: newFilename, path: `/uploads${tenantUploadPrefix()}/${newFilename}` },
         });
-        url = `/uploads/${newFilename}`;
+        url = `/uploads${tenantUploadPrefix()}/${newFilename}`;
       }
     }
     const image = await prisma.productImage.create({
@@ -910,7 +911,7 @@ router.post('/:id/images/url', async (req, res) => {
 
     const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[mime] || 'jpg';
     const filename = `product-${product.id}-${Date.now()}.${ext}`;
-    fs.writeFileSync(path.join(UPLOAD_ROOT, filename), buf);
+    fs.writeFileSync(path.join(uploadsRoot(), filename), buf);
 
     const attachment = await prisma.fileAttachment.create({
       data: {
@@ -920,7 +921,7 @@ router.post('/:id/images/url', async (req, res) => {
         originalName: url.split('/').pop()?.split('?')[0] || filename,
         mimeType: mime,
         size: buf.length,
-        path: `/uploads/${filename}`,
+        path: `/uploads${tenantUploadPrefix()}/${filename}`,
         authorId: (req as AuthRequest).user!.id,
       },
     });
@@ -947,7 +948,7 @@ router.delete('/:id/images/:imageId', async (req, res) => {
     }
     const attachment = await prisma.fileAttachment.findUnique({ where: { id: image.attachmentId } });
     if (attachment) {
-      const filePath = path.join(UPLOAD_ROOT, attachment.filename);
+      const filePath = '/app' + attachment.path; // URL-путь из БД уже содержит префикс tenant'а
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }

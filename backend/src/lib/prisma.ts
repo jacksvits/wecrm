@@ -1,7 +1,22 @@
 import { PrismaClient } from '@prisma/client';
+import { platformPrisma, tenantContext, getTenantPrisma } from './tenant.js';
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+/**
+ * Глобальный prisma-клиент. Для главного домена и вне HTTP-контекста
+ * (скрипты, часть воркеров) обращается к платформенной БД. Внутри запроса
+ * tenant-поддомена — прозрачно маршрутизируется в БД текущей организации
+ * через AsyncLocalStorage (см. lib/tenant.ts и middleware/tenant.ts).
+ */
+function activeClient(): PrismaClient {
+  const t = tenantContext.getStore();
+  if (t && !t.isMain) return getTenantPrisma(t.dbName);
+  return platformPrisma;
+}
 
-export const prisma = globalForPrisma.prisma || new PrismaClient();
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+export const prisma = new Proxy(platformPrisma, {
+  get(_target, prop) {
+    const client = activeClient();
+    const value = (client as any)[prop];
+    return typeof value === 'function' ? value.bind(client) : value;
+  },
+}) as PrismaClient;

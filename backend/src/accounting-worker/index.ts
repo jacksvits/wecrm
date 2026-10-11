@@ -2,6 +2,7 @@ import { ImapFlow, ImapFlowOptions, FetchMessageObject } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import pdfParse from 'pdf-parse';
 import { prisma } from '../lib/prisma.js';
+import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
 import { applyAccountingRules } from '../lib/accounting-rules.js';
 import {
   extractAmounts,
@@ -30,7 +31,7 @@ interface AccountingWorkerConfig {
 }
 
 /** Папка для вложений финансовых документов */
-const UPLOAD_DIR = '/app/uploads/accounting';
+// Директория текущего tenant'а (с префиксом /t-<slug>, см. lib/tenant.ts)
 
 /**
  * Простейшее преобразование HTML в текст: убираем теги, скрипты и стили,
@@ -282,20 +283,21 @@ export class AccountingWorker {
             if (!authorId) {
               console.warn('[AccountingWorker] No admin user found, attachments not saved');
             } else {
-              if (!fs.existsSync(UPLOAD_DIR)) {
-                fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+              const accDir = path.join(uploadsRoot(), 'accounting');
+              if (!fs.existsSync(accDir)) {
+                fs.mkdirSync(accDir, { recursive: true });
               }
               for (const att of realAttachments) {
                 const ext = path.extname(att.filename || '') || '';
                 const filename = `${randomUUID()}${ext}`;
-                fs.writeFileSync(path.join(UPLOAD_DIR, filename), att.content);
+                fs.writeFileSync(path.join(accDir, filename), att.content);
                 await prisma.fileAttachment.create({
                   data: {
                     filename,
                     originalName: att.filename || 'attachment',
                     mimeType: att.contentType || 'application/octet-stream',
                     size: att.content.length,
-                    path: `/uploads/accounting/${filename}`,
+                    path: `/uploads${tenantUploadPrefix()}/accounting/${filename}`,
                     entityType: 'finance_document',
                     entityId: doc.id,
                     authorId,

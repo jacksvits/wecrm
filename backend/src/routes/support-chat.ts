@@ -3,6 +3,7 @@ import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';
 import { prisma } from '../lib/prisma.js';
+import { uploadsRoot } from '../lib/tenant.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { sendPushToRoleUsers, sendPushToUser } from '../lib/push.js';
@@ -11,9 +12,8 @@ import { notifyRoleUsers } from '../lib/notifications.js';
 const router = Router();
 router.use(authMiddleware);
 
-const UPLOAD_DIR = '/app/uploads';
-const TASKS_DIR = path.join(UPLOAD_DIR, 'tasks');
-if (!fs.existsSync(TASKS_DIR)) { fs.mkdirSync(TASKS_DIR, { recursive: true }); }
+// Папка задач текущего tenant'а (с префиксом /t-<slug> для tenant'ов, см. lib/tenant.ts)
+const taskDirFor = (ticketNum: string | number) => path.join(uploadsRoot(), 'tasks', String(ticketNum));
 
 const createMessageSchema = z.object({
   content: z.string().min(1, 'Сообщение не может быть пустым').max(10000),
@@ -148,7 +148,7 @@ const createTicket = async (userId: string, name: string, content: string) => {
     },
   });
   // Папка вложений задачи по номеру тикета (как в routes/tasks.ts)
-  const taskDir = path.join(TASKS_DIR, String(task.ticketNumber));
+  const taskDir = taskDirFor(task.ticketNumber);
   if (!fs.existsSync(taskDir)) { fs.mkdirSync(taskDir, { recursive: true }); }
   await prisma.activity.create({ data: { action: 'created', entity: 'task', entityId: task.id, userId } });
   await prisma.taskHistory.create({ data: { taskId: task.id, field: 'task', oldValue: null, newValue: 'Создана задача: ' + task.title, userId } });

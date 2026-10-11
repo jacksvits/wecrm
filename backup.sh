@@ -1,35 +1,49 @@
 #!/bin/bash
-# WeCRM PostgreSQL Backup Script
-# Runs daily at 01:00, keeps 7 days of backups
+# WeCRM PostgreSQL Backup Script (мультитенантный)
+# - Бэкапит платформенную БД (wecrm) и каждую БД организации (wecrm_t_*)
+# - Ротация: base — 7 дней, download — 30 дней
+# Использование: backup.sh [base|download]   (по умолчанию base)
 
-BACKUP_DIR="/mnt/nfs/wecrm-uploads/backup/base"
-DB_NAME="wecrm"
+MODE="${1:-base}"
+BACKUP_DIR="/mnt/nfs/wecrm-uploads/backup/${MODE}"
 DB_USER="crm"
+MAIN_DB="wecrm"
 CONTAINER="wecrm-db-1"
-DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="${BACKUP_DIR}/wecrm_backup_${DATE}.sql"
+RETENTION_DAYS=7
+[ "$MODE" = "download" ] && RETENTION_DAYS=30
 
-# Ensure backup directory exists
 mkdir -p "${BACKUP_DIR}"
 
-# Run pg_dump inside Docker container
-echo "[$(date)] Starting backup..."
-docker exec "${CONTAINER}" pg_dump -U "${DB_USER}" -d "${DB_NAME}" --no-owner --no-privileges > "${BACKUP_FILE}"
+dump_db() {
+  local db="$1"
+  local date_suffix
+  date_suffix=$(date +%Y%m%d_%H%M%S)
+  local file="${BACKUP_DIR}/${db}_backup_${date_suffix}.sql"
+  echo "[$(date)] Backup ${db}..."
+  if docker exec "${CONTAINER}" pg_dump -U "${DB_USER}" -d "${db}" --no-owner --no-privileges > "${file}"; then
+    gzip "${file}"
+    echo "[$(date)] OK: ${file}.gz"
+  else
+    echo "[$(date)] FAILED: ${db}"
+    rm -f "${file}"
+    return 1
+  fi
+}
 
-if [ $? -eq 0 ]; then
-    # Compress the backup
-    gzip "${BACKUP_FILE}"
-    echo "[$(date)] Backup OK: ${BACKUP_FILE}.gz"
-else
-    echo "[$(date)] Backup FAILED"
-    rm -f "${BACKUP_FILE}"
-    exit 1
-fi
+# Платформенная БД (главная организация + реестр tenant'ов)
+dump_db "${MAIN_DB}" || exit 1
 
-# Delete backups older than 7 days
-echo "[$(date)] Cleaning up backups older than 7 days..."
-find "${BACKUP_DIR}" -name "wecrm_backup_*.sql.gz" -type f -mtime +7 -delete
+# Базы данных организаций
+TENANT_DBS=$(docker exec "${CONTAINER}" psql -U "${DB_USER}" -d "${MAIN_DB}" -tAc \
+  "SELECT datname FROM pg_database WHERE datname LIKE 'wecrm_t\_%' ORDER BY datname")
 
-# List remaining backups
-echo "[$(date)] Remaining backups:"
-ls -lh "${BACKUP_DIR}"
+for db in ${TENANT_DBS}; do
+  dump_db "${db}" || echo "[$(date)] WARNING: бэкап ${db} не выполнен"
+done
+
+# Ротация
+echo "[$(date)] Cleaning up backups older than ${RETENTION_DAYS} days..."
+find "${BACKUP_DIR}" -name "*_backup_*.sql.gz" -type f -mtime "+${RETENTION_DAYS}" -delete
+
+echo "[$(date)] Backups in ${BACKUP_DIR}:"
+ls -lh "${BACKUP_DIR}" | tail -20

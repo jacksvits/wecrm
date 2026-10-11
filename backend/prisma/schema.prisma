@@ -1717,3 +1717,23 @@ model TochkaAcquiringPayment {
   @@map("tochka_acquiring_payments")
 }
 
+
+// ==== Мультитенантность платформы ====
+// Реестр организаций. Главная организация живёт в основной БД (DATABASE_URL)
+// и в этой таблице не нуждается; каждая запись — отдельная БД wecrm_t_<slug>.
+model Tenant {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique // поддомен: <slug>.welans.cc
+  dbName      String    @unique @map("db_name")
+  adminEmail  String    @map("admin_email")
+  status      String    @default("pending") // pending | active | suspended
+  plan        String    @default("standard")
+  pricePerMonth Int?    @map("price_per_month") // копейки
+  paidUntil   DateTime? @map("paid_until")
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  activatedAt DateTime? @map("activated_at")
+
+  @@map("tenants")
+}

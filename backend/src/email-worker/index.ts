@@ -1,6 +1,7 @@
 import { ImapFlow, ImapFlowOptions, FetchMessageObject } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { prisma } from '../lib/prisma.js';
+import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
 import { postHandlerGreeting } from '../lib/handler-messages.js';
 import { normalizeEmailDescription, normalizeEmailDescriptionHtml } from '../lib/email-description.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers } from '../lib/notifications.js';
@@ -256,8 +257,7 @@ export class EmailWorker {
           const inlineImagePaths = new Map<string, string>();
           let inlineImageRecords: { filename: string; originalName: string; mimeType: string; size: number; path: string }[] = [];
           if (inlineImages.length > 0) {
-            const UPLOAD_DIR_IMAGES = '/app/uploads';
-            const IMAGES_DIR = path.join(UPLOAD_DIR_IMAGES, 'comments');
+            const IMAGES_DIR = path.join(uploadsRoot(), 'comments');
             if (!fs.existsSync(IMAGES_DIR)) {
               fs.mkdirSync(IMAGES_DIR, { recursive: true });
             }
@@ -265,7 +265,7 @@ export class EmailWorker {
               const ext = path.extname(img.filename || '') || `.${(img.contentType || 'png').split('/')[1] || 'png'}`;
               const filename = `${randomUUID()}${ext}`;
               fs.writeFileSync(path.join(IMAGES_DIR, filename), img.content);
-              const dbPath = `/uploads/comments/${filename}`;
+              const dbPath = `/uploads${tenantUploadPrefix()}/comments/${filename}`;
               inlineImagePaths.set(String(img.contentId).replace(/^<|>$/g, ''), dbPath);
               inlineImageRecords.push({
                 filename,
@@ -402,8 +402,7 @@ export class EmailWorker {
             (a: any) => a.filename && a.content && a.content.length > 0
           );
           if (hasRealAttachments.length > 0) {
-            const UPLOAD_DIR = '/app/uploads';
-            const COMMENTS_DIR = path.join(UPLOAD_DIR, 'comments');
+            const COMMENTS_DIR = path.join(uploadsRoot(), 'comments');
             if (!fs.existsSync(COMMENTS_DIR)) {
               fs.mkdirSync(COMMENTS_DIR, { recursive: true });
             }
@@ -414,7 +413,7 @@ export class EmailWorker {
               const filename = `${randomUUID()}${ext}`;
               const filePath = path.join(COMMENTS_DIR, filename);
               fs.writeFileSync(filePath, att.content);
-              const dbPath = `/uploads/comments/${filename}`;
+              const dbPath = `/uploads${tenantUploadPrefix()}/comments/${filename}`;
 
               const fileAtt = await prisma.fileAttachment.create({
                 data: {

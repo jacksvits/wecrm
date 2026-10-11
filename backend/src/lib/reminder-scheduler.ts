@@ -116,6 +116,11 @@ async function processTick() {
   }
 }
 
+/** Один тик обработки напоминаний (вызывается tenant-циклом для каждой организации) */
+export function runReminderTick(): Promise<void> {
+  return processTick();
+}
+
 export function startReminderScheduler() {
   console.log('[Reminders] Планировщик напоминаний запущен (интервал 30с, повторный push при просрочке каждые 15 мин)');
   setInterval(() => {

@@ -275,6 +275,18 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     cancel: (id: string): Promise<WebCall> => fetchApi(`/api/calls/${id}/cancel`, { method: 'POST' }),
     end: (id: string): Promise<WebCall> => fetchApi(`/api/calls/${id}/end`, { method: 'POST' }),
   },
+  // === Мультитенантность платформы (организации) ===
+  platform: {
+    register: (data: { name: string; slug: string; adminName: string; adminEmail: string; adminPassword: string }): Promise<{ ok: boolean; status: string; subdomain: string; message: string }> => fetchApi('/api/platform/register', { method: 'POST', body: JSON.stringify(data) }),
+    me: (): Promise<{ name: string; slug: string; isMain: boolean; status: string }> => fetchApi('/api/platform/me'),
+    tenants: (): Promise<any[]> => fetchApi('/api/platform/tenants'),
+    activate: (id: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/activate`, { method: 'POST' }),
+    suspend: (id: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/suspend`, { method: 'POST' }),
+    resume: (id: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/resume`, { method: 'POST' }),
+    extend: (id: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/extend`, { method: 'POST' }),
+    deleteTenant: (id: string, slug: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}?confirm=${encodeURIComponent(slug)}`, { method: 'DELETE' }),
+    resetPassword: (id: string, password: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ password }) }),
+  },
   get: (path: string): Promise<any> => fetchApi(path),
   // === Модуль «Бухгалтерия по почте» ===
   accounting: {

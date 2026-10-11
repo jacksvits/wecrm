@@ -20,6 +20,14 @@ fi
 cd "$PROJECT_DIR"
 echo "Project directory: $PROJECT_DIR"
 
+# 0. Backup ALL databases to NFS before deploy (/volume2/NFS/wecrm/backup/download)
+echo "Pre-deploy backup of all databases..."
+if [ -x ./backup.sh ]; then
+  ./backup.sh download || echo 'WARNING: backup failed, deploy continues'
+else
+  echo "WARNING: backup.sh not found, skipping backup"
+fi
+
 # 1. Update code
 echo "Pulling latest code..."
 git reset --hard origin/HEAD
