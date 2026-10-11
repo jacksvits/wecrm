@@ -471,13 +471,17 @@ export function Login() {
             )}
           </p>
           {tenantInfo?.isMain && (
-            <a href="/org-login" style={{
-              display: 'block', textAlign: 'center', padding: '11px', marginTop: 12,
-              border: '1px solid var(--border-color)', borderRadius: 10,
-              color: 'var(--text-primary)', textDecoration: 'none', fontSize: 14, fontWeight: 500,
-            }}>
-              Войти в свою CRM
-            </a>
+            <>
+              {/* Разделитель */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '18px 0 12px', color: 'var(--text-secondary)', fontSize: 13 }}>
+                <span style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
+                или
+                <span style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
+              </div>
+              <a href="/org-login" className="login-btn-primary" style={{ display: 'block', textAlign: 'center', padding: '12px', borderRadius: 10, color: '#fff', textDecoration: 'none', fontSize: 15, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.28)' }}>
+                Войти в свою CRM
+              </a>
+            </>
           )}
           {tenantInfo?.isMain && (
             <p className="login-register" style={{ marginTop: 8 }}>
