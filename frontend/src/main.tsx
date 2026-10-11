@@ -2,7 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import App from './App';
+import App from './App'
+import { SplashScreen } from './components/SplashScreen';
 import './index.css';
 import { loadBranding } from './lib/branding';
 import { initNativePush } from './lib/nativePush';
@@ -53,7 +54,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <><SplashScreen /><App /></>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,
