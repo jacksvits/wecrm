@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { Link } from 'react-router-dom'
 
 interface Tenant {
   id: string
@@ -7,11 +8,13 @@ interface Tenant {
   slug: string
   dbName: string
   adminEmail: string
-  status: string // pending | active | suspended
+  status: string
   plan: string
+  planProductId?: string | null
   paidUntil?: string | null
   createdAt: string
-  activatedAt?: string | null
+  usersCount?: number | null
+  dbSizeBytes?: number | null
 }
 
 const STATUS_LABEL: Record<string, { text: string; color: string; bg: string }> = {
@@ -25,12 +28,29 @@ function fmtDate(d?: string | null) {
   return new Date(d).toLocaleDateString('ru-RU')
 }
 
+function fmtSize(bytes?: number | null) {
+  if (bytes == null) return '—'
+  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' КБ'
+  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' МБ'
+  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' ГБ'
+}
+
+function toDateInput(d?: string | null) {
+  if (!d) return ''
+  const dt = new Date(d)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+
 /** Админка платформы: управление организациями (только главный домен, роль admin) */
 export function TenantsAdmin() {
   const [tenants, setTenants] = useState<Tenant[]>([])
+  const [tariffs, setTariffs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actionId, setActionId] = useState<string | null>(null)
+  const [editing, setEditing] = useState<Tenant | null>(null)
+  const [editPlan, setEditPlan] = useState('')
+  const [editDate, setEditDate] = useState('')
   const baseHost = window.location.hostname.replace(/^www\./, '')
 
   const load = () => {
@@ -40,11 +60,32 @@ export function TenantsAdmin() {
       .catch((e: any) => setError(e.message || 'Не удалось загрузить организации'))
       .finally(() => setLoading(false))
   }
-  useEffect(load, [])
+  useEffect(() => {
+    load()
+    api.platform.tariffs?.().catch(() => {})
+    fetch('/api/platform/tariffs').then((r) => (r.ok ? r.json() : [])).then((l) => setTariffs(Array.isArray(l) ? l : [])).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const act = (fn: () => Promise<any>) => {
     setActionId('wait')
     fn().catch((e: any) => setError(e.message || 'Ошибка')).finally(() => { setActionId(null); load() })
+  }
+
+  const openEdit = (t: Tenant) => {
+    setEditing(t)
+    setEditPlan(t.planProductId || '')
+    setEditDate(toDateInput(t.paidUntil))
+    setError('')
+  }
+
+  const saveEdit = () => {
+    if (!editing) return
+    const body: any = {}
+    if (editPlan !== (editing.planProductId || '')) body.planProductId = editPlan || null
+    if (editDate !== toDateInput(editing.paidUntil)) body.paidUntil = editDate ? new Date(editDate + 'T23:59:59').toISOString() : null
+    if (!Object.keys(body).length) { setEditing(null); return }
+    act(() => api.platform.updateTenant(editing.id, body).then(() => setEditing(null)))
   }
 
   const card: React.CSSProperties = {
@@ -55,13 +96,23 @@ export function TenantsAdmin() {
     padding: '7px 12px', borderRadius: 8, border: `1px solid ${color}`, background: 'transparent',
     color, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
   })
+  const overlay: React.CSSProperties = {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+  }
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '10px 12px', borderRadius: 8, fontSize: 14, boxSizing: 'border-box',
+    border: '1px solid var(--border-color)', background: 'var(--bg-input, var(--bg-secondary))', color: 'var(--text-primary)',
+  }
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
         <h1 style={{ margin: 0, fontSize: 22 }}>Организации платформы</h1>
-        <a href="/platform/tickets" style={{ fontSize: 14 }}>Запросы организаций →</a>
-        <button onClick={load} style={btn('var(--text-secondary)')}>Обновить</button>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+          <a href="/platform/tickets" style={{ fontSize: 14 }}>Запросы организаций →</a>
+          <button onClick={load} style={btn('var(--text-secondary)')}>Обновить</button>
+        </div>
       </div>
       {error && <div style={{ color: '#dc2626', marginBottom: 12 }}>{error}</div>}
       {loading && <div>Загрузка...</div>}
@@ -71,7 +122,7 @@ export function TenantsAdmin() {
           <a href="/register" target="_blank" rel="noreferrer">/register</a>.
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
         {tenants.map((t) => {
           const st = STATUS_LABEL[t.status] || STATUS_LABEL.pending
           const busy = actionId !== null
@@ -90,11 +141,16 @@ export function TenantsAdmin() {
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <span>Админ: {t.adminEmail}</span>
-                <span>Тариф: {t.plan}</span>
+                <span>Тариф: <b>{t.plan}</b></span>
                 <span>Оплачено по: <b>{fmtDate(t.paidUntil)}</b></span>
+                <span>Пользователей в CRM: <b>{t.usersCount ?? '—'}</b></span>
+                <span>База данных: <b>{fmtSize(t.dbSizeBytes)}</b></span>
                 <span>Регистрация: {fmtDate(t.createdAt)}</span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <button disabled={busy} style={btn('#1e40af')} onClick={() => openEdit(t)}>
+                  Редактировать
+                </button>
                 {t.status !== 'active' && (
                   <button disabled={busy} style={btn('#16a34a')} onClick={() => act(() => api.platform.activate(t.id))}>
                     Активировать (+30 дней)
@@ -141,6 +197,46 @@ export function TenantsAdmin() {
           )
         })}
       </div>
+
+      {editing && (
+        <div style={overlay} onClick={() => setEditing(null)}>
+          <div style={{ ...card, width: '100%', maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Редактирование: {editing.name}</h2>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 14 }}>
+              {editing.slug}.{baseHost}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>Тариф</label>
+                <select style={inputStyle} value={editPlan} onChange={(e) => setEditPlan(e.target.value)}>
+                  <option value="">— без привязки к товару (текущее: {editing.plan}) —</option>
+                  {tariffs.map((x) => (
+                    <option key={x.productId} value={x.productId}>
+                      {x.name}{x.price != null ? ` — ${Number(x.price).toLocaleString('ru-RU')} ₽` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  Дата окончания подписки
+                </label>
+                <input type="date" style={inputStyle} value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+              </div>
+              {error && <div style={{ color: '#dc2626', fontSize: 13 }}>{error}</div>}
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button style={{ ...btn('var(--text-secondary)') }} onClick={() => setEditing(null)}>Отмена</button>
+                <button
+                  style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', fontSize: 13, cursor: 'pointer' }}
+                  onClick={saveEdit}
+                >
+                  Сохранить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

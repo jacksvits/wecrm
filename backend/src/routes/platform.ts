@@ -8,7 +8,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { currentTenant, platformPrisma, invalidateTenantCache } from '../lib/tenant.js';
+import { currentTenant, platformPrisma, invalidateTenantCache, getTenantPrisma } from '../lib/tenant.js';
 import { dbNameForSlug, provisionTenantDb, dropTenantDb, slugTaken, SLUG_PATTERN } from '../lib/tenant-provision.js';
 import { createTenantProxyRule, deleteTenantProxyRule } from '../lib/nas-proxy.js';
 
@@ -187,11 +187,61 @@ function requirePlatformAdmin(req: AuthRequest, res: any, next: any) {
 /** Список организаций платформы */
 router.get('/tenants', authMiddleware, requirePlatformAdmin, async (_req, res) => {
   const tenants = await (platformPrisma as any).tenant.findMany({ orderBy: { createdAt: 'desc' } });
-  res.json(tenants);
+  // Обогащаем: число пользователей в БД организации и размер базы
+  const out: any[] = [];
+  for (const t of tenants) {
+    let usersCount: number | null = null;
+    let dbSizeBytes: number | null = null;
+    try {
+      const client = getTenantPrisma(t.dbName);
+      usersCount = await client.user.count();
+    } catch { usersCount = null; }
+    try {
+      const rows: any[] = await platformPrisma.$queryRawUnsafe('SELECT pg_database_size($1) AS size', t.dbName);
+      dbSizeBytes = Number(rows[0]?.size ?? 0);
+    } catch { dbSizeBytes = null; }
+    out.push({ ...t, usersCount, dbSizeBytes });
+  }
+  res.json(out);
 });
 
 const TENANT_STATUSES = ['pending', 'active', 'suspended'];
 
+/** Редактирование организации: тариф и/или дата окончания подписки */
+router.put('/tenants/:id', authMiddleware, requirePlatformAdmin, async (req, res) => {
+  const tenant = await (platformPrisma as any).tenant.findUnique({ where: { id: req.params.id } });
+  if (!tenant) return res.status(404).json({ error: 'Организация не найдена' });
+  const body = z.object({
+    plan: z.string().trim().max(100).optional(),
+    planProductId: z.string().trim().optional(),
+    paidUntil: z.string().optional(),
+  }).parse(req.body || {});
+  const data: any = {};
+  if (body.plan !== undefined) data.plan = body.plan;
+  if (body.planProductId !== undefined) {
+    if (body.planProductId) {
+      const p = await (platformPrisma as any).product.findFirst({
+        where: { id: body.planProductId, isActive: true, categoryNode: { isCrmTariff: true } },
+        include: { prices: true },
+      });
+      if (!p) return res.status(400).json({ error: 'Тариф не найден в тарифных категориях' });
+      data.plan = p.name;
+      data.planProductId = p.id;
+      const prices = (p.prices || []).map((x: any) => Number(x.price)).filter((n: number) => Number.isFinite(n));
+      if (prices.length) data.pricePerMonth = Math.round(Math.min(...prices) * 100);
+    } else {
+      data.planProductId = null;
+    }
+  }
+  if (body.paidUntil !== undefined) {
+    const d = new Date(body.paidUntil);
+    if (Number.isNaN(d.getTime())) return res.status(400).json({ error: 'Некорректная дата окончания подписки' });
+    data.paidUntil = d;
+  }
+  const updated = await (platformPrisma as any).tenant.update({ where: { id: tenant.id }, data });
+  invalidateTenantCache(tenant.slug);
+  res.json(updated);
+});
 /** Активация организации после оплаты подписки (+30 дней) */
 router.post('/tenants/:id/activate', authMiddleware, requirePlatformAdmin, async (req, res) => {
   const tenant = await (platformPrisma as any).tenant.findUnique({ where: { id: req.params.id } });

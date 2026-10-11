@@ -280,6 +280,8 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     register: (data: { name: string; slug: string; adminName: string; adminEmail: string; adminPassword: string }): Promise<{ ok: boolean; status: string; subdomain: string; message: string }> => fetchApi('/api/platform/register', { method: 'POST', body: JSON.stringify(data) }),
     me: (): Promise<{ name: string; slug: string; isMain: boolean; status: string }> => fetchApi('/api/platform/me'),
     tenants: (): Promise<any[]> => fetchApi('/api/platform/tenants'),
+    updateTenant: (id: string, data: any): Promise<any> => fetchApi(`/api/platform/tenants/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    tariffs: (): Promise<any[]> => fetchApi('/api/platform/tariffs'),
     activate: (id: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/activate`, { method: 'POST' }),
     suspend: (id: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/suspend`, { method: 'POST' }),
     resume: (id: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/resume`, { method: 'POST' }),
