@@ -117,7 +117,7 @@ const handleSubmit = async (e: React.FormEvent) => { e.preventDefault() ; setErr
                 ...(((currentUser as any)?.crmCalls !== false ? [{ key: 'notifyOnNewCall', label: 'Новые звонки' }] : []) as any),
                 { key: 'notifyOnNewComment', label: 'Новые комментарии' },
                 { key: 'notifyOnNewChat', label: 'Новые сообщения в чате' },
-                { key: 'notifyOnNewCall', label: 'Новые звонки' },
+                
                 { key: 'notifyOnNewNews', label: 'Новости' },
               ].map((item) => (
                 <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', padding: '4px 0' }}>
