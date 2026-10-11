@@ -170,7 +170,7 @@ return (
             </div>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 16, borderRadius: 12, background: cardBg, border: `1px solid ${borderColor}` }}>
+          {(authUser as any)?.crmBilling !== false && (<div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 16, borderRadius: 12, background: cardBg, border: `1px solid ${borderColor}` }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>Мои подписки</h3>
               <button type='button' onClick={() => navigate('/subscriptions')} style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer' }}>
@@ -215,7 +215,7 @@ return (
                 )}
               </div>
             )}
-          </div>
+          </div>)}
         </div>
       </div>
     </div>
