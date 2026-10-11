@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import { api } from "../api/client";
+import { useAuth } from "../hooks/useAuth";
 import { loadBranding } from "../lib/branding";
 import { THEMES } from "../lib/themes";
 import { User, AutoReplyTrigger } from "../types";
@@ -38,7 +39,7 @@ type SystemSubTab = "design" | "themes" | "storage" | "promo" | "slides" | "call
 
 export function SystemSettings() {
   // По умолчанию открываем под-вкладку «Дизайн»
-  const [subTab, setSubTab] = useState<SystemSubTab>("design");
+  const [subTab, setSubTab] = useState<SystemSubTab>("design"); const { user } = useAuth() as any ; const ssPages: string[] = (user as any)?.allowedPages || [] ; const catalogAllowed = ssPages.length === 0 || ssPages.includes('/products') ; const tasksAllowedSS = ssPages.length === 0 || ssPages.includes('/tasks') ;
   const [settings, setSettings] = useState<Record<string, { url: string; path: string }>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -61,7 +62,7 @@ export function SystemSettings() {
   const [handlerGreeting, setHandlerGreeting] = useState("");
   const [handlerCompletion, setHandlerCompletion] = useState("");
   const [handlerUserId, setHandlerUserId] = useState<string | null>(null);
-  const [handlerUsers, setHandlerUsers] = useState<User[]>([]);
+  useEffect(() => { if (subTab === 'promo' && !catalogAllowed) setSubTab('design') ; if (subTab === 'autoreply' && !tasksAllowedSS) setSubTab('design') ; }, [subTab, catalogAllowed, tasksAllowedSS]) ; const [handlerUsers, setHandlerUsers] = useState<User[]>([]);
   const [handlerLoading, setHandlerLoading] = useState(true);
   const [handlerSaving, setHandlerSaving] = useState(false);
 
@@ -1499,9 +1500,9 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "storage")} onClick={() => setSubTab("storage")}>
           Хранение
         </button>
-        <button style={subTabStyle(subTab === "promo")} onClick={() => setSubTab("promo")}>
+        {catalogAllowed && (<button style={subTabStyle(subTab === "promo")} onClick={() => setSubTab("promo")}>
           Промо-блоки
-        </button>
+        </button>)}
         <button style={subTabStyle(subTab === "slides")} onClick={() => setSubTab("slides")}>
           Слайдер авторизации
         </button>
@@ -1511,9 +1512,9 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "handler")} onClick={() => setSubTab("handler")}>
           Обработчик
         </button>
-        <button style={subTabStyle(subTab === "autoreply")} onClick={() => setSubTab("autoreply")}>
+        {tasksAllowedSS && (<button style={subTabStyle(subTab === "autoreply")} onClick={() => setSubTab("autoreply")}>
           Автоответчик
-        </button>
+        </button>)}
         <button style={subTabStyle(subTab === "legal")} onClick={() => setSubTab("legal")}>
           Документы
         </button>
