@@ -62,7 +62,7 @@ export function SystemSettings() {
   const [handlerGreeting, setHandlerGreeting] = useState("");
   const [handlerCompletion, setHandlerCompletion] = useState("");
   const [handlerUserId, setHandlerUserId] = useState<string | null>(null);
-  useEffect(() => { if (subTab === 'promo' && !catalogAllowed) setSubTab('design') ; if (subTab === 'autoreply' && !tasksAllowedSS) setSubTab('design') ; }, [subTab, catalogAllowed, tasksAllowedSS]) ; const [handlerUsers, setHandlerUsers] = useState<User[]>([]);
+  useEffect(() => { if (subTab === 'promo' && !catalogAllowed) setSubTab('design') ; if (subTab === 'autoreply' && !tasksAllowedSS) setSubTab('design') ; if (subTab === 'legal' && !catalogAllowed) setSubTab('design') ; }, [subTab, catalogAllowed, tasksAllowedSS]) ; const [handlerUsers, setHandlerUsers] = useState<User[]>([]);
   const [handlerLoading, setHandlerLoading] = useState(true);
   const [handlerSaving, setHandlerSaving] = useState(false);
 
@@ -1515,9 +1515,9 @@ export function SystemSettings() {
         {tasksAllowedSS && (<button style={subTabStyle(subTab === "autoreply")} onClick={() => setSubTab("autoreply")}>
           Автоответчик
         </button>)}
-        <button style={subTabStyle(subTab === "legal")} onClick={() => setSubTab("legal")}>
+        {catalogAllowed && (<button style={subTabStyle(subTab === "legal")} onClick={() => setSubTab("legal")}>
           Документы
-        </button>
+        </button>)}
         <button style={subTabStyle(subTab === "seo")} onClick={() => setSubTab("seo")}>
           SEO
         </button>
