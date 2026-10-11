@@ -7,7 +7,7 @@ import { useBrandLogo } from '../lib/branding'
  * Организация активируется после оплаты подписки администратором платформы.
  */
 export function Register() {
-  const brandLogo = useBrandLogo(true)
+  const brandLogo = useBrandLogo(false)
   const mainHost = window.location.hostname === 'welans.cc' || window.location.hostname === 'www.welans.cc'
   const baseHost = window.location.hostname.replace(/^www\./, '')
 
@@ -114,7 +114,7 @@ export function Register() {
                   </button>
                   <p style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>
                     После регистрации организация будет активирована после оплаты подписки.
-                    По вопросам оплаты: <a href="mailto:support@welans.cc">support@welans.cc</a>
+                    По вопросам оплаты: <a href="mailto:info@welans.ru">info@welans.ru</a>
                   </p>
                 </form>
                 <p style={{ textAlign: 'center', fontSize: 13, marginTop: 16 }}>
