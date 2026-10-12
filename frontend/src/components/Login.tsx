@@ -506,14 +506,16 @@ export function Login() {
           </form>
 
 
-          <div className="login-divider"><span>или</span></div>
-
-          {vkConfig && (isMainLoginHost || vkConfig.active !== false) ? (
-            <button onClick={handleVKLogin} disabled={vkLoading} className="login-btn-vk">
-              {vkIcon}
-              {vkLoading ? 'Перенаправление...' : 'Войти через VK'}
-            </button>
-          ) : (
+{vkConfig && (isMainLoginHost || vkConfig.active !== false) && (
+            <>
+              <div className="login-divider"><span>или</span></div>
+              <button onClick={handleVKLogin} disabled={vkLoading} className="login-btn-vk">
+                {vkIcon}
+                {vkLoading ? 'Перенаправление...' : 'Войти через VK'}
+              </button>
+            </>
+          )}
+          {!vkConfig && isMainLoginHost && (
             <div className="login-vk-hint">VK ID не настроен</div>
           )}
 
