@@ -258,10 +258,20 @@ router.post('/pay-notify', async (req, res) => {
   res.json({ ok: true });
 });
 /** Информация о текущем tenant'е — для логин-страницы (публичный) */
-router.get('/me', (_req, res) => {
+router.get('/me', async (_req, res) => {
   const t = currentTenant();
   if (!t) return res.status(404).json({ error: 'Организация не найдена' });
-  res.json({ name: t.name, slug: t.slug, isMain: t.isMain, status: t.status });
+  let allowedPages: string[] | null = null;
+  if (!t.isMain) {
+    try {
+      const tenantRow = await (platformPrisma as any).tenant.findUnique({ where: { id: t.id } });
+      if (tenantRow?.planProductId) {
+        const product = await (platformPrisma as any).product.findUnique({ where: { id: tenantRow.planProductId } });
+        if (Array.isArray(product?.crmAllowedPages)) allowedPages = product.crmAllowedPages;
+      }
+    } catch { /* ignore */ }
+  }
+  res.json({ name: t.name, slug: t.slug, isMain: t.isMain, status: t.status, allowedPages });
 });
 
 /** Дальше — только главный домен + админ платформы */
