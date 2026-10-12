@@ -299,6 +299,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     adminGet: (id: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}`),
     adminReply: (id: string, body: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}/reply`, { method: 'POST', body: JSON.stringify({ body }) }),
     adminStatus: (id: string, status: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
+    adminDelete: (id: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}`, { method: 'DELETE' }),
   },
   get: (path: string): Promise<any> => fetchApi(path),
   // === Модуль «Бухгалтерия по почте» ===

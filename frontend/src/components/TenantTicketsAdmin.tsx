@@ -129,8 +129,8 @@ export function TenantTicketsAdmin() {
             style={{
               padding: '6px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
               border: '1px solid var(--border-color)',
-              background: filter === val ? 'var(--text-primary)' : 'transparent',
-              color: filter === val ? 'var(--bg-primary)' : 'var(--text-secondary)',
+              background: filter === val ? '#16a34a' : 'transparent',
+              color: filter === val ? '#ffffff' : 'var(--text-secondary)',
             }}
           >{label}</button>
         ))}
@@ -150,6 +150,16 @@ export function TenantTicketsAdmin() {
             <div key={t.id} style={{ ...card, cursor: 'pointer' }} onClick={() => openTicket(t.id)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                 <b style={{ fontSize: 15 }}>{t.subject}</b>
+                <span
+                  role="button" title="Удалить запрос"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm('Удалить запрос навсегда?')) {
+                      setLoading(true); api.tenantSupport.adminDelete(t.id).catch((err2: any) => setError(err2.message || 'Ошибка')).finally(() => { setLoading(false); load(); });
+                    }
+                  }}
+                  style={{ fontSize: 12, color: '#dc2626', cursor: 'pointer', whiteSpace: 'nowrap', border: '1px solid #dc2626', borderRadius: 8, padding: '3px 10px' }}
+                >Удалить</span>
                 <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>{st.text}</span>
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>

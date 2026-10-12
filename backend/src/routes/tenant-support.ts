@@ -174,6 +174,15 @@ router.post('/admin/:id/reply', authMiddleware, requirePlatformAdmin, async (req
   res.json(ticketWithMessages(full));
 });
 
+/** Удаление запроса (платформа) */
+router.delete('/admin/:id', authMiddleware, requirePlatformAdmin, async (req, res) => {
+  const ticket = await db.tenantTicket.findUnique({ where: { id: req.params.id } });
+  if (!ticket) return res.status(404).json({ error: 'Запрос не найден' });
+  await db.tenantTicketMessage.deleteMany({ where: { ticketId: ticket.id } });
+  await db.tenantTicket.delete({ where: { id: ticket.id } });
+  res.json({ ok: true });
+});
+
 /** Смена статуса (open/answered/closed) */
 router.post('/admin/:id/status', authMiddleware, requirePlatformAdmin, async (req: AuthRequest, res) => {
   const parsedStatus = z.object({ status: z.enum(['open', 'answered', 'closed']) }).safeParse(req.body || {});
