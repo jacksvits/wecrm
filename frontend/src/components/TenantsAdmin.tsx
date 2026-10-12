@@ -127,24 +127,35 @@ export function TenantsAdmin() {
   const th: React.CSSProperties = { textAlign: 'left', fontSize: 12, color: 'var(--text-secondary)', padding: '8px 10px', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }
   const td: React.CSSProperties = { padding: '8px 10px', fontSize: 13, borderBottom: '1px solid var(--border-color)' }
 
-  const actions = (t: Tenant, compact = false) => {
+  const actions = (t: Tenant) => {
     const busy = actionId !== null
-    const b = (label: string, color: string, fn: () => void, title?: string) => (
-      <button key={label} disabled={busy} title={title || label} style={compact ? { ...btn(color), padding: '4px 8px', fontSize: 12 } : btn(color)} onClick={fn}>{label}</button>
+    const ib = (key: string, icon: string, title: string, fn: () => void) => (
+      <button
+        key={key}
+        disabled={busy}
+        title={title}
+        onClick={fn}
+        style={{
+          width: 30, height: 30, borderRadius: 8, cursor: busy ? 'default' : 'pointer',
+          border: '1px solid var(--border-color)', background: 'transparent',
+          fontSize: 14, lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          opacity: busy ? 0.5 : 1,
+        }}
+      >{icon}</button>
     )
     return (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {b('Редактировать', '#1e40af', () => openEdit(t))}
-        {t.status !== 'active' && b('Активировать', '#16a34a', () => act(() => api.platform.activate(t.id)))}
-        {t.status === 'active' && b('Продлить', '#16a34a', () => act(() => api.platform.extend(t.id)))}
-        {t.status === 'active' && b('Приостановить', '#d97706', () => act(() => api.platform.suspend(t.id)))}
-        {t.status === 'suspended' && b('Возобновить', '#16a34a', () => act(() => api.platform.resume(t.id)))}
-        {b('Сброс пароля', '#dc2626', () => {
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+        {ib('edit', '✎', 'Редактировать', () => openEdit(t))}
+        {t.status !== 'active' && ib('activate', '✔', 'Активировать (+30 дней)', () => act(() => api.platform.activate(t.id)))}
+        {t.status === 'active' && ib('extend', '⟳', 'Продлить (+30 дней)', () => act(() => api.platform.extend(t.id)))}
+        {t.status === 'active' && ib('suspend', '⏸', 'Приостановить', () => act(() => api.platform.suspend(t.id)))}
+        {t.status === 'suspended' && ib('resume', '▶', 'Возобновить', () => act(() => api.platform.resume(t.id)))}
+        {ib('pwd', '🔑', 'Сброс пароля администратора', () => {
           const pwd = window.prompt(`Новый пароль администратора ${t.adminEmail} (минимум 8 символов):`)
           if (pwd && pwd.length >= 8) act(() => api.platform.resetPassword(t.id, pwd))
           else if (pwd) window.alert('Пароль должен быть не короче 8 символов')
         })}
-        {b('Удалить', '#991b1b', () => {
+        {ib('del', '🗑', 'Удалить организацию с базой данных', () => {
           if (window.confirm(`Удалить организацию «${t.name}» ВМЕСТЕ С БАЗОЙ ДАННЫХ? Действие необратимо.`)) {
             const confirmSlug = window.prompt(`Введите поддомен «${t.slug}» для подтверждения удаления:`)
             if (confirmSlug === t.slug) act(() => api.platform.deleteTenant(t.id, t.slug))
@@ -257,7 +268,7 @@ export function TenantsAdmin() {
                     <td style={td}>{t.usersCount ?? '—'}</td>
                     <td style={td}>{fmtSize(t.dbSizeBytes)}</td>
                     <td style={td}>{fmtSize(t.filesSizeBytes)}</td>
-                    <td style={td}>{actions(t, true)}</td>
+                    <td style={td}>{actions(t)}</td>
                   </tr>
                 )
               })}
