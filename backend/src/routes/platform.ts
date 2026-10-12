@@ -302,11 +302,38 @@ router.get('/tenants', authMiddleware, requirePlatformAdmin, async (_req, res) =
     try { filesSizeBytes = await getTenantFilesSize(t.slug); } catch { filesSizeBytes = null; }
     out.push({ ...t, usersCount, dbSizeBytes, filesSizeBytes });
   }
-  res.json(out);
+  const mainUsers = await platformPrisma.user.count();
+  let mainDb: number | null = null;
+  try {
+    const mrows: any[] = await platformPrisma.$queryRawUnsafe('SELECT pg_database_size(current_database()) AS size');
+    mainDb = Number(mrows[0]?.size ?? 0);
+  } catch { mainDb = null; }
+  let mainFiles: number | null = null;
+  try { mainFiles = await getMainFilesSize(); } catch { mainFiles = null; }
+  res.json({ main: { slug: 'main', name: 'Главная организация', domain: 'welans.cc', status: 'active', usersCount: mainUsers, dbSizeBytes: mainDb, filesSizeBytes: mainFiles }, tenants: out });
 });
 
 const TENANT_STATUSES = ['pending', 'active', 'suspended'];
 
+/** Размер файлов главной организации (/app/uploads без папок tenant'ов t-*) */
+async function getMainFilesSize(): Promise<number> {
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const root = '/app/uploads';
+  let total = 0;
+  async function walk(dir: string): Promise<void> {
+    let entries: any[] = [];
+    try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.isDirectory() && e.name.startsWith('t-')) continue;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) await walk(full);
+      else { try { total += (await fs.stat(full)).size; } catch { /* ignore */ } }
+    }
+  }
+  await walk(root);
+  return total;
+}
 /** Размер файлов организации в общем томе uploads (рекурсивно) */
 async function getTenantFilesSize(slug: string): Promise<number> {
   const fs = await import('fs/promises');

@@ -20,6 +20,15 @@ interface Tenant {
   filesSizeBytes?: number | null
 }
 
+interface MainInfo {
+  slug: string
+  name: string
+  domain: string
+  usersCount?: number | null
+  dbSizeBytes?: number | null
+  filesSizeBytes?: number | null
+}
+
 const STATUS_LABEL: Record<string, { text: string; color: string; bg: string }> = {
   pending: { text: 'Ожидает оплаты', color: '#92400e', bg: '#fef3c7' },
   active: { text: 'Активна', color: '#166534', bg: '#dcfce7' },
@@ -44,9 +53,11 @@ function toDateInput(d?: string | null) {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
 }
 
-/** Админка платформы: управление организациями (только главный домен, роль admin) */
+/** Админка платформы: главная организация + организации (сетка/список) */
 export function TenantsAdmin() {
   const [tenants, setTenants] = useState<Tenant[]>([])
+  const [main, setMain] = useState<MainInfo | null>(null)
+  const [view, setView] = useState<'grid' | 'list'>('grid')
   const [tariffs, setTariffs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -60,13 +71,15 @@ export function TenantsAdmin() {
   const load = () => {
     setLoading(true)
     api.platform.tenants()
-      .then(setTenants)
+      .then((d: any) => {
+        setTenants(Array.isArray(d) ? d : (d?.tenants || []))
+        setMain(d?.main || null)
+      })
       .catch((e: any) => setError(e.message || 'Не удалось загрузить организации'))
       .finally(() => setLoading(false))
   }
   useEffect(() => {
     load()
-    api.platform.tariffs?.().catch(() => {})
     fetch('/api/platform/tariffs').then((r) => (r.ok ? r.json() : [])).then((l) => setTariffs(Array.isArray(l) ? l : [])).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -111,16 +124,68 @@ export function TenantsAdmin() {
     border: '1px solid var(--border-color)', background: 'var(--bg-input, var(--bg-secondary))', color: 'var(--text-primary)',
   }
 
+  const th: React.CSSProperties = { textAlign: 'left', fontSize: 12, color: 'var(--text-secondary)', padding: '8px 10px', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }
+  const td: React.CSSProperties = { padding: '8px 10px', fontSize: 13, borderBottom: '1px solid var(--border-color)' }
+
+  const actions = (t: Tenant, compact = false) => {
+    const busy = actionId !== null
+    const b = (label: string, color: string, fn: () => void, title?: string) => (
+      <button key={label} disabled={busy} title={title || label} style={compact ? { ...btn(color), padding: '4px 8px', fontSize: 12 } : btn(color)} onClick={fn}>{label}</button>
+    )
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {b('Редактировать', '#1e40af', () => openEdit(t))}
+        {t.status !== 'active' && b('Активировать', '#16a34a', () => act(() => api.platform.activate(t.id)))}
+        {t.status === 'active' && b('Продлить', '#16a34a', () => act(() => api.platform.extend(t.id)))}
+        {t.status === 'active' && b('Приостановить', '#d97706', () => act(() => api.platform.suspend(t.id)))}
+        {t.status === 'suspended' && b('Возобновить', '#16a34a', () => act(() => api.platform.resume(t.id)))}
+        {b('Сброс пароля', '#dc2626', () => {
+          const pwd = window.prompt(`Новый пароль администратора ${t.adminEmail} (минимум 8 символов):`)
+          if (pwd && pwd.length >= 8) act(() => api.platform.resetPassword(t.id, pwd))
+          else if (pwd) window.alert('Пароль должен быть не короче 8 символов')
+        })}
+        {b('Удалить', '#991b1b', () => {
+          if (window.confirm(`Удалить организацию «${t.name}» ВМЕСТЕ С БАЗОЙ ДАННЫХ? Действие необратимо.`)) {
+            const confirmSlug = window.prompt(`Введите поддомен «${t.slug}» для подтверждения удаления:`)
+            if (confirmSlug === t.slug) act(() => api.platform.deleteTenant(t.id, t.slug))
+          }
+        })}
+      </div>
+    )
+  }
+
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
         <h1 style={{ margin: 0, fontSize: 22 }}>Организации платформы</h1>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <a href="/platform/tickets" style={{ fontSize: 14 }}>Запросы организаций →</a>
+          <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
+            <button onClick={() => setView('grid')} style={{ padding: '7px 14px', border: 'none', cursor: 'pointer', fontSize: 13, background: view === 'grid' ? 'var(--text-primary)' : 'transparent', color: view === 'grid' ? 'var(--bg-primary)' : 'var(--text-secondary)' }}>▦ Сетка</button>
+            <button onClick={() => setView('list')} style={{ padding: '7px 14px', border: 'none', borderLeft: '1px solid var(--border-color)', cursor: 'pointer', fontSize: 13, background: view === 'list' ? 'var(--text-primary)' : 'transparent', color: view === 'list' ? 'var(--bg-primary)' : 'var(--text-secondary)' }}>☰ Список</button>
+          </div>
           <button onClick={load} style={btn('var(--text-secondary)')}>Обновить</button>
         </div>
       </div>
       {error && <div style={{ color: '#dc2626', marginBottom: 12 }}>{error}</div>}
+
+      {main && (
+        <div style={{ ...card, marginBottom: 18, border: '2px solid #16a34a' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>★ {main.name}</div>
+              <a href={`https://${main.domain}`} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>{main.domain}</a>
+            </div>
+            <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: '#dcfce7', color: '#166534', whiteSpace: 'nowrap' }}>Активна (платформа)</span>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+            <span>Пользователей: <b>{main.usersCount ?? '—'}</b></span>
+            <span>База данных: <b>{fmtSize(main.dbSizeBytes)}</b></span>
+            <span>Файлы: <b>{fmtSize(main.filesSizeBytes)}</b></span>
+          </div>
+        </div>
+      )}
+
       {loading && <div>Загрузка...</div>}
       {!loading && tenants.length === 0 && (
         <div style={{ color: 'var(--text-secondary)' }}>
@@ -128,82 +193,78 @@ export function TenantsAdmin() {
           <a href="/register" target="_blank" rel="noreferrer">/register</a>.
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
-        {tenants.map((t) => {
-          const st = STATUS_LABEL[t.status] || STATUS_LABEL.pending
-          const busy = actionId !== null
-          return (
-            <div key={t.id} style={card}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{t.name}</div>
-                  <a href={`https://${t.slug}.${baseHost}`} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>
-                    {t.slug}.{baseHost}
-                  </a>
+
+      {!loading && view === 'grid' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
+          {tenants.map((t) => {
+            const st = STATUS_LABEL[t.status] || STATUS_LABEL.pending
+            return (
+              <div key={t.id} style={card}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 15 }}>{t.name}</div>
+                    <a href={`https://${t.slug}.${baseHost}`} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>
+                      {t.slug}.{baseHost}
+                    </a>
+                  </div>
+                  <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>{st.text}</span>
                 </div>
-                <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>
-                  {st.text}
-                </span>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span>Админ: {t.adminEmail}</span>
+                  <span>Тариф: <b>{t.plan}</b></span>
+                  <span>Оплачено по: <b>{fmtDate(t.paidUntil)}</b></span>
+                  <span>Пользователей в CRM: <b>{t.usersCount ?? '—'}</b></span>
+                  <span>База данных: <b>{fmtSize(t.dbSizeBytes)}</b></span>
+                  <span>Файлы: <b>{fmtSize(t.filesSizeBytes)}</b></span>
+                  <span>Регистрация: {fmtDate(t.createdAt)}</span>
+                </div>
+                {actions(t)}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <span>Админ: {t.adminEmail}</span>
-                <span>Тариф: <b>{t.plan}</b></span>
-                <span>Оплачено по: <b>{fmtDate(t.paidUntil)}</b></span>
-                <span>Пользователей в CRM: <b>{t.usersCount ?? '—'}</b></span>
-                <span>База данных: <b>{fmtSize(t.dbSizeBytes)}</b></span>
-                <span>Файлы: <b>{fmtSize(t.filesSizeBytes)}</b></span>
-                <span>Регистрация: {fmtDate(t.createdAt)}</span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                <button disabled={busy} style={btn('#1e40af')} onClick={() => openEdit(t)}>
-                  Редактировать
-                </button>
-                {t.status !== 'active' && (
-                  <button disabled={busy} style={btn('#16a34a')} onClick={() => act(() => api.platform.activate(t.id))}>
-                    Активировать (+30 дней)
-                  </button>
-                )}
-                {t.status === 'active' && (
-                  <button disabled={busy} style={btn('#16a34a')} onClick={() => act(() => api.platform.extend(t.id))}>
-                    Продлить (+30 дней)
-                  </button>
-                )}
-                {t.status === 'active' && (
-                  <button disabled={busy} style={btn('#d97706')} onClick={() => act(() => api.platform.suspend(t.id))}>
-                    Приостановить
-                  </button>
-                )}
-                {t.status === 'suspended' && (
-                  <button disabled={busy} style={btn('#16a34a')} onClick={() => act(() => api.platform.resume(t.id))}>
-                    Возобновить
-                  </button>
-                )}
-                <button
-                  disabled={busy} style={btn('#dc2626')}
-                  onClick={() => {
-                    const pwd = window.prompt(`Новый пароль администратора ${t.adminEmail} (минимум 8 символов):`)
-                    if (pwd && pwd.length >= 8) act(() => api.platform.resetPassword(t.id, pwd))
-                    else if (pwd) window.alert('Пароль должен быть не короче 8 символов')
-                  }}
-                >
-                  Сброс пароля
-                </button>
-                <button
-                  disabled={busy} style={btn('#991b1b')}
-                  onClick={() => {
-                    if (window.confirm(`Удалить организацию «${t.name}» ВМЕСТЕ С БАЗОЙ ДАННЫХ? Действие необратимо.`)) {
-                      const confirmSlug = window.prompt(`Введите поддомен «${t.slug}» для подтверждения удаления:`)
-                      if (confirmSlug === t.slug) act(() => api.platform.deleteTenant(t.id, t.slug))
-                    }
-                  }}
-                >
-                  Удалить
-                </button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
+
+      {!loading && view === 'list' && tenants.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12 }}>
+            <thead>
+              <tr>
+                <th style={th}>Организация</th>
+                <th style={th}>Статус</th>
+                <th style={th}>Админ</th>
+                <th style={th}>Тариф</th>
+                <th style={th}>Оплачено по</th>
+                <th style={th}>Польз.</th>
+                <th style={th}>БД</th>
+                <th style={th}>Файлы</th>
+                <th style={th}>Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tenants.map((t) => {
+                const st = STATUS_LABEL[t.status] || STATUS_LABEL.pending
+                return (
+                  <tr key={t.id}>
+                    <td style={td}>
+                      <b>{t.name}</b><br />
+                      <a href={`https://${t.slug}.${baseHost}`} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>{t.slug}.{baseHost}</a>
+                    </td>
+                    <td style={td}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>{st.text}</span></td>
+                    <td style={td}>{t.adminEmail}</td>
+                    <td style={td}>{t.plan}</td>
+                    <td style={td}>{fmtDate(t.paidUntil)}</td>
+                    <td style={td}>{t.usersCount ?? '—'}</td>
+                    <td style={td}>{fmtSize(t.dbSizeBytes)}</td>
+                    <td style={td}>{fmtSize(t.filesSizeBytes)}</td>
+                    <td style={td}>{actions(t, true)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {editing && (
         <div style={overlay} onClick={() => setEditing(null)}>
@@ -235,8 +296,6 @@ export function TenantsAdmin() {
                   Реквизиты / инструкция оплаты (показываются организации при оплате)
                 </label>
                 <ReactQuill theme='snow' value={editPaymentInfo} onChange={setEditPaymentInfo} style={{ background: 'var(--bg-primary)' }} />
-              </div>
-              <div style={{ display: 'none' }}>
               </div>
               {error && <div style={{ color: '#dc2626', fontSize: 13 }}>{error}</div>}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
