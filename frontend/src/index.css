@@ -1072,12 +1072,14 @@ html, body { overflow-x: hidden; }
 .legal-content a { color: #5eb21f; }
 @media (max-width: 700px) { .legal-page { padding: 22px 12px 40px; } .legal-card { padding: 22px; border-radius: 18px; } .legal-card h1 { font-size: 24px; } }
 
-/* Центральная FAB-кнопка мобильной панели: для светлой темы — белая 70px без тени */
+/* Центральная FAB-кнопка мобильной панели: 70px; светлая тема — белая без тени */
 .mobile-fab-btn {
   width: 70px !important;
   height: 70px !important;
-}
-[data-palette="light"] .mobile-fab-btn {
   background: rgb(255, 255, 255) !important;
   box-shadow: none !important;
+}
+[data-theme="dark"] .mobile-fab-btn {
+  background: #00b300 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
 }
