@@ -57,7 +57,7 @@ function toDateInput(d?: string | null) {
 export function TenantsAdmin() {
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [main, setMain] = useState<MainInfo | null>(null)
-  const [view, setView] = useState<'grid' | 'list'>('grid')
+  const [view, setView] = useState<'grid' | 'list'>('list')
   const [tariffs, setTariffs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -189,8 +189,8 @@ export function TenantsAdmin() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <a href="/platform/tickets" style={{ fontSize: 14 }}>Запросы организаций →</a>
           <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
-            <button onClick={() => setView('grid')} style={{ padding: '7px 14px', border: 'none', cursor: 'pointer', fontSize: 13, background: view === 'grid' ? 'var(--text-primary)' : 'transparent', color: view === 'grid' ? 'var(--bg-primary)' : 'var(--text-secondary)' }}>▦ Сетка</button>
-            <button onClick={() => setView('list')} style={{ padding: '7px 14px', border: 'none', borderLeft: '1px solid var(--border-color)', cursor: 'pointer', fontSize: 13, background: view === 'list' ? 'var(--text-primary)' : 'transparent', color: view === 'list' ? 'var(--bg-primary)' : 'var(--text-secondary)' }}>☰ Список</button>
+            <button onClick={() => setView('grid')} style={{ padding: '7px 14px', border: 'none', cursor: 'pointer', fontSize: 13, background: view === 'grid' ? '#16a34a' : 'transparent', color: view === 'grid' ? '#ffffff' : 'var(--text-secondary)' }}>▦ Сетка</button>
+            <button onClick={() => setView('list')} style={{ padding: '7px 14px', border: 'none', borderLeft: '1px solid var(--border-color)', cursor: 'pointer', fontSize: 13, background: view === 'list' ? '#16a34a' : 'transparent', color: view === 'list' ? '#ffffff' : 'var(--text-secondary)' }}>☰ Список</button>
           </div>
           <button onClick={load} style={btn('var(--text-secondary)')}>Обновить</button>
         </div>
