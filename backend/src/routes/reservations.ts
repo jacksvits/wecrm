@@ -243,7 +243,7 @@ router.post('/:id/share', async (req: any, res) => {
     if (!task) return res.status(404).json({ error: `Задача с номером «${taskId}» не найдена` });
     const r = await prisma.reservation.findUnique({ where: { id: req.params.id }, include: { contact: true } });
     if (!r) return res.status(404).json({ error: 'Резерв не найден' });
-    const statusLabel = r.status === 'held' ? 'Отложено' : r.status === 'issued' ? 'Выдано' : 'Отменено';
+    const statusLabel = r.status === 'held' ? 'Отложено' : r.status === 'issued' ? 'Выдано' : r.status === 'paid' ? 'Оплачен' : r.status === 'completed' ? 'Завершён (списан)' : 'Отменено';
     const text = `Резерв №${r.number} — ${r.contact.name} на сумму ${r.total.toFixed(2)} ₽ (${statusLabel}).`;
     const comment = await prisma.comment.create({
       data: { taskId: task.id, authorId: req.user?.id, content: text },
@@ -293,9 +293,9 @@ router.patch('/:id', async (req: any, res) => {
         // остатки при этом пересчитываются автоматически (например, «Выдано» → «Отменён»
         // возвращает товар на склад, а «Оплачен» → «Выдано» списывает его)
         const effect = (s: string, qty: number) =>
-          s === 'issued' ? { q: -qty, r: 0 }
+          s === 'issued' || s === 'completed' ? { q: -qty, r: 0 }
           : s === 'canceled' ? { q: 0, r: 0 }
-          : { q: 0, r: qty }; // held / paid / completed держат резерв без движения остатков
+          : { q: 0, r: qty }; // held / paid держат резерв без движения остатков; completed = оплачен и списан
         // Проверки остатков до смены статуса (админ/менеджер — в том числе в минус)
         for (const it of canMinus ? [] : r.items) {
           const from = effect(r.status, it.quantity);
@@ -318,7 +318,7 @@ router.patch('/:id', async (req: any, res) => {
             }
           }
         }
-        await flipStatus(r.status, { status, issuedAt: status === 'issued' ? (r.issuedAt ?? new Date()) : null });
+        await flipStatus(r.status, { status, issuedAt: (status === 'issued' || status === 'completed') ? (r.issuedAt ?? new Date()) : null });
         // Пересчёт остатков и движения товара по разнице вкладов статусов
         for (const it of r.items) {
           const from = effect(r.status, it.quantity);
