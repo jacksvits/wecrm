@@ -288,6 +288,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     extend: (id: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/extend`, { method: 'POST' }),
     deleteTenant: (id: string, slug: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}?confirm=${encodeURIComponent(slug)}`, { method: 'DELETE' }),
     resetPassword: (id: string, password: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ password }) }),
+    diskReport: (): Promise<any> => fetchApi('/api/platform/disk-report'),
   },
   // === Запросы организаций в поддержку платформы ===
   tenantSupport: {
