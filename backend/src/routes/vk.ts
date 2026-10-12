@@ -98,7 +98,7 @@ router.get('/config', async (_req, res) => {
   }
   let active = true;
   try {
-    const settings = await prisma.vkPluginSettings.findFirst();
+    const settings = await prisma.vkGroupSettings.findFirst();
     active = settings?.isActive === true;
   } catch { /* ignore */ }
   res.json({ appId: parseInt(VK_CLIENT_ID, 10), redirectUri: VK_REDIRECT_URI, active });
