@@ -17,6 +17,7 @@ interface Tenant {
   createdAt: string
   usersCount?: number | null
   dbSizeBytes?: number | null
+  filesSizeBytes?: number | null
 }
 
 const STATUS_LABEL: Record<string, { text: string; color: string; bg: string }> = {
@@ -150,6 +151,7 @@ export function TenantsAdmin() {
                 <span>Оплачено по: <b>{fmtDate(t.paidUntil)}</b></span>
                 <span>Пользователей в CRM: <b>{t.usersCount ?? '—'}</b></span>
                 <span>База данных: <b>{fmtSize(t.dbSizeBytes)}</b></span>
+                <span>Файлы: <b>{fmtSize(t.filesSizeBytes)}</b></span>
                 <span>Регистрация: {fmtDate(t.createdAt)}</span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

@@ -298,12 +298,33 @@ router.get('/tenants', authMiddleware, requirePlatformAdmin, async (_req, res) =
       const rows: any[] = await platformPrisma.$queryRawUnsafe('SELECT pg_database_size($1) AS size', t.dbName);
       dbSizeBytes = Number(rows[0]?.size ?? 0);
     } catch { dbSizeBytes = null; }
-    out.push({ ...t, usersCount, dbSizeBytes });
+    let filesSizeBytes: number | null = null;
+    try { filesSizeBytes = await getTenantFilesSize(t.slug); } catch { filesSizeBytes = null; }
+    out.push({ ...t, usersCount, dbSizeBytes, filesSizeBytes });
   }
   res.json(out);
 });
 
 const TENANT_STATUSES = ['pending', 'active', 'suspended'];
+
+/** Размер файлов организации в общем томе uploads (рекурсивно) */
+async function getTenantFilesSize(slug: string): Promise<number> {
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const root = `/app/uploads/t-${slug}`;
+  let total = 0;
+  async function walk(dir: string): Promise<void> {
+    let entries: any[] = [];
+    try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) await walk(full);
+      else { try { total += (await fs.stat(full)).size; } catch { /* ignore */ } }
+    }
+  }
+  await walk(root);
+  return total;
+}
 
 /** Редактирование организации: тариф и/или дата окончания подписки */
 router.put('/tenants/:id', authMiddleware, requirePlatformAdmin, async (req, res) => {
