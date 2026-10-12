@@ -1080,6 +1080,6 @@ html, body { overflow-x: hidden; }
   box-shadow: none !important;
 }
 [data-theme="dark"] .mobile-fab-btn {
-  background: #00b300 !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+  background: #2a2a35 !important;
+  box-shadow: none !important;
 }
