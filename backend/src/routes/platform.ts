@@ -310,10 +310,39 @@ router.get('/tenants', authMiddleware, requirePlatformAdmin, async (_req, res) =
   } catch { mainDb = null; }
   let mainFiles: number | null = null;
   try { mainFiles = await getMainFilesSize(); } catch { mainFiles = null; }
-  res.json({ main: { slug: 'main', name: 'Главная организация', domain: 'welans.cc', status: 'active', usersCount: mainUsers, dbSizeBytes: mainDb, filesSizeBytes: mainFiles }, tenants: out });
+  let system: any = null;
+  try { system = await getSystemInfo(); } catch { system = null; }
+  res.json({ main: { slug: 'main', name: 'Главная организация', domain: 'welans.cc', status: 'active', usersCount: mainUsers, dbSizeBytes: mainDb, filesSizeBytes: mainFiles, system }, tenants: out });
 });
 
 const TENANT_STATUSES = ['pending', 'active', 'suspended'];
+
+/** Системная информация сервера (ОС, NFS, диск, CPU, RAM) */
+async function getSystemInfo(): Promise<any> {
+  const os = await import('os');
+  const fs = await import('fs/promises');
+  let diskFree: number | null = null; let diskTotal: number | null = null;
+  try {
+    const st: any = await (fs as any).statfs('/');
+    diskFree = Number(st.bavail) * Number(st.bsize);
+    diskTotal = Number(st.blocks) * Number(st.bsize);
+  } catch { /* ignore */ }
+  let nfs: string[] = [];
+  try {
+    const mounts = await fs.readFile('/proc/mounts', 'utf-8');
+    nfs = mounts.split('\n').filter(l => /\bnfs4?\b/.test(l)).map(l => l.split(' ')[1]).filter(Boolean);
+  } catch { /* ignore */ }
+  return {
+    os: `${os.type()} ${os.release()} (${os.platform()} ${os.arch})`,
+    nfsMounts: nfs,
+    diskFreeBytes: diskFree,
+    diskTotalBytes: diskTotal,
+    loadAvg: os.loadavg(),
+    cpus: os.cpus().length,
+    memFreeBytes: os.freemem(),
+    memTotalBytes: os.totalmem(),
+  };
+}
 
 /** Размер файлов главной организации (/app/uploads без папок tenant'ов t-*) */
 async function getMainFilesSize(): Promise<number> {

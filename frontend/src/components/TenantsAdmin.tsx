@@ -27,6 +27,18 @@ interface MainInfo {
   usersCount?: number | null
   dbSizeBytes?: number | null
   filesSizeBytes?: number | null
+  system?: SystemInfo
+}
+
+interface SystemInfo {
+  os?: string
+  nfsMounts?: string[]
+  diskFreeBytes?: number | null
+  diskTotalBytes?: number | null
+  loadAvg?: number[]
+  cpus?: number
+  memFreeBytes?: number
+  memTotalBytes?: number
 }
 
 const STATUS_LABEL: Record<string, { text: string; color: string; bg: string }> = {
@@ -180,6 +192,15 @@ export function TenantsAdmin() {
             <span>База данных: <b>{fmtSize(main.dbSizeBytes)}</b></span>
             <span>Файлы: <b>{fmtSize(main.filesSizeBytes)}</b></span>
           </div>
+          {main.system && (
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 3, fontFamily: 'monospace' }}>
+              <span>ОС: {main.system.os}</span>
+              <span>NFS: {(main.system.nfsMounts || []).length > 0 ? (main.system.nfsMounts || []).join(', ') : '—'}</span>
+              <span>Диск: свободно <b style={{ color: 'var(--text-primary)' }}>{fmtSize(main.system.diskFreeBytes)}</b> из {fmtSize(main.system.diskTotalBytes)}</span>
+              <span>CPU: нагрузка {(main.system.loadAvg || []).map((x: number) => x.toFixed(2)).join(' / ')} ({main.system.cpus ?? '—'} ядер)</span>
+              <span>RAM: свободно <b style={{ color: 'var(--text-primary)' }}>{fmtSize(main.system.memFreeBytes)}</b> из {fmtSize(main.system.memTotalBytes)}</span>
+            </div>
+          )}
         </div>
       )}
 
