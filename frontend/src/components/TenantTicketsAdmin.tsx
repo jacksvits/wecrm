@@ -148,8 +148,10 @@ export function TenantTicketsAdmin() {
           const last = t.messages && t.messages[0]
           return (
             <div key={t.id} style={{ ...card, cursor: 'pointer' }} onClick={() => openTicket(t.id)}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                 <b style={{ fontSize: 15 }}>{t.subject}</b>
+
+                <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>{st.text}</span>
                 <span
                   role="button" title="Удалить запрос"
                   onClick={(e) => {
@@ -158,9 +160,8 @@ export function TenantTicketsAdmin() {
                       setLoading(true); api.tenantSupport.adminDelete(t.id).catch((err2: any) => setError(err2.message || 'Ошибка')).finally(() => { setLoading(false); load(); });
                     }
                   }}
-                  style={{ fontSize: 12, color: '#dc2626', cursor: 'pointer', whiteSpace: 'nowrap', border: '1px solid #dc2626', borderRadius: 8, padding: '3px 10px' }}
-                >Удалить</span>
-                <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>{st.text}</span>
+                  style={{ marginLeft: 'auto', fontSize: 16, color: '#dc2626', cursor: 'pointer', whiteSpace: 'nowrap', lineHeight: 1, padding: '2px 6px' }}
+                >✕</span>
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
                 Организация: <b>{t.tenantName}</b> ({t.tenantSlug}) · Автор: {t.authorName} · Обновлён {fmt(t.updatedAt)}
