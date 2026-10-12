@@ -387,6 +387,27 @@ async function getTenantFilesSize(slug: string): Promise<number> {
   return total;
 }
 
+/** Запуск очистки Docker (host-скрипт по cron раз в минуту) */
+router.post('/docker-cleanup', authMiddleware, requirePlatformAdmin, async (_req, res) => {
+  try {
+    const fs = await import('fs/promises');
+    await fs.writeFile('/app/data/cleanup-request.json', JSON.stringify({ requestedAt: new Date().toISOString() }));
+    res.json({ ok: true, message: 'Очистка запущена — займёт до минуты' });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/** Результат последней очистки */
+router.get('/docker-cleanup-result', authMiddleware, requirePlatformAdmin, async (_req, res) => {
+  try {
+    const fs = await import('fs/promises');
+    const raw = await fs.readFile('/app/data/cleanup-result.json', 'utf-8');
+    res.json(JSON.parse(raw));
+  } catch {
+    res.status(404).json({ error: 'Результата ещё нет' });
+  }
+});
 /** Отчёт по диску (host-скрипт пишет JSON в /app/data) */
 router.get('/disk-report', authMiddleware, requirePlatformAdmin, async (_req, res) => {
   try {

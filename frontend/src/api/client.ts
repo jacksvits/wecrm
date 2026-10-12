@@ -289,6 +289,8 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     deleteTenant: (id: string, slug: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}?confirm=${encodeURIComponent(slug)}`, { method: 'DELETE' }),
     resetPassword: (id: string, password: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ password }) }),
     diskReport: (): Promise<any> => fetchApi('/api/platform/disk-report'),
+    dockerCleanup: (): Promise<any> => fetchApi('/api/platform/docker-cleanup', { method: 'POST' }),
+    dockerCleanupResult: (): Promise<any> => fetchApi('/api/platform/docker-cleanup-result'),
   },
   // === Запросы организаций в поддержку платформы ===
   tenantSupport: {

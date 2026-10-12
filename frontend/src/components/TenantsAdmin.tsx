@@ -73,6 +73,7 @@ export function TenantsAdmin() {
   const [view, setView] = useState<'grid' | 'list'>('list')
   const [diskReport, setDiskReport] = useState<any | null>(null)
   const [diskReportLoading, setDiskReportLoading] = useState(false)
+  const [cleanupState, setCleanupState] = useState<'idle' | 'running' | 'done'>('idle')
   const [tariffs, setTariffs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -207,7 +208,23 @@ export function TenantsAdmin() {
                     api.platform.diskReport().then(setDiskReport).catch((e: any) => setError(e.message || 'Не удалось загрузить отчёт')).finally(() => setDiskReportLoading(false))
                   }}
                   style={{ marginLeft: 8, padding: '2px 10px', fontSize: 11, borderRadius: 6, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}
-                >{diskReportLoading ? '...' : diskReport ? 'Скрыть' : 'Отчёт'}</button></span>
+                >{diskReportLoading ? '...' : diskReport ? 'Скрыть' : 'Отчёт'}</button>
+                <button
+                  disabled={cleanupState === 'running'}
+                  onClick={() => {
+                    if (!window.confirm('Очистить старые Docker-образы и build cache? Используемые образы не тронуты.')) return
+                    setCleanupState('running')
+                    api.platform.dockerCleanup().catch((e: any) => { setError(e.message); setCleanupState('idle') })
+                    setTimeout(() => {
+                      api.platform.dockerCleanupResult().then((r: any) => {
+                        setCleanupState('done')
+                        window.alert('Очистка завершена. Образы: ' + (r?.before?.Images || '?') + ' -> ' + (r?.after?.Images || '?') + ' | Build cache: ' + (r?.before?.['Build Cache'] || '?') + ' -> ' + (r?.after?.['Build Cache'] || '?'))
+                        load()
+                      }).catch(() => { setCleanupState('idle') })
+                    }, 65000)
+                  }}
+                  style={{ marginLeft: 6, padding: '2px 10px', fontSize: 11, borderRadius: 6, border: '1px solid #d97706', background: 'transparent', color: '#d97706', cursor: cleanupState === 'running' ? 'default' : 'pointer', opacity: cleanupState === 'running' ? 0.6 : 1 }}
+                >{cleanupState === 'running' ? 'Очистка...' : 'Очистить кеш'}</button></span>
               <span>CPU: нагрузка {(main.system.loadAvg || []).map((x: number) => x.toFixed(2)).join(' / ')} ({main.system.cpus ?? '—'} ядер)</span>
               <span>RAM: свободно <b style={{ color: 'var(--text-primary)' }}>{fmtSize(main.system.memFreeBytes)}</b> из {fmtSize(main.system.memTotalBytes)}</span>
 {main.system.docker && (<>
