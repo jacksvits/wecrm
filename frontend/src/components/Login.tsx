@@ -178,6 +178,7 @@ export function Login() {
   const isMainLoginHost = ['welans.cc', 'www.welans.cc'].includes(window.location.hostname)
   // Мультитенантность: название организации (tenant'а) и статус активации
   const [tenantInfo, setTenantInfo] = useState<{ name: string; isMain: boolean; allowedPages?: string[] | null } | null>(null)
+  const showCatalogHint = isMainLoginHost || ((tenantInfo?.allowedPages || []).includes('/products'))
   const [tenantPending, setTenantPending] = useState(false)
   const [pay, setPay] = useState<any | null>(null)
   const [paySent, setPaySent] = useState(false)
@@ -535,15 +536,6 @@ export function Login() {
               <>Нет аккаунта? <button type="button" onClick={() => { setIsRegister(true); setError('') }}>Регистрация</button></>
             )}
           </p>
-          {tenantInfo && !tenantInfo.isMain && (tenantInfo.allowedPages || []).includes('/products') && (
-            <div style={{ marginTop: 18, textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              Ознакомиться с нашими продуктами вы можете без регистрации по гостевому доступу в разделе «Каталог»
-              <div style={{ marginTop: 8, display: 'flex', gap: 16, justifyContent: 'center' }}>
-                <a href="/offer" target="_blank" rel="noreferrer">Договор публичной оферты</a>
-                <a href="/privacy" target="_blank" rel="noreferrer">Политика конфиденциальности</a>
-              </div>
-            </div>
-          )}
           {tenantInfo?.isMain && (
             <>
               {/* Разделитель */}
@@ -564,6 +556,7 @@ export function Login() {
           )}
           </div>
 
+          {showCatalogHint && (<>
           <p className="login-catalog-hint">
             Ознакомиться с нашими продуктами вы можете без регистрации по гостевому доступу в разделе <strong>«Каталог»</strong>
           </p>
@@ -573,6 +566,7 @@ export function Login() {
             <span aria-hidden="true">·</span>
             <a href="/privacy">Политика конфиденциальности</a>
           </footer>
+          </>)}
         </div>
       </section>
 
