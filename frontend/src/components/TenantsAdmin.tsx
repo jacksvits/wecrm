@@ -155,21 +155,7 @@ export function TenantsAdmin() {
   }
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
-        <h1 style={{ margin: 0, fontSize: 22 }}>Организации платформы</h1>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <a href="/platform/tickets" style={{ fontSize: 14 }}>Запросы организаций →</a>
-          <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
-            <button onClick={() => setView('grid')} style={{ padding: '7px 14px', border: 'none', cursor: 'pointer', fontSize: 13, background: view === 'grid' ? 'var(--text-primary)' : 'transparent', color: view === 'grid' ? 'var(--bg-primary)' : 'var(--text-secondary)' }}>▦ Сетка</button>
-            <button onClick={() => setView('list')} style={{ padding: '7px 14px', border: 'none', borderLeft: '1px solid var(--border-color)', cursor: 'pointer', fontSize: 13, background: view === 'list' ? 'var(--text-primary)' : 'transparent', color: view === 'list' ? 'var(--bg-primary)' : 'var(--text-secondary)' }}>☰ Список</button>
-          </div>
-          <button onClick={load} style={btn('var(--text-secondary)')}>Обновить</button>
-        </div>
-      </div>
-      {error && <div style={{ color: '#dc2626', marginBottom: 12 }}>{error}</div>}
-
-      {main && (
+    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px' }}>      {main && (
         <div style={{ ...card, marginBottom: 18, border: '2px solid #16a34a' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
             <div>
@@ -185,6 +171,20 @@ export function TenantsAdmin() {
           </div>
         </div>
       )}
+
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
+        <h1 style={{ margin: 0, fontSize: 22 }}>Организации платформы</h1>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <a href="/platform/tickets" style={{ fontSize: 14 }}>Запросы организаций →</a>
+          <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
+            <button onClick={() => setView('grid')} style={{ padding: '7px 14px', border: 'none', cursor: 'pointer', fontSize: 13, background: view === 'grid' ? 'var(--text-primary)' : 'transparent', color: view === 'grid' ? 'var(--bg-primary)' : 'var(--text-secondary)' }}>▦ Сетка</button>
+            <button onClick={() => setView('list')} style={{ padding: '7px 14px', border: 'none', borderLeft: '1px solid var(--border-color)', cursor: 'pointer', fontSize: 13, background: view === 'list' ? 'var(--text-primary)' : 'transparent', color: view === 'list' ? 'var(--bg-primary)' : 'var(--text-secondary)' }}>☰ Список</button>
+          </div>
+          <button onClick={load} style={btn('var(--text-secondary)')}>Обновить</button>
+        </div>
+      </div>
+      {error && <div style={{ color: '#dc2626', marginBottom: 12 }}>{error}</div>}
 
       {loading && <div>Загрузка...</div>}
       {!loading && tenants.length === 0 && (
