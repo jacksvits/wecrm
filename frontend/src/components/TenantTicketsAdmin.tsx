@@ -151,7 +151,7 @@ export function TenantTicketsAdmin() {
               <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                 <b style={{ fontSize: 15 }}>{t.subject}</b>
 
-                <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>{st.text}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 12, padding: '3px 10px', borderRadius: 20, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>{st.text}</span>
                 <span
                   role="button" title="Удалить запрос"
                   onClick={(e) => {
@@ -160,7 +160,7 @@ export function TenantTicketsAdmin() {
                       setLoading(true); api.tenantSupport.adminDelete(t.id).catch((err2: any) => setError(err2.message || 'Ошибка')).finally(() => { setLoading(false); load(); });
                     }
                   }}
-                  style={{ marginLeft: 'auto', fontSize: 16, color: '#dc2626', cursor: 'pointer', whiteSpace: 'nowrap', lineHeight: 1, padding: '2px 6px' }}
+                  style={{ fontSize: 16, color: '#dc2626', cursor: 'pointer', whiteSpace: 'nowrap', lineHeight: 1, padding: '2px 6px' }}
                 >✕</span>
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
