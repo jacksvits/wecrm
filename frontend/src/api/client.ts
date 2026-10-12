@@ -296,6 +296,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     get: (id: string): Promise<any> => fetchApi(`/api/tenant-support/${id}`),
     reply: (id: string, body: string): Promise<any> => fetchApi(`/api/tenant-support/${id}/reply`, { method: 'POST', body: JSON.stringify({ body }) }),
     adminList: (status?: string): Promise<any[]> => fetchApi(`/api/tenant-support/admin/list${status ? `?status=${status}` : ''}`),
+    diskReport: (): Promise<any> => fetchApi('/api/platform/disk-report'),
     adminGet: (id: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}`),
     adminReply: (id: string, body: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}/reply`, { method: 'POST', body: JSON.stringify({ body }) }),
     adminStatus: (id: string, status: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }),

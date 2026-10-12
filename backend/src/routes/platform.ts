@@ -382,6 +382,17 @@ async function getTenantFilesSize(slug: string): Promise<number> {
   return total;
 }
 
+/** Отчёт по диску (host-скрипт пишет JSON в /app/data) */
+router.get('/disk-report', authMiddleware, requirePlatformAdmin, async (_req, res) => {
+  try {
+    const fs = await import('fs/promises');
+    const raw = await fs.readFile('/app/data/disk-report.json', 'utf-8');
+    res.json(JSON.parse(raw));
+  } catch {
+    res.status(404).json({ error: 'Отчёт ещё не сформирован' });
+  }
+});
+
 /** Редактирование организации: тариф и/или дата окончания подписки */
 router.put('/tenants/:id', authMiddleware, requirePlatformAdmin, async (req, res) => {
   const tenant = await (platformPrisma as any).tenant.findUnique({ where: { id: req.params.id } });

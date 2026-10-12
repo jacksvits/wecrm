@@ -70,6 +70,8 @@ export function TenantsAdmin() {
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [main, setMain] = useState<MainInfo | null>(null)
   const [view, setView] = useState<'grid' | 'list'>('list')
+  const [diskReport, setDiskReport] = useState<any | null>(null)
+  const [diskReportLoading, setDiskReportLoading] = useState(false)
   const [tariffs, setTariffs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -196,9 +198,36 @@ export function TenantsAdmin() {
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 3, fontFamily: 'monospace' }}>
               <span>ОС: {main.system.os}</span>
               <span>NFS: {(main.system.nfsMounts || []).length > 0 ? (main.system.nfsMounts || []).join(', ') : '—'}</span>
-              <span>Диск: свободно <b style={{ color: 'var(--text-primary)' }}>{fmtSize(main.system.diskFreeBytes)}</b> из {fmtSize(main.system.diskTotalBytes)}</span>
+              <span>Диск: свободно <b style={{ color: 'var(--text-primary)' }}>{fmtSize(main.system.diskFreeBytes)}</b> из {fmtSize(main.system.diskTotalBytes)}
+                <button
+                  onClick={() => {
+                    if (diskReport) { setDiskReport(null); return }
+                    setDiskReportLoading(true)
+                    api.platform.diskReport().then(setDiskReport).catch((e: any) => setError(e.message || 'Не удалось загрузить отчёт')).finally(() => setDiskReportLoading(false))
+                  }}
+                  style={{ marginLeft: 8, padding: '2px 10px', fontSize: 11, borderRadius: 6, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                >{diskReportLoading ? '...' : diskReport ? 'Скрыть' : 'Отчёт'}</button></span>
               <span>CPU: нагрузка {(main.system.loadAvg || []).map((x: number) => x.toFixed(2)).join(' / ')} ({main.system.cpus ?? '—'} ядер)</span>
               <span>RAM: свободно <b style={{ color: 'var(--text-primary)' }}>{fmtSize(main.system.memFreeBytes)}</b> из {fmtSize(main.system.memTotalBytes)}</span>
+            </div>
+          )}
+          {diskReport && (
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Сформирован: {diskReport.generatedAt ? new Date(diskReport.generatedAt).toLocaleString('ru-RU') : '—'}</div>
+              {(diskReport.sections || []).map((sec: any) => (
+                <div key={sec.label}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{sec.label}</div>
+                  {(sec.items || []).slice(0, 6).map((it: any) => (
+                    <div key={it.path} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, fontSize: 12, fontFamily: 'monospace' }}>
+                      <span style={{ width: 70, textAlign: 'right', color: 'var(--text-secondary)' }}>{it.size}</span>
+                      <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'var(--bg-secondary)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: '#16a34a' }} />
+                      </div>
+                      <span style={{ flex: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.path}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           )}
         </div>
