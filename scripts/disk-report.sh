@@ -1,5 +1,5 @@
 #!/bin/bash
-# Отчёт по диску и Docker -> JSON (backend/data внутри контейнера)
+# Отчёт по диску, Docker и контейнерам -> JSON (backend/data внутри контейнера)
 OUT="/home/crm/wecrm-platform/backend/data/disk-report.json"
 PASS='16Fhuevtyn_'
 set -e
@@ -25,8 +25,16 @@ docker_json() {
   vol_size=$(echo "$df" | awk -F'|' '$1=="Local Volumes"{print $3}')
   cache_size=$(echo "$df" | awk -F'|' '$1=="Build Cache"{print $3}')
   cache_reb=$(echo "$df" | awk -F'|' '$1=="Build Cache"{print $4}')
-  printf '{"containersRunning":%s,"containersTotal":%s,"imagesCount":%s,"imagesSize":"%s","imagesReclaimable":"%s","volumesCount":%s,"volumesSize":"%s","buildCacheSize":"%s","buildCacheReclaimable":"%s"}' \
-    "$running" "$total" "$img_count" "$img_size" "$img_reb" "${vol_count:-0}" "$vol_size" "$cache_size" "$cache_reb"
+  local containers
+  containers=$(docker ps -a --format '{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}|{{.Ports}}' | awk -F'|' '
+    BEGIN { printf "[" }
+    {
+      ports=$5; gsub(/"/,"\\\"",ports); name=$1; gsub(/"/,"\\\"",name); img=$2; gsub(/"/,"\\\"",img); st=$3; gsub(/"/,"\\\"",st); status=$4; gsub(/"/,"\\\"",status);
+      printf "%s{\"name\":\"%s\",\"image\":\"%s\",\"state\":\"%s\",\"status\":\"%s\",\"ports\":\"%s\"}", (NR>1?",":""), name, img, st, status, ports
+    }
+    END { printf "]" }')
+  printf '{"containersRunning":%s,"containersTotal":%s,"imagesCount":%s,"imagesSize":"%s","imagesReclaimable":"%s","volumesCount":%s,"volumesSize":"%s","buildCacheSize":"%s","buildCacheReclaimable":"%s","containers":%s}' \
+    "$running" "$total" "$img_count" "$img_size" "$img_reb" "${vol_count:-0}" "$vol_size" "$cache_size" "$cache_reb" "$containers"
 }
 
 {

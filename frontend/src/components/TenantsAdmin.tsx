@@ -74,6 +74,7 @@ export function TenantsAdmin() {
   const [diskReport, setDiskReport] = useState<any | null>(null)
   const [diskReportLoading, setDiskReportLoading] = useState(false)
   const [cleanupState, setCleanupState] = useState<'idle' | 'running' | 'done'>('idle')
+  const [containersOpen, setContainersOpen] = useState(false)
   const [tariffs, setTariffs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -228,7 +229,24 @@ export function TenantsAdmin() {
               <span>CPU: нагрузка {(main.system.loadAvg || []).map((x: number) => x.toFixed(2)).join(' / ')} ({main.system.cpus ?? '—'} ядер)</span>
               <span>RAM: свободно <b style={{ color: 'var(--text-primary)' }}>{fmtSize(main.system.memFreeBytes)}</b> из {fmtSize(main.system.memTotalBytes)}</span>
 {main.system.docker && (<>
-              <span>Контейнеры: <b style={{ color: 'var(--text-primary)' }}>{main.system.docker.containersRunning}/{main.system.docker.containersTotal}</b> запущено</span>
+              <span>Контейнеры: <b style={{ color: 'var(--text-primary)' }}>{main.system.docker.containersRunning}/{main.system.docker.containersTotal}</b> запущено
+                <button
+                  onClick={() => setContainersOpen(!containersOpen)}
+                  style={{ marginLeft: 8, padding: '2px 10px', fontSize: 11, borderRadius: 6, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                >{containersOpen ? 'Скрыть' : 'Отчёт'}</button></span>
+              {containersOpen && main.system.docker.containers && (
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontFamily: 'monospace' }}>
+                  {main.system.docker.containers.map((c: any) => (
+                    <div key={c.name} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                      <b style={{ color: c.state === 'running' ? '#16a34a' : '#dc2626' }}>{c.state === 'running' ? '●' : '○'}</b>
+                      <span style={{ minWidth: 170 }}>{c.name}</span>
+                      <span style={{ color: 'var(--text-secondary)', flex: 1 }}>{c.image}</span>
+                      <span>{c.status}</span>
+                      {c.ports && <span style={{ color: 'var(--text-secondary)' }}>{c.ports}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
               <span>Образы: <b style={{ color: 'var(--text-primary)' }}>{main.system.docker.imagesCount}</b> ({main.system.docker.imagesSize}, освобождаемо {main.system.docker.imagesReclaimable})</span>
               <span>Build cache: {main.system.docker.buildCacheSize} (освобождаемо {main.system.docker.buildCacheReclaimable})</span>
               <span>Тома: <b style={{ color: 'var(--text-primary)' }}>{main.system.docker.volumesCount}</b> ({main.system.docker.volumesSize})</span>
