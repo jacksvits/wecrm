@@ -167,8 +167,7 @@ export function Login() {
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [error, setError] = useState('')
-  const [vkConfig, setVkConfig] = useState<{ appId: number;
-    redirectUri: string } | null>(null)
+  const [vkConfig, setVkConfig] = useState<{ appId: number; redirectUri: string; active?: boolean } | null>(null)
   const brandLogo = useBrandLogo(true)
   const [vkLoading, setVkLoading] = useState(false)
   const [guestLoading, setGuestLoading] = useState(false)
@@ -509,7 +508,7 @@ export function Login() {
 
           <div className="login-divider"><span>или</span></div>
 
-          {vkConfig ? (
+          {vkConfig && (isMainLoginHost || vkConfig.active !== false) ? (
             <button onClick={handleVKLogin} disabled={vkLoading} className="login-btn-vk">
               {vkIcon}
               {vkLoading ? 'Перенаправление...' : 'Войти через VK'}

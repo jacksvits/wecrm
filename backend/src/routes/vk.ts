@@ -92,11 +92,16 @@ router.post('/webhook', async (req: Request, res: Response) => {
 });
 // ===================================
 
-router.get('/config', (_req, res) => {
+router.get('/config', async (_req, res) => {
   if (!VK_CLIENT_ID) {
     return res.status(500).json({ error: 'VK ID not configured' });
   }
-  res.json({ appId: parseInt(VK_CLIENT_ID, 10), redirectUri: VK_REDIRECT_URI });
+  let active = true;
+  try {
+    const settings = await prisma.vkPluginSettings.findFirst();
+    active = settings?.isActive === true;
+  } catch { /* ignore */ }
+  res.json({ appId: parseInt(VK_CLIENT_ID, 10), redirectUri: VK_REDIRECT_URI, active });
 });
 
 async function downloadVkAvatar(url: string): Promise<string | null> {
