@@ -312,6 +312,11 @@ router.get('/tenants', authMiddleware, requirePlatformAdmin, async (_req, res) =
   try { mainFiles = await getMainFilesSize(); } catch { mainFiles = null; }
   let system: any = null;
   try { system = await getSystemInfo(); } catch { system = null; }
+  try {
+    const fs2 = await import('fs/promises');
+    const rep = JSON.parse(await fs2.readFile('/app/data/disk-report.json', 'utf-8'));
+    if (system) system.docker = rep.docker || null;
+  } catch { /* ignore */ }
   res.json({ main: { slug: 'main', name: 'Главная организация', domain: 'welans.cc', status: 'active', usersCount: mainUsers, dbSizeBytes: mainDb, filesSizeBytes: mainFiles, system }, tenants: out });
 });
 

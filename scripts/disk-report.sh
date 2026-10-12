@@ -1,7 +1,8 @@
 #!/bin/bash
-# Отчёт по занятому месту на диске -> JSON (backend/data внутри контейнера)
+# Отчёт по диску и Docker -> JSON (backend/data внутри контейнера)
 OUT="/home/crm/wecrm-platform/backend/data/disk-report.json"
 PASS='16Fhuevtyn_'
+set -e
 
 section() {
   local label="$1"; shift
@@ -11,11 +12,31 @@ section() {
     END { print "]}" }'
 }
 
+docker_json() {
+  local running total img_count img_size img_reb vol_count vol_size cache_size cache_reb
+  running=$(docker ps -q | wc -l)
+  total=$(docker ps -aq | wc -l)
+  img_count=$(docker images -q | wc -l)
+  local df
+  df=$(docker system df --format '{{.Type}}|{{.TotalCount}}|{{.Size}}|{{.Reclaimable}}')
+  img_size=$(echo "$df" | awk -F'|' '$1=="Images"{print $3}')
+  img_reb=$(echo "$df" | awk -F'|' '$1=="Images"{print $4}')
+  vol_count=$(echo "$df" | awk -F'|' '$1=="Local Volumes"{print $2}')
+  vol_size=$(echo "$df" | awk -F'|' '$1=="Local Volumes"{print $3}')
+  cache_size=$(echo "$df" | awk -F'|' '$1=="Build Cache"{print $3}')
+  cache_reb=$(echo "$df" | awk -F'|' '$1=="Build Cache"{print $4}')
+  printf '{"containersRunning":%s,"containersTotal":%s,"imagesCount":%s,"imagesSize":"%s","imagesReclaimable":"%s","volumesCount":%s,"volumesSize":"%s","buildCacheSize":"%s","buildCacheReclaimable":"%s"}' \
+    "$running" "$total" "$img_count" "$img_size" "$img_reb" "${vol_count:-0}" "$vol_size" "$cache_size" "$cache_reb"
+}
+
 {
   echo "{\"generatedAt\":\"$(date -Iseconds)\","
   echo -n "\"disk\":["
   df -h / | tail -1 | awk '{printf "{\"mount\":\"%s\",\"size\":\"%s\",\"used\":\"%s\",\"avail\":\"%s\",\"usePct\":\"%s\"}", $6, $2, $3, $4, $5}'
   echo "],"
+  echo -n "\"docker\":"
+  docker_json
+  echo ","
   echo -n "\"sections\":["
   first=1
   for spec in "Вся система:/" "Docker и контейнеры:/var/lib/docker" "Containerd (образы):/var/lib/containerd" "Логи:/var/log" "Домашние папки:/home" "Программы (snap):/var/lib/snapd" "Приложения:/app"; do

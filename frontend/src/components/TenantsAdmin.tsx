@@ -36,6 +36,7 @@ interface SystemInfo {
   diskFreeBytes?: number | null
   diskTotalBytes?: number | null
   loadAvg?: number[]
+  docker?: any
   cpus?: number
   memFreeBytes?: number
   memTotalBytes?: number
@@ -209,6 +210,12 @@ export function TenantsAdmin() {
                 >{diskReportLoading ? '...' : diskReport ? 'Скрыть' : 'Отчёт'}</button></span>
               <span>CPU: нагрузка {(main.system.loadAvg || []).map((x: number) => x.toFixed(2)).join(' / ')} ({main.system.cpus ?? '—'} ядер)</span>
               <span>RAM: свободно <b style={{ color: 'var(--text-primary)' }}>{fmtSize(main.system.memFreeBytes)}</b> из {fmtSize(main.system.memTotalBytes)}</span>
+{main.system.docker && (<>
+              <span>Контейнеры: <b style={{ color: 'var(--text-primary)' }}>{main.system.docker.containersRunning}/{main.system.docker.containersTotal}</b> запущено</span>
+              <span>Образы: <b style={{ color: 'var(--text-primary)' }}>{main.system.docker.imagesCount}</b> ({main.system.docker.imagesSize}, освобождаемо {main.system.docker.imagesReclaimable})</span>
+              <span>Build cache: {main.system.docker.buildCacheSize} (освобождаемо {main.system.docker.buildCacheReclaimable})</span>
+              <span>Тома: <b style={{ color: 'var(--text-primary)' }}>{main.system.docker.volumesCount}</b> ({main.system.docker.volumesSize})</span>
+              </>)}
             </div>
           )}
           {diskReport && (
