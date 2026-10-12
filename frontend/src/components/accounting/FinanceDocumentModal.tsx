@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { api } from '../../api/client';
@@ -192,7 +193,9 @@ export function FinanceDocumentModal({ documentId, initialTaskId, onClose, onSav
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const canResetMatch = doc?.matchStatus === 'ignored' || doc?.matchStatus === 'unmatched';
 
-  return (
+  // Портал в body: иначе position: fixed ломается внутри виджетов
+  // с CSS-transform (SortableWidget на странице директора)
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -492,6 +495,7 @@ export function FinanceDocumentModal({ documentId, initialTaskId, onClose, onSav
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
