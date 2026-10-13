@@ -11,6 +11,25 @@ import { randomUUID } from 'crypto';
 
 const UPLOAD_DIR = '/app/uploads';
 const TASKS_DIR = path.join(UPLOAD_DIR, 'tasks');
+
+// MIME-типы по расширению для вложений MAX (офисные и медиа-форматы)
+const MIME_BY_EXT: Record<string, string> = {
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif',
+  '.bmp': 'image/bmp', '.webp': 'image/webp', '.tiff': 'image/tiff', '.heic': 'image/heic', '.svg': 'image/svg+xml',
+  '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.amr': 'audio/amr',
+  '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.mkv': 'video/x-matroska', '.webm': 'video/webm', '.avi': 'video/x-msvideo',
+  '.pdf': 'application/pdf',
+  '.txt': 'text/plain', '.csv': 'text/csv', '.json': 'application/json', '.xml': 'application/xml',
+  '.md': 'text/markdown', '.rtf': 'application/rtf',
+  '.zip': 'application/zip', '.rar': 'application/vnd.rar', '.7z': 'application/x-7z-compressed',
+  '.tar': 'application/x-tar', '.gz': 'application/gzip',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.ppt': 'application/vnd.ms-powerpoint',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+};
 const MAX_API_BASE = 'https://platform-api2.max.ru';
 
 if (!fs.existsSync(TASKS_DIR)) {
@@ -405,8 +424,12 @@ async function downloadMaxAttachment(attachment: any, taskDir: string): Promise<
       originalName = 'max_photo_' + (attachment.id || 'unknown') + ext;
     } else if (attachment.type === 'document' || attachment.type === 'file') {
       url = payloadUrl || attachment.url || attachment.file_url;
-      ext = path.extname(attachment.name || attachment.payload?.name || '') || '.bin';
-      originalName = attachment.name || attachment.payload?.name || 'max_doc_' + (attachment.id || 'unknown') + ext;
+      // В webhook MAX оригинальное имя файла приходит в поле filename (верхний уровень
+      // вложения), а не в name/payload.name — иначе расширение терялось и файл
+      // сохранялся с расширением .bin
+      const rawName: string = attachment.filename || attachment.name || attachment.payload?.name || '';
+      ext = path.extname(rawName);
+      originalName = rawName || 'max_doc_' + (attachment.id || attachment.payload?.fileId || 'unknown') + (ext || '.bin');
     } else if (attachment.type === 'video') {
       console.log('[MAX Processor] Video attachment skipped');
       return null;
@@ -439,12 +462,11 @@ async function downloadMaxAttachment(attachment: any, taskDir: string): Promise<
     const filepath = path.join(taskDir, filename);
     fs.writeFileSync(filepath, Buffer.from(buffer));
 
-    let mimeType = 'application/octet-stream';
-    if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
-    else if (ext === '.png') mimeType = 'image/png';
-    else if (ext === '.gif') mimeType = 'image/gif';
-    else if (ext === '.mp3') mimeType = 'audio/mpeg';
-    else if (ext === '.pdf') mimeType = 'application/pdf';
+    // MIME-тип: сначала из заголовка ответа CDN, иначе по расширению из таблицы
+    const headerMime = res.headers.get('content-type')?.split(';')[0]?.trim() || '';
+    const mimeType = headerMime && headerMime !== 'application/octet-stream'
+      ? headerMime
+      : (MIME_BY_EXT[ext.toLowerCase()] || 'application/octet-stream');
 
     return {
       filename,

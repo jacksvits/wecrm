@@ -112,6 +112,47 @@ async function uploadMaxAttachment(
   }
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Отправляет сообщение с вложениями в MAX, повторяя попытки при attachment.not.ready.
+// CDN MAX обрабатывает загруженные файлы асинхронно: если отправить вложение сразу
+// после загрузки, API отвечает 400 attachment.not.ready. Повторная отправка безопасна —
+// отклонённое сообщение не создаётся, токен вложения сохраняется.
+async function sendMaxCommentMessage(
+  userId: string,
+  text: string,
+  attachments: any[],
+  apiToken: string,
+): Promise<boolean> {
+  const retryDelays = [1000, 2000, 4000, 8000, 8000]; // суммарно ~23 с ожидания
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(`${MAX_API_BASE}/messages?user_id=${userId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': apiToken,
+      },
+      body: JSON.stringify({
+        text,
+        ...(attachments.length > 0 ? { attachments } : {}),
+      }),
+    });
+
+    const responseText = await response.text();
+    if (response.ok) {
+      console.log('[MAX Comment Send] Sent to user', userId, 'response:', responseText.substring(0, 100));
+      return true;
+    }
+    const notReady = response.status === 400 && responseText.includes('attachment.not.ready');
+    if (!notReady || attempt >= retryDelays.length) {
+      console.error('[MAX Comment Send] Failed:', response.status, responseText);
+      return false;
+    }
+    console.log('[MAX Comment Send] Attachment not ready, retry in', retryDelays[attempt], 'ms, attempt', attempt + 2);
+    await sleep(retryDelays[attempt]);
+  }
+}
+
 const createSchema = z.object({
   content: z.string().min(1, 'Комментарий не может быть пустым').max(2000),
   attachmentIds: z.array(z.string()).optional(),
@@ -280,24 +321,12 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
 
           console.log('[MAX Comment Send] Sending to user_id:', task.maxUserId, 'text:', messageText.substring(0, 100), 'attachments:', maxAttachments.length);
 
-          const response = await fetch(`${MAX_API_BASE}/messages?user_id=${task.maxUserId}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': maxSettings.apiToken,
-            },
-            body: JSON.stringify({
-              text: messageText,
-              ...(maxAttachments.length > 0 ? { attachments: maxAttachments } : {}),
-            }),
-          });
-
-          const responseText = await response.text();
-          if (!response.ok) {
-            console.error('[MAX Comment Send] Failed:', response.status, responseText);
-          } else {
-            console.log('[MAX Comment Send] Sent to user', task.maxUserId, 'response:', responseText.substring(0, 100));
+          // Пауза после загрузки: CDN MAX обрабатывает файл асинхронно,
+          // sendMaxCommentMessage дожидается готовности вложения через ретраи
+          if (maxAttachments.length > 0) {
+            await sleep(500);
           }
+          await sendMaxCommentMessage(task.maxUserId, messageText, maxAttachments, maxSettings.apiToken);
         }
       } catch (err: any) {
         console.error('[MAX Comment Send] Error:', err.message);
