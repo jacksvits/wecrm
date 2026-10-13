@@ -555,6 +555,11 @@ export function Login() {
               Хотите свою CRM для организации? <a href="/register">Регистрация организации</a>
             </p>
           )}
+          {tenantInfo?.isMain && (
+            <p className="login-register" style={{ marginTop: 8 }}>
+              Что умеет система? <a href="/presentation">Презентация</a>
+            </p>
+          )}
           </div>
 
           {showCatalogHint && (<>
