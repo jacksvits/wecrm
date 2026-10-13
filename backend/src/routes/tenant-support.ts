@@ -110,14 +110,20 @@ router.post('/attachments', authMiddleware, requireUploader, upload.single('file
   }
 });
 
-/** Скачивание вложения: организация — только свои файлы, админ платформы — любые */
+/** Скачивание вложения: организация — свои файлы и файлы из переписки своего
+ *  запроса (в т.ч. приложенные поддержкой), админ платформы — любые */
 router.get('/attachments/:id/download', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const attachment = await db.tenantTicketAttachment.findUnique({ where: { id: req.params.id } });
     if (!attachment) return res.status(404).json({ error: 'Вложение не найдено' });
     const t = currentTenant();
     const isPlatformAdmin = !!t?.isMain && req.user?.role === 'admin';
-    if (!isPlatformAdmin && attachment.tenantSlug !== t?.slug) {
+    let allowed = isPlatformAdmin || attachment.tenantSlug === t?.slug;
+    if (!allowed && attachment.ticketId && t) {
+      const ticket = await db.tenantTicket.findUnique({ where: { id: attachment.ticketId }, select: { tenantId: true } });
+      allowed = ticket?.tenantId === t.id;
+    }
+    if (!allowed) {
       return res.status(403).json({ error: 'Доступ запрещен' });
     }
     const filePath = '/app' + attachment.path;
