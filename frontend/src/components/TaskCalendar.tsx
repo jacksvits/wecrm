@@ -29,7 +29,10 @@ const ghostBtn: React.CSSProperties = {
   background: 'transparent', color: 'var(--text-primary)', fontSize: 14, cursor: 'pointer',
 };
 
-const toMin = (d: Date) => d.getHours() * 60 + d.getMinutes();
+// Срок задачи в проекте хранится и показывается как UTC «wall-clock»
+// (форма slice(0,16), список timeZone:"UTC") — календарь извлекает дату/время так же
+const taskDate = (iso: string) => iso.slice(0, 10);
+const taskMin = (iso: string) => Number(iso.slice(11, 13)) * 60 + Number(iso.slice(14, 16));
 
 interface Props {
   onOpenTask: (id: string) => void;
@@ -58,7 +61,7 @@ export function TaskCalendar({ onOpenTask }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
-  const byDate = (iso: string) => tasks.filter((t) => t.dueDate && toISODate(new Date(t.dueDate)) === iso);
+  const byDate = (iso: string) => tasks.filter((t) => t.dueDate && taskDate(t.dueDate) === iso);
 
   const openDay = (iso: string) => {
     setDate(iso);
@@ -101,11 +104,11 @@ export function TaskCalendar({ onOpenTask }: Props) {
 
   // ---------- день ----------
   const dayTasks = byDate(date);
-  const timed = dayTasks.filter((t) => { const d = new Date(t.dueDate!); return toMin(d) !== 0; });
-  const untimed = dayTasks.filter((t) => { const d = new Date(t.dueDate!); return toMin(d) === 0; });
+  const timed = dayTasks.filter((t) => taskMin(t.dueDate!) !== 0);
+  const untimed = dayTasks.filter((t) => taskMin(t.dueDate!) === 0);
 
   const items: TimelineItem[] = timed.map((t) => {
-    const start = toMin(new Date(t.dueDate!));
+    const start = taskMin(t.dueDate!);
     const assignees = (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ');
     return {
       id: t.id, columnId: 'tasks', startMin: start, endMin: start + 30,

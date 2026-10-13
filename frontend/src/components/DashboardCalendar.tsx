@@ -41,7 +41,11 @@ const ghostBtn: React.CSSProperties = {
   background: 'transparent', color: 'var(--text-primary)', fontSize: 14, cursor: 'pointer',
 };
 
+// Напоминания в проекте — локальное время (форма toISOString, список без timeZone)
 const toMin = (d: Date) => d.getHours() * 60 + d.getMinutes();
+// Срок задачи — UTC «wall-clock» (форма slice(0,16), список timeZone:"UTC")
+const taskDate = (iso: string) => iso.slice(0, 10);
+const taskMin = (iso: string) => Number(iso.slice(11, 13)) * 60 + Number(iso.slice(14, 16));
 
 const stripHtml = (html: string) => {
   const tmp = document.createElement('div');
@@ -123,7 +127,7 @@ export function DashboardCalendar() {
   };
 
   // ---------- данные по датам ----------
-  const tasksByDate = (iso: string) => tasks.filter((t) => t.dueDate && toISODate(new Date(t.dueDate)) === iso);
+  const tasksByDate = (iso: string) => tasks.filter((t) => t.dueDate && taskDate(t.dueDate) === iso);
   const remindersByDate = (iso: string) => reminders.filter((r) => r.remindAt && toISODate(new Date(r.remindAt)) === iso);
   const taskColor = (t: Task) =>
     statuses.find((s) => s.name === t.status)?.color || TASK_STATUS_COLORS[t.status] || '#3b82f6';
@@ -189,8 +193,8 @@ export function DashboardCalendar() {
   const dayTasks = tasksByDate(date);
   const dayReminders = remindersByDate(date);
   // Время 00:00 считаем «без времени» (как в TaskCalendar)
-  const timedTasks = dayTasks.filter((t) => toMin(new Date(t.dueDate!)) !== 0);
-  const untimedTasks = dayTasks.filter((t) => toMin(new Date(t.dueDate!)) === 0);
+  const timedTasks = dayTasks.filter((t) => taskMin(t.dueDate!) !== 0);
+  const untimedTasks = dayTasks.filter((t) => taskMin(t.dueDate!) === 0);
   const timedReminders = dayReminders.filter((r) => toMin(new Date(r.remindAt)) !== 0);
   const untimedReminders = dayReminders.filter((r) => toMin(new Date(r.remindAt)) === 0);
 
@@ -231,7 +235,7 @@ export function DashboardCalendar() {
     if (canViewTasks && timedTasks.length > 0) {
       cols.push({ id: '__tasks__', title: 'Задачи', color: '#3b82f6' });
       for (const t of timedTasks) {
-        const start = toMin(new Date(t.dueDate!));
+        const start = taskMin(t.dueDate!);
         const assignees = (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ');
         itms.push({
           id: `t${t.id}`, columnId: '__tasks__', startMin: start, endMin: start + 30,
