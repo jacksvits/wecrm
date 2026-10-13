@@ -288,6 +288,8 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     extend: (id: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/extend`, { method: 'POST' }),
     deleteTenant: (id: string, slug: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}?confirm=${encodeURIComponent(slug)}`, { method: 'DELETE' }),
     resetPassword: (id: string, password: string): Promise<any> => fetchApi(`/api/platform/tenants/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ password }) }),
+    // «Сменить тенант»: JWT для входа в организацию под её главным администратором (призрачная сессия)
+    impersonate: (id: string): Promise<{ url: string; token: string; tenantName: string; adminName: string }> => fetchApi(`/api/platform/tenants/${id}/impersonate`, { method: 'POST' }),
     diskReport: (): Promise<any> => fetchApi('/api/platform/disk-report'),
     dockerCleanup: (): Promise<any> => fetchApi('/api/platform/docker-cleanup', { method: 'POST' }),
     dockerCleanupResult: (): Promise<any> => fetchApi('/api/platform/docker-cleanup-result'),

@@ -20,6 +20,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // «Сменить тенант»: главный админ платформы переходит в организацию по ссылке
+  // вида https://<slug>.welans.cc/?switch_token=<JWT>. Сохраняем токен и метку сессии
+  // до первичной загрузки пользователя, затем подчищаем адресную строку.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const switchToken = params.get('switch_token');
+    if (!switchToken) return;
+    localStorage.setItem('token', switchToken);
+    localStorage.setItem('platformTenantSwitch', '1');
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }, []);
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {

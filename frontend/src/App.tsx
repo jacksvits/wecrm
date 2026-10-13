@@ -17,6 +17,9 @@ function App() { const { user, loading } = useAuth() ; const location = useLocat
   // Global heartbeat: mark user as online on every navigation and every 30s
   useEffect(() => {
     if (!user) return;
+    // Призрачная сессия «Сменить тенант»: heartbeats не отправляем вовсе
+    // (сервер их тоже игнорирует) — админ организации не светится «онлайн»
+    if (localStorage.getItem('platformTenantSwitch')) return;
     // Send heartbeat immediately on mount and route change
     api.users.heartbeat().catch(() => {});
     // Send heartbeat every 30 seconds while user is active

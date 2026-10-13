@@ -195,6 +195,11 @@ router.get('/online', authMiddleware, async (_req, res) => {
 
 router.post('/heartbeat', authMiddleware, async (req: AuthRequest, res) => {
   try {
+    // Призрачная сессия (главный админ платформы вошёл в тенант через «Сменить тенант»):
+    // не трогаем lastActiveAt — админ организации не отображается «онлайн», его «был в сети» не меняется
+    if (req.user?.ghost) {
+      return res.json({ ok: true });
+    }
     await prisma.user.update({
       where: { id: req.user!.id },
       data: { lastActiveAt: new Date() },

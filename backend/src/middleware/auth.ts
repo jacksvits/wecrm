@@ -20,6 +20,9 @@ export interface AuthRequest extends Request {
     canEditNews?: boolean;
       canHandleSpam?: boolean;
       isGuest?: boolean;
+      // Призрачная сессия: вход главного админа платформы в тенант кнопкой «Сменить тенант»
+      // (heartbeat не обновляет lastActiveAt — пользователь не светится «онлайн»/«был в сети»)
+      ghost?: boolean;
   };
 }
 
@@ -70,6 +73,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       canEditNews: isGuest ? false : (user.role?.canEditNews ?? true),
       canHandleSpam: user.role?.canHandleSpam ?? false,
       impersonatorId: decoded.imp,
+      ghost: decoded.ghost === true,
     };
     next();
   } catch {

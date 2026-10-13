@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { currentTenant, platformPrisma, invalidateTenantCache, getTenantPrisma, asMainTenant } from '../lib/tenant.js';
 import { dbNameForSlug, provisionTenantDb, dropTenantDb, slugTaken, SLUG_PATTERN } from '../lib/tenant-provision.js';
@@ -14,6 +15,9 @@ import { createTenantProxyRule, deleteTenantProxyRule } from '../lib/nas-proxy.j
 import { createTenantPaymentLink } from './tochka-acquiring.js';
 
 const router = Router();
+
+// Тот же секрет, что и в auth.ts — токен тенанта проверяется его authMiddleware на поддомене
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
 const registerSchema = z.object({
   name: z.string().trim().min(2, 'Название организации — минимум 2 символа').max(100),
@@ -538,6 +542,33 @@ router.post('/tenants/:id/reset-password', authMiddleware, requirePlatformAdmin,
     },
   );
   res.json({ ok: true });
+});
+
+/**
+ * Вход главного администратора платформы в организацию (кнопка «Сменить тенант»).
+ * Выпускает JWT для главного администратора организации (первый по дате создания пользователь
+ * с ролью admin) с меткой ghost: такая сессия не отмечает пользователя «онлайн»
+ * и не меняет его «был в сети» (heartbeat для неё no-op).
+ */
+router.post('/tenants/:id/impersonate', authMiddleware, requirePlatformAdmin, async (req, res) => {
+  try {
+    const tenant = await (platformPrisma as any).tenant.findUnique({ where: { id: req.params.id } });
+    if (!tenant) return res.status(404).json({ error: 'Организация не найдена' });
+    const client = getTenantPrisma(tenant.dbName);
+    const admin = await (client as any).user.findFirst({
+      where: { role: { name: 'admin' } },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, name: true, email: true },
+    });
+    if (!admin) return res.status(404).json({ error: 'В организации нет администратора' });
+    const token = jwt.sign({ id: admin.id, ghost: true }, JWT_SECRET, { expiresIn: '12h' });
+    // Поддомен организации на базовом домене текущего запроса (как при регистрации)
+    const baseDomain = (req.headers.host || 'welans.cc').split(':')[0].replace(/^www\./, '');
+    const url = `https://${tenant.slug}.${baseDomain}`;
+    res.json({ url, token, tenantName: tenant.name, adminName: admin.name || admin.email });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;
