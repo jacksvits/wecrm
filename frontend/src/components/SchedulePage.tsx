@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { CalendarMonth, toISODate, MONTH_NAMES } from './calendar/CalendarMonth';
 import { DayTimeline, minToTime, TimelineBand, TimelineColumn, TimelineItem } from './calendar/DayTimeline';
+import { DayAgenda, AgendaSection } from './calendar/DayAgenda';
 import { useIsMobile } from '../hooks/useIsMobile';
 
 /**
@@ -240,6 +241,34 @@ export function SchedulePage() {
     });
   };
 
+  // Мобильная «повестка дня»: секция на каждого сотрудника с его записями
+  const agendaSections = useMemo<AgendaSection[]>(() => {
+    if (!dayData) return [];
+    return dayData.users.map((u: any) => {
+      const userShift = dayData.shifts.find((s: any) => s.userId === u.id);
+      const userAppts = dayData.appointments
+        .filter((a: any) => a.userId === u.id)
+        .sort((a: any, b: any) => a.startMin - b.startMin);
+      return {
+        id: u.id,
+        title: u.name,
+        subtitle: userShift
+          ? `${userShift.room?.name || 'без кабинета'} · ${minToTime(userShift.startMin)}–${minToTime(userShift.endMin)}`
+          : 'без смены',
+        color: userShift?.room?.color || '#3b82f6',
+        items: userAppts.map((a: any) => ({
+          id: a.id, startMin: a.startMin,
+          time: `${minToTime(a.startMin)}–${minToTime(a.endMin)}`,
+          title: a.clientName,
+          subtitle: [a.room?.name ? `Кабинет: ${a.room.name}` : 'без кабинета', a.clientPhone].filter(Boolean).join(' · '),
+          color: APPT_STATUS[a.status]?.color || '#3b82f6',
+          conflict: a.conflict,
+          onClick: () => openAppt(a),
+        })),
+      };
+    });
+  }, [dayData, date]);
+
   const saveAppt = async () => {
     if (!apptForm) return;
     const payload = {
@@ -337,7 +366,9 @@ export function SchedulePage() {
             </div>
           )}
           {dayData && columns.length > 0 && (
-            <DayTimeline columns={columns} bands={bands} items={items} onDrop={handleDrop} />
+            isMobile
+              ? <DayAgenda sections={agendaSections} />
+              : <DayTimeline columns={columns} bands={bands} items={items} onDrop={handleDrop} />
           )}
           {dayData && (
             <div style={{ marginTop: 10, display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, color: 'var(--text-secondary)' }}>

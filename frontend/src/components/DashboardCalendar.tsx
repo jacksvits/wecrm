@@ -6,6 +6,7 @@ import { useRealtime } from '../hooks/useRealtime';
 import { Task, Reminder, Status } from '../types';
 import { CalendarMonth, toISODate, MONTH_NAMES } from './calendar/CalendarMonth';
 import { DayTimeline, TimelineBand, TimelineColumn, TimelineItem, minToTime } from './calendar/DayTimeline';
+import { DayAgenda, AgendaSection } from './calendar/DayAgenda';
 import { useIsMobile } from '../hooks/useIsMobile';
 
 /**
@@ -280,6 +281,56 @@ export function DashboardCalendar() {
     return { columns: cols, bands: bnds, items: itms, empty: isEmpty };
   }, [dayData, tasks, reminders, canViewTasks, date, navigate, statuses]);
 
+  // Мобильная «повестка дня»: секции с полноширинными карточками вместо колонок
+  const agendaSections = useMemo<AgendaSection[]>(() => {
+    const secs: AgendaSection[] = [];
+    const appts = (dayData?.appointments || []) as any[];
+    if (appts.length > 0) {
+      secs.push({
+        id: 'schedule', title: 'Записи расписания', color: '#16a34a',
+        items: appts.map((a: any) => ({
+          id: a.id, startMin: a.startMin,
+          time: `${minToTime(a.startMin)}–${minToTime(a.endMin)}`,
+          title: a.clientName,
+          subtitle: [a.user?.name, a.room?.name ? `Кабинет: ${a.room.name}` : 'без кабинета', a.clientPhone].filter(Boolean).join(' · '),
+          color: APPT_STATUS_COLORS[a.status] || '#3b82f6',
+          conflict: a.conflict,
+          onClick: () => navigate('/schedule'),
+        })),
+      });
+    }
+    if (canViewTasks && timedTasks.length > 0) {
+      secs.push({
+        id: 'tasks', title: 'Задачи', color: '#3b82f6',
+        items: timedTasks.map((t) => ({
+          id: t.id, startMin: taskMin(t.dueDate!),
+          time: `${t.dueDate!.slice(11, 16)}–${minToTime(taskMin(t.dueDate!) + 30)}`,
+          title: t.title,
+          subtitle: [TASK_STATUS_LABELS[t.status] || t.status, (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ')].filter(Boolean).join(' · '),
+          color: taskColor(t),
+          onClick: () => navigate(`/tasks/${t.id}`),
+        })),
+      });
+    }
+    if (timedReminders.length > 0) {
+      secs.push({
+        id: 'reminders', title: 'Напоминания', color: '#f59e0b',
+        items: timedReminders.map((r) => {
+          const start = toMin(new Date(r.remindAt));
+          return {
+            id: r.id, startMin: start,
+            time: `${minToTime(start)}–${minToTime(start + 30)}`,
+            title: r.title,
+            subtitle: [r.user?.name, stripHtml((r as any).content || '').slice(0, 80)].filter(Boolean).join(' · '),
+            color: reminderColor(r),
+            onClick: () => navigate(`/reminders/${r.id}/edit`),
+          };
+        }),
+      });
+    }
+    return secs;
+  }, [dayData, tasks, reminders, canViewTasks, date, navigate, statuses]);
+
   // Диапазон часов — по содержимому дня (по умолчанию 8–20)
   const { startHour, endHour } = useMemo(() => {
     const mins = [
@@ -369,6 +420,8 @@ export function DashboardCalendar() {
           }}>
             На этот день ничего не запланировано.
           </div>
+        ) : isMobile ? (
+          <DayAgenda sections={agendaSections} untimedRow={untimedRow} />
         ) : columns.length > 0 ? (
           <DayTimeline
             columns={columns}
