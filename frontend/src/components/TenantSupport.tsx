@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { SupportAttachPicker, SupportAttachments, SupFile } from './supportFiles'
 
-interface Msg { id: string; authorRole: string; authorName: string; body: string; createdAt: string }
+interface Msg { id: string; authorRole: string; authorName: string; body: string; createdAt: string; attachments?: SupFile[] }
 interface Ticket {
   id: string; subject: string; status: string; authorName: string; createdAt: string; updatedAt: string
   messages?: Msg[]
@@ -28,6 +29,8 @@ export function TenantSupport() {
   const [sending, setSending] = useState(false)
   const [selected, setSelected] = useState<Ticket | null>(null)
   const [reply, setReply] = useState('')
+  const [drafts, setDrafts] = useState<SupFile[]>([])        // файлы нового запроса
+  const [replyDrafts, setReplyDrafts] = useState<SupFile[]>([]) // файлы ответа в переписке
 
   const load = () => {
     setLoading(true)
@@ -39,22 +42,22 @@ export function TenantSupport() {
   useEffect(load, [])
 
   const openTicket = (id: string) => {
-    api.tenantSupport.get(id).then((t) => { setSelected(t as Ticket); setReply('') }).catch(() => {})
+    api.tenantSupport.get(id).then((t) => { setSelected(t as Ticket); setReply(''); setReplyDrafts([]) }).catch(() => {})
   }
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     setSending(true); setError('')
-    api.tenantSupport.create({ subject, message })
-      .then(() => { setShowForm(false); setSubject(''); setMessage(''); load() })
+    api.tenantSupport.create({ subject, message, attachmentIds: drafts.map((d) => d.id) })
+      .then(() => { setShowForm(false); setSubject(''); setMessage(''); setDrafts([]); load() })
       .catch((e: any) => setError(e.message || 'Не удалось отправить запрос'))
       .finally(() => setSending(false))
   }
 
   const sendReply = () => {
     if (!selected || !reply.trim()) return
-    api.tenantSupport.reply(selected.id, reply.trim())
-      .then((t) => { setSelected(t as Ticket); setReply(''); load() })
+    api.tenantSupport.reply(selected.id, reply.trim(), replyDrafts.map((d) => d.id))
+      .then((t) => { setSelected(t as Ticket); setReply(''); setReplyDrafts([]); load() })
       .catch((e: any) => setError(e.message || 'Не удалось отправить'))
   }
 
@@ -93,6 +96,7 @@ export function TenantSupport() {
                 <b>{m.authorName}</b> · {m.authorRole === 'platform' ? 'Поддержка WeCRM' : 'Вы'} · {fmt(m.createdAt)}
               </div>
               <div style={{ fontSize: 14, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{m.body}</div>
+              <SupportAttachments items={m.attachments} />
             </div>
           ))}
         </div>
@@ -104,6 +108,9 @@ export function TenantSupport() {
               value={reply}
               onChange={(e) => setReply(e.target.value)}
             />
+            <div style={{ marginTop: 10 }}>
+              <SupportAttachPicker files={replyDrafts} onChange={setReplyDrafts} />
+            </div>
             <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
               <button style={btn('#16a34a')} onClick={sendReply} disabled={!reply.trim()}>Отправить</button>
             </div>
@@ -168,6 +175,7 @@ export function TenantSupport() {
                 onChange={(e) => setMessage(e.target.value)}
                 required minLength={3}
               />
+              <SupportAttachPicker files={drafts} onChange={setDrafts} disabled={sending} />
               {error && <div style={{ color: '#dc2626', fontSize: 13 }}>{error}</div>}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button type="button" style={{ ...btn('transparent'), color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }} onClick={() => setShowForm(false)}>Отмена</button>

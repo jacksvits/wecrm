@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { Link, useNavigate } from 'react-router-dom'
+import { SupportAttachPicker, SupportAttachments, SupFile } from './supportFiles'
 
-interface Msg { id: string; authorRole: string; authorName: string; body: string; createdAt: string }
+interface Msg { id: string; authorRole: string; authorName: string; body: string; createdAt: string; attachments?: SupFile[] }
 interface Ticket {
   id: string; subject: string; status: string; tenantSlug: string; tenantName: string
   authorName: string; authorEmail: string; createdAt: string; updatedAt: string
@@ -26,6 +27,7 @@ export function TenantTicketsAdmin() {
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<Ticket | null>(null)
   const [reply, setReply] = useState('')
+  const [replyDrafts, setReplyDrafts] = useState<SupFile[]>([]) // файлы ответа поддержки
   const navigate = useNavigate()
 
   const load = (f = filter) => {
@@ -38,13 +40,13 @@ export function TenantTicketsAdmin() {
   useEffect(() => { load('') /* eslint-disable-line */ }, [])
 
   const openTicket = (id: string) => {
-    api.tenantSupport.adminGet(id).then((t) => { setSelected(t as Ticket); setReply('') }).catch(() => {})
+    api.tenantSupport.adminGet(id).then((t) => { setSelected(t as Ticket); setReply(''); setReplyDrafts([]) }).catch(() => {})
   }
 
   const sendReply = () => {
     if (!selected || !reply.trim()) return
-    api.tenantSupport.adminReply(selected.id, reply.trim())
-      .then((t) => { setSelected(t as Ticket); setReply(''); load() })
+    api.tenantSupport.adminReply(selected.id, reply.trim(), replyDrafts.map((d) => d.id))
+      .then((t) => { setSelected(t as Ticket); setReply(''); setReplyDrafts([]); load() })
       .catch((e: any) => setError(e.message || 'Не удалось отправить'))
   }
 
@@ -96,6 +98,7 @@ export function TenantTicketsAdmin() {
                 <b>{m.authorName}</b> · {m.authorRole === 'platform' ? 'Поддержка платформы' : 'Организация'} · {fmt(m.createdAt)}
               </div>
               <div style={{ fontSize: 14, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{m.body}</div>
+              <SupportAttachments items={m.attachments} />
             </div>
           ))}
         </div>
@@ -107,6 +110,9 @@ export function TenantTicketsAdmin() {
               value={reply}
               onChange={(e) => setReply(e.target.value)}
             />
+            <div style={{ marginTop: 10 }}>
+              <SupportAttachPicker files={replyDrafts} onChange={setReplyDrafts} />
+            </div>
             <div style={{ marginTop: 10 }}>
               <button style={btn('#16a34a')} onClick={sendReply} disabled={!reply.trim()}>Отправить ответ</button>
             </div>

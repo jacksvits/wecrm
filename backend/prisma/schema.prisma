@@ -1776,20 +1776,48 @@ model TenantTicket {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   messages    TenantTicketMessage[]
+  attachments TenantTicketAttachment[]
 
   @@map("tenant_tickets")
 }
 
 model TenantTicketMessage {
-  id         String   @id @default(cuid())
-  ticketId   String   @map("ticket_id")
-  authorRole String   @map("author_role") // tenant | platform
-  authorName String   @map("author_name")
-  body       String
-  createdAt  DateTime @default(now()) @map("created_at")
-  ticket     TenantTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  ticketId    String   @map("ticket_id")
+  authorRole  String   @map("author_role") // tenant | platform
+  authorName  String   @map("author_name")
+  body        String
+  createdAt   DateTime @default(now()) @map("created_at")
+  ticket      TenantTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  attachments TenantTicketAttachment[]
 
   @@map("tenant_ticket_messages")
+}
+
+// Вложения запросов в поддержку: скриншоты, документы, видео ошибок.
+// Файл грузится «черновиком» (ticketId/messageId = null) и привязывается
+// к сообщению при создании запроса или ответа. Скачивание — с проверкой
+// прав: организация видит только свои файлы, админ платформы — все.
+model TenantTicketAttachment {
+  id           String   @id @default(cuid())
+  ticketId     String?  @map("ticket_id")
+  messageId    String?  @map("message_id")
+  tenantSlug   String   @map("tenant_slug") // slug организации-владельца; 'platform' — файл поддержки
+  authorId     String?  @map("author_id")   // id пользователя в своей БД (без FK: тенант и платформа — разные БД)
+  authorRole   String   @map("author_role") // tenant | platform
+  authorName   String   @map("author_name")
+  filename     String
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  size         Int
+  path         String
+  createdAt    DateTime @default(now()) @map("created_at")
+  ticket       TenantTicket?        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  message      TenantTicketMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([messageId])
+  @@map("tenant_ticket_attachments")
 }
 
 // ==== Справочный центр платформы ====

@@ -333,16 +333,27 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
   },
   // === Запросы организаций в поддержку платформы ===
   tenantSupport: {
-    create: (data: { subject: string; message: string }): Promise<any> => fetchApi('/api/tenant-support', { method: 'POST', body: JSON.stringify(data) }),
+    create: (data: { subject: string; message: string; attachmentIds?: string[] }): Promise<any> => fetchApi('/api/tenant-support', { method: 'POST', body: JSON.stringify(data) }),
     list: (): Promise<any[]> => fetchApi('/api/tenant-support'),
     get: (id: string): Promise<any> => fetchApi(`/api/tenant-support/${id}`),
-    reply: (id: string, body: string): Promise<any> => fetchApi(`/api/tenant-support/${id}/reply`, { method: 'POST', body: JSON.stringify({ body }) }),
+    reply: (id: string, body: string, attachmentIds?: string[]): Promise<any> => fetchApi(`/api/tenant-support/${id}/reply`, { method: 'POST', body: JSON.stringify({ body, attachmentIds }) }),
     adminList: (status?: string): Promise<any[]> => fetchApi(`/api/tenant-support/admin/list${status ? `?status=${status}` : ''}`),
     diskReport: (): Promise<any> => fetchApi('/api/platform/disk-report'),
     adminGet: (id: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}`),
-    adminReply: (id: string, body: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}/reply`, { method: 'POST', body: JSON.stringify({ body }) }),
+    adminReply: (id: string, body: string, attachmentIds?: string[]): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}/reply`, { method: 'POST', body: JSON.stringify({ body, attachmentIds }) }),
     adminStatus: (id: string, status: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
     adminDelete: (id: string): Promise<any> => fetchApi(`/api/tenant-support/admin/${id}`, { method: 'DELETE' }),
+    // Вложения запросов: загрузка черновика, скачивание (blob с токеном), удаление
+    uploadAttachment: (file: File): Promise<any> => {
+      const form = new FormData();
+      form.append('file', file);
+      return fetch(`${API_URL}/api/tenant-support/attachments`, { method: 'POST', headers: { ...(getToken() ? { 'X-Auth-Token': getToken()! } : {}) }, body: form })
+        .then(async (r) => { if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || `HTTP ${r.status}`); } return r.json(); });
+    },
+    downloadAttachment: (id: string): Promise<Blob> =>
+      fetch(`${API_URL}/api/tenant-support/attachments/${id}/download`, { headers: { ...(getToken() ? { 'X-Auth-Token': getToken()! } : {}) } })
+        .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.blob(); }),
+    deleteAttachment: (id: string): Promise<any> => fetchApi(`/api/tenant-support/attachments/${id}`, { method: 'DELETE' }),
   },
   get: (path: string): Promise<any> => fetchApi(path),
   // === Модуль «Бухгалтерия по почте» ===
