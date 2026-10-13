@@ -1240,22 +1240,21 @@ export function TaskList() {
         <h2 style={{ margin: 0, fontSize: 18 }}>Задачи</h2>{" "}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {" "}
-          {!isMobile && (
-            <div
-              style={{
-                display: "flex",
-                gap: 2,
-                background: "var(--bg-hover)",
-                padding: 4,
-                borderRadius: 10,
-              }}
-            >
-              {" "}
-              {viewBtn("grid", "Блоки", "▦")} {viewBtn("list", "Список", "☰")}{" "}
-              {viewBtn("kanban", "Канбан", "▦")}{" "}
-              {viewBtn("calendar", "Календарь", "📅")}{" "}
-            </div>
-          )}{" "}
+          {/* Переключатель вида: на телефоне — мобильно-адаптированные «Канбан» и «Календарь», на десктопе — все четыре */}
+          <div
+            style={{
+              display: "flex",
+              gap: 2,
+              background: "var(--bg-hover)",
+              padding: 4,
+              borderRadius: 10,
+            }}
+          >
+            {" "}
+            {!isMobile && viewBtn("grid", "Блоки", "▦")} {!isMobile && viewBtn("list", "Список", "☰")}{" "}
+            {viewBtn("kanban", "Канбан", "▦")}{" "}
+            {viewBtn("calendar", "Календарь", "📅")}{" "}
+          </div>{" "}
           {!isGuest && (
             <button
               className="btn-action"
