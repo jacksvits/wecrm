@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { Reminder, Status } from '../types';
+import { ReminderCalendar } from './ReminderCalendar';
 
 const REPEAT_LABELS: Record<string, string> = {
   none: 'Без повтора',
@@ -29,6 +30,7 @@ export function Reminders() {
   const [search, setSearch] = useState('');
   const [statusId, setStatusId] = useState('');
   const [filter, setFilter] = useState<'active' | 'completed' | 'all'>('active');
+  const [view, setView] = useState<'list' | 'calendar'>('list');
   const [loading, setLoading] = useState(true);
 
   const chip = (active: boolean): React.CSSProperties => ({
@@ -92,15 +94,20 @@ export function Reminders() {
       {/* Шапка */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>Напоминания</h2>
-        <button
-          className="btn-action"
-          onClick={() => navigate('/reminders/new')}
-          title="Создать напоминание"
-        >
-          +
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button style={chip(view === 'list')} onClick={() => setView('list')}>Список</button>
+          <button style={chip(view === 'calendar')} onClick={() => setView('calendar')}>Календарь</button>
+          <button
+            className="btn-action"
+            onClick={() => navigate('/reminders/new')}
+            title="Создать напоминание"
+          >
+            +
+          </button>
+        </div>
       </div>
 
+      {view === 'list' && (<>
       {/* Поиск */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <input
@@ -223,6 +230,8 @@ export function Reminders() {
           )}
         </div>
       )}
+      </>)}
+      {view === 'calendar' && <ReminderCalendar onOpen={(id) => navigate(`/reminders/${id}/edit`)} />}
     </div>
   );
 }

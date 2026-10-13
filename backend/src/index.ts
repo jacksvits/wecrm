@@ -72,6 +72,7 @@ import browserRoutes from './routes/browser.js';
 import vncRoutes, { handleVncUpgrade, isVncUpgradePath } from './routes/browser-vnc.js';
 import platformRoutes from './routes/platform.js';
 import helpRoutes from './routes/help.js';
+import scheduleRoutes from './routes/schedule.js';
 import tenantSupportRoutes from './routes/tenant-support.js';
 import { tenantMiddleware } from './middleware/tenant.js';
 import { runTenantLoops } from './lib/tenant-loop.js';
@@ -137,6 +138,7 @@ app.get('/api/events', authMiddleware, (req, res) => {
 
 app.use('/api/platform', platformRoutes);
 app.use('/api/help', helpRoutes);
+app.use('/api/schedule', scheduleRoutes);
 app.use('/api/tenant-support', tenantSupportRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/contact-types', contactTypeRoutes);

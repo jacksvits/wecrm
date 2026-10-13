@@ -64,7 +64,7 @@ async function getDefaultStatusId(): Promise<string | null> {
 router.get('/', async (req, res) => {
   try {
     const user = (req as any).user;
-    const { q, statusId, filter } = req.query;
+    const { q, statusId, filter, from, to } = req.query;
 
     const where: any = {
       OR: [
@@ -77,6 +77,14 @@ router.get('/', async (req, res) => {
     else if (filter !== 'all') where.completedAt = null;
 
     if (statusId) where.statusId = statusId as string;
+
+    // Календарь: диапазон дат по remindAt (YYYY-MM-DD)
+    if (from || to) {
+      const range: any = {};
+      if (from) { const d = new Date(String(from) + 'T00:00:00'); if (!isNaN(d.getTime())) range.gte = d; }
+      if (to) { const d = new Date(String(to) + 'T23:59:59.999'); if (!isNaN(d.getTime())) range.lte = d; }
+      if (range.gte || range.lte) where.remindAt = range;
+    }
 
     if (q) {
       const searchTerm = q as string;

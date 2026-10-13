@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { useRealtime } from "../hooks/useRealtime";
 import { Task, User, Project, Status } from "../types";
 import { userOptionLabel } from "../lib/userOptionLabel";
+import { TaskCalendar } from "./TaskCalendar";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 const priorityLabels: Record<string, string> = {
@@ -13,7 +14,7 @@ const priorityLabels: Record<string, string> = {
   high: "Высокий",
   urgent: "Срочный",
 };
-type ViewMode = "grid" | "list" | "kanban";
+type ViewMode = "grid" | "list" | "kanban" | "calendar";
 const assignableUsers = (users: User[]) =>
   users.filter((u) => {
     const r = typeof u.role === "string" ? null : u.role;
@@ -56,7 +57,7 @@ export function TaskList() {
   const [sortBy, setSortBy] = useState("createdAt");
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem("taskViewMode") as ViewMode;
-    return ["grid", "list", "kanban"].includes(saved) ? saved : "grid";
+    return ["grid", "list", "kanban", "calendar"].includes(saved) ? saved : "grid";
   });
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -132,7 +133,7 @@ export function TaskList() {
 
   // Force kanban view on mobile
   useEffect(() => {
-    if (isMobile && viewMode !== "kanban") {
+    if (isMobile && viewMode !== "kanban" && viewMode !== "calendar") {
       setViewMode("kanban");
     }
   }, [isMobile]);
@@ -1252,6 +1253,7 @@ export function TaskList() {
               {" "}
               {viewBtn("grid", "Блоки", "▦")} {viewBtn("list", "Список", "☰")}{" "}
               {viewBtn("kanban", "Канбан", "▦")}{" "}
+              {viewBtn("calendar", "Календарь", "📅")}{" "}
             </div>
           )}{" "}
           {!isGuest && (
@@ -1380,6 +1382,7 @@ export function TaskList() {
       {viewMode === "grid" && renderGrid()}{" "}
       {viewMode === "list" && renderList()}{" "}
       {viewMode === "kanban" && renderKanban()}{" "}
+      {viewMode === "calendar" && <TaskCalendar onOpenTask={(id) => navigate(`/tasks/${id}`)} />}{" "}
       {showModal && (
         <div
           style={{

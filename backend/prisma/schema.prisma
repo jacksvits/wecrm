@@ -119,6 +119,9 @@ model User {
   reservations Reservation[]
   sales          Sale[]
   dashboardMetricSettings DashboardMetricSetting[]
+  scheduleShiftTemplates ScheduleShiftTemplate[]
+  scheduleShifts       ScheduleShift[]
+  scheduleAppointments ScheduleAppointment[]
 }
 
 model ContactType {
@@ -190,6 +193,8 @@ model Contact {
   sales          Sale[]
   subscriptions  ProductSubscription[]
   accesses       ContactAccess[]
+  scheduleAppointments ScheduleAppointment[]
+
 }
 
 model Project {
@@ -1802,4 +1807,88 @@ model HelpArticle {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("help_articles")
+}
+
+// ===================== РАСПИСАНИЕ (календарь) =====================
+// Кабинет/комната, в которой принимают сотрудники (клиника: кабинеты врачей)
+model ScheduleRoom {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#3b82f6")
+  note      String   @default("")
+  position  Int      @default(0)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  templates ScheduleShiftTemplate[]
+  shifts    ScheduleShift[]
+
+  @@map("schedule_rooms")
+}
+
+// Шаблон смены: сотрудник принимает в кабинете в указанные дни недели и часы.
+// weekday: 0=воскресенье … 6=суббота (JS Date.getDay()); время — минуты от полуночи.
+model ScheduleShiftTemplate {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roomId    String   @map("room_id")
+  room      ScheduleRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  weekday   Int
+  startMin  Int      @map("start_min")
+  endMin    Int      @map("end_min")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  overrides ScheduleShift[]
+
+  @@index([userId])
+  @@map("schedule_shift_templates")
+}
+
+// Смена на конкретную дату: разовая или переопределение шаблона (templateId).
+// cancelled=true — «надгробие»: отменяет экземпляр шаблона на эту дату.
+// Записи клиентов к кабинету не привязаны — кабинет вычисляется из смены,
+// поэтому при переносе смены записи переезжают вместе с сотрудником.
+model ScheduleShift {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roomId     String   @map("room_id")
+  room       ScheduleRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  date       String   // YYYY-MM-DD (локальная дата организации)
+  startMin   Int      @map("start_min")
+  endMin     Int      @map("end_min")
+  templateId String?  @map("template_id")
+  template   ScheduleShiftTemplate? @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  cancelled  Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@index([userId, date])
+  @@index([templateId, date])
+  @@map("schedule_shifts")
+}
+
+// Запись клиента на приём к сотруднику (клиент привязан к сотруднику, не к кабинету)
+model ScheduleAppointment {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId   String?  @map("contact_id")
+  contact     Contact? @relation(fields: [contactId], references: [id])
+  clientName  String   @map("client_name")
+  clientPhone String   @default("") @map("client_phone")
+  date        String   // YYYY-MM-DD
+  startMin    Int      @map("start_min")
+  endMin      Int      @map("end_min")
+  status      String   @default("planned") // planned | arrived | done | no_show | cancelled
+  comment     String   @default("") // HTML из WYSIWYG-редактора
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@index([userId, date])
+  @@map("schedule_appointments")
 }

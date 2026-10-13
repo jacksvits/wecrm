@@ -163,11 +163,13 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     delete: (id: string) => fetchApi(`/api/notes/${id}`, { method: 'DELETE' }),
   },
   reminders: {
-    list: (params?: { q?: string; statusId?: string; filter?: string }): Promise<Reminder[]> => {
+    list: (params?: { q?: string; statusId?: string; filter?: string; from?: string; to?: string }): Promise<Reminder[]> => {
       const qs = new URLSearchParams();
       if (params?.q) qs.set('q', params.q);
       if (params?.statusId) qs.set('statusId', params.statusId);
       if (params?.filter) qs.set('filter', params.filter);
+      if (params?.from) qs.set('from', params.from);
+      if (params?.to) qs.set('to', params.to);
       const str = qs.toString();
       return fetchApi(`/api/reminders${str ? `?${str}` : ''}`);
     },
@@ -177,6 +179,33 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     delete: (id: string) => fetchApi(`/api/reminders/${id}`, { method: 'DELETE' }),
     complete: (id: string) => fetchApi(`/api/reminders/${id}/complete`, { method: 'POST' }),
     reopen: (id: string) => fetchApi(`/api/reminders/${id}/reopen`, { method: 'POST' }),
+  },
+  // Расписание (календарь): кабинеты, смены, записи клиентов. Чтение — все, запись — админ.
+  schedule: {
+    rooms: {
+      list: (all = false): Promise<any[]> => fetchApi(`/api/schedule/rooms${all ? '?all=1' : ''}`),
+      create: (data: any): Promise<any> => fetchApi('/api/schedule/rooms', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: any): Promise<any> => fetchApi(`/api/schedule/rooms/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      remove: (id: string): Promise<any> => fetchApi(`/api/schedule/rooms/${id}`, { method: 'DELETE' }),
+    },
+    templates: {
+      list: (): Promise<any[]> => fetchApi('/api/schedule/templates'),
+      create: (data: any): Promise<any> => fetchApi('/api/schedule/templates', { method: 'POST', body: JSON.stringify(data) }),
+      remove: (id: string): Promise<any> => fetchApi(`/api/schedule/templates/${id}`, { method: 'DELETE' }),
+    },
+    shifts: {
+      create: (data: any): Promise<any> => fetchApi('/api/schedule/shifts', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: any): Promise<any> => fetchApi(`/api/schedule/shifts/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+      remove: (id: string): Promise<any> => fetchApi(`/api/schedule/shifts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    },
+    appointments: {
+      list: (from: string, to: string): Promise<any[]> => fetchApi(`/api/schedule/appointments?from=${from}&to=${to}`),
+      create: (data: any): Promise<any> => fetchApi('/api/schedule/appointments', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: any): Promise<any> => fetchApi(`/api/schedule/appointments/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      remove: (id: string): Promise<any> => fetchApi(`/api/schedule/appointments/${id}`, { method: 'DELETE' }),
+    },
+    day: (date: string): Promise<any> => fetchApi(`/api/schedule/day?date=${date}`),
+    month: (year: number, month: number): Promise<any> => fetchApi(`/api/schedule/month?year=${year}&month=${month}`),
   },
   handlerSettings: {
     get: (): Promise<{ greeting: string; completion: string; userId: string | null; user?: { id: string; name: string } | null }> => fetchApi("/api/handler-settings"),
