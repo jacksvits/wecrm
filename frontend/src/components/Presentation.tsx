@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState, type TouchEvent } from 'react'
 import { useBrandLogo } from '../lib/branding'
 
 /* Публичная страница презентации возможностей WeLANS CRM.
-   Слайды лежат в public/presentation/slide-N.png (рендер из .pptd).
+   Слайды лежат в public/pres-slides/slide-N.png (рендер из .pptd).
    Открывается без авторизации по ссылке «Презентация» на странице входа. */
 const SLIDE_COUNT = 7
-const SLIDES = Array.from({ length: SLIDE_COUNT }, (_, i) => `/presentation/slide-${i + 1}.png`)
+const SLIDES = Array.from({ length: SLIDE_COUNT }, (_, i) => `/pres-slides/slide-${i + 1}.png`)
 
 export function Presentation() {
   const brandLogo = useBrandLogo(true)
