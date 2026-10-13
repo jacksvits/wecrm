@@ -1,19 +1,36 @@
-import { useMemo, useState } from 'react' ;
+import { useEffect, useMemo, useState } from 'react' ;
 import { useNavigate } from 'react-router-dom' ;
-import { HELP_ARTICLES, HELP_GROUPS } from '../lib/helpContent' ;
+import { useAuth } from '../hooks/useAuth' ;
+import { api } from '../api/client' ;
+import { HELP_ARTICLES, HelpArticle as HelpArticleData } from '../lib/helpContent' ;
+import { isMainPlatformHost } from './TenantSwitcher' ;
 
 // === Справочный центр: оглавление статей по функциям и интеграциям ===
+// Контент грузится из API (платформенная БД, един для всех); при сбое — встроенная копия.
+// Главный администратор платформы видит кнопки редактирования.
 export function HelpCenter() {
   const navigate = useNavigate() ;
+  const { user } = useAuth() as any ;
   const [query, setQuery] = useState('') ;
+  const [articles, setArticles] = useState<HelpArticleData[]>(HELP_ARTICLES) ;
+
+  const canEdit = !!user && user.role === 'admin' && isMainPlatformHost() ;
+
+  useEffect(() => {
+    api.help.list()
+      .then((list) => { if (Array.isArray(list) && list.length) setArticles(list as any) ; })
+      .catch(() => {}) ;
+  }, []) ;
+
+  const groups = useMemo(() => ['Начало работы', 'Функции', 'Интеграции'], []) ;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase() ;
-    if (!q) return HELP_ARTICLES ;
-    return HELP_ARTICLES.filter(a =>
+    if (!q) return articles ;
+    return articles.filter(a =>
       a.title.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q)
     ) ;
-  }, [query]) ;
+  }, [query, articles]) ;
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '20px 16px' }}>
@@ -30,6 +47,15 @@ export function HelpCenter() {
             или воспользуйтесь поиском.
           </p>
         </div>
+        {canEdit && (
+          <button
+            onClick={() => navigate('/help/new')}
+            style={{
+              padding: '8px 16px', borderRadius: 10, border: 'none', background: '#16a34a',
+              color: '#fff', fontSize: 14, cursor: 'pointer', flexShrink: 0,
+            }}
+          >+ Новая статья</button>
+        )}
       </div>
 
       {/* Поиск по статьям */}
@@ -44,7 +70,7 @@ export function HelpCenter() {
         }}
       />
 
-      {HELP_GROUPS.map(group => {
+      {groups.map(group => {
         const items = filtered.filter(a => a.group === group) ;
         if (items.length === 0) return null ;
         return (
@@ -54,23 +80,35 @@ export function HelpCenter() {
               display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12,
             }}>
               {items.map(a => (
-                <button
-                  key={a.slug}
-                  onClick={() => navigate(`/help/${a.slug}`)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', textAlign: 'left',
-                    borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)',
-                    cursor: 'pointer', color: 'var(--text-primary)', fontFamily: 'inherit',
-                  }}
-                >
-                  {a.mascot && (
-                    <img src={a.mascot} alt="" style={{ width: 44, height: 44, objectFit: 'contain', flexShrink: 0 }} />
+                <div key={a.slug} style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => navigate(`/help/${a.slug}`)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', textAlign: 'left',
+                      borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)',
+                      cursor: 'pointer', color: 'var(--text-primary)', fontFamily: 'inherit', width: '100%',
+                    }}
+                  >
+                    {a.mascot && (
+                      <img src={a.mascot} alt="" style={{ width: 44, height: 44, objectFit: 'contain', flexShrink: 0 }} />
+                    )}
+                    <span>
+                      <span style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{a.title}</span>
+                      <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{a.desc}</span>
+                    </span>
+                  </button>
+                  {canEdit && (
+                    <button
+                      onClick={() => navigate(`/help/${a.slug}/edit`)}
+                      title="Редактировать статью"
+                      style={{
+                        position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8,
+                        border: '1px solid var(--border-color)', background: 'var(--bg-card)',
+                        color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer',
+                      }}
+                    >✎</button>
                   )}
-                  <span>
-                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{a.title}</span>
-                    <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{a.desc}</span>
-                  </span>
-                </button>
+                </div>
               ))}
             </div>
           </div>

@@ -1,13 +1,24 @@
+import { useEffect, useState } from 'react' ;
 import { useNavigate, useParams, Link } from 'react-router-dom' ;
-import { HELP_ARTICLES, getHelpArticle, HelpBlock } from '../lib/helpContent' ;
+import { useAuth } from '../hooks/useAuth' ;
+import { api } from '../api/client' ;
+import { HELP_ARTICLES, HelpBlock, HelpArticle as HelpArticleData } from '../lib/helpContent' ;
+import { isMainPlatformHost } from './TenantSwitcher' ;
 
 // === Страница одной статьи справки ===
+// Контент из API (един для всех доменов); при сбое — встроенная копия.
+// Блоки 'p' и 'tip' содержат HTML из WYSIWYG-редактора.
 function Block({ block }: { block: HelpBlock }) {
   switch (block.type) {
     case 'h':
       return <h2 style={{ fontSize: 16, margin: '22px 0 10px', color: 'var(--text-primary)' }}>{block.text}</h2> ;
     case 'p':
-      return <p style={{ fontSize: 14, lineHeight: 1.65, margin: '0 0 12px', color: 'var(--text-primary)' }}>{block.text}</p> ;
+      return (
+        <div
+          style={{ fontSize: 14, lineHeight: 1.65, margin: '0 0 12px', color: 'var(--text-primary)' }}
+          dangerouslySetInnerHTML={{ __html: block.text }}
+        />
+      ) ;
     case 'steps':
       return (
         <ol style={{ margin: '0 0 14px', paddingLeft: 22, fontSize: 14, lineHeight: 1.65, color: 'var(--text-primary)' }}>
@@ -28,7 +39,7 @@ function Block({ block }: { block: HelpBlock }) {
           fontSize: 13, lineHeight: 1.55, color: 'var(--text-primary)',
         }}>
           <img src="/mascot/mascot_point.png" alt="" style={{ width: 26, height: 26, objectFit: 'contain', flexShrink: 0 }} />
-          <span>{block.text}</span>
+          <div dangerouslySetInnerHTML={{ __html: block.text }} />
         </div>
       ) ;
   }
@@ -37,7 +48,18 @@ function Block({ block }: { block: HelpBlock }) {
 export function HelpArticle() {
   const { slug } = useParams() ;
   const navigate = useNavigate() ;
-  const article = getHelpArticle(slug) ;
+  const { user } = useAuth() as any ;
+  const [articles, setArticles] = useState<HelpArticleData[]>(HELP_ARTICLES) ;
+
+  const canEdit = !!user && user.role === 'admin' && isMainPlatformHost() ;
+
+  useEffect(() => {
+    api.help.list()
+      .then((list) => { if (Array.isArray(list) && list.length) setArticles(list as any) ; })
+      .catch(() => {}) ;
+  }, []) ;
+
+  const article = articles.find(a => a.slug === slug) ;
 
   if (!article) {
     return (
@@ -49,18 +71,29 @@ export function HelpArticle() {
   }
 
   // Предыдущая/следующая статья в общем списке для удобной навигации
-  const idx = HELP_ARTICLES.findIndex(a => a.slug === article.slug) ;
-  const prev = idx > 0 ? HELP_ARTICLES[idx - 1] : null ;
-  const next = idx < HELP_ARTICLES.length - 1 ? HELP_ARTICLES[idx + 1] : null ;
+  const idx = articles.findIndex(a => a.slug === article.slug) ;
+  const prev = idx > 0 ? articles[idx - 1] : null ;
+  const next = idx < articles.length - 1 ? articles[idx + 1] : null ;
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto', padding: '20px 16px' }}>
-      <button
-        onClick={() => navigate('/help')}
-        style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer', padding: 0, marginBottom: 14 }}
-      >
-        ← Все статьи справки
-      </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <button
+          onClick={() => navigate('/help')}
+          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer', padding: 0 }}
+        >
+          ← Все статьи справки
+        </button>
+        {canEdit && (
+          <button
+            onClick={() => navigate(`/help/${article.slug}/edit`)}
+            style={{
+              padding: '6px 14px', borderRadius: 10, border: '1px solid var(--border-color)',
+              background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer',
+            }}
+          >✎ Редактировать</button>
+        )}
+      </div>
 
       {/* Шапка статьи с маскотом */}
       <div style={{

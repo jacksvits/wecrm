@@ -294,6 +294,14 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     dockerCleanup: (): Promise<any> => fetchApi('/api/platform/docker-cleanup', { method: 'POST' }),
     dockerCleanupResult: (): Promise<any> => fetchApi('/api/platform/docker-cleanup-result'),
   },
+  // Справочный центр: чтение — все авторизованные; запись — главный админ платформы
+  help: {
+    list: (): Promise<any[]> => fetchApi('/api/help/articles'),
+    create: (data: any): Promise<any> => fetchApi('/api/help/articles', { method: 'POST', body: JSON.stringify(data) }),
+    update: (slug: string, data: any): Promise<any> => fetchApi(`/api/help/articles/${encodeURIComponent(slug)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (slug: string): Promise<any> => fetchApi(`/api/help/articles/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
+    reset: (slug: string): Promise<any> => fetchApi(`/api/help/articles/${encodeURIComponent(slug)}/reset`, { method: 'POST' }),
+  },
   // === Запросы организаций в поддержку платформы ===
   tenantSupport: {
     create: (data: { subject: string; message: string }): Promise<any> => fetchApi('/api/tenant-support', { method: 'POST', body: JSON.stringify(data) }),

@@ -1786,3 +1786,20 @@ model TenantTicketMessage {
 
   @@map("tenant_ticket_messages")
 }
+
+// ==== Справочный центр платформы ====
+// Статьи справки глобальные (одни на всех): хранятся в платформенной БД,
+// читают все авторизованные, редактирует только главный администратор платформы.
+model HelpArticle {
+  id        String   @id @default(cuid())
+  slug      String   @unique // адрес статьи: /help/<slug>
+  title     String
+  section   String   // «Начало работы» | «Функции» | «Интеграции»
+  descr     String   @default("") // короткое описание для карточки в оглавлении
+  mascot    String?  // путь к маскоту: /mascot/mascot_*.png
+  blocks    Json     // массив блоков: { type: 'p'|'h'|'steps'|'ul'|'tip', ... }
+  position  Int      @default(0) // порядок внутри раздела
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("help_articles")
+}

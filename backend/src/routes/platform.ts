@@ -279,7 +279,7 @@ router.get('/me', async (_req, res) => {
 });
 
 /** Дальше — только главный домен + админ платформы */
-function requirePlatformAdmin(req: AuthRequest, res: any, next: any) {
+export function requirePlatformAdmin(req: AuthRequest, res: any, next: any) {
   const t = currentTenant();
   if (!t?.isMain) return res.status(403).json({ error: 'Доступно только на основном домене платформы' });
   if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Требуются права администратора платформы' });

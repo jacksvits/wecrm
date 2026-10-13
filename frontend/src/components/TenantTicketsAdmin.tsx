@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 interface Msg { id: string; authorRole: string; authorName: string; body: string; createdAt: string }
 interface Ticket {
@@ -26,6 +26,7 @@ export function TenantTicketsAdmin() {
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<Ticket | null>(null)
   const [reply, setReply] = useState('')
+  const navigate = useNavigate()
 
   const load = (f = filter) => {
     setLoading(true)
@@ -119,7 +120,13 @@ export function TenantTicketsAdmin() {
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
         <h1 style={{ margin: 0, fontSize: 22 }}>Запросы организаций</h1>
-        <Link to="/platform" style={{ fontSize: 14 }}>← Организации платформы</Link>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <button style={{ ...btn('transparent'), color: 'var(--text-primary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: 8 }} onClick={() => navigate('/help')}>
+            <img src="/mascot/mascot_point.png" alt="" style={{ width: 22, height: 22, objectFit: 'contain' }} />
+            Справка
+          </button>
+          <Link to="/platform" style={{ fontSize: 14 }}>← Организации платформы</Link>
+        </div>
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         {FILTERS.map(([val, label]) => (
