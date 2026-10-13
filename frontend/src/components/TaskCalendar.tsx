@@ -183,7 +183,7 @@ export function TaskCalendar({ onOpenTask }: Props) {
             // Мобильный вид: повестка полноширинными карточками
             <DayAgenda
               sections={[{
-                id: 'tasks', title: 'Задачи', subtitle: fmtDay(date), color: '#3b82f6',
+                id: 'tasks', title: '', color: '#3b82f6',
                 items: timed.map((t) => ({
                   id: t.id, startMin: taskMin(t.dueDate!),
                   time: `${t.dueDate!.slice(11, 16)}–${minToTime(taskMin(t.dueDate!) + 30)}`,

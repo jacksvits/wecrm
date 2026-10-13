@@ -152,7 +152,7 @@ export function ReminderCalendar({ onOpen }: Props) {
             // Мобильный вид: повестка полноширинными карточками
             <DayAgenda
               sections={[{
-                id: 'reminders', title: 'Напоминания', subtitle: new Date(date).toLocaleDateString('ru-RU', { weekday: 'long' }), color: '#f59e0b',
+                id: 'reminders', title: '', color: '#f59e0b',
                 items: dayList.map((r) => {
                   const start = new Date(r.remindAt).getHours() * 60 + new Date(r.remindAt).getMinutes();
                   return {
