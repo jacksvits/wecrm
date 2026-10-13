@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 
 interface Msg { id: string; authorRole: string; authorName: string; body: string; createdAt: string }
@@ -15,8 +16,9 @@ const STATUS: Record<string, { text: string; color: string; bg: string }> = {
 
 const fmt = (d?: string) => (d ? new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 
-/** Поддержка платформы (только для организаций на поддоменах) */
+/** Поддержка (только для организаций на поддоменах) */
 export function TenantSupport() {
+  const navigate = useNavigate()
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -114,8 +116,14 @@ export function TenantSupport() {
   return (
     <div style={{ maxWidth: 860, margin: '0 auto', padding: '20px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
-        <h1 style={{ margin: 0, fontSize: 22 }}>Поддержка платформы</h1>
-        <button style={btn('#16a34a')} onClick={() => setShowForm(true)}>Оформить запрос</button>
+        <h1 style={{ margin: 0, fontSize: 22 }}>Поддержка</h1>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button style={{ ...btn('transparent'), color: 'var(--text-primary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: 8 }} onClick={() => navigate('/help')}>
+            <img src="/mascot/mascot_point.png" alt="" style={{ width: 22, height: 22, objectFit: 'contain' }} />
+            Справка
+          </button>
+          <button style={btn('#16a34a')} onClick={() => setShowForm(true)}>Оформить запрос</button>
+        </div>
       </div>
       <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 16px' }}>
         Запросы уходят в техподдержку платформы WeCRM (welans.cc). Ответ появится в этой переписке.
