@@ -58,6 +58,16 @@ export function SystemSettings() {
   const [accentSaving, setAccentSaving] = useState(false);
   const [themeSaving, setThemeSaving] = useState(false);
 
+  // Текущая организация (tenant) — администратору показываем, чьи настройки дизайна он редактирует.
+  // У каждой организации своя БД, поэтому настройки дизайна изолированы и применяются только к её поддомену.
+  const [designTenant, setDesignTenant] = useState<{ name: string; isMain: boolean } | null>(null);
+  useEffect(() => {
+    fetch("/api/platform/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setDesignTenant(data); })
+      .catch(() => {});
+  }, []);
+
   // === Обработчик: авто-сообщения в обсуждение задачи ===
   const [handlerGreeting, setHandlerGreeting] = useState("");
   const [handlerCompletion, setHandlerCompletion] = useState("");
@@ -595,6 +605,25 @@ export function SystemSettings() {
   // === Под-вкладка «Дизайн»: брендинг (иконка приложения и логотип компании) ===
   const renderDesign = () => (
     <div>
+      {/* Подсказка: настройки дизайна изолированы для каждой организации (tenant'а) */}
+      <div
+        style={{
+          marginBottom: 20,
+          padding: "10px 16px",
+          borderRadius: 10,
+          border: "1px solid var(--border-color)",
+          background: "var(--bg-card)",
+          fontSize: 13,
+          color: "var(--text-muted)",
+        }}
+      >
+        Вы редактируете дизайн:{" "}
+        <strong style={{ color: "var(--text-primary)" }}>
+          {designTenant ? (designTenant.isMain ? "WeCRM (главный домен)" : designTenant.name) : window.location.hostname}
+        </strong>{" "}
+        · {window.location.hostname}. Настройки применяются только к этой организации.
+      </div>
+
       {/* Иконка приложения: PWA, favicon, уведомления */}
       <div
         style={{
