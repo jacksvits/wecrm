@@ -35,6 +35,7 @@ const ghostBtn: React.CSSProperties = {
 // (форма slice(0,16), список timeZone:"UTC") — календарь извлекает дату/время так же
 const taskDate = (iso: string) => iso.slice(0, 10);
 const taskMin = (iso: string) => Number(iso.slice(11, 13)) * 60 + Number(iso.slice(14, 16));
+const assigneeNames = (t: Task) => (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ');
 
 interface Props {
   onOpenTask: (id: string) => void;
@@ -55,7 +56,7 @@ export function TaskCalendar({ onOpenTask }: Props) {
     const from = `${year}-${String(month).padStart(2, '0')}-01`;
     const lastDay = new Date(year, month, 0).getDate();
     const to = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-    const params = new URLSearchParams({ dueFrom: from, dueTo: to, includeChildren: 'true' });
+    const params = new URLSearchParams({ dueFrom: from, dueTo: to, includeChildren: 'true', includeNoDue: 'true' });
     api.tasks.list(params.toString())
       .then((list) => setTasks(Array.isArray(list) ? list : []))
       .catch(() => setTasks([]))
@@ -65,6 +66,7 @@ export function TaskCalendar({ onOpenTask }: Props) {
   useEffect(() => { load(); }, [load]);
 
   const byDate = (iso: string) => tasks.filter((t) => t.dueDate && taskDate(t.dueDate) === iso);
+  const noDueTasks = tasks.filter((t) => !t.dueDate);
 
   const openDay = (iso: string) => {
     setDate(iso);
@@ -123,7 +125,7 @@ export function TaskCalendar({ onOpenTask }: Props) {
 
   const items: TimelineItem[] = timed.map((t) => {
     const start = taskMin(t.dueDate!);
-    const assignees = (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ');
+    const assignees = assigneeNames(t);
     return {
       id: t.id, columnId: 'tasks', startMin: start, endMin: start + 30,
       title: t.title,
@@ -132,6 +134,36 @@ export function TaskCalendar({ onOpenTask }: Props) {
       onClick: () => onOpenTask(t.id),
     };
   });
+
+  const noDueBlock = noDueTasks.length > 0 ? (
+    <section style={{ marginTop: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Не указан срок</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{noDueTasks.length}</div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+        {noDueTasks.map((t) => (
+          <div
+            key={t.id}
+            onClick={() => onOpenTask(t.id)}
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderLeft: `3px solid ${STATUS_COLORS[t.status] || '#3b82f6'}`,
+              borderRadius: 12,
+              padding: '10px 12px',
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{t.title}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              {[STATUS_LABELS[t.status] || t.status, assigneeNames(t)].filter(Boolean).join(' · ')}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  ) : null;
 
   const untimedRow = untimed.length > 0 ? (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -161,6 +193,7 @@ export function TaskCalendar({ onOpenTask }: Props) {
             {loading && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Загрузка...</span>}
           </div>
           <CalendarMonth year={year} month={month} onDayClick={openDay} compact={isMobile} renderDay={renderDay} />
+          {noDueBlock}
           <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>Нажмите на дату, чтобы открыть временную шкалу дня.</div>
         </div>
       )}
