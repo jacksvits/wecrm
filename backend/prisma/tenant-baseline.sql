@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict HqQ4gAF1pR8hpTExMPHSf21mj0PbtNNRSzscYByfSh3bAxGmDzISAzakMa4HdO0
+\restrict kczVYipbq8CSv8pDgoTCaNjQ6PQVHUDVzbZsXBTeO4OdegBZ0XNPf7LsiYUmmoF
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -597,6 +597,23 @@ CREATE TABLE public.handler_settings (
 
 
 --
+-- Name: help_articles; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.help_articles (
+    id text NOT NULL,
+    slug text NOT NULL,
+    title text NOT NULL,
+    section text NOT NULL,
+    descr text DEFAULT ''::text NOT NULL,
+    mascot text,
+    blocks jsonb NOT NULL,
+    "position" integer DEFAULT 0 NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL
+);
+
+
+--
 -- Name: legal_documents; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -991,7 +1008,13 @@ CREATE TABLE public.products (
     brand text,
     tnved text,
     crm_allowed_pages jsonb,
-    pay_link text
+    pay_link text,
+    crm_cameras boolean DEFAULT false NOT NULL,
+    crm_subscriptions boolean DEFAULT false NOT NULL,
+    crm_accounting boolean DEFAULT false NOT NULL,
+    crm_video_notes boolean DEFAULT false NOT NULL,
+    crm_calls boolean DEFAULT false NOT NULL,
+    crm_integrations jsonb
 );
 
 
@@ -1268,6 +1291,75 @@ CREATE TABLE public.sales (
     "paidAt" timestamp(3) without time zone,
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: schedule_appointments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.schedule_appointments (
+    id text NOT NULL,
+    user_id text NOT NULL,
+    contact_id text,
+    client_name text NOT NULL,
+    client_phone text DEFAULT ''::text NOT NULL,
+    date text NOT NULL,
+    start_min integer NOT NULL,
+    end_min integer NOT NULL,
+    status text DEFAULT 'planned'::text NOT NULL,
+    comment text DEFAULT ''::text NOT NULL,
+    created_by_id text,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: schedule_rooms; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.schedule_rooms (
+    id text NOT NULL,
+    name text NOT NULL,
+    color text DEFAULT '#3b82f6'::text NOT NULL,
+    note text DEFAULT ''::text NOT NULL,
+    "position" integer DEFAULT 0 NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: schedule_shift_templates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.schedule_shift_templates (
+    id text NOT NULL,
+    user_id text NOT NULL,
+    room_id text NOT NULL,
+    weekday integer NOT NULL,
+    start_min integer NOT NULL,
+    end_min integer NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: schedule_shifts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.schedule_shifts (
+    id text NOT NULL,
+    user_id text NOT NULL,
+    room_id text NOT NULL,
+    date text NOT NULL,
+    start_min integer NOT NULL,
+    end_min integer NOT NULL,
+    template_id text,
+    cancelled boolean DEFAULT false NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL
 );
 
 
@@ -2048,6 +2140,14 @@ ALTER TABLE ONLY public.handler_settings
 
 
 --
+-- Name: help_articles help_articles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.help_articles
+    ADD CONSTRAINT help_articles_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: legal_documents legal_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2357,6 +2457,38 @@ ALTER TABLE ONLY public.sales
 
 ALTER TABLE ONLY public.sales
     ADD CONSTRAINT sales_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: schedule_appointments schedule_appointments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_appointments
+    ADD CONSTRAINT schedule_appointments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: schedule_rooms schedule_rooms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_rooms
+    ADD CONSTRAINT schedule_rooms_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: schedule_shift_templates schedule_shift_templates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_shift_templates
+    ADD CONSTRAINT schedule_shift_templates_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: schedule_shifts schedule_shifts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_shifts
+    ADD CONSTRAINT schedule_shifts_pkey PRIMARY KEY (id);
 
 
 --
@@ -2837,6 +2969,13 @@ CREATE INDEX finance_documents_type_idx ON public.finance_documents USING btree 
 
 
 --
+-- Name: help_articles_slug_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX help_articles_slug_key ON public.help_articles USING btree (slug);
+
+
+--
 -- Name: max_user_chats_chat_id_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3163,6 +3302,48 @@ CREATE INDEX "sales_contactId_idx" ON public.sales USING btree ("contactId");
 --
 
 CREATE INDEX "sales_warehouseId_idx" ON public.sales USING btree ("warehouseId");
+
+
+--
+-- Name: schedule_appointments_date_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX schedule_appointments_date_idx ON public.schedule_appointments USING btree (date);
+
+
+--
+-- Name: schedule_appointments_user_id_date_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX schedule_appointments_user_id_date_idx ON public.schedule_appointments USING btree (user_id, date);
+
+
+--
+-- Name: schedule_shift_templates_user_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX schedule_shift_templates_user_id_idx ON public.schedule_shift_templates USING btree (user_id);
+
+
+--
+-- Name: schedule_shifts_date_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX schedule_shifts_date_idx ON public.schedule_shifts USING btree (date);
+
+
+--
+-- Name: schedule_shifts_template_id_date_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX schedule_shifts_template_id_date_idx ON public.schedule_shifts USING btree (template_id, date);
+
+
+--
+-- Name: schedule_shifts_user_id_date_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX schedule_shifts_user_id_date_idx ON public.schedule_shifts USING btree (user_id, date);
 
 
 --
@@ -3990,6 +4171,62 @@ ALTER TABLE ONLY public.reservations
 
 
 --
+-- Name: schedule_appointments schedule_appointments_contact_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_appointments
+    ADD CONSTRAINT schedule_appointments_contact_id_fkey FOREIGN KEY (contact_id) REFERENCES public.contacts(id) ON UPDATE CASCADE ON DELETE SET NULL;
+
+
+--
+-- Name: schedule_appointments schedule_appointments_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_appointments
+    ADD CONSTRAINT schedule_appointments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: schedule_shift_templates schedule_shift_templates_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_shift_templates
+    ADD CONSTRAINT schedule_shift_templates_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.schedule_rooms(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: schedule_shift_templates schedule_shift_templates_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_shift_templates
+    ADD CONSTRAINT schedule_shift_templates_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: schedule_shifts schedule_shifts_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_shifts
+    ADD CONSTRAINT schedule_shifts_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.schedule_rooms(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: schedule_shifts schedule_shifts_template_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_shifts
+    ADD CONSTRAINT schedule_shifts_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.schedule_shift_templates(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: schedule_shifts schedule_shifts_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_shifts
+    ADD CONSTRAINT schedule_shifts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
 -- Name: sms_messages sms_messages_contact_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4217,13 +4454,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HqQ4gAF1pR8hpTExMPHSf21mj0PbtNNRSzscYByfSh3bAxGmDzISAzakMa4HdO0
+\unrestrict kczVYipbq8CSv8pDgoTCaNjQ6PQVHUDVzbZsXBTeO4OdegBZ0XNPf7LsiYUmmoF
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 8Ttnz0z5poHsSOUSC7oIrVI3Za8JuclvETCkPDqLB3p4frlAXslyTAD6bY6zNeH
+\restrict GLewzXhvad4v7lfath0cYEdk9jYOp3s2168gbJkR2gxIbguMd6FkegJwEX4Ybhc
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -4550,17 +4787,23 @@ INSERT INTO public._prisma_migrations VALUES ('9b8e6486-9839-4994-a619-21139d89f
 INSERT INTO public._prisma_migrations VALUES ('c57701f7-3646-4d48-af01-eebd927be7ad', '3709d1d3ecc1d925d2cd0cf16b17d9ec636988f37d953b1ae8a0f5504977df90', '2026-10-09 11:37:46.032437+00', '20261009144000_vk_market_token_refresh', NULL, NULL, '2026-10-09 11:37:46.02527+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('7da6bf07-aeb4-4bd2-9a92-4f17a3da7379', '73b52f0179ff75fc5ee2a221717c69d66ba466f75b7e712df1ae6e6813a2aca0', '2026-10-09 17:03:42.496252+00', '20261009200000_support_chat', NULL, NULL, '2026-10-09 17:03:42.482665+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('44633cc1-876c-443a-a832-798e2eb1ef68', 'a69ee992f54bf52dc79d31249a8cd835905ff8fc898265c54441569f25d0cb6e', '2026-10-09 19:21:19.172222+00', '20261009223000_support_tickets_visibility', NULL, NULL, '2026-10-09 19:21:19.165947+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('87ec5ee2-42ee-4abc-9327-c4063f00295d', '8a4d07f0700e87a330b6c2a2822f8f6674c6ba6b50d98a1b12c7e2b9a3013a50', '2026-10-11 19:31:55.421927+00', '20261011222000_crm_cameras', NULL, NULL, '2026-10-11 19:31:55.416144+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('9a2d7a0f-9911-46be-b66f-c3285ad81a55', '9761b70bdda8d4bb64e6351fd0be14a6cb53db56d1e90f3488be9c76b14df488', '2026-10-09 21:51:37.228532+00', '20261010000000_add_seo_settings', NULL, NULL, '2026-10-09 21:51:37.216209+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('131bc505-24d7-4da7-9868-c50fb34c478b', '3d3f967e92fdf68c3af91ee56a7e903ae785440c38b1f3921acaaeb9bfce9cdb', '2026-10-10 16:26:00.295459+00', '20261010191500_add_product_default_image', NULL, NULL, '2026-10-10 16:26:00.290446+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('d0b5bd5d-762a-4946-a7b8-716994f72647', '8e59a0512b5e5de767b9d15a5849c41f3c5fa8a4399f6429e650795c660089e2', '2026-10-10 17:34:34.850066+00', '20261010195000_add_product_card_style', NULL, NULL, '2026-10-10 17:34:34.845391+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('6ef2116f-4940-478f-bbc4-e1f4c29a452a', 'bb31a872a1cdb8f0963c2bfcd3014f376d717c49dcb42a830426a80e5865a4a5', '2026-10-11 19:55:19.669309+00', '20261011224500_crm_subscription_options', NULL, NULL, '2026-10-11 19:55:19.662163+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('a59ecdb5-f1a9-4a97-b5de-d0a7f1a57e1b', 'a9839d84e69a5a14e3eec786562d89bf192be7447b6b7624b07a7d4c845a9f88', '2026-10-11 11:05:53.090682+00', '20261011140000_platform_tenants', NULL, NULL, '2026-10-11 11:05:53.076102+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('8140916c-7072-49c3-8751-e818ec92e00a', '07ff4798826c48d98c62f8cfb95ef3f0e13a4cd7ff2453a44a071c29d616c49e', '2026-10-11 13:20:00.517262+00', '20261011160000_tenant_support_tickets', NULL, NULL, '2026-10-11 13:20:00.49503+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('0331f96b-ab54-47de-bbd9-41638fe1d749', '5b7c2aab3e0e490de792d3563b97ba7f4a53569e9353c3ab5298f611880fb4b2', '2026-10-11 15:08:38.288665+00', '20261011180000_crm_tariff_plans', NULL, NULL, '2026-10-11 15:08:38.278259+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('9f123f6c-76f4-49ec-af45-1b6197200c25', 'f021d1e73d5ef720e722f94842d395891f5016a837a5c8f58aab8e0431aae601', '2026-10-11 22:19:12.432481+00', '20261012012000_crm_calls', NULL, NULL, '2026-10-11 22:19:12.426224+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('cdb6bfb0-99c9-45a3-900c-e6dc16c8b8da', '41bf312a64ef260c32a6dc66e1fbd7de0e45368e990a6f35e0500db5dcf885c7', '2026-10-11 23:08:13.300651+00', '20261012020000_crm_integrations', NULL, NULL, '2026-10-11 23:08:13.295336+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('9d616b3a-967b-4876-88a7-e4dc994c5933', '6186d2261cd19d275eaf6029777b4c2024e15a0761f9eccbdae49cc1cffa389d', '2026-10-13 18:07:07.631212+00', '20261013204500_help_articles', NULL, NULL, '2026-10-13 18:07:07.614158+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('20c71eb6-c372-4dd9-9c84-7b7a33fb8c02', '72ab017ac7872c8cd4c8963fafbc9cccb64959aff63ae2f8cafcbe9ce66e1d2d', '2026-10-13 19:08:41.003556+00', '20261014120000_schedule', NULL, NULL, '2026-10-13 19:08:40.958194+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8Ttnz0z5poHsSOUSC7oIrVI3Za8JuclvETCkPDqLB3p4frlAXslyTAD6bY6zNeH
+\unrestrict GLewzXhvad4v7lfath0cYEdk9jYOp3s2168gbJkR2gxIbguMd6FkegJwEX4Ybhc
 
