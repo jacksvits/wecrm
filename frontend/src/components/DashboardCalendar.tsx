@@ -388,7 +388,7 @@ export function DashboardCalendar() {
     }}>
       {/* Шапка виджета */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>📅 Календарь</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>📅</div>
         <button style={ghostBtn} onClick={() => shiftMonth(-1)}>‹</button>
         <div style={{ fontSize: 15, fontWeight: 600, minWidth: 130, textAlign: 'center', color: 'var(--text-primary)' }}>
           {MONTH_NAMES[month - 1]} {year}
