@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict kczVYipbq8CSv8pDgoTCaNjQ6PQVHUDVzbZsXBTeO4OdegBZ0XNPf7LsiYUmmoF
+\restrict NxOBkjMXlukUhyyOj24swEeuwDUbq3seNXxJFqZSb2WUU9R2mfLcywBrBwC3MzP
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -1626,6 +1626,27 @@ CREATE TABLE public.telephony_settings (
 
 
 --
+-- Name: tenant_ticket_attachments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tenant_ticket_attachments (
+    id text NOT NULL,
+    ticket_id text,
+    message_id text,
+    tenant_slug text NOT NULL,
+    author_id text,
+    author_role text NOT NULL,
+    author_name text NOT NULL,
+    filename text NOT NULL,
+    original_name text NOT NULL,
+    mime_type text NOT NULL,
+    size integer NOT NULL,
+    path text NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: tenant_ticket_messages; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2628,6 +2649,14 @@ ALTER TABLE ONLY public.telephony_settings
 
 
 --
+-- Name: tenant_ticket_attachments tenant_ticket_attachments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tenant_ticket_attachments
+    ADD CONSTRAINT tenant_ticket_attachments_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: tenant_ticket_messages tenant_ticket_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3550,6 +3579,20 @@ CREATE UNIQUE INDEX telegram_user_chat_chat_id_key ON public.telegram_user_chat 
 
 
 --
+-- Name: tenant_ticket_attachments_message_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tenant_ticket_attachments_message_id_idx ON public.tenant_ticket_attachments USING btree (message_id);
+
+
+--
+-- Name: tenant_ticket_attachments_ticket_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tenant_ticket_attachments_ticket_id_idx ON public.tenant_ticket_attachments USING btree (ticket_id);
+
+
+--
 -- Name: tenant_ticket_messages_ticket_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4411,6 +4454,22 @@ ALTER TABLE ONLY public.telephony_settings
 
 
 --
+-- Name: tenant_ticket_attachments tenant_ticket_attachments_message_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tenant_ticket_attachments
+    ADD CONSTRAINT tenant_ticket_attachments_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.tenant_ticket_messages(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: tenant_ticket_attachments tenant_ticket_attachments_ticket_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tenant_ticket_attachments
+    ADD CONSTRAINT tenant_ticket_attachments_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES public.tenant_tickets(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
 -- Name: tochka_acquiring_payments tochka_acquiring_payments_sale_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4454,13 +4513,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kczVYipbq8CSv8pDgoTCaNjQ6PQVHUDVzbZsXBTeO4OdegBZ0XNPf7LsiYUmmoF
+\unrestrict NxOBkjMXlukUhyyOj24swEeuwDUbq3seNXxJFqZSb2WUU9R2mfLcywBrBwC3MzP
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict GLewzXhvad4v7lfath0cYEdk9jYOp3s2168gbJkR2gxIbguMd6FkegJwEX4Ybhc
+\restrict P4cTH6OUmHB2aTcAx3nyVQATWZkY09numkASyuKZmH3rvV1jMFaOaLFPNjjVKed
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -4799,11 +4858,12 @@ INSERT INTO public._prisma_migrations VALUES ('9f123f6c-76f4-49ec-af45-1b6197200
 INSERT INTO public._prisma_migrations VALUES ('cdb6bfb0-99c9-45a3-900c-e6dc16c8b8da', '41bf312a64ef260c32a6dc66e1fbd7de0e45368e990a6f35e0500db5dcf885c7', '2026-10-11 23:08:13.300651+00', '20261012020000_crm_integrations', NULL, NULL, '2026-10-11 23:08:13.295336+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('9d616b3a-967b-4876-88a7-e4dc994c5933', '6186d2261cd19d275eaf6029777b4c2024e15a0761f9eccbdae49cc1cffa389d', '2026-10-13 18:07:07.631212+00', '20261013204500_help_articles', NULL, NULL, '2026-10-13 18:07:07.614158+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('20c71eb6-c372-4dd9-9c84-7b7a33fb8c02', '72ab017ac7872c8cd4c8963fafbc9cccb64959aff63ae2f8cafcbe9ce66e1d2d', '2026-10-13 19:08:41.003556+00', '20261014120000_schedule', NULL, NULL, '2026-10-13 19:08:40.958194+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('78c74d13-5624-4eb9-87d0-8bcc5e5158ff', '80af48117d48a4494e028d7966bb83e2a17c10e1a26bac28d2432321f2d498a7', '2026-10-13 20:38:22.169439+00', '20261013210000_tenant_ticket_attachments', NULL, NULL, '2026-10-13 20:38:22.150311+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GLewzXhvad4v7lfath0cYEdk9jYOp3s2168gbJkR2gxIbguMd6FkegJwEX4Ybhc
+\unrestrict P4cTH6OUmHB2aTcAx3nyVQATWZkY09numkASyuKZmH3rvV1jMFaOaLFPNjjVKed
 
