@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client';
-import { Task } from '../types';
+import { Status, Task } from '../types';
 import { CalendarMonth, toISODate, MONTH_NAMES } from './calendar/CalendarMonth';
 import { DayTimeline, TimelineItem, minToTime } from './calendar/DayTimeline';
 import { DayAgenda } from './calendar/DayAgenda';
@@ -49,6 +49,8 @@ export function TaskCalendar({ onOpenTask }: Props) {
   const [mode, setMode] = useState<'month' | 'day'>('month');
   const [date, setDate] = useState(today);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [statuses, setStatuses] = useState<Status[]>([]);
+  const [hideCompletedTasks, setHideCompletedTasks] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(() => {
@@ -64,9 +66,17 @@ export function TaskCalendar({ onOpenTask }: Props) {
   }, [year, month]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { api.statuses.list('task').then(setStatuses).catch(() => setStatuses([])); }, []);
+  useEffect(() => { api.profile.get().then((u) => setHideCompletedTasks(u.hideCompletedTasks ?? true)).catch(() => {}); }, []);
 
   const byDate = (iso: string) => tasks.filter((t) => t.dueDate && taskDate(t.dueDate) === iso);
   const noDueTasks = tasks.filter((t) => !t.dueDate);
+  const visibleNoDueTasks = hideCompletedTasks
+    ? noDueTasks.filter((t) => {
+        const taskStatus = statuses.find((s) => s.name === t.status);
+        return !(taskStatus && !taskStatus.isActive);
+      })
+    : noDueTasks;
 
   const openDay = (iso: string) => {
     setDate(iso);
@@ -135,14 +145,14 @@ export function TaskCalendar({ onOpenTask }: Props) {
     };
   });
 
-  const noDueBlock = noDueTasks.length > 0 ? (
+  const noDueBlock = visibleNoDueTasks.length > 0 ? (
     <section style={{ marginTop: 14 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Не указан срок</div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{noDueTasks.length}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{visibleNoDueTasks.length}</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-        {noDueTasks.map((t) => (
+        {visibleNoDueTasks.map((t) => (
           <div
             key={t.id}
             onClick={() => onOpenTask(t.id)}
