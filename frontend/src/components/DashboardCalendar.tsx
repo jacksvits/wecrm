@@ -1,0 +1,367 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../api/client';
+import { useAuth } from '../hooks/useAuth';
+import { useRealtime } from '../hooks/useRealtime';
+import { Task, Reminder, Status } from '../types';
+import { CalendarMonth, toISODate, MONTH_NAMES } from './calendar/CalendarMonth';
+import { DayTimeline, TimelineBand, TimelineColumn, TimelineItem, minToTime } from './calendar/DayTimeline';
+
+/**
+ * Виджет дашборда «Календарь»: задачи + напоминания + расписание на одном месяце.
+ * Клик по дате — временная шкала дня внутри виджета (колонки сотрудников, «Задачи», «Напоминания»).
+ * Виджет только для чтения: редактирование — в разделах «Расписание», «Задачи», «Напоминания».
+ */
+
+// Цвета статусов — как в TaskCalendar / ReminderCalendar / SchedulePage (единая стилистика)
+const TASK_STATUS_COLORS: Record<string, string> = {
+  open: '#3b82f6',
+  in_progress: '#f59e0b',
+  load: '#8b5cf6',
+  cancelled: '#9ca3af',
+  win: '#16a34a',
+};
+const TASK_STATUS_LABELS: Record<string, string> = {
+  open: 'Открыта',
+  in_progress: 'В работе',
+  load: 'Загрузка',
+  cancelled: 'Отменена',
+  win: 'Завершена',
+};
+const APPT_STATUS_COLORS: Record<string, string> = {
+  planned: '#3b82f6',
+  arrived: '#16a34a',
+  done: '#6b7280',
+  no_show: '#dc2626',
+  cancelled: '#9ca3af',
+};
+
+const ghostBtn: React.CSSProperties = {
+  padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border-color)',
+  background: 'transparent', color: 'var(--text-primary)', fontSize: 14, cursor: 'pointer',
+};
+
+const toMin = (d: Date) => d.getHours() * 60 + d.getMinutes();
+
+const stripHtml = (html: string) => {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html || '';
+  return tmp.textContent || '';
+};
+
+export function DashboardCalendar() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  // Доступ к задачам — как в Dashboard: админ или раздел «/tasks» в allowedPages
+  const canViewTasks = user?.role === 'admin' || ((user as any)?.allowedPages || []).includes('/tasks');
+
+  const [year, setYear] = useState(() => new Date().getFullYear());
+  const [month, setMonth] = useState(() => new Date().getMonth() + 1);
+  const [date, setDate] = useState(() => toISODate(new Date()));
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [statuses, setStatuses] = useState<Status[]>([]);
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [monthData, setMonthData] = useState<any>(null); // агрегаты расписания по дням
+  const [dayData, setDayData] = useState<any>(null);     // день расписания (смены + записи)
+  const [loading, setLoading] = useState(false);
+
+  // ---------- загрузка месяца (источники независимы: сбой одного не ломает остальные) ----------
+  const loadMonth = useCallback(() => {
+    setLoading(true);
+    const from = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const to = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    let pending = canViewTasks ? 3 : 2;
+    const done = () => { pending -= 1; if (pending <= 0) setLoading(false); };
+    if (canViewTasks) {
+      api.tasks.list(new URLSearchParams({ dueFrom: from, dueTo: to, includeChildren: 'true' }).toString())
+        .then((list) => setTasks(Array.isArray(list) ? list : []))
+        .catch(() => setTasks([]))
+        .finally(done);
+    }
+    api.reminders.list({ from, to, filter: 'all' })
+      .then((list) => setReminders(Array.isArray(list) ? list : []))
+      .catch(() => setReminders([]))
+      .finally(done);
+    // У тенанта может не быть таблиц расписания (старая БД) — тогда блок просто пуст
+    api.schedule.month(year, month)
+      .then(setMonthData)
+      .catch(() => setMonthData(null))
+      .finally(done);
+  }, [year, month, canViewTasks]);
+
+  const loadDay = useCallback(() => {
+    api.schedule.day(date).then(setDayData).catch(() => setDayData(null));
+  }, [date]);
+
+  useEffect(() => { loadMonth(); }, [loadMonth]);
+  useEffect(() => { loadDay(); }, [loadDay]);
+  useEffect(() => {
+    if (canViewTasks) api.statuses.list('task').then(setStatuses).catch(() => {});
+  }, [canViewTasks]);
+  useEffect(() => {
+    api.schedule.rooms.list().then(setRooms).catch(() => {});
+  }, []);
+
+  // Живое обновление при изменениях задач/напоминаний (как в Dashboard)
+  useRealtime(['tasks', 'reminders'], () => { loadMonth(); });
+
+  // ---------- навигация ----------
+  const openDay = (iso: string) => {
+    setDate(iso);
+    const [y, m] = iso.split('-').map(Number);
+    setYear(y); setMonth(m);
+  };
+  const shiftMonth = (delta: number) => {
+    const d = new Date(year, month - 1 + delta, 1);
+    setYear(d.getFullYear()); setMonth(d.getMonth() + 1);
+  };
+  const shiftDay = (delta: number) => {
+    const [y, m, d] = date.split('-').map(Number);
+    openDay(toISODate(new Date(y, m - 1, d + delta)));
+  };
+
+  // ---------- данные по датам ----------
+  const tasksByDate = (iso: string) => tasks.filter((t) => t.dueDate && toISODate(new Date(t.dueDate)) === iso);
+  const remindersByDate = (iso: string) => reminders.filter((r) => r.remindAt && toISODate(new Date(r.remindAt)) === iso);
+  const taskColor = (t: Task) =>
+    statuses.find((s) => s.name === t.status)?.color || TASK_STATUS_COLORS[t.status] || '#3b82f6';
+  const reminderColor = (r: Reminder) => ((r as any).status?.color) || (r.completedAt ? '#9ca3af' : '#f59e0b');
+
+  const chipStyle = (color: string, extra?: React.CSSProperties): React.CSSProperties => ({
+    fontSize: 11, padding: '1px 6px', borderRadius: 6, whiteSpace: 'nowrap',
+    overflow: 'hidden', textOverflow: 'ellipsis',
+    background: `${color}22`, borderLeft: `2px solid ${color}`, color: 'var(--text-primary)',
+    ...extra,
+  });
+
+  // ---------- месяц: метки трёх типов на каждой дате ----------
+  const renderDay = (iso: string) => {
+    const dayTasks = tasksByDate(iso);
+    const dayReminders = remindersByDate(iso);
+    const sched = monthData?.days?.[iso];
+    const chips: React.ReactNode[] = [];
+    for (const t of dayTasks) {
+      chips.push(
+        <div key={`t${t.id}`} style={chipStyle(taskColor(t))} title={`Задача: ${t.title}`}>📋 {t.title}</div>
+      );
+    }
+    for (const r of dayReminders) {
+      chips.push(
+        <div
+          key={`r${r.id}`}
+          style={chipStyle(reminderColor(r), r.completedAt ? { textDecoration: 'line-through', opacity: 0.65 } : undefined)}
+          title={`Напоминание: ${r.title}`}
+        >
+          🔔 {new Date(r.remindAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} {r.title}
+        </div>
+      );
+    }
+    if (sched && (sched.appointments > 0 || sched.shifts > 0)) {
+      const roomIds = Object.keys(sched.rooms || {});
+      chips.push(
+        <div
+          key="s"
+          style={{ fontSize: 11, fontWeight: 600, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}
+          title={`Записей: ${sched.appointments}, смен: ${sched.shifts}`}
+        >
+          🗓 {sched.appointments > 0
+            ? `${sched.appointments} зап.`
+            : `${sched.shifts} смен${sched.shifts === 1 ? 'а' : sched.shifts < 5 ? 'ы' : ''}`}
+          {roomIds.slice(0, 4).map((rid) => {
+            const room = rooms.find((r) => r.id === rid);
+            return <span key={rid} style={{ width: 8, height: 8, borderRadius: 2, background: room?.color || '#94a3b8', display: 'inline-block' }} />;
+          })}
+        </div>
+      );
+    }
+    if (chips.length === 0) return null;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {chips.slice(0, 4)}
+        {chips.length > 4 && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>+{chips.length - 4} ещё</div>}
+      </div>
+    );
+  };
+
+  // ---------- день: единая временная шкала ----------
+  const dayTasks = tasksByDate(date);
+  const dayReminders = remindersByDate(date);
+  // Время 00:00 считаем «без времени» (как в TaskCalendar)
+  const timedTasks = dayTasks.filter((t) => toMin(new Date(t.dueDate!)) !== 0);
+  const untimedTasks = dayTasks.filter((t) => toMin(new Date(t.dueDate!)) === 0);
+  const timedReminders = dayReminders.filter((r) => toMin(new Date(r.remindAt)) !== 0);
+  const untimedReminders = dayReminders.filter((r) => toMin(new Date(r.remindAt)) === 0);
+
+  const { columns, bands, items, empty } = useMemo(() => {
+    const cols: TimelineColumn[] = [];
+    const bnds: TimelineBand[] = [];
+    const itms: TimelineItem[] = [];
+    const shifts: any[] = dayData?.shifts || [];
+    const appts: any[] = dayData?.appointments || [];
+    // Колонки сотрудников — у кого есть смена или записи в этот день
+    for (const u of dayData?.users || []) {
+      const userShift = shifts.find((s: any) => s.userId === u.id);
+      cols.push({
+        id: u.id, title: u.name,
+        subtitle: userShift
+          ? `${userShift.room?.name || ''} · ${minToTime(userShift.startMin)}–${minToTime(userShift.endMin)}`
+          : 'без смены',
+      });
+    }
+    for (const s of shifts) {
+      bnds.push({
+        id: s.id, columnId: s.userId, startMin: s.startMin, endMin: s.endMin,
+        color: s.room?.color || '#3b82f6',
+        label: `${s.room?.name || '—'} · ${minToTime(s.startMin)}–${minToTime(s.endMin)}`,
+        conflict: s.roomConflict,
+      });
+    }
+    for (const a of appts) {
+      itms.push({
+        id: `a${a.id}`, columnId: a.userId, startMin: a.startMin, endMin: a.endMin,
+        title: a.clientName,
+        subtitle: `${a.room?.name || 'без кабинета'}${a.clientPhone ? ' · ' + a.clientPhone : ''}`,
+        color: APPT_STATUS_COLORS[a.status] || '#3b82f6', conflict: a.conflict,
+        onClick: () => navigate('/schedule'),
+      });
+    }
+    // Колонка «Задачи»
+    if (canViewTasks && timedTasks.length > 0) {
+      cols.push({ id: '__tasks__', title: 'Задачи', color: '#3b82f6' });
+      for (const t of timedTasks) {
+        const start = toMin(new Date(t.dueDate!));
+        const assignees = (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ');
+        itms.push({
+          id: `t${t.id}`, columnId: '__tasks__', startMin: start, endMin: start + 30,
+          title: t.title,
+          subtitle: [TASK_STATUS_LABELS[t.status] || t.status, assignees].filter(Boolean).join(' · '),
+          color: taskColor(t),
+          onClick: () => navigate(`/tasks/${t.id}`),
+        });
+      }
+    }
+    // Колонка «Напоминания»
+    if (timedReminders.length > 0) {
+      cols.push({ id: '__reminders__', title: 'Напоминания', color: '#f59e0b' });
+      for (const r of timedReminders) {
+        const start = toMin(new Date(r.remindAt));
+        const content = stripHtml((r as any).content || '');
+        itms.push({
+          id: `r${r.id}`, columnId: '__reminders__', startMin: start, endMin: start + 30,
+          title: r.title,
+          subtitle: [r.user?.name, content.slice(0, 60)].filter(Boolean).join(' · '),
+          color: reminderColor(r),
+          onClick: () => navigate(`/reminders/${r.id}/edit`),
+        });
+      }
+    }
+    const isEmpty = cols.length === 0 && untimedTasks.length === 0 && untimedReminders.length === 0;
+    return { columns: cols, bands: bnds, items: itms, empty: isEmpty };
+  }, [dayData, tasks, reminders, canViewTasks, date, navigate, statuses]);
+
+  // Диапазон часов — по содержимому дня (по умолчанию 8–20)
+  const { startHour, endHour } = useMemo(() => {
+    const mins = [
+      ...items.flatMap((i) => [i.startMin, i.endMin]),
+      ...bands.flatMap((b) => [b.startMin, b.endMin]),
+    ];
+    if (mins.length === 0) return { startHour: 8, endHour: 20 };
+    const start = Math.max(0, Math.min(8, Math.floor(Math.min(...mins) / 60)));
+    const end = Math.min(24, Math.max(20, Math.ceil(Math.max(...mins) / 60)));
+    return { startHour: start, endHour: Math.max(end, start + 2) };
+  }, [items, bands]);
+
+  // Строка «Без времени»: задачи и напоминания на 00:00
+  const untimedRow = (untimedTasks.length > 0 || untimedReminders.length > 0) ? (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+      <span style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center' }}>Без времени:</span>
+      {untimedTasks.map((t) => (
+        <span
+          key={`t${t.id}`} onClick={() => navigate(`/tasks/${t.id}`)}
+          style={{
+            fontSize: 12, padding: '4px 10px', borderRadius: 8, cursor: 'pointer',
+            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            borderLeft: `3px solid ${taskColor(t)}`,
+          }}
+        >📋 {t.title}</span>
+      ))}
+      {untimedReminders.map((r) => (
+        <span
+          key={`r${r.id}`} onClick={() => navigate(`/reminders/${r.id}/edit`)}
+          style={{
+            fontSize: 12, padding: '4px 10px', borderRadius: 8, cursor: 'pointer',
+            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            borderLeft: `3px solid ${reminderColor(r)}`,
+          }}
+        >🔔 {r.title}</span>
+      ))}
+    </div>
+  ) : undefined;
+
+  const schedDayCount = (dayData?.appointments || []).length;
+
+  return (
+    <div style={{
+      marginTop: 20, padding: 20, borderRadius: 16,
+      border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: 'var(--shadow)',
+    }}>
+      {/* Шапка виджета */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>📅 Календарь</div>
+        <button style={ghostBtn} onClick={() => shiftMonth(-1)}>‹</button>
+        <div style={{ fontSize: 15, fontWeight: 600, minWidth: 130, textAlign: 'center', color: 'var(--text-primary)' }}>
+          {MONTH_NAMES[month - 1]} {year}
+        </div>
+        <button style={ghostBtn} onClick={() => shiftMonth(1)}>›</button>
+        <button
+          style={{ ...ghostBtn, fontSize: 13 }}
+          onClick={() => { const n = new Date(); setYear(n.getFullYear()); setMonth(n.getMonth() + 1); setDate(toISODate(n)); }}
+        >Сегодня</button>
+        {loading && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Загрузка...</span>}
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
+          📋 — задачи · 🔔 — напоминания · 🗓 — записи расписания
+        </span>
+      </div>
+
+      <CalendarMonth year={year} month={month} selectedDate={date} onDayClick={openDay} renderDay={renderDay} />
+
+      {/* Шкала выбранного дня */}
+      <div style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          <button style={ghostBtn} onClick={() => shiftDay(-1)}>‹</button>
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
+            {Number(date.split('-')[2])} {MONTH_NAMES[Number(date.split('-')[1]) - 1].toLowerCase()}
+          </div>
+          <button style={ghostBtn} onClick={() => shiftDay(1)}>›</button>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            {[
+              canViewTasks && dayTasks.length > 0 ? `задач: ${dayTasks.length}` : '',
+              dayReminders.length > 0 ? `напоминаний: ${dayReminders.length}` : '',
+              schedDayCount > 0 ? `записей: ${schedDayCount}` : '',
+            ].filter(Boolean).join(' · ') || 'событий нет'}
+          </span>
+        </div>
+        {empty ? (
+          <div style={{
+            border: '1px solid var(--border-color)', borderRadius: 12, padding: 24,
+            textAlign: 'center', color: 'var(--text-secondary)',
+          }}>
+            На этот день ничего не запланировано.
+          </div>
+        ) : columns.length > 0 ? (
+          <DayTimeline
+            columns={columns}
+            bands={bands}
+            items={items}
+            startHour={startHour}
+            endHour={endHour}
+            hourHeight={40}
+            untimedRow={untimedRow}
+          />
+        ) : untimedRow}
+      </div>
+    </div>
+  );
+}

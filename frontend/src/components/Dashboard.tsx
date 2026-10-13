@@ -24,6 +24,7 @@ import { DashboardStats, DashboardMetricSetting, Task, Status } from '../types';
 import { Avatar } from './Avatar';
 import { NewsSlider } from './NewsSlider';
 import { NewsPromoBlocks } from './NewsPromoBlocks';
+import { DashboardCalendar } from './DashboardCalendar';
 
 interface Metric {
   key: string;
@@ -326,6 +327,9 @@ export function Dashboard() {
           </div>
         </SortableContext>
       </DndContext>
+
+      {/* Виджет календаря: задачи + напоминания + расписание, шкала дня внутри */}
+      <DashboardCalendar />
 
     </div>
   );
