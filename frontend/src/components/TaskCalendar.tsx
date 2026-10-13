@@ -70,7 +70,7 @@ export function TaskCalendar({ onOpenTask }: Props) {
   useEffect(() => { api.profile.get().then((u) => setHideCompletedTasks(u.hideCompletedTasks ?? true)).catch(() => {}); }, []);
 
   const byDate = (iso: string) => tasks.filter((t) => t.dueDate && taskDate(t.dueDate) === iso);
-  const noDueTasks = tasks.filter((t) => !t.dueDate);
+  const noDueTasks = tasks.filter((t) => !t.dueDate && !t.parentId);
   const visibleNoDueTasks = hideCompletedTasks
     ? noDueTasks.filter((t) => {
         const taskStatus = statuses.find((s) => s.name === t.status);
