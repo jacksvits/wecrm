@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { CalendarMonth, toISODate, MONTH_NAMES } from './calendar/CalendarMonth';
 import { DayTimeline, minToTime, TimelineBand, TimelineColumn, TimelineItem } from './calendar/DayTimeline';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 /**
  * Расписание (календарь): кабинеты, смены сотрудников, записи клиентов.
@@ -82,6 +83,7 @@ interface ApptForm {
 export function SchedulePage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isMobile = useIsMobile();
   const today = toISODate(new Date());
 
   const [mode, setMode] = useState<'month' | 'day'>('month');
@@ -278,11 +280,24 @@ export function SchedulePage() {
             <button style={{ ...ghostBtn, fontSize: 13 }} onClick={() => { const n = new Date(); setYear(n.getFullYear()); setMonth(n.getMonth() + 1); }}>Сегодня</button>
           </div>
           <CalendarMonth
-            year={year} month={month} onDayClick={openDay}
-            renderDay={(iso) => {
+            year={year} month={month} onDayClick={openDay} compact={isMobile}
+            renderDay={(iso, compact) => {
               const d = monthData?.days?.[iso];
               if (!d) return null;
               const roomIds = Object.keys(d.rooms || {});
+              // Мобильный вид: счётчики + точки кабинетов
+              if (compact) {
+                return (
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', fontSize: 11, fontWeight: 600 }}>
+                    {d.appointments > 0 && <span style={{ color: '#16a34a' }}>{d.appointments} зап.</span>}
+                    {d.appointments === 0 && d.shifts > 0 && <span style={{ color: 'var(--text-secondary)' }}>{d.shifts} смен.</span>}
+                    {roomIds.slice(0, 3).map((rid) => {
+                      const room = rooms.find((r) => r.id === rid);
+                      return <span key={rid} style={{ width: 7, height: 7, borderRadius: 2, background: room?.color || '#94a3b8', display: 'inline-block' }} />;
+                    })}
+                  </div>
+                );
+              }
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {d.shifts > 0 && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{d.shifts} смен{ d.shifts === 1 ? 'а' : d.shifts < 5 ? 'ы' : ''}</div>}

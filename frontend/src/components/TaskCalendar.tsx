@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { Task } from '../types';
 import { CalendarMonth, toISODate, MONTH_NAMES } from './calendar/CalendarMonth';
 import { DayTimeline, TimelineItem } from './calendar/DayTimeline';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 /**
  * Календарный вид задач: месяц → клик по дате → временная шкала дня.
@@ -39,6 +40,7 @@ interface Props {
 }
 
 export function TaskCalendar({ onOpenTask }: Props) {
+  const isMobile = useIsMobile();
   const today = toISODate(new Date());
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
@@ -80,9 +82,20 @@ export function TaskCalendar({ onOpenTask }: Props) {
   };
 
   // ---------- месяц ----------
-  const renderDay = (iso: string) => {
+  const renderDay = (iso: string, compact: boolean) => {
     const list = byDate(iso);
     if (list.length === 0) return null;
+    // Мобильный вид: цветные точки по статусам (до 3) + счётчик
+    if (compact) {
+      return (
+        <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+          {list.slice(0, 3).map((t) => (
+            <span key={t.id} style={{ width: 7, height: 7, borderRadius: '50%', background: STATUS_COLORS[t.status] || '#3b82f6', display: 'inline-block' }} />
+          ))}
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{list.length}</span>
+        </div>
+      );
+    }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {list.slice(0, 3).map((t) => (
@@ -146,7 +159,7 @@ export function TaskCalendar({ onOpenTask }: Props) {
             <button style={{ ...ghostBtn, fontSize: 13 }} onClick={() => { const n = new Date(); setYear(n.getFullYear()); setMonth(n.getMonth() + 1); }}>Сегодня</button>
             {loading && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Загрузка...</span>}
           </div>
-          <CalendarMonth year={year} month={month} onDayClick={openDay} renderDay={renderDay} />
+          <CalendarMonth year={year} month={month} onDayClick={openDay} compact={isMobile} renderDay={renderDay} />
           <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>Нажмите на дату, чтобы открыть временную шкалу дня.</div>
         </div>
       )}

@@ -6,6 +6,7 @@ import { useRealtime } from '../hooks/useRealtime';
 import { Task, Reminder, Status } from '../types';
 import { CalendarMonth, toISODate, MONTH_NAMES } from './calendar/CalendarMonth';
 import { DayTimeline, TimelineBand, TimelineColumn, TimelineItem, minToTime } from './calendar/DayTimeline';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 /**
  * Виджет дашборда «Календарь»: задачи + напоминания + расписание на одном месяце.
@@ -58,6 +59,7 @@ export function DashboardCalendar() {
   const { user } = useAuth();
   // Доступ к задачам — как в Dashboard: админ или раздел «/tasks» в allowedPages
   const canViewTasks = user?.role === 'admin' || ((user as any)?.allowedPages || []).includes('/tasks');
+  const isMobile = useIsMobile();
 
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
@@ -141,10 +143,23 @@ export function DashboardCalendar() {
   });
 
   // ---------- месяц: метки трёх типов на каждой дате ----------
-  const renderDay = (iso: string) => {
+  const renderDay = (iso: string, compact: boolean) => {
     const dayTasks = tasksByDate(iso);
     const dayReminders = remindersByDate(iso);
     const sched = monthData?.days?.[iso];
+
+    // Мобильный вид: только индикаторы «иконка + количество», названия — на шкале дня по тапу
+    if (compact) {
+      const ind: React.ReactNode[] = [];
+      if (dayTasks.length > 0) ind.push(<span key="t" style={{ color: '#3b82f6' }}>📋{dayTasks.length}</span>);
+      if (dayReminders.length > 0) ind.push(<span key="r" style={{ color: '#f59e0b' }}>🔔{dayReminders.length}</span>);
+      if (sched && (sched.appointments > 0 || sched.shifts > 0)) {
+        ind.push(<span key="s" style={{ color: '#16a34a' }}>🗓{sched.appointments > 0 ? sched.appointments : sched.shifts}</span>);
+      }
+      if (ind.length === 0) return null;
+      return <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', fontSize: 11, fontWeight: 600, lineHeight: 1.25 }}>{ind}</div>;
+    }
+
     const chips: React.ReactNode[] = [];
     for (const t of dayTasks) {
       chips.push(
@@ -329,7 +344,7 @@ export function DashboardCalendar() {
         </span>
       </div>
 
-      <CalendarMonth year={year} month={month} selectedDate={date} onDayClick={openDay} renderDay={renderDay} />
+      <CalendarMonth year={year} month={month} selectedDate={date} onDayClick={openDay} compact={isMobile} renderDay={renderDay} />
 
       {/* Шкала выбранного дня */}
       <div style={{ marginTop: 16 }}>
