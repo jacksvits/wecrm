@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { Task } from '../types';
 import { CalendarMonth, toISODate, MONTH_NAMES } from './calendar/CalendarMonth';
-import { DayTimeline, TimelineItem } from './calendar/DayTimeline';
+import { DayTimeline, TimelineItem, minToTime } from './calendar/DayTimeline';
+import { DayAgenda } from './calendar/DayAgenda';
 import { useIsMobile } from '../hooks/useIsMobile';
 
 /**
@@ -178,6 +179,22 @@ export function TaskCalendar({ onOpenTask }: Props) {
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 30, textAlign: 'center', color: 'var(--text-secondary)' }}>
               На этот день задач нет.
             </div>
+          ) : isMobile ? (
+            // Мобильный вид: повестка полноширинными карточками
+            <DayAgenda
+              sections={[{
+                id: 'tasks', title: 'Задачи', subtitle: fmtDay(date), color: '#3b82f6',
+                items: timed.map((t) => ({
+                  id: t.id, startMin: taskMin(t.dueDate!),
+                  time: `${t.dueDate!.slice(11, 16)}–${minToTime(taskMin(t.dueDate!) + 30)}`,
+                  title: t.title,
+                  subtitle: [STATUS_LABELS[t.status] || t.status, (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ')].filter(Boolean).join(' · '),
+                  color: STATUS_COLORS[t.status] || '#3b82f6',
+                  onClick: () => onOpenTask(t.id),
+                })),
+              }]}
+              untimedRow={untimedRow}
+            />
           ) : (
             <DayTimeline
               columns={[{ id: 'tasks', title: 'Задачи', subtitle: fmtDay(date) }]}

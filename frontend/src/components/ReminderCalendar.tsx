@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { Reminder } from '../types';
 import { CalendarMonth, toISODate, MONTH_NAMES } from './calendar/CalendarMonth';
-import { DayTimeline, TimelineItem } from './calendar/DayTimeline';
+import { DayTimeline, TimelineItem, minToTime } from './calendar/DayTimeline';
+import { DayAgenda } from './calendar/DayAgenda';
 import { useIsMobile } from '../hooks/useIsMobile';
 
 /**
@@ -147,6 +148,24 @@ export function ReminderCalendar({ onOpen }: Props) {
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 30, textAlign: 'center', color: 'var(--text-secondary)' }}>
               На этот день напоминаний нет.
             </div>
+          ) : isMobile ? (
+            // Мобильный вид: повестка полноширинными карточками
+            <DayAgenda
+              sections={[{
+                id: 'reminders', title: 'Напоминания', subtitle: new Date(date).toLocaleDateString('ru-RU', { weekday: 'long' }), color: '#f59e0b',
+                items: dayList.map((r) => {
+                  const start = new Date(r.remindAt).getHours() * 60 + new Date(r.remindAt).getMinutes();
+                  return {
+                    id: r.id, startMin: start,
+                    time: `${minToTime(start)}–${minToTime(start + 30)}`,
+                    title: r.title,
+                    subtitle: [r.user?.name, stripHtml((r as any).content || '').slice(0, 80)].filter(Boolean).join(' · '),
+                    color: colorOf(r),
+                    onClick: () => onOpen(r.id),
+                  };
+                }),
+              }]}
+            />
           ) : (
             <DayTimeline
               columns={[{ id: 'reminders', title: 'Напоминания', subtitle: new Date(date).toLocaleDateString('ru-RU', { weekday: 'long' }) }]}
