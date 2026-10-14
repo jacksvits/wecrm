@@ -67,6 +67,34 @@ export function DayTimeline({
   const hours: number[] = [];
   for (let h = startHour; h < endHour; h++) hours.push(h);
 
+  // Раскладка пересекающихся карточек по «дорожкам» внутри колонки:
+  // задачи на одно время делят ширину колонки поровну, а не перекрывают друг друга
+  const layoutItems = (list: TimelineItem[]): { it: TimelineItem; lane: number; lanes: number }[] => {
+    const sorted = [...list].sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+    const placed: { it: TimelineItem; lane: number; lanes: number }[] = [];
+    let cluster: { it: TimelineItem; lane: number; lanes: number }[] = [];
+    let clusterEnd = -1;
+    const flush = () => {
+      const lanes = cluster.reduce((m, p) => Math.max(m, p.lane + 1), 0);
+      cluster.forEach((p) => { p.lanes = lanes; });
+      placed.push(...cluster);
+      cluster = [];
+    };
+    for (const it of sorted) {
+      if (cluster.length > 0 && it.startMin >= clusterEnd) {
+        flush();
+        clusterEnd = -1;
+      }
+      const used = new Set(cluster.filter((p) => p.it.endMin > it.startMin).map((p) => p.lane));
+      let lane = 0;
+      while (used.has(lane)) lane++;
+      cluster.push({ it, lane, lanes: 1 });
+      clusterEnd = Math.max(clusterEnd, it.endMin);
+    }
+    flush();
+    return placed;
+  };
+
   const handleDragStart = (e: React.DragEvent, kind: 'band' | 'item', id: string) => {
     e.dataTransfer.setData('text/plain', JSON.stringify({ kind, id }));
     e.dataTransfer.effectAllowed = 'move';
@@ -164,17 +192,25 @@ export function DayTimeline({
                   );
                 })}
                 {/* Карточки (записи) */}
-                {items.filter((it) => it.columnId === col.id).map((it) => {
+                {layoutItems(items.filter((it) => it.columnId === col.id)).map(({ it, lane, lanes }) => {
                   const top = Math.max(0, minToY(it.startMin));
                   const height = Math.max(20, minToY(it.endMin) - top);
+                  // Одна карточка в ряду — на всю ширину; несколько — делят колонку поровну
+                  const lanePos = lanes === 1
+                    ? { left: 8, right: 4 }
+                    : {
+                        left: `calc(8px + ${(lane * 100) / lanes}% - ${(lane * 12) / lanes}px + 1px)`,
+                        width: `calc(${100 / lanes}% - ${12 / lanes}px - 2px)`,
+                      };
                   return (
                     <div
                       key={it.id}
                       draggable={it.draggable}
                       onDragStart={(e) => handleDragStart(e, 'item', it.id)}
                       onClick={it.onClick}
+                      title={`${minToTime(it.startMin)}–${minToTime(it.endMin)} · ${it.title}${it.subtitle ? ' · ' + it.subtitle : ''}`}
                       style={{
-                        position: 'absolute', top, left: 8, right: 4, height,
+                        position: 'absolute', top, ...lanePos, height,
                         background: it.background || 'var(--bg-secondary, rgba(127,127,127,0.12))',
                         borderLeft: `3px solid ${it.conflict ? '#dc2626' : it.color || '#3b82f6'}`,
                         borderRadius: 6, padding: '2px 6px', fontSize: 12,
