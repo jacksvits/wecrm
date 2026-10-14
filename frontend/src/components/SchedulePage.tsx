@@ -294,6 +294,13 @@ export function SchedulePage() {
     }
   };
 
+  // Счётчик смен в ячейке месяца: со стандартным названием «Смены» сохраняем склонение,
+  // своё название из настроек подставляем как есть
+  const shiftsCounter = (n: number, short: boolean) =>
+    btnLabels.shiftsLabel === 'Смены'
+      ? `${n} ${short ? 'смен.' : `смен${n === 1 ? 'а' : n < 5 ? 'ы' : ''}`}`
+      : `${n} ${btnLabels.shiftsLabel}`;
+
   // ---------- рендер ----------
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -326,7 +333,7 @@ export function SchedulePage() {
                 return (
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', fontSize: 11, fontWeight: 600 }}>
                     {d.appointments > 0 && <span style={{ color: '#16a34a' }}>{d.appointments} зап.</span>}
-                    {d.appointments === 0 && d.shifts > 0 && <span style={{ color: 'var(--text-secondary)' }}>{d.shifts} смен.</span>}
+                    {d.appointments === 0 && d.shifts > 0 && <span style={{ color: 'var(--text-secondary)' }}>{shiftsCounter(d.shifts, true)}</span>}
                     {roomIds.slice(0, 3).map((rid) => {
                       const room = rooms.find((r) => r.id === rid);
                       return <span key={rid} style={{ width: 7, height: 7, borderRadius: 2, background: room?.color || '#94a3b8', display: 'inline-block' }} />;
@@ -336,7 +343,7 @@ export function SchedulePage() {
               }
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {d.shifts > 0 && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{d.shifts} смен{ d.shifts === 1 ? 'а' : d.shifts < 5 ? 'ы' : ''}</div>}
+                  {d.shifts > 0 && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{shiftsCounter(d.shifts, false)}</div>}
                   {d.appointments > 0 && (
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                       {d.appointments} зап.
@@ -467,7 +474,7 @@ export function SchedulePage() {
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Кабинет</label>
+              <label style={labelStyle}>{btnLabels.roomsLabel}</label>
               <select style={inputStyle} value={shiftEdit.roomId} onChange={(e) => setShiftEdit({ ...shiftEdit, roomId: e.target.value })}>
                 {(dayData?.rooms || rooms).map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
@@ -510,7 +517,7 @@ export function SchedulePage() {
       {showRooms && <RoomsModal title={btnLabels.roomsLabel} rooms={rooms} onClose={() => setShowRooms(false)} onChanged={() => { loadRooms(); loadDay(); }} />}
 
       {/* ===== Смены (шаблоны + разовые) ===== */}
-      {showShifts && <ShiftsModal title={btnLabels.shiftsLabel} rooms={rooms} users={users} date={date} onClose={() => setShowShifts(false)} onChanged={() => { loadDay(); loadMonth(); }} />}
+      {showShifts && <ShiftsModal title={btnLabels.shiftsLabel} roomsLabel={btnLabels.roomsLabel} rooms={rooms} users={users} date={date} onClose={() => setShowShifts(false)} onChanged={() => { loadDay(); loadMonth(); }} />}
     </div>
   );
 }
@@ -670,7 +677,7 @@ function RoomsModal({ title, rooms, onClose, onChanged }: { title: string; rooms
             </div>
           </div>
         ) : (
-          <button style={btn('#16a34a')} onClick={() => setForm({ name: '', color: '#3b82f6', note: '' })}>+ Добавить кабинет</button>
+          <button style={btn('#16a34a')} onClick={() => setForm({ name: '', color: '#3b82f6', note: '' })}>Добавить</button>
         )}
       </div>
     </Modal>
@@ -678,8 +685,8 @@ function RoomsModal({ title, rooms, onClose, onChanged }: { title: string; rooms
 }
 
 /** Управление сменами: шаблоны по дням недели + разовые смены */
-function ShiftsModal({ title, rooms, users, date, onClose, onChanged }: {
-  title: string; rooms: any[]; users: any[]; date: string; onClose: () => void; onChanged: () => void;
+function ShiftsModal({ title, roomsLabel, rooms, users, date, onClose, onChanged }: {
+  title: string; roomsLabel: string; rooms: any[]; users: any[]; date: string; onClose: () => void; onChanged: () => void;
 }) {
   const [templates, setTemplates] = useState<any[]>([]);
   const [error, setError] = useState('');
@@ -803,7 +810,7 @@ function ShiftsModal({ title, rooms, users, date, onClose, onChanged }: {
     <Modal title={title} onClose={onClose} wide>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         <button style={chip(tab === 'templates')} onClick={() => setTab('templates')}>Постоянные (по дням недели)</button>
-        <button style={chip(tab === 'once')} onClick={() => setTab('once')}>Разовая смена</button>
+        <button style={chip(tab === 'once')} onClick={() => setTab('once')}>Разовые</button>
       </div>
       {error && <div style={{ color: '#dc2626', fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
@@ -834,7 +841,7 @@ function ShiftsModal({ title, rooms, users, date, onClose, onChanged }: {
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Кабинет</label>
+                <label style={labelStyle}>{roomsLabel}</label>
                 <select style={inputStyle} value={tplForm.roomId} onChange={(e) => setTplForm({ ...tplForm, roomId: e.target.value })}>
                   {activeRooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
@@ -869,7 +876,7 @@ function ShiftsModal({ title, rooms, users, date, onClose, onChanged }: {
             </div>
             {tplEdit && (
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--bg-hover)', borderRadius: 8, padding: '8px 10px' }}>
-                Редактирование шаблона — изменения применятся ко всем будущим сменам по этим дням недели.
+                Редактирование шаблона — изменения применятся ко всем будущим записям по этим дням недели.
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
@@ -890,7 +897,7 @@ function ShiftsModal({ title, rooms, users, date, onClose, onChanged }: {
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Кабинет</label>
+              <label style={labelStyle}>{roomsLabel}</label>
               <select style={inputStyle} value={onceForm.roomId} onChange={(e) => setOnceForm({ ...onceForm, roomId: e.target.value })}>
                 {activeRooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
