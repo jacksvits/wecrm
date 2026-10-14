@@ -686,18 +686,35 @@ function ShiftsModal({ title, rooms, users, date, onClose, onChanged }: {
   const [tab, setTab] = useState<'templates' | 'once'>('templates');
   const [tplForm, setTplForm] = useState({ userId: users[0]?.id || '', roomId: rooms[0]?.id || '', weekdays: [] as number[], start: '08:00', end: '14:00' });
   const [onceForm, setOnceForm] = useState({ userId: users[0]?.id || '', roomId: rooms[0]?.id || '', date, start: '08:00', end: '14:00' });
+  // Редактирование: шаблон (id строк + исходные дни недели) и разовая смена (id)
+  const [tplEdit, setTplEdit] = useState<{ ids: string[]; weekdays: number[] } | null>(null);
+  const [onceEditId, setOnceEditId] = useState<string | null>(null);
+  // Ближайшие разовые смены (не из шаблонов) — для редактирования
+  const [onceList, setOnceList] = useState<any[]>([]);
 
   const load = useCallback(() => {
     api.schedule.templates.list().then(setTemplates).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  // Разовые смены на ближайшие 3 месяца (сгенерированные из шаблонов не показываем —
+  // они меняются через шаблон или через день в календаре)
+  const loadOnce = useCallback(() => {
+    const from = toISODate(new Date());
+    const toDate = new Date();
+    toDate.setDate(toDate.getDate() + 93);
+    api.schedule.shifts.list(from, toISODate(toDate))
+      .then((list) => setOnceList((list || []).filter((s: any) => !s.generated)))
+      .catch(() => {});
+  }, []);
+  useEffect(() => { loadOnce(); }, [loadOnce]);
+
   // Группировка шаблонов: сотрудник+кабинет+время → список дней недели
   const grouped = useMemo(() => {
     const map = new Map<string, any>();
     for (const t of templates) {
       const key = `${t.userId}|${t.roomId}|${t.startMin}|${t.endMin}`;
-      if (!map.has(key)) map.set(key, { ids: [] as string[], user: t.user, room: t.room, startMin: t.startMin, endMin: t.endMin, weekdays: [] as number[] });
+      if (!map.has(key)) map.set(key, { ids: [] as string[], userId: t.userId, roomId: t.roomId, user: t.user, room: t.room, startMin: t.startMin, endMin: t.endMin, weekdays: [] as number[] });
       const g = map.get(key)!;
       g.ids.push(t.id);
       g.weekdays.push(t.weekday);
@@ -705,28 +722,79 @@ function ShiftsModal({ title, rooms, users, date, onClose, onChanged }: {
     return [...map.values()];
   }, [templates]);
 
-  const addTemplate = async () => {
+  const saveTemplate = async () => {
     setError('');
     if (tplForm.weekdays.length === 0) { setError('Выберите хотя бы один день недели'); return; }
+    const startMin = timeToMin(tplForm.start);
+    const endMin = timeToMin(tplForm.end);
     try {
-      await api.schedule.templates.create({
-        userId: tplForm.userId, roomId: tplForm.roomId, weekdays: tplForm.weekdays,
-        startMin: timeToMin(tplForm.start), endMin: timeToMin(tplForm.end),
-      });
+      if (tplEdit) {
+        // Оставшиеся дни — обновляем по месту (переопределения на даты сохраняются),
+        // снятые — удаляем, новые — создаём
+        for (let i = 0; i < tplEdit.ids.length; i++) {
+          const id = tplEdit.ids[i];
+          const weekday = tplEdit.weekdays[i];
+          if (tplForm.weekdays.includes(weekday)) {
+            await api.schedule.templates.update(id, { userId: tplForm.userId, roomId: tplForm.roomId, weekday, startMin, endMin });
+          } else {
+            await api.schedule.templates.remove(id);
+          }
+        }
+        const added = tplForm.weekdays.filter((w) => !tplEdit.weekdays.includes(w));
+        if (added.length) {
+          await api.schedule.templates.create({ userId: tplForm.userId, roomId: tplForm.roomId, weekdays: added, startMin, endMin });
+        }
+        setTplEdit(null);
+      } else {
+        await api.schedule.templates.create({
+          userId: tplForm.userId, roomId: tplForm.roomId, weekdays: tplForm.weekdays,
+          startMin, endMin,
+        });
+      }
       setTplForm({ ...tplForm, weekdays: [] });
       load(); onChanged();
     } catch (e: any) { setError(e.message || 'Ошибка'); }
   };
 
-  const addOnce = async () => {
+  // Переход в режим редактирования шаблона: форма заполняется данными группы
+  const editTemplate = (g: any) => {
+    setError('');
+    setTplEdit({ ids: g.ids, weekdays: [...g.weekdays] });
+    setTplForm({ userId: g.userId, roomId: g.roomId, weekdays: [...g.weekdays], start: minToTime(g.startMin), end: minToTime(g.endMin) });
+  };
+
+  const cancelTemplateEdit = () => {
+    setTplEdit(null);
+    setTplForm({ userId: users[0]?.id || '', roomId: rooms[0]?.id || '', weekdays: [], start: '08:00', end: '14:00' });
+  };
+
+  const saveOnce = async () => {
     setError('');
     try {
-      await api.schedule.shifts.create({
+      const data = {
         userId: onceForm.userId, roomId: onceForm.roomId, date: onceForm.date,
         startMin: timeToMin(onceForm.start), endMin: timeToMin(onceForm.end),
-      });
-      load(); onChanged();
+      };
+      if (onceEditId) {
+        await api.schedule.shifts.update(onceEditId, data);
+        setOnceEditId(null);
+      } else {
+        await api.schedule.shifts.create(data);
+      }
+      load(); loadOnce(); onChanged();
     } catch (e: any) { setError(e.message || 'Ошибка'); }
+  };
+
+  // Переход в режим редактирования разовой смены: форма заполняется её данными
+  const editOnce = (s: any) => {
+    setError('');
+    setOnceEditId(s.id);
+    setOnceForm({ userId: s.userId, roomId: s.roomId, date: s.date, start: minToTime(s.startMin), end: minToTime(s.endMin) });
+  };
+
+  const cancelOnceEdit = () => {
+    setOnceEditId(null);
+    setOnceForm({ userId: users[0]?.id || '', roomId: rooms[0]?.id || '', date, start: '08:00', end: '14:00' });
   };
 
   const activeRooms = rooms.filter((r) => r.isActive !== false);
@@ -748,6 +816,7 @@ function ShiftsModal({ title, rooms, users, date, onClose, onChanged }: {
                 <b>{g.user?.name}</b> · {g.room?.name} · {minToTime(g.startMin)}–{minToTime(g.endMin)}
                 <span style={{ color: 'var(--text-secondary)' }}> · {g.weekdays.sort().map((w: number) => WEEKDAY_SHORT[w]).join(', ')}</span>
               </div>
+              <button style={ghostBtn} title="Изменить шаблон" onClick={() => editTemplate(g)}>✎</button>
               <button style={{ ...ghostBtn, color: '#dc2626' }} onClick={async () => {
                 if (!confirm('Удалить шаблон? Смены на будущие даты исчезнут, записи клиентов останутся.')) return;
                 try { for (const id of g.ids) await api.schedule.templates.remove(id); load(); onChanged(); }
@@ -798,7 +867,15 @@ function ShiftsModal({ title, rooms, users, date, onClose, onChanged }: {
                 <input type="time" style={inputStyle} value={tplForm.end} onChange={(e) => setTplForm({ ...tplForm, end: e.target.value })} />
               </div>
             </div>
-            <button style={btn('#16a34a')} onClick={addTemplate}>+ Добавить шаблон</button>
+            {tplEdit && (
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--bg-hover)', borderRadius: 8, padding: '8px 10px' }}>
+                Редактирование шаблона — изменения применятся ко всем будущим сменам по этим дням недели.
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={btn('#16a34a')} onClick={saveTemplate}>{tplEdit ? 'Сохранить шаблон' : '+ Добавить шаблон'}</button>
+              {tplEdit && <button style={ghostBtn} onClick={cancelTemplateEdit}>Отмена</button>}
+            </div>
           </div>
         </div>
       )}
@@ -833,7 +910,30 @@ function ShiftsModal({ title, rooms, users, date, onClose, onChanged }: {
               <input type="time" style={inputStyle} value={onceForm.end} onChange={(e) => setOnceForm({ ...onceForm, end: e.target.value })} />
             </div>
           </div>
-          <button style={btn('#16a34a')} onClick={addOnce}>+ Добавить смену</button>
+          {onceEditId && (
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--bg-hover)', borderRadius: 8, padding: '8px 10px' }}>
+              Редактирование смены — записи клиентов переедут вместе со сменой автоматически.
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={btn('#16a34a')} onClick={saveOnce}>{onceEditId ? 'Сохранить смену' : '+ Добавить смену'}</button>
+            {onceEditId && <button style={ghostBtn} onClick={cancelOnceEdit}>Отмена</button>}
+          </div>
+          {onceList.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Ближайшие разовые смены</div>
+              {onceList.map((s: any) => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-color)' }}>
+                  <span style={{ width: 14, height: 14, borderRadius: 4, background: s.room?.color || '#94a3b8', flexShrink: 0 }} />
+                  <div style={{ flex: 1, fontSize: 14 }}>
+                    <b>{s.user?.name}</b> · {s.room?.name} · {minToTime(s.startMin)}–{minToTime(s.endMin)}
+                    <span style={{ color: 'var(--text-secondary)' }}> · {fmtDayTitle(s.date)}</span>
+                  </div>
+                  <button style={ghostBtn} title="Изменить смену" onClick={() => editOnce(s)}>✎</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </Modal>

@@ -155,6 +155,12 @@ const templateSchema = z.object({
   weekdays: z.array(z.number().int().min(0).max(6)).min(1, 'Выберите хотя бы один день недели'),
   startMin: minutes, endMin: minutes,
 }).refine((v) => v.startMin < v.endMin, { message: 'Начало смены должно быть раньше конца' });
+const templateUpdateSchema = z.object({
+  userId: z.string().min(1),
+  roomId: z.string().min(1),
+  weekday: z.number().int().min(0).max(6),
+  startMin: minutes, endMin: minutes,
+}).refine((v) => v.startMin < v.endMin, { message: 'Начало смены должно быть раньше конца' });
 const shiftSchema = z.object({
   userId: z.string().min(1),
   roomId: z.string().min(1),
@@ -280,6 +286,25 @@ router.post('/templates', async (req: AuthRequest, res) => {
       ),
     );
     res.json(created);
+  } catch (err: any) {
+    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.errors?.[0]?.message || err.message });
+  }
+});
+
+/**
+ * Изменение шаблона смены. Обновление по месту (id сохраняется) —
+ * переопределения смен на конкретные даты не теряются.
+ */
+router.put('/templates/:id', async (req: AuthRequest, res) => {
+  if (!isAdmin(req)) return forbid(res);
+  try {
+    const data = templateUpdateSchema.parse(req.body || {});
+    const tpl = await (prisma as any).scheduleShiftTemplate.update({
+      where: { id: req.params.id },
+      data,
+      include: { user: userSelect, room: true },
+    });
+    res.json(tpl);
   } catch (err: any) {
     res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.errors?.[0]?.message || err.message });
   }

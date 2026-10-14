@@ -191,9 +191,11 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     templates: {
       list: (): Promise<any[]> => fetchApi('/api/schedule/templates'),
       create: (data: any): Promise<any> => fetchApi('/api/schedule/templates', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: any): Promise<any> => fetchApi(`/api/schedule/templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
       remove: (id: string): Promise<any> => fetchApi(`/api/schedule/templates/${id}`, { method: 'DELETE' }),
     },
     shifts: {
+      list: (from: string, to: string): Promise<any[]> => fetchApi(`/api/schedule/shifts?from=${from}&to=${to}`),
       create: (data: any): Promise<any> => fetchApi('/api/schedule/shifts', { method: 'POST', body: JSON.stringify(data) }),
       update: (id: string, data: any): Promise<any> => fetchApi(`/api/schedule/shifts/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
       remove: (id: string): Promise<any> => fetchApi(`/api/schedule/shifts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
