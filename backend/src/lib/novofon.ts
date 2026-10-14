@@ -32,6 +32,8 @@ export interface NovofonRecordInfo {
     duration: number;
     created: string;
   };
+  // true, если ссылка получена media-фолбэком без Data API (метаданные неизвестны)
+  viaMediaFallback?: boolean;
 }
 
 // Параметры авторизации: если заполнен apiSecret — старая схема key/secret
@@ -127,6 +129,7 @@ export async function getCallRecord(
         duration: 0,
         created: new Date().toISOString(),
       },
+      viaMediaFallback: true,
     };
   };
   let data: any = null;

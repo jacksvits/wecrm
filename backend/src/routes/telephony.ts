@@ -1009,8 +1009,12 @@ async function attachCallRecord(
     const buffer = await downloadRecordWithRetry(record.url);
     const duration = record.data?.duration || 0;
     // Запись ещё не обработана АТС (пустой файл или нулевая длительность при
-    // состоявшемся разговоре) — сбрасываем резервирование, придёт повторное событие
-    if (buffer.length === 0 || (duration === 0 && call.duration > 0)) {
+    // состоявшемся разговоре) — сбрасываем резервирование, придёт повторное событие.
+    // Для media-фолбэка длительность неизвестна — достаточно непустого файла.
+    if (
+      buffer.length === 0 ||
+      (!record.viaMediaFallback && duration === 0 && call.duration > 0)
+    ) {
       await release();
       console.log(
         `[Novofon] Запись звонка ${call.pbxCallId} ещё не готова (duration=${duration}), ожидаем повторное событие`,
