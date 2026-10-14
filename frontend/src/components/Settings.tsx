@@ -23,8 +23,9 @@ import OneCSettings from "./OneCSettings";
 import DiadocSettings from "./DiadocSettings";
 import OzonSellerSettings from "./OzonSellerSettings";
 import { SystemSettings } from "./SystemSettings";
+import { ScheduleSettings } from "./ScheduleSettings";
 
-type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "integrations" | "system";
+type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "schedule" | "integrations" | "system";
 type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "vpn";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
@@ -181,6 +182,8 @@ export function Settings() {
         return <UserList />;
       case "contactTypes":
         return <ContactTypeManager />;
+      case "schedule":
+        return <ScheduleSettings />;
       case "integrations":
         return renderIntegrations();
       case "system":
@@ -401,6 +404,9 @@ export function Settings() {
         </button>
         <button style={tabStyle(activeTab === "contactTypes")} onClick={() => setActiveTab("contactTypes")}>
           Типы контактов
+        </button>
+        <button style={tabStyle(activeTab === "schedule")} onClick={() => setActiveTab("schedule")}>
+          Расписание
         </button>
         <button style={tabStyle(activeTab === "integrations")} onClick={() => setActiveTab("integrations")}>
           Интеграции

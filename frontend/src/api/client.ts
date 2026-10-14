@@ -206,6 +206,11 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     },
     day: (date: string): Promise<any> => fetchApi(`/api/schedule/day?date=${date}`),
     month: (year: number, month: number): Promise<any> => fetchApi(`/api/schedule/month?year=${year}&month=${month}`),
+    // Настройки страницы: собственные названия кнопок (Настройки → Расписание)
+    settings: {
+      get: (): Promise<{ roomsLabel: string; shiftsLabel: string }> => fetchApi('/api/schedule/settings'),
+      save: (data: { roomsLabel: string; shiftsLabel: string }): Promise<any> => fetchApi('/api/schedule/settings', { method: 'PUT', body: JSON.stringify(data) }),
+    },
   },
   handlerSettings: {
     get: (): Promise<{ greeting: string; completion: string; userId: string | null; user?: { id: string; name: string } | null }> => fetchApi("/api/handler-settings"),

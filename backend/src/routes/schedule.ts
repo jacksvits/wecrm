@@ -181,6 +181,40 @@ const appointmentSchema = appointmentBase.refine((v) => v.startMin < v.endMin, {
 
 // ---------- rooms ----------
 
+// ---------- Настройки страницы: собственные названия кнопок ----------
+// Singleton-строка schedule_settings; чтение — все авторизованные, запись — admin.
+const SETTINGS_ID = 'singleton';
+
+/** Названия кнопок страницы «Расписание» (создаёт строку с дефолтами при первом обращении) */
+async function getScheduleSettings() {
+  return (prisma as any).scheduleSettings.upsert({
+    where: { id: SETTINGS_ID },
+    update: {},
+    create: { id: SETTINGS_ID },
+  });
+}
+
+router.get('/settings', async (_req: AuthRequest, res) => {
+  const s = await getScheduleSettings();
+  res.json({ roomsLabel: s.roomsLabel, shiftsLabel: s.shiftsLabel });
+});
+
+router.put('/settings', async (req: AuthRequest, res) => {
+  if (!isAdmin(req)) return forbid(res);
+  const schema = z.object({
+    roomsLabel: z.string().trim().min(1).max(40),
+    shiftsLabel: z.string().trim().min(1).max(40),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Названия кнопок: от 1 до 40 символов' });
+  const s = await (prisma as any).scheduleSettings.upsert({
+    where: { id: SETTINGS_ID },
+    update: parsed.data,
+    create: { id: SETTINGS_ID, ...parsed.data },
+  });
+  res.json({ roomsLabel: s.roomsLabel, shiftsLabel: s.shiftsLabel });
+});
+
 router.get('/rooms', async (req: AuthRequest, res) => {
   const all = req.query.all === '1' && isAdmin(req);
   const rooms = await (prisma as any).scheduleRoom.findMany({

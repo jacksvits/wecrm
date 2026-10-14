@@ -1924,3 +1924,14 @@ model ScheduleAppointment {
   @@index([userId, date])
   @@map("schedule_appointments")
 }
+
+// Настройки страницы «Расписание»: собственные названия кнопок (singleton-строка).
+// Меняются администратором в Настройки → Расписание.
+model ScheduleSettings {
+  id          String   @id @default(cuid())
+  roomsLabel  String   @default("Кабинеты") @map("rooms_label")
+  shiftsLabel String   @default("Смены") @map("shifts_label")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("schedule_settings")
+}

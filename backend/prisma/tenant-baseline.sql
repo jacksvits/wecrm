@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pZk4BzOHqEFaN2TpYyxuGisZjW6S9gNoGfDl6Rbm4uBtX61Vw1j4cD8eEPc3JCx
+\restrict 6pbdAd2yND604pQlwAIOn9mzXuxGm6qUh2ALbaEeoBLRfaXJus1ayMvOMC5jf3Y
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -1332,6 +1332,18 @@ CREATE TABLE public.schedule_rooms (
 
 
 --
+-- Name: schedule_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.schedule_settings (
+    id text NOT NULL,
+    rooms_label text DEFAULT 'Кабинеты'::text NOT NULL,
+    shifts_label text DEFAULT 'Смены'::text NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL
+);
+
+
+--
 -- Name: schedule_shift_templates; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2495,6 +2507,14 @@ ALTER TABLE ONLY public.schedule_appointments
 
 ALTER TABLE ONLY public.schedule_rooms
     ADD CONSTRAINT schedule_rooms_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: schedule_settings schedule_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schedule_settings
+    ADD CONSTRAINT schedule_settings_pkey PRIMARY KEY (id);
 
 
 --
@@ -4514,13 +4534,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pZk4BzOHqEFaN2TpYyxuGisZjW6S9gNoGfDl6Rbm4uBtX61Vw1j4cD8eEPc3JCx
+\unrestrict 6pbdAd2yND604pQlwAIOn9mzXuxGm6qUh2ALbaEeoBLRfaXJus1ayMvOMC5jf3Y
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict ltThMD8xYeVYhwm2eDf9ElijyWzegCWonAJPY8brwnwxfvSTSwTJiJ2iOrGRMBD
+\restrict Y3sTBJLaOlzK312VaaJDhgGpCpUpVSyXJJiglPd6k6WvVxDhy5BtU5ad7IyvTGd
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -4857,6 +4877,7 @@ INSERT INTO public._prisma_migrations VALUES ('a59ecdb5-f1a9-4a97-b5de-d0a7f1a57
 INSERT INTO public._prisma_migrations VALUES ('8140916c-7072-49c3-8751-e818ec92e00a', '07ff4798826c48d98c62f8cfb95ef3f0e13a4cd7ff2453a44a071c29d616c49e', '2026-10-11 13:20:00.517262+00', '20261011160000_tenant_support_tickets', NULL, NULL, '2026-10-11 13:20:00.49503+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('0331f96b-ab54-47de-bbd9-41638fe1d749', '5b7c2aab3e0e490de792d3563b97ba7f4a53569e9353c3ab5298f611880fb4b2', '2026-10-11 15:08:38.288665+00', '20261011180000_crm_tariff_plans', NULL, NULL, '2026-10-11 15:08:38.278259+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('9f123f6c-76f4-49ec-af45-1b6197200c25', 'f021d1e73d5ef720e722f94842d395891f5016a837a5c8f58aab8e0431aae601', '2026-10-11 22:19:12.432481+00', '20261012012000_crm_calls', NULL, NULL, '2026-10-11 22:19:12.426224+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('f20bc1c5-9591-420a-8d92-9114299ced93', '620e41a9218f61ff62dda63617efb5cf22d906684418ad6fcba38f140160a004', '2026-10-14 09:29:39.665229+00', '20261014150000_schedule_settings', NULL, NULL, '2026-10-14 09:29:39.653542+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('cdb6bfb0-99c9-45a3-900c-e6dc16c8b8da', '41bf312a64ef260c32a6dc66e1fbd7de0e45368e990a6f35e0500db5dcf885c7', '2026-10-11 23:08:13.300651+00', '20261012020000_crm_integrations', NULL, NULL, '2026-10-11 23:08:13.295336+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('9d616b3a-967b-4876-88a7-e4dc994c5933', '6186d2261cd19d275eaf6029777b4c2024e15a0761f9eccbdae49cc1cffa389d', '2026-10-13 18:07:07.631212+00', '20261013204500_help_articles', NULL, NULL, '2026-10-13 18:07:07.614158+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('20c71eb6-c372-4dd9-9c84-7b7a33fb8c02', '72ab017ac7872c8cd4c8963fafbc9cccb64959aff63ae2f8cafcbe9ce66e1d2d', '2026-10-13 19:08:41.003556+00', '20261014120000_schedule', NULL, NULL, '2026-10-13 19:08:40.958194+00', 1);
@@ -4867,5 +4888,5 @@ INSERT INTO public._prisma_migrations VALUES ('78c74d13-5624-4eb9-87d0-8bcc5e515
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ltThMD8xYeVYhwm2eDf9ElijyWzegCWonAJPY8brwnwxfvSTSwTJiJ2iOrGRMBD
+\unrestrict Y3sTBJLaOlzK312VaaJDhgGpCpUpVSyXJJiglPd6k6WvVxDhy5BtU5ad7IyvTGd
 

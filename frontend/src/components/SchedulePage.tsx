@@ -101,6 +101,8 @@ export function SchedulePage() {
 
   const [showRooms, setShowRooms] = useState(false);
   const [showShifts, setShowShifts] = useState(false);
+  // Названия кнопок из настроек (Настройки → Расписание); по умолчанию — стандартные
+  const [btnLabels, setBtnLabels] = useState({ roomsLabel: 'Кабинеты', shiftsLabel: 'Смены' });
   const [apptForm, setApptForm] = useState<ApptForm | null>(null);
   const [shiftEdit, setShiftEdit] = useState<any>(null);
 
@@ -111,6 +113,11 @@ export function SchedulePage() {
   useEffect(() => {
     if (isAdmin) api.users.list().then((u: any[]) => setUsers(u)).catch(() => {});
   }, [isAdmin]);
+  useEffect(() => {
+    api.schedule.settings.get()
+      .then((s) => setBtnLabels({ roomsLabel: s.roomsLabel || 'Кабинеты', shiftsLabel: s.shiftsLabel || 'Смены' }))
+      .catch(() => {});
+  }, []);
 
   const loadMonth = useCallback(() => {
     api.schedule.month(year, month).then(setMonthData).catch((e: any) => setError(e.message || 'Ошибка загрузки'));
@@ -293,8 +300,8 @@ export function SchedulePage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <h1 style={{ margin: 0, fontSize: 22 }}>Расписание</h1>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {isAdmin && <button style={ghostBtn} onClick={() => setShowRooms(true)}>Кабинеты</button>}
-          {isAdmin && <button style={ghostBtn} onClick={() => setShowShifts(true)}>Смены</button>}
+          {isAdmin && <button style={ghostBtn} onClick={() => setShowRooms(true)}>{btnLabels.roomsLabel}</button>}
+          {isAdmin && <button style={ghostBtn} onClick={() => setShowShifts(true)}>{btnLabels.shiftsLabel}</button>}
           {isAdmin && <button style={btn('#16a34a')} onClick={() => openAppt()}>+ Запись</button>}
         </div>
       </div>
@@ -362,7 +369,7 @@ export function SchedulePage() {
           {!dayData && <div style={{ color: 'var(--text-secondary)' }}>Загрузка...</div>}
           {dayData && columns.length === 0 && (
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 30, textAlign: 'center', color: 'var(--text-secondary)' }}>
-              На этот день смен не запланировано.{isAdmin && ' Добавьте смену через кнопку «Смены».'}
+              На этот день смен не запланировано.{isAdmin && ` Добавьте смену через кнопку «${btnLabels.shiftsLabel}».`}
             </div>
           )}
           {dayData && columns.length > 0 && (
@@ -500,10 +507,10 @@ export function SchedulePage() {
       )}
 
       {/* ===== Кабинеты ===== */}
-      {showRooms && <RoomsModal rooms={rooms} onClose={() => setShowRooms(false)} onChanged={() => { loadRooms(); loadDay(); }} />}
+      {showRooms && <RoomsModal title={btnLabels.roomsLabel} rooms={rooms} onClose={() => setShowRooms(false)} onChanged={() => { loadRooms(); loadDay(); }} />}
 
       {/* ===== Смены (шаблоны + разовые) ===== */}
-      {showShifts && <ShiftsModal rooms={rooms} users={users} date={date} onClose={() => setShowShifts(false)} onChanged={() => { loadDay(); loadMonth(); }} />}
+      {showShifts && <ShiftsModal title={btnLabels.shiftsLabel} rooms={rooms} users={users} date={date} onClose={() => setShowShifts(false)} onChanged={() => { loadDay(); loadMonth(); }} />}
     </div>
   );
 }
@@ -607,7 +614,7 @@ function ContactPicker({ clientName, clientPhone, onChange }: {
 }
 
 /** Справочник кабинетов */
-function RoomsModal({ rooms, onClose, onChanged }: { rooms: any[]; onClose: () => void; onChanged: () => void }) {
+function RoomsModal({ title, rooms, onClose, onChanged }: { title: string; rooms: any[]; onClose: () => void; onChanged: () => void }) {
   const [form, setForm] = useState<{ id?: string; name: string; color: string; note: string } | null>(null);
   const [error, setError] = useState('');
 
@@ -621,7 +628,7 @@ function RoomsModal({ rooms, onClose, onChanged }: { rooms: any[]; onClose: () =
   };
 
   return (
-    <Modal title="Кабинеты" onClose={onClose}>
+    <Modal title={title} onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {rooms.filter((r) => r.isActive !== false).map((r) => (
           <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-color)' }}>
@@ -671,8 +678,8 @@ function RoomsModal({ rooms, onClose, onChanged }: { rooms: any[]; onClose: () =
 }
 
 /** Управление сменами: шаблоны по дням недели + разовые смены */
-function ShiftsModal({ rooms, users, date, onClose, onChanged }: {
-  rooms: any[]; users: any[]; date: string; onClose: () => void; onChanged: () => void;
+function ShiftsModal({ title, rooms, users, date, onClose, onChanged }: {
+  title: string; rooms: any[]; users: any[]; date: string; onClose: () => void; onChanged: () => void;
 }) {
   const [templates, setTemplates] = useState<any[]>([]);
   const [error, setError] = useState('');
@@ -725,7 +732,7 @@ function ShiftsModal({ rooms, users, date, onClose, onChanged }: {
   const activeRooms = rooms.filter((r) => r.isActive !== false);
 
   return (
-    <Modal title="Смены" onClose={onClose} wide>
+    <Modal title={title} onClose={onClose} wide>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         <button style={chip(tab === 'templates')} onClick={() => setTab('templates')}>Постоянные (по дням недели)</button>
         <button style={chip(tab === 'once')} onClick={() => setTab('once')}>Разовая смена</button>
