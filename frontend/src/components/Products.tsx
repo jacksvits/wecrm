@@ -1312,11 +1312,12 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages: string[]; payLink: string; crmCameras: boolean; crmSubscriptions: boolean; crmAccounting: boolean; crmVideoNotes: boolean; crmCalls: boolean; crmIntegrations: string[]; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages: string[]; payLink: string; crmRenewMonths: string; crmCameras: boolean; crmSubscriptions: boolean; crmAccounting: boolean; crmVideoNotes: boolean; crmCalls: boolean; crmIntegrations: string[]; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : (product.kind as any) || 'product',
     crmAllowedPages: isNew ? [] : (Array.isArray((product as any).crmAllowedPages) ? (product as any).crmAllowedPages : []),
     payLink: isNew ? '' : ((product as any).payLink || ''),
+    crmRenewMonths: isNew ? '' : ((product as any).crmRenewMonths != null ? String((product as any).crmRenewMonths) : ''),
     crmCameras: isNew ? false : ((product as any).crmCameras === true),    sku: isNew ? '' : product.sku || '',
     crmSubscriptions: isNew ? false : ((product as any).crmSubscriptions === true),
     crmAccounting: isNew ? false : ((product as any).crmAccounting === true),
@@ -1379,7 +1380,7 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     setSaving(true); setError('');
     try {
       const num = (v: string) => (v === '' ? null : Number(v));
-      const payload = { ...form, categoryId: categoryId || null, weight: num(form.weight), width: num(form.width), height: num(form.height), depth: num(form.depth), brand: form.brand.trim() || null, tnved: form.tnved.trim() || null };
+      const payload = { ...form, categoryId: categoryId || null, weight: num(form.weight), width: num(form.width), height: num(form.height), depth: num(form.depth), brand: form.brand.trim() || null, tnved: form.tnved.trim() || null, crmRenewMonths: form.crmRenewMonths === '' ? null : Number(form.crmRenewMonths) };
       if (isNew) await api.products.create(payload);
       else await api.products.update(product.id, payload);
       onSaved();
@@ -1578,35 +1579,59 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     </div>
   </div>
 )}
+{form.kind === 'crm_subscription' && (
+  <div style={{ marginTop: 8 }}>
+    <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Срок продления</label>
+    <select
+      value={form.crmRenewMonths}
+      onChange={(e) => setForm({ ...form, crmRenewMonths: e.target.value })}
+      style={{ width: '100%', padding: '9px 11px', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', border: '1px solid var(--border-color)', background: 'var(--bg-input, var(--bg-secondary))', color: 'var(--text-primary)' }}
+    >
+      <option value=''>— Не указан —</option>
+      <option value='1'>1 месяц</option>
+      <option value='2'>2 месяца</option>
+      <option value='3'>3 месяца</option>
+    </select>
+    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+      Если ссылка на оплату пустая и срок указан — организация активируется сразу после регистрации на этот срок.
+    </div>
+  </div>
+)}
           {form.kind === 'service' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
               <input type="checkbox" checked={form.isSubscription} onChange={e => setForm({ ...form, isSubscription: e.target.checked })} style={{ width: 16, height: 16 }} />
               Подписка
             </label>
           )}
-          {!isNew && product.article && (
+          {!isNew && product.article && form.kind !== 'crm_subscription' && (
             <div>
               <label style={{ fontSize: 14, fontWeight: 500 }}>Внутренний артикул</label>
               <div style={{ ...inputStyle, background: 'var(--bg-hover)', color: 'var(--text-muted)', cursor: 'default' }}>{product.article}</div>
             </div>
           )}
-          <label style={{ fontSize: 14, fontWeight: 500 }}>Артикул</label>
-          <input value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })} style={inputStyle} />
+          {form.kind !== 'crm_subscription' && (
+            <>
+              <label style={{ fontSize: 14, fontWeight: 500 }}>Артикул</label>
+              <input value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })} style={inputStyle} />
+            </>
+          )}
           <label style={{ fontSize: 14, fontWeight: 500 }}>Категория (виды номенклатуры 1С)</label>
           <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={inputStyle}>
             <option value="">— Без категории —</option>
             {categoryOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 14, fontWeight: 500 }}>Единица</label>
-              <input value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} style={inputStyle} />
+          {form.kind !== 'crm_subscription' && (
+            <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 14, fontWeight: 500 }}>Единица</label>
+                <input value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} style={inputStyle} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 14, fontWeight: 500 }}>Штрихкод</label>
+                <input value={form.barcode} onChange={e => setForm({ ...form, barcode: e.target.value })} style={inputStyle} />
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 14, fontWeight: 500 }}>Штрихкод</label>
-              <input value={form.barcode} onChange={e => setForm({ ...form, barcode: e.target.value })} style={inputStyle} />
-            </div>
-          </div>
+          )}
           {form.kind === 'product' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
               <div>
@@ -1627,10 +1652,12 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
               </div>
             </div>
           )}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-            <input type="checkbox" checked={form.syncToVk} onChange={e => setForm({ ...form, syncToVk: e.target.checked })} style={{ width: 16, height: 16 }} />
-            Синхронизировать с ВКонтакте
-          </label>
+          {form.kind !== 'crm_subscription' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.syncToVk} onChange={e => setForm({ ...form, syncToVk: e.target.checked })} style={{ width: 16, height: 16 }} />
+              Синхронизировать с ВКонтакте
+            </label>
+          )}
           {form.kind === 'product' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
               <input type="checkbox" checked={form.syncToOzon} onChange={e => setForm({ ...form, syncToOzon: e.target.checked })} style={{ width: 16, height: 16 }} />
@@ -1644,10 +1671,12 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
               )}
             </label>
           )}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-            <input type="checkbox" checked={form.onVitrine} onChange={e => setForm({ ...form, onVitrine: e.target.checked })} style={{ width: 16, height: 16 }} />
-            На витрине
-          </label>
+          {form.kind !== 'crm_subscription' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.onVitrine} onChange={e => setForm({ ...form, onVitrine: e.target.checked })} style={{ width: 16, height: 16 }} />
+              На витрине
+            </label>
+          )}
           <label style={{ fontSize: 14, fontWeight: 500 }}>Теги</label>
           <TagInput value={form.tags} onChange={tags => setForm({ ...form, tags })} suggestions={tagSuggestions} />
           <label style={{ fontSize: 14, fontWeight: 500 }}>Бренд</label>
@@ -1661,13 +1690,17 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
           <datalist id="product-brand-suggestions">
             {brandSuggestions.map(b => <option key={b} value={b} />)}
           </datalist>
-          <label style={{ fontSize: 14, fontWeight: 500 }}>Код ТН ВЭД</label>
-          <input
-            value={form.tnved}
-            onChange={e => setForm({ ...form, tnved: e.target.value })}
-            placeholder="Например: 7009100009 (подтягивается из OZON при импорте)"
-            style={inputStyle}
-          />
+          {form.kind !== 'crm_subscription' && (
+            <>
+              <label style={{ fontSize: 14, fontWeight: 500 }}>Код ТН ВЭД</label>
+              <input
+                value={form.tnved}
+                onChange={e => setForm({ ...form, tnved: e.target.value })}
+                placeholder="Например: 7009100009 (подтягивается из OZON при импорте)"
+                style={inputStyle}
+              />
+            </>
+          )}
           <label style={{ fontSize: 14, fontWeight: 500 }}>Описание</label>
           <ReactQuill theme="snow" value={form.description} onChange={v => setForm({ ...form, description: v })}
             modules={quillModules} formats={quillFormats} />

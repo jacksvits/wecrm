@@ -662,6 +662,7 @@ router.post('/', async (req, res) => {
         description: description || '',
         crmAllowedPages: productKind === 'crm_subscription' && Array.isArray(req.body.crmAllowedPages) ? req.body.crmAllowedPages : null,
         payLink: typeof req.body.payLink === 'string' && req.body.payLink.trim() ? req.body.payLink.trim() : null,
+        crmRenewMonths: productKind === 'crm_subscription' && [1, 2, 3].includes(Number(req.body.crmRenewMonths)) ? Number(req.body.crmRenewMonths) : null,
         crmCameras: req.body.crmCameras === true || req.body.crmCameras === 'true',
         crmSubscriptions: req.body.crmSubscriptions === true || req.body.crmSubscriptions === 'true',
         crmAccounting: req.body.crmAccounting === true || req.body.crmAccounting === 'true',
@@ -749,6 +750,7 @@ router.patch('/:id', async (req, res) => {
     if (kind !== undefined) data.kind = ['service', 'crm_subscription'].includes(kind) ? kind : 'product';
     if (req.body.crmAllowedPages !== undefined) data.crmAllowedPages = Array.isArray(req.body.crmAllowedPages) ? req.body.crmAllowedPages : null;
     if (req.body.payLink !== undefined) data.payLink = typeof req.body.payLink === 'string' && req.body.payLink.trim() ? req.body.payLink.trim() : null;
+    if (req.body.crmRenewMonths !== undefined) data.crmRenewMonths = [1, 2, 3].includes(Number(req.body.crmRenewMonths)) ? Number(req.body.crmRenewMonths) : null;
     if (req.body.crmCameras !== undefined) data.crmCameras = req.body.crmCameras === true || req.body.crmCameras === 'true';
     if (req.body.crmSubscriptions !== undefined) data.crmSubscriptions = req.body.crmSubscriptions === true || req.body.crmSubscriptions === 'true';
     if (req.body.crmAccounting !== undefined) data.crmAccounting = req.body.crmAccounting === true || req.body.crmAccounting === 'true';

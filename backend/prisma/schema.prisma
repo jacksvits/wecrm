@@ -1213,6 +1213,10 @@ model Product {
 
   payLink       String?   @map("pay_link")
 
+  // Срок продления подписки CRM в месяцах (1/2/3). Тариф без ссылки на оплату
+  // и с указанным сроком активирует организацию сразу после регистрации.
+  crmRenewMonths Int?     @map("crm_renew_months")
+
   crmCameras      Boolean  @default(false) @map("crm_cameras")
 
   crmSubscriptions      Boolean  @default(false) @map("crm_subscriptions")

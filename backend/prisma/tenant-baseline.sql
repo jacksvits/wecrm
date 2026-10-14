@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict NxOBkjMXlukUhyyOj24swEeuwDUbq3seNXxJFqZSb2WUU9R2mfLcywBrBwC3MzP
+\restrict pZk4BzOHqEFaN2TpYyxuGisZjW6S9gNoGfDl6Rbm4uBtX61Vw1j4cD8eEPc3JCx
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -1014,7 +1014,8 @@ CREATE TABLE public.products (
     crm_accounting boolean DEFAULT false NOT NULL,
     crm_video_notes boolean DEFAULT false NOT NULL,
     crm_calls boolean DEFAULT false NOT NULL,
-    crm_integrations jsonb
+    crm_integrations jsonb,
+    crm_renew_months integer
 );
 
 
@@ -4513,13 +4514,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NxOBkjMXlukUhyyOj24swEeuwDUbq3seNXxJFqZSb2WUU9R2mfLcywBrBwC3MzP
+\unrestrict pZk4BzOHqEFaN2TpYyxuGisZjW6S9gNoGfDl6Rbm4uBtX61Vw1j4cD8eEPc3JCx
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict P4cTH6OUmHB2aTcAx3nyVQATWZkY09numkASyuKZmH3rvV1jMFaOaLFPNjjVKed
+\restrict ltThMD8xYeVYhwm2eDf9ElijyWzegCWonAJPY8brwnwxfvSTSwTJiJ2iOrGRMBD
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -4849,6 +4850,7 @@ INSERT INTO public._prisma_migrations VALUES ('44633cc1-876c-443a-a832-798e2eb1e
 INSERT INTO public._prisma_migrations VALUES ('87ec5ee2-42ee-4abc-9327-c4063f00295d', '8a4d07f0700e87a330b6c2a2822f8f6674c6ba6b50d98a1b12c7e2b9a3013a50', '2026-10-11 19:31:55.421927+00', '20261011222000_crm_cameras', NULL, NULL, '2026-10-11 19:31:55.416144+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('9a2d7a0f-9911-46be-b66f-c3285ad81a55', '9761b70bdda8d4bb64e6351fd0be14a6cb53db56d1e90f3488be9c76b14df488', '2026-10-09 21:51:37.228532+00', '20261010000000_add_seo_settings', NULL, NULL, '2026-10-09 21:51:37.216209+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('131bc505-24d7-4da7-9868-c50fb34c478b', '3d3f967e92fdf68c3af91ee56a7e903ae785440c38b1f3921acaaeb9bfce9cdb', '2026-10-10 16:26:00.295459+00', '20261010191500_add_product_default_image', NULL, NULL, '2026-10-10 16:26:00.290446+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('80a81aa3-a6f3-4478-b0ac-ae3bf0c74ee6', '174f143c40b8c4a28513c51f8a9b753810d2bbc8e2fcb201447ac1d74e8b33a1', '2026-10-14 08:30:01.746717+00', '20261014140000_product_crm_renew_months', NULL, NULL, '2026-10-14 08:30:01.740985+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('d0b5bd5d-762a-4946-a7b8-716994f72647', '8e59a0512b5e5de767b9d15a5849c41f3c5fa8a4399f6429e650795c660089e2', '2026-10-10 17:34:34.850066+00', '20261010195000_add_product_card_style', NULL, NULL, '2026-10-10 17:34:34.845391+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('6ef2116f-4940-478f-bbc4-e1f4c29a452a', 'bb31a872a1cdb8f0963c2bfcd3014f376d717c49dcb42a830426a80e5865a4a5', '2026-10-11 19:55:19.669309+00', '20261011224500_crm_subscription_options', NULL, NULL, '2026-10-11 19:55:19.662163+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('a59ecdb5-f1a9-4a97-b5de-d0a7f1a57e1b', 'a9839d84e69a5a14e3eec786562d89bf192be7447b6b7624b07a7d4c845a9f88', '2026-10-11 11:05:53.090682+00', '20261011140000_platform_tenants', NULL, NULL, '2026-10-11 11:05:53.076102+00', 1);
@@ -4865,5 +4867,5 @@ INSERT INTO public._prisma_migrations VALUES ('78c74d13-5624-4eb9-87d0-8bcc5e515
 -- PostgreSQL database dump complete
 --
 
-\unrestrict P4cTH6OUmHB2aTcAx3nyVQATWZkY09numkASyuKZmH3rvV1jMFaOaLFPNjjVKed
+\unrestrict ltThMD8xYeVYhwm2eDf9ElijyWzegCWonAJPY8brwnwxfvSTSwTJiJ2iOrGRMBD
 
