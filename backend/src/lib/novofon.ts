@@ -34,6 +34,16 @@ export interface NovofonRecordInfo {
   };
 }
 
+// Параметры авторизации: если заполнен apiSecret — старая схема key/secret
+// (auth.login/password), иначе apiKey трактуется как постоянный access_token
+// (актуальная схема Novofon 2.0: params.access_token)
+function authParams(credentials: NovofonCredentials): Record<string, any> {
+  if (credentials.apiSecret) {
+    return { auth: { login: credentials.apiKey, password: credentials.apiSecret } };
+  }
+  return { access_token: credentials.apiKey };
+}
+
 async function jsonRpcRequest<T = any>(
   url: string,
   method: string,
@@ -45,7 +55,7 @@ async function jsonRpcRequest<T = any>(
     id: `req_${Date.now()}`,
     method,
     params: {
-      auth: { login: credentials.apiKey, password: credentials.apiSecret },
+      ...authParams(credentials),
       ...params,
     },
   };
@@ -104,32 +114,11 @@ export async function getCallRecord(
   credentials: NovofonCredentials,
   callIdWithRec: string
 ): Promise<NovofonRecordInfo> {
-  const res = await fetch(DATA_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: `req_${Date.now()}`,
-      method: 'get.call_record',
-      params: {
-        auth: { login: credentials.apiKey, password: credentials.apiSecret },
-        call_id_with_rec: callIdWithRec,
-      },
-    }),
-  });
-  const data: any = await res.json();
-  if (data.error) {
-    throw new Error(`Novofon API error: ${data.error.message || JSON.stringify(data.error)}`);
-  }
-  // get.call_record может вернуть result.data объектом, массивом либо отдать поля сразу в result
-  let record: any = data.result?.data ?? data.result;
-  if (Array.isArray(record)) record = record[0];
-  if (record && record.url) return record as NovofonRecordInfo;
   // Фолбэк: прямая ссылка на media.novofon.ru/<session_id>/<rec_hash>
   // (call_id_with_rec приходит в формате <session_id>.<rec_hash>)
-  const mediaPath = String(callIdWithRec).replace('.', '/');
-  if (mediaPath.includes('/')) {
-    console.warn('[Novofon] get.call_record: пустой ответ, используем media-фолбэк', JSON.stringify(data).slice(0, 300));
+  const mediaFallback = (): NovofonRecordInfo | null => {
+    const mediaPath = String(callIdWithRec).replace('.', '/');
+    if (!mediaPath.includes('/')) return null;
     return {
       url: `https://media.novofon.ru/${mediaPath}`,
       data: {
@@ -139,7 +128,37 @@ export async function getCallRecord(
         created: new Date().toISOString(),
       },
     };
+  };
+  let data: any = null;
+  try {
+    const res = await fetch(DATA_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: `req_${Date.now()}`,
+        method: 'get.call_record',
+        params: {
+          ...authParams(credentials),
+          call_id_with_rec: callIdWithRec,
+        },
+      }),
+    });
+    data = await res.json();
+  } catch (err: any) {
+    console.warn('[Novofon] get.call_record: ошибка запроса, используем media-фолбэк:', err.message);
   }
+  if (data?.error) {
+    // Ошибка авторизации/API не должна рвать прикрепление записи — пробуем media-фолбэк
+    console.warn('[Novofon] get.call_record: ошибка API, используем media-фолбэк:', data.error.message || JSON.stringify(data.error).slice(0, 300));
+    data = null;
+  }
+  // get.call_record может вернуть result.data объектом, массивом либо отдать поля сразу в result
+  let record: any = data?.result?.data ?? data?.result;
+  if (Array.isArray(record)) record = record[0];
+  if (record && record.url) return record as NovofonRecordInfo;
+  const fallback = mediaFallback();
+  if (fallback) return fallback;
   throw new Error(`Novofon get.call_record: неожиданный ответ: ${JSON.stringify(data).slice(0, 300)}`);
 }
 

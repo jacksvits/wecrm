@@ -309,7 +309,11 @@ router.post("/webhook", async (req, res) => {
           }
         }
       }
-    } else if (event === "NOTIFY_END") {
+    // NOTIFY_END — завершение входящего звонка, NOTIFY_OUT_END — исходящего.
+    // Без обработки NOTIFY_OUT_END исходящий зависал в in_progress: не обновлялся
+    // disposition/длительность, не создавалась запись в обсуждении повторной задачи
+    // и не прикреплялась запись разговора
+    } else if (event === "NOTIFY_END" || event === "NOTIFY_OUT_END") {
       const duration =
         typeof body.duration === "string"
           ? parseInt(body.duration, 10)
@@ -492,11 +496,9 @@ router.post("/webhook", async (req, res) => {
         });
         if (call.taskId && call.callIdWithRec && !call.recordLocalPath) {
           const settings = await prisma.telephonySettings.findFirst();
-          if (
-            settings?.autoAttachRecord &&
-            settings.apiKey &&
-            settings.apiSecret
-          ) {
+          // Ключи API больше не обязательны: при ошибке авторизации getCallRecord
+          // использует media-фолбэк по call_id_with_rec
+          if (settings?.autoAttachRecord) {
             try {
               const attached = await attachCallRecord(call, settings);
               if (attached) {
@@ -513,6 +515,10 @@ router.post("/webhook", async (req, res) => {
                 err.message,
               );
             }
+          } else {
+            console.warn(
+              "[Novofon NOTIFY_RECORD] Запись не прикреплена: autoAttachRecord выключен",
+            );
           }
         }
       } catch (err: any) {
@@ -672,17 +678,19 @@ router.post("/settings", async (req: AuthRequest, res) => {
   const data = settingsSchema.parse(req.body);
   const existing = await prisma.telephonySettings.findFirst();
   if (existing) {
+    // Пустой apiSecret из формы (поле оставлено без изменений, там маска) —
+    // не затираем сохранённый секрет, иначе ломается авторизация в API Novofon
+    const updateData = { ...data };
+    if (!updateData.apiSecret) {
+      delete updateData.apiSecret;
+    }
     const updated = await prisma.telephonySettings.update({
       where: { id: existing.id },
-      data,
+      data: updateData,
     });
     res.json(updated);
   } else {
-    if (!data.apiSecret) {
-      return res
-        .status(400)
-        .json({ error: "API Secret обязателен при первой настройке" });
-    }
+    // apiSecret не обязателен: при работе по access_token достаточно apiKey
     const created = await prisma.telephonySettings.create({
       data: data as any,
     });
@@ -693,10 +701,10 @@ router.post("/settings", async (req: AuthRequest, res) => {
 // Позволяет сразу после ввода API Secret в интерфейсе убедиться, что авторизация работает.
 router.post("/test", async (_req, res) => {
   const settings = await prisma.telephonySettings.findFirst();
-  if (!settings?.apiSecret) {
+  if (!settings?.apiKey) {
     return res
       .status(400)
-      .json({ ok: false, error: "API Secret не заполнен" });
+      .json({ ok: false, error: "API Key не заполнен" });
   }
   try {
     const employees = await novofon.getEmployees({
