@@ -50,7 +50,8 @@ export function Register() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || `Ошибка ${res.status}`)
       setDone({ subdomain: data.subdomain, message: data.message || '' })
-      fetch(`/api/platform/pay-info?slug=${encodeURIComponent(data.subdomain)}`).then((r) => (r.ok ? r.json() : null)).then((pi) => { if (pi) setPay(pi) }).catch(() => {})
+      // Тариф без ссылки на оплату со сроком продления активируется сразу — блок оплаты не показываем
+      fetch(`/api/platform/pay-info?slug=${encodeURIComponent(data.subdomain)}`).then((r) => (r.ok ? r.json() : null)).then((pi) => { if (pi && pi.status !== 'active') setPay(pi) }).catch(() => {})
     } catch (err: any) {
       setError(err.message || 'Не удалось зарегистрировать организацию')
     } finally {
@@ -139,6 +140,7 @@ export function Register() {
                                 </span>
                               </span>
                               {t.description && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.description}</span>}
+                              {t.renewMonths && <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Срок продления: {t.renewMonths === 1 ? '1 месяц' : t.renewMonths === 2 ? '2 месяца' : '3 месяца'}</span>}
                             </span>
                           </label>
                         ))}

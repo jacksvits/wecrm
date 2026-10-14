@@ -79,6 +79,12 @@ router.post('/register', async (req, res) => {
   if (!planProduct) return res.status(400).json({ error: 'Выберите тариф из списка' });
   const planPrices = (planProduct.prices || []).map((x: any) => Number(x.price)).filter((n: number) => Number.isFinite(n));
   const planPrice = planPrices.length ? Math.round(Math.min(...planPrices) * 100) : null;
+  // Тариф без ссылки на оплату и с указанным сроком продления (мес.):
+  // организация активируется сразу после регистрации, оплата не требуется.
+  const renewMonths = [1, 2, 3].includes(Number(planProduct.crmRenewMonths)) ? Number(planProduct.crmRenewMonths) : null;
+  const autoActivate = !planProduct.payLink && renewMonths != null;
+  const renewMonthsLbl = renewMonths === 1 ? '1 месяц' : renewMonths === 2 ? '2 месяца' : '3 месяца';
+  const autoPaidUntil = autoActivate ? (() => { const d = new Date(); d.setMonth(d.getMonth() + renewMonths!); return d; })() : null;
   const provisioning: Promise<void> = (router as any)._provisioning || Promise.resolve();
   const run = provisioning.then(async () => {
     const dbName = await provisionTenantDb(slug, { name: adminName, email: adminEmail, password: adminPassword });
@@ -88,10 +94,11 @@ router.post('/register', async (req, res) => {
         slug,
         dbName,
         adminEmail,
-        status: 'pending',
+        status: autoActivate ? 'active' : 'pending',
         plan: planProduct.name,
         planProductId: planProduct.id,
         pricePerMonth: planPrice,
+        ...(autoActivate ? { activatedAt: new Date(), paidUntil: autoPaidUntil } : {}),
 
       },
     });
@@ -112,7 +119,9 @@ router.post('/register', async (req, res) => {
           data: {
             userId: admin.id,
             title: 'Новая организация на платформе',
-            body: `«${name}» (${slug}) ожидает активации после оплаты подписки`,
+            body: autoActivate
+              ? `«${name}» (${slug}) активирована автоматически на ${renewMonthsLbl} (тариф без оплаты)`
+              : `«${name}» (${slug}) ожидает активации после оплаты подписки`,
             type: 'system',
           },
         });
@@ -127,11 +136,15 @@ router.post('/register', async (req, res) => {
     await run;
     res.json({
       ok: true,
-      status: 'pending',
+      status: autoActivate ? 'active' : 'pending',
       subdomain: slug,
       planName: planProduct.name,
       priceRub: planPrice != null ? planPrice / 100 : null,
-      message: 'Организация создана. После оплаты подписки она будет активирована, и вы сможете войти по адресу https://' + slug + '.' + ((req.headers.host || 'welans.cc').split(':')[0].replace(/^www\./, '')),
+      renewMonths: autoActivate ? renewMonths : null,
+      paidUntil: autoPaidUntil ? autoPaidUntil.toISOString() : null,
+      message: autoActivate
+        ? 'Организация создана и активирована на ' + renewMonthsLbl + '. Вы можете войти по адресу https://' + slug + '.' + ((req.headers.host || 'welans.cc').split(':')[0].replace(/^www\./, ''))
+        : 'Организация создана. После оплаты подписки она будет активирована, и вы сможете войти по адресу https://' + slug + '.' + ((req.headers.host || 'welans.cc').split(':')[0].replace(/^www\./, '')),
     });
   } catch (e: any) {
     console.error('[platform] register error:', e);
@@ -167,6 +180,7 @@ router.get('/tariffs', async (_req, res) => {
           description: p.description || '',
           price: prices.length ? Math.min(...prices) : null,
           categoryName: cat.name,
+          renewMonths: p.crmRenewMonths ?? null,
         });
       }
     }
