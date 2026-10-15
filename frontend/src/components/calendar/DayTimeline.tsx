@@ -87,7 +87,9 @@ export function DayTimeline({
     const ro = new ResizeObserver(compute);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [fillHeight, maxHeight, hourHeight, startHour, endHour]);
+    // Без массива зависимостей: пересчёт на каждом рендере — надёжно при включении/выходе
+    // из полноэкранного режима (layout-эффект успевает до отрисовки, скроллбар не мелькает)
+  });
 
   // Эффективная высота часа: адаптивная (fillHeight) или переданная
   const hh = fillHeight && fillHourH ? fillHourH : hourHeight;
