@@ -24,10 +24,12 @@ interface Props {
   fillHeight?: boolean;
   /** акцентный цвет темы (кольцо выбранного/сегодняшнего дня), по умолчанию зелёный */
   accentColor?: string;
+  /** цвет фона ячеек «через одну» (шахматный порядок) — задаётся только в виджете дашборда */
+  zebraColor?: string;
   renderDay?: (dateISO: string, compact: boolean) => React.ReactNode;
 }
 
-export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, dayMinHeight, fillHeight, accentColor, renderDay }: Props) {
+export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, dayMinHeight, fillHeight, accentColor, zebraColor, renderDay }: Props) {
   const todayISO = toISODate(new Date());
   // Сетка: начинаем с понедельника недели, в которую попадает 1-е число
   const first = new Date(year, month - 1, 1);
@@ -58,7 +60,7 @@ export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, 
         // fillHeight: строки растягиваются, делив доступную высоту поровну
         ...(fillHeight ? { flex: 1, minHeight: 0, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` } : {}),
       }}>
-        {cells.slice(0, rows * 7).map((d) => {
+        {cells.slice(0, rows * 7).map((d, i) => {
           const iso = toISODate(d);
           const other = d.getMonth() !== month - 1;
           const isToday = iso === todayISO;
@@ -69,7 +71,10 @@ export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, 
               onClick={() => onDayClick(iso)}
               style={{
                 minHeight: compact ? 50 : dayMinHeight ?? 86, padding: compact ? 4 : 6, borderRadius: compact ? 8 : 10, cursor: 'pointer',
-                background: isSelected ? `${accentColor ?? '#16a34a'}1F` : 'var(--bg-card)',
+                // Фоны «через одну»: шахматный порядок по (строка + колонка)
+                background: isSelected
+                  ? `${accentColor ?? '#16a34a'}1F`
+                  : (zebraColor && (Math.floor(i / 7) + (i % 7)) % 2 === 0 ? zebraColor : 'var(--bg-card)'),
                 border: `1px solid ${isToday ? (accentColor ?? '#16a34a') : isSelected ? (accentColor ?? '#16a34a') : 'var(--border-color)'}`,
                 opacity: other ? 0.45 : 1,
                 display: 'flex', flexDirection: 'column', gap: compact ? 2 : 3,

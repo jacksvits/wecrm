@@ -92,6 +92,10 @@ export function DashboardCalendar() {
   const themeSettingsRef = useRef<HTMLDivElement>(null);
   const themeKey: CalendarTheme = user?.calendarTheme ?? 'classic';
   const themeAccent = CALENDAR_THEMES[themeKey].accent;
+  // Фон виджета и «шашечные» фоны ячеек подкрашены акцентом темы (color-mix —
+  // подложка var(--bg-card) сохраняется, тёмная тема не ломается)
+  const themeWidgetBg = `color-mix(in srgb, ${themeAccent} 9%, var(--bg-card))`;
+  const themeZebra = `color-mix(in srgb, ${themeAccent} 14%, var(--bg-card))`;
   const setTheme = (key: CalendarTheme) => {
     setSavingTheme(true);
     api.profile.update({ calendarTheme: key })
@@ -548,7 +552,7 @@ export function DashboardCalendar() {
   return (
     <div style={{
       marginTop: 20, padding: 20, borderRadius: 16,
-      border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: 'var(--shadow)',
+      border: '1px solid var(--border-color)', background: themeWidgetBg, boxShadow: 'var(--shadow)',
       ...(fullscreen
         ? {
             position: 'fixed', inset: 0, zIndex: 1000, marginTop: 0, borderRadius: 0, border: 'none',
@@ -685,6 +689,7 @@ export function DashboardCalendar() {
             compact={isMobile} dayMinHeight={120}
             fillHeight={fullscreen && !isMobile}
             accentColor={themeAccent}
+            zebraColor={themeZebra} // фоны карточек дат «через одну» (шахматный порядок)
             renderDay={renderDay}
           />
         </div>
