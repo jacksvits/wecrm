@@ -690,6 +690,7 @@ export function DashboardCalendar() {
             fillHeight={fullscreen && !isMobile}
             accentColor={themeAccent}
             zebraColor={themeZebra} // фоны карточек дат «через одну» (шахматный порядок)
+            volumetric // объёмные ячейки в стиле промоблоков витрины
             renderDay={renderDay}
           />
         </div>
