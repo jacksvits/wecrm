@@ -69,6 +69,7 @@ export function DashboardCalendar() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
+  const [hideCompletedTasks, setHideCompletedTasks] = useState(true);
   const [rooms, setRooms] = useState<any[]>([]);
   const [monthData, setMonthData] = useState<any>(null); // агрегаты расписания по дням
   const [dayData, setDayData] = useState<any>(null);     // день расписания (смены + записи)
@@ -159,6 +160,7 @@ export function DashboardCalendar() {
   useEffect(() => {
     if (canViewTasks) api.statuses.list('task').then(setStatuses).catch(() => {});
   }, [canViewTasks]);
+  useEffect(() => { api.profile.get().then((u) => setHideCompletedTasks(u.hideCompletedTasks ?? true)).catch(() => {}); }, []);
   useEffect(() => {
     api.schedule.rooms.list().then(setRooms).catch(() => {});
   }, []);
@@ -273,7 +275,11 @@ export function DashboardCalendar() {
   };
 
   // ---------- данные по датам ----------
-  const tasksByDate = (iso: string) => tasks.filter((t) => t.dueDate && taskDate(t.dueDate) === iso);
+  // «Скрывать выполненные задачи» из профиля: задачи с неактивным статусом не учитываем
+  // в метриках месяца, счётчике дня и временной шкале
+  const taskVisible = (t: Task) =>
+    !hideCompletedTasks || statuses.find((s) => s.name === t.status)?.isActive !== false;
+  const tasksByDate = (iso: string) => tasks.filter((t) => t.dueDate && taskDate(t.dueDate) === iso && taskVisible(t));
   const remindersByDate = (iso: string) => reminders.filter((r) => r.remindAt && toISODate(new Date(r.remindAt)) === iso);
   const taskLabel = (t: Task) => statuses.find((s) => s.name === t.status)?.label || t.status;
   const taskColor = (t: Task) =>

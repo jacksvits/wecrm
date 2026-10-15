@@ -46,6 +46,10 @@ export function TaskCalendar({ onOpenTask }: Props) {
   // STATUS_COLORS — только запасной вариант, если список статусов ещё не загрузился
   const statusLabel = (name: string) => statuses.find((s) => s.name === name)?.label || name;
   const statusColor = (name: string) => statuses.find((s) => s.name === name)?.color || STATUS_COLORS[name] || '#3b82f6';
+  // «Скрывать выполненные задачи» из профиля: задачи с неактивным статусом не показываем
+  // (единая логика для метрик месяца, счётчика дня и списков)
+  const taskVisible = (t: Task) =>
+    !hideCompletedTasks || statuses.find((s) => s.name === t.status)?.isActive !== false;
   const [hideCompletedTasks, setHideCompletedTasks] = useState(true);
   const [loading, setLoading] = useState(false);
 
@@ -65,14 +69,9 @@ export function TaskCalendar({ onOpenTask }: Props) {
   useEffect(() => { api.statuses.list('task').then(setStatuses).catch(() => setStatuses([])); }, []);
   useEffect(() => { api.profile.get().then((u) => setHideCompletedTasks(u.hideCompletedTasks ?? true)).catch(() => {}); }, []);
 
-  const byDate = (iso: string) => tasks.filter((t) => t.dueDate && taskDate(t.dueDate) === iso);
+  const byDate = (iso: string) => tasks.filter((t) => t.dueDate && taskDate(t.dueDate) === iso && taskVisible(t));
   const noDueTasks = tasks.filter((t) => !t.dueDate && !t.parentId);
-  const visibleNoDueTasks = hideCompletedTasks
-    ? noDueTasks.filter((t) => {
-        const taskStatus = statuses.find((s) => s.name === t.status);
-        return !(taskStatus && !taskStatus.isActive);
-      })
-    : noDueTasks;
+  const visibleNoDueTasks = noDueTasks.filter(taskVisible);
 
   const openDay = (iso: string) => {
     setDate(iso);
