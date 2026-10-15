@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict rNCrvJT9UORm7uCo4LRS5BxbTaZR3v6fPvoShhI7ziLYpNfqTZwcmV3KvWi3MoJ
+\restrict cHTjAwTHgyBENPDrZL8aj8SGTah717zW1ohe1dOUhNGTLa7C2PZ06elVLgirJ8w
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -1793,7 +1793,8 @@ CREATE TABLE public.users (
     default_task_assignee boolean DEFAULT false NOT NULL,
     default_task_curator boolean DEFAULT false NOT NULL,
     mobile_nav text[] DEFAULT '{}'::text[] NOT NULL,
-    stock_access boolean DEFAULT false NOT NULL
+    stock_access boolean DEFAULT false NOT NULL,
+    calendar_timeline_pos text DEFAULT 'bottom'::text NOT NULL
 );
 
 
@@ -4535,13 +4536,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rNCrvJT9UORm7uCo4LRS5BxbTaZR3v6fPvoShhI7ziLYpNfqTZwcmV3KvWi3MoJ
+\unrestrict cHTjAwTHgyBENPDrZL8aj8SGTah717zW1ohe1dOUhNGTLa7C2PZ06elVLgirJ8w
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 1a8dZjWjpYStQAy4E6bVn5VEadAPCEedXa91UjVVAt0VfNeP6WHVI6dNAuUbcBi
+\restrict bkgQJpU6WY3SIOAUCrjJS4HmeOEiCUHbR4ivcgp0fXnz9tvw1GpevOtyeE0vauC
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -4884,11 +4885,12 @@ INSERT INTO public._prisma_migrations VALUES ('9d616b3a-967b-4876-88a7-e4dc994c5
 INSERT INTO public._prisma_migrations VALUES ('20c71eb6-c372-4dd9-9c84-7b7a33fb8c02', '72ab017ac7872c8cd4c8963fafbc9cccb64959aff63ae2f8cafcbe9ce66e1d2d', '2026-10-13 19:08:41.003556+00', '20261014120000_schedule', NULL, NULL, '2026-10-13 19:08:40.958194+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('da941b60-5f9c-43fe-9d07-b2c62918eacf', '7218d83203d2d6b71d22d2d59ccadfc1cc12db0d79c03aeffe20e19d300cac33', '2026-10-15 09:00:09.758132+00', '20261015103000_role_show_calendar_metric', NULL, NULL, '2026-10-15 09:00:09.745693+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('78c74d13-5624-4eb9-87d0-8bcc5e5158ff', '80af48117d48a4494e028d7966bb83e2a17c10e1a26bac28d2432321f2d498a7', '2026-10-13 20:38:22.169439+00', '20261013210000_tenant_ticket_attachments', NULL, NULL, '2026-10-13 20:38:22.150311+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('38f925aa-aff8-412c-b818-9711e608c25d', 'edb74c1bcca8961cfdab0b8fb34d48fdf10aabe6b3e55131a36a998e96401f2b', '2026-10-15 12:28:07.262017+00', '20261015130000_user_calendar_timeline_pos', NULL, NULL, '2026-10-15 12:28:07.247653+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1a8dZjWjpYStQAy4E6bVn5VEadAPCEedXa91UjVVAt0VfNeP6WHVI6dNAuUbcBi
+\unrestrict bkgQJpU6WY3SIOAUCrjJS4HmeOEiCUHbR4ivcgp0fXnz9tvw1GpevOtyeE0vauC
 
