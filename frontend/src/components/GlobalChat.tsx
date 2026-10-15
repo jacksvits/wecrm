@@ -313,6 +313,20 @@ export function GlobalChat() {
     }
   };
 
+  const handleReply = (msg: ChatMessage) => {
+    const personalParticipantIds = Array.from(new Set([
+      msg.authorId,
+      ...(msg.recipients || []).map(r => r.userId),
+    ])).filter(id => id && id !== user?.id);
+
+    if (personalParticipantIds.length > 0) {
+      setRecipientIds(personalParticipantIds);
+      setIsAllSelected(false);
+    }
+
+    setReplyTo(msg);
+  };
+
   // Формат даты и времени сообщения в стиле проекта: «09.09.2026 23:24»
   const formatTime = (date: string) => {
     const d = new Date(date);
@@ -701,7 +715,7 @@ export function GlobalChat() {
                       marginRight: isMe ? 14 : 0,
                     }}>
                       <button
-                        onClick={() => setReplyTo(msg)}
+                        onClick={() => handleReply(msg)}
                         style={{
                           padding: '4px 10px',
                           borderRadius: 10,
@@ -810,7 +824,7 @@ export function GlobalChat() {
         }}>
           <div style={{ flex: 1, overflow: 'hidden' }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }}>
-              Ответ {replyTo.author?.name || '??'}
+              Ответ {replyTo.author?.name || '??'}{!isAllSelected && recipientIds.length > 0 ? ' · лично' : ''}
             </div>
             <div style={{ fontSize: 13, color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {replyTo.content}

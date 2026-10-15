@@ -54,57 +54,14 @@ export function FloatingGlobalChat() {
             maxHeight: 'calc(100vh - 120px)',
             zIndex: 1495,
             background: 'var(--bg-card)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 16,
-            boxShadow: 'var(--shadow)',
+            border: '1px solid rgba(120,180,255,0.28)',
+            borderRadius: 18,
+            boxShadow: '0 28px 80px rgba(0,0,0,0.34), 0 14px 34px rgba(0,122,255,0.20), inset 0 1px 0 rgba(255,255,255,0.14)',
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
           }}
         >
-          <header
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-              padding: '10px 10px 10px 16px',
-              borderBottom: '1px solid var(--border-color)',
-              background: 'var(--bg-header)',
-              flexShrink: 0,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-color)', flexShrink: 0 }}>
-                {CHAT_SVG}
-              </span>
-              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                Общий чат
-              </span>
-            </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              title='Закрыть чат'
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 12,
-                border: 'none',
-                background: 'transparent',
-                color: 'var(--text-muted)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 22,
-                lineHeight: 1,
-                transition: 'all 0.15s ease',
-              }}
-            >
-              ×
-            </button>
-          </header>
-
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <GlobalChat />
           </div>
