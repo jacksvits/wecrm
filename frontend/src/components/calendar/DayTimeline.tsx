@@ -79,7 +79,8 @@ export function DayTimeline({
       const cap = maxHeight ? Math.min(el.clientHeight, maxHeight) : el.clientHeight;
       const available = cap - 44; // минус шапка колонок
       if (available <= 0 || totalHours <= 0) return;
-      const next = Math.max(available / totalHours, 14);
+      // Запас 1px: при расчёте впритык дробные доли пикселя включают скроллбар
+      const next = Math.max(Math.floor(((available - 1) / totalHours) * 100) / 100, 14);
       setFillHourH((prev) => (prev !== null && Math.abs(prev - next) < 0.5 ? prev : next));
     };
     compute();
@@ -204,8 +205,9 @@ export function DayTimeline({
                 ))}
                 {/* Фоновые полосы (смены) */}
                 {bands.filter((b) => b.columnId === col.id).map((b) => {
-                  const top = Math.max(0, minToY(b.startMin));
-                  const height = Math.max(14, minToY(b.endMin) - top);
+                  // Ограничиваем границами сетки: карточка за полночь не должна расширять прокрутку
+                  const top = Math.min(Math.max(0, minToY(b.startMin)), Math.max(0, gridHeight - 14));
+                  const height = Math.min(Math.max(14, minToY(b.endMin) - Math.max(0, minToY(b.startMin))), Math.max(14, gridHeight - top));
                   return (
                     <div
                       key={b.id}
@@ -230,8 +232,9 @@ export function DayTimeline({
                 })}
                 {/* Карточки (записи) */}
                 {layoutItems(items.filter((it) => it.columnId === col.id)).map(({ it, lane, lanes }) => {
-                  const top = Math.max(0, minToY(it.startMin));
-                  const height = Math.max(20, minToY(it.endMin) - top);
+                  // Ограничиваем границами сетки: карточка за полночь не должна расширять прокрутку
+                  const top = Math.min(Math.max(0, minToY(it.startMin)), Math.max(0, gridHeight - 20));
+                  const height = Math.min(Math.max(20, minToY(it.endMin) - Math.max(0, minToY(it.startMin))), Math.max(20, gridHeight - top));
                   // Одна карточка в ряду — на всю ширину; несколько — делят колонку поровну
                   const lanePos = lanes === 1
                     ? { left: 8, right: 4 }
