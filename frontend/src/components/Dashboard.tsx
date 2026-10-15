@@ -328,8 +328,8 @@ export function Dashboard() {
         </SortableContext>
       </DndContext>
 
-      {/* Виджет календаря: задачи + напоминания + расписание, шкала дня внутри */}
-      <DashboardCalendar />
+      {/* Виджет календаря: задачи + напоминания + расписание, шкала дня внутри (опция роли «Метрика календаря») */}
+      {user?.showCalendarMetric !== false && <DashboardCalendar />}
 
     </div>
   );

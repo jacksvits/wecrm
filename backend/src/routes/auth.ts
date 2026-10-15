@@ -107,7 +107,7 @@ router.post('/register', async (req, res) => {
         name: data.name,
         roleId: defaultRole.id,
       },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true } } },
     });
 
     const roleName = user.role?.name || 'user';
@@ -130,6 +130,7 @@ router.post('/register', async (req, res) => {
         allowedPages,
         mobileNav: user.mobileNav || [],
         stockAccess,
+        showCalendarMetric: user.role?.showCalendarMetric ?? true,
       },
       token,
     });
@@ -145,13 +146,13 @@ router.post('/login', async (req, res) => {
     // Try to find by email first, then by username
     let user = await prisma.user.findUnique({
       where: { email: data.login },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true } } },
     });
 
     if (!user) {
       user = await prisma.user.findUnique({
         where: { username: data.login },
-        include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
+        include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true } } },
       });
     }
 
@@ -180,6 +181,7 @@ router.post('/login', async (req, res) => {
         allowedPages,
         mobileNav: user.mobileNav || [],
         stockAccess,
+        showCalendarMetric: user.role?.showCalendarMetric ?? true,
       },
       token,
     });
@@ -199,7 +201,7 @@ router.post('/guest', async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { id: guest.id },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true } } },
     });
     if (!user) return res.status(500).json({ error: 'Guest user not found' });
 
@@ -227,7 +229,7 @@ router.get('/me', async (req, res) => {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, canAccessSupportChat: true, canSeeAllSupportTickets: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true, canAccessSupportChat: true, canSeeAllSupportTickets: true } } },
     });
     if (!user) return res.status(401).json({ error: 'User not found' });
 
@@ -255,6 +257,7 @@ router.get('/me', async (req, res) => {
       crmIntegrations: await getTenantIntegrations(),
       mobileNav: user.mobileNav || [],
       showFinancesTab: user.role?.showFinancesTab ?? false,
+      showCalendarMetric: user.role?.showCalendarMetric ?? true,
       isGuest: user.email === GUEST_EMAIL,
       stockAccess: user.email === GUEST_EMAIL ? false : (user.stockAccess || user.role?.stockAccess || false),
       canChangeTaskStatus: user.role?.canChangeTaskStatus ?? true,
@@ -318,7 +321,7 @@ router.post('/impersonate', authMiddleware, adminOnly, async (req: AuthRequest, 
     if (userId === req.user!.id) return res.status(400).json({ error: 'Вы уже в своём аккаунте' });
     const target = await prisma.user.findUnique({
       where: { id: userId },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true } } },
     });
     if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
     const { token, roleName, allowedPages } = issueToken(target, req.user!.id);
@@ -344,7 +347,7 @@ router.post('/stop-impersonation', authMiddleware, async (req: AuthRequest, res)
     if (!impersonatorId) return res.status(400).json({ error: 'Нет активного переключения аккаунта' });
     const admin = await prisma.user.findUnique({
       where: { id: impersonatorId },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true } } },
     });
     if (!admin) return res.status(401).json({ error: 'User not found' });
     const { token, roleName, allowedPages } = issueToken(admin);
