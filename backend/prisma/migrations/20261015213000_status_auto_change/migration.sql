@@ -23,4 +23,4 @@ CREATE INDEX "reminders_status_changed_at_idx" ON "reminders"("status_changed_at
 UPDATE "tasks" SET "status_changed_at" = "updatedAt" WHERE "status_changed_at" IS NULL;
 UPDATE "projects" SET "status_changed_at" = "updatedAt" WHERE "status_changed_at" IS NULL;
 UPDATE "deals" SET "status_changed_at" = "updatedAt" WHERE "status_changed_at" IS NULL;
-UPDATE "reminders" SET "status_changed_at" = "updatedAt" WHERE "status_changed_at" IS NULL;
+UPDATE "reminders" SET "status_changed_at" = "updated_at" WHERE "status_changed_at" IS NULL;
