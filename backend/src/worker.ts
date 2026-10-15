@@ -51,6 +51,20 @@ async function syncTenant(t: TenantInfo): Promise<void> {
   let bag = instances.get(key);
   if (!bag) { bag = {}; instances.set(key, bag); }
 
+  // --- «Авто смена» статусов (раз в минуту, независимо от «тяжёлых» интеграций ниже) ---
+  if (!bag.statusAutoTimer) {
+    const runStatusAutoChangeJob = async () => {
+      try {
+        await runStatusAutoChange();
+      } catch (e: any) {
+        console.error(`[Worker] Status auto-change error (${key}):`, e.message);
+      }
+    };
+    await runStatusAutoChangeJob();
+    bag.statusAutoTimer = setInterval(() => { withTenant(t, runStatusAutoChangeJob).catch((e: any) => console.error(`[Worker] Status auto-change error (${key}):`, e.message)); }, STATUS_AUTO_CHANGE_MS);
+    console.log(`[Worker] Status auto-change scheduled (${key})`);
+  }
+
   // --- Email Worker ---
   const emailSettings = await prisma.emailSettings.findFirst();
   if (emailSettings && emailSettings.isActive) {
@@ -154,19 +168,6 @@ async function syncTenant(t: TenantInfo): Promise<void> {
     bag.ozonTimer = undefined;
   }
 
-  // --- «Авто смена» статусов (раз в минуту для каждого tenant'а) ---
-  if (!bag.statusAutoTimer) {
-    const runStatusAutoChangeJob = async () => {
-      try {
-        await runStatusAutoChange();
-      } catch (e: any) {
-        console.error(`[Worker] Status auto-change error (${key}):`, e.message);
-      }
-    };
-    await runStatusAutoChangeJob();
-    bag.statusAutoTimer = setInterval(() => { withTenant(t, runStatusAutoChangeJob).catch((e: any) => console.error(`[Worker] Status auto-change error (${key}):`, e.message)); }, STATUS_AUTO_CHANGE_MS);
-    console.log(`[Worker] Status auto-change scheduled (${key})`);
-  }
 }
 
 async function reconcile() {
