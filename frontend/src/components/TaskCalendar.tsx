@@ -18,14 +18,6 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: '#9ca3af',
   win: '#16a34a',
 };
-const STATUS_LABELS: Record<string, string> = {
-  open: 'Открыта',
-  in_progress: 'В работе',
-  load: 'Загрузка',
-  cancelled: 'Отменена',
-  win: 'Завершена',
-};
-
 const ghostBtn: React.CSSProperties = {
   padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border-color)',
   background: 'transparent', color: 'var(--text-primary)', fontSize: 14, cursor: 'pointer',
@@ -50,6 +42,10 @@ export function TaskCalendar({ onOpenTask }: Props) {
   const [date, setDate] = useState(today);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
+  // Название и цвет статуса — из настроек (единая стилистика с TaskList/TaskDetail);
+  // STATUS_COLORS — только запасной вариант, если список статусов ещё не загрузился
+  const statusLabel = (name: string) => statuses.find((s) => s.name === name)?.label || name;
+  const statusColor = (name: string) => statuses.find((s) => s.name === name)?.color || STATUS_COLORS[name] || '#3b82f6';
   const [hideCompletedTasks, setHideCompletedTasks] = useState(true);
   const [loading, setLoading] = useState(false);
 
@@ -103,7 +99,7 @@ export function TaskCalendar({ onOpenTask }: Props) {
       return (
         <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
           {list.slice(0, 3).map((t) => (
-            <span key={t.id} style={{ width: 7, height: 7, borderRadius: '50%', background: STATUS_COLORS[t.status] || '#3b82f6', display: 'inline-block' }} />
+            <span key={t.id} style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor(t.status), display: 'inline-block' }} />
           ))}
           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{list.length}</span>
         </div>
@@ -117,8 +113,8 @@ export function TaskCalendar({ onOpenTask }: Props) {
             style={{
               fontSize: 11, padding: '1px 6px', borderRadius: 6, whiteSpace: 'nowrap',
               overflow: 'hidden', textOverflow: 'ellipsis',
-              background: `${STATUS_COLORS[t.status] || '#3b82f6'}22`,
-              borderLeft: `2px solid ${STATUS_COLORS[t.status] || '#3b82f6'}`,
+              background: `${statusColor(t.status)}22`,
+              borderLeft: `2px solid ${statusColor(t.status)}`,
               color: 'var(--text-primary)',
             }}
           >{t.title}</div>
@@ -139,8 +135,8 @@ export function TaskCalendar({ onOpenTask }: Props) {
     return {
       id: t.id, columnId: 'tasks', startMin: start, endMin: start + 30,
       title: t.title,
-      subtitle: [STATUS_LABELS[t.status] || t.status, assignees].filter(Boolean).join(' · '),
-      color: STATUS_COLORS[t.status] || '#3b82f6',
+      subtitle: [statusLabel(t.status), assignees].filter(Boolean).join(' · '),
+      color: statusColor(t.status),
       onClick: () => onOpenTask(t.id),
     };
   });
@@ -159,7 +155,7 @@ export function TaskCalendar({ onOpenTask }: Props) {
             style={{
               background: 'var(--bg-card)',
               border: '1px solid var(--border-color)',
-              borderLeft: `3px solid ${STATUS_COLORS[t.status] || '#3b82f6'}`,
+              borderLeft: `3px solid ${statusColor(t.status)}`,
               borderRadius: 12,
               padding: '10px 12px',
               cursor: 'pointer',
@@ -167,7 +163,7 @@ export function TaskCalendar({ onOpenTask }: Props) {
           >
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{t.title}</div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              {[STATUS_LABELS[t.status] || t.status, assigneeNames(t)].filter(Boolean).join(' · ')}
+              {[statusLabel(t.status), assigneeNames(t)].filter(Boolean).join(' · ')}
             </div>
           </div>
         ))}
@@ -184,7 +180,7 @@ export function TaskCalendar({ onOpenTask }: Props) {
           style={{
             fontSize: 12, padding: '4px 10px', borderRadius: 8, cursor: 'pointer',
             background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-            borderLeft: `3px solid ${STATUS_COLORS[t.status] || '#3b82f6'}`,
+            borderLeft: `3px solid ${statusColor(t.status)}`,
           }}
         >{t.title}</span>
       ))}
@@ -231,8 +227,8 @@ export function TaskCalendar({ onOpenTask }: Props) {
                   id: t.id, startMin: taskMin(t.dueDate!),
                   time: `${t.dueDate!.slice(11, 16)}–${minToTime(taskMin(t.dueDate!) + 30)}`,
                   title: t.title,
-                  subtitle: [STATUS_LABELS[t.status] || t.status, (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ')].filter(Boolean).join(' · '),
-                  color: STATUS_COLORS[t.status] || '#3b82f6',
+                  subtitle: [statusLabel(t.status), (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ')].filter(Boolean).join(' · '),
+                  color: statusColor(t.status),
                   onClick: () => onOpenTask(t.id),
                 })),
               }]}

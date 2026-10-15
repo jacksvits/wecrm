@@ -23,13 +23,6 @@ const TASK_STATUS_COLORS: Record<string, string> = {
   cancelled: '#9ca3af',
   win: '#16a34a',
 };
-const TASK_STATUS_LABELS: Record<string, string> = {
-  open: 'Открыта',
-  in_progress: 'В работе',
-  load: 'Загрузка',
-  cancelled: 'Отменена',
-  win: 'Завершена',
-};
 const APPT_STATUS_COLORS: Record<string, string> = {
   planned: '#3b82f6',
   arrived: '#16a34a',
@@ -282,6 +275,7 @@ export function DashboardCalendar() {
   // ---------- данные по датам ----------
   const tasksByDate = (iso: string) => tasks.filter((t) => t.dueDate && taskDate(t.dueDate) === iso);
   const remindersByDate = (iso: string) => reminders.filter((r) => r.remindAt && toISODate(new Date(r.remindAt)) === iso);
+  const taskLabel = (t: Task) => statuses.find((s) => s.name === t.status)?.label || t.status;
   const taskColor = (t: Task) =>
     statuses.find((s) => s.name === t.status)?.color || TASK_STATUS_COLORS[t.status] || '#3b82f6';
   const reminderColor = (r: Reminder) => ((r as any).status?.color) || (r.completedAt ? '#9ca3af' : '#f59e0b');
@@ -424,7 +418,7 @@ export function DashboardCalendar() {
         itms.push({
           id: `t${t.id}`, columnId: '__tasks__', startMin: start, endMin: start + 30,
           title: t.title,
-          subtitle: [TASK_STATUS_LABELS[t.status] || t.status, assignees].filter(Boolean).join(' · '),
+          subtitle: [taskLabel(t), assignees].filter(Boolean).join(' · '),
           color: taskColor(t),
           onClick: () => navigate(`/tasks/${t.id}`),
         });
@@ -487,7 +481,7 @@ export function DashboardCalendar() {
           id: `task_${t.id}`, startMin: taskMin(t.dueDate!), icon: '📋',
           time: `${t.dueDate!.slice(11, 16)}–${minToTime(taskMin(t.dueDate!) + 30)}`,
           title: t.title,
-          subtitle: [TASK_STATUS_LABELS[t.status] || t.status, (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ')].filter(Boolean).join(' · '),
+          subtitle: [taskLabel(t), (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ')].filter(Boolean).join(' · '),
           color: taskColor(t),
           onClick: () => navigate(`/tasks/${t.id}`),
         });
