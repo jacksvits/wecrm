@@ -43,14 +43,6 @@ export function FloatingGlobalChat() {
   return (
     <>
       {isOpen && (
-        <div
-          onClick={() => setIsOpen(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 1490 }}
-          aria-hidden='true'
-        />
-      )}
-
-      {isOpen && (
         <section
           aria-label='Общий чат'
           style={{
