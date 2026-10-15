@@ -16,7 +16,7 @@ export function FloatingGlobalChat() {
   const { user } = useAuth();
   const location = useLocation();
   const isMobile = useIsMobile();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(() => localStorage.getItem('floatingGlobalChatOpen') === 'true');
 
   const role = typeof user?.role === 'string' ? null : user?.role;
   const canAccessChat = role?.canAccessChat !== false;
@@ -26,8 +26,8 @@ export function FloatingGlobalChat() {
   const isChatPage = location.pathname === '/chat';
 
   useEffect(() => {
-    setIsOpen(false);
-  }, [location.pathname]);
+    localStorage.setItem('floatingGlobalChatOpen', isOpen ? 'true' : 'false');
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
