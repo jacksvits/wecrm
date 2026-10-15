@@ -35,6 +35,9 @@ interface Metric {
   avatars?: Array<{ id: string; name: string; avatar?: string | null }>;
 }
 
+// Псевдо-метрика для персональной настройки видимости календаря на главной
+const CALENDAR_METRIC_KEY = 'calendar';
+
 // Карточка метрики с ручкой перетаскивания и кнопкой скрытия (стилистика Director.tsx)
 function SortableMetricCard({ metric, onHide, children }: { metric: Metric; onHide: (key: string) => void; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: metric.key });
@@ -198,6 +201,9 @@ export function Dashboard() {
     [orderedKeys, layout, metrics]
   );
 
+  // Календарь управляется отдельной опцией в «⚙ Метрики»; по умолчанию — как в роли
+  const calendarSetting = layout?.find((s) => s.metricKey === CALENDAR_METRIC_KEY);
+  const isCalendarVisible = calendarSetting ? calendarSetting.visible !== false : user?.showCalendarMetric !== false;
 
   const isBlocked = !user?.roleId && user?.role === 'user';
   if (isBlocked) {
@@ -217,9 +223,14 @@ export function Dashboard() {
 
   // Сохранение полного порядка + видимости на сервере (персонально для пользователя)
   const saveLayout = (keys: string[], visibleMap: Record<string, boolean>) => {
-    const items = keys.map((metricKey) => ({ metricKey, visible: visibleMap[metricKey] ?? true }));
-    setLayout(items.map((item, i) => ({ metricKey: item.metricKey, sortOrder: i, visible: item.visible })));
-    api.dashboard.saveLayout(items).catch((e) => console.error('[dashboard] save layout error:', e));
+    const metricItems = keys.map((metricKey) => ({ metricKey, visible: visibleMap[metricKey] ?? true }));
+    // Служебные настройки (например, видимость календаря) не участвуют в сетке метрик, но должны сохраняться
+    const extraItems = (layout || [])
+      .filter((s) => !metrics.some((m) => m.key === s.metricKey))
+      .map((s) => ({ metricKey: s.metricKey, visible: s.visible !== false }));
+    const items = [...metricItems, ...extraItems].map((item, i) => ({ metricKey: item.metricKey, sortOrder: i, visible: item.visible }));
+    setLayout(items);
+    api.dashboard.saveLayout(items.map(({ metricKey, visible }) => ({ metricKey, visible }))).catch((e) => console.error('[dashboard] save layout error:', e));
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -244,6 +255,17 @@ export function Dashboard() {
     const visibleMap = Object.fromEntries((layout || []).map((s) => [s.metricKey, s.visible]));
     visibleMap[key] = visible;
     saveLayout(orderedKeys, visibleMap);
+  };
+
+  const toggleCalendarVisibility = (visible: boolean) => {
+    const current = layout || [];
+    const items = current.some((s) => s.metricKey === CALENDAR_METRIC_KEY)
+      ? current.map((s) => s.metricKey === CALENDAR_METRIC_KEY ? { ...s, visible } : s)
+      : [...current, { metricKey: CALENDAR_METRIC_KEY, sortOrder: current.length, visible }];
+    const normalized = items.map((s, i) => ({ metricKey: s.metricKey, sortOrder: i, visible: s.visible !== false }));
+    setLayout(normalized);
+    api.dashboard.saveLayout(normalized.map(({ metricKey, visible }) => ({ metricKey, visible })))
+      .catch((e) => console.error('[dashboard] save calendar visibility error:', e));
   };
 
   return (
@@ -276,6 +298,14 @@ export function Dashboard() {
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
             Порядок и видимость метрик сохраняются персонально для вас. Перетаскивайте карточки за ручку ⋮⋮, скрывайте крестиком.
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0 10px', marginBottom: 6, cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)' }}>
+            <input
+              type='checkbox'
+              checked={isCalendarVisible}
+              onChange={(e) => toggleCalendarVisibility(e.target.checked)}
+            />
+            <span>Отображать календарь</span>
+          </label>
           {metrics.map((m) => (
             <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 14, color: 'var(--text-primary)' }}>
               <input
@@ -328,8 +358,8 @@ export function Dashboard() {
         </SortableContext>
       </DndContext>
 
-      {/* Виджет календаря: задачи + напоминания + расписание, шкала дня внутри (опция роли «Метрика календаря») */}
-      {user?.showCalendarMetric !== false && <DashboardCalendar />}
+      {/* Виджет календаря: задачи + напоминания + расписание, шкала дня внутри (персональная опция в «⚙ Метрики») */}
+      {isCalendarVisible && <DashboardCalendar />}
 
     </div>
   );
