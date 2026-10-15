@@ -49,7 +49,7 @@ interface Props {
   stepMin?: number;
   hourHeight?: number;
   maxHeight?: number;           // высота прокручиваемой области, px (по умолчанию 72vh)
-  fillHeight?: boolean;         // растянуть сетку на всю высоту родителя (часы распределяются равномерно)
+  fillHeight?: boolean;         // адаптивная высота: часы растягиваются/сжимаются так, чтобы сетка полностью помещалась без прокрутки
   untimedRow?: React.ReactNode; // строка «без времени» над сеткой
   onDrop?: (kind: 'band' | 'item', id: string, columnId: string, startMin: number) => void;
 }
@@ -67,26 +67,28 @@ export function DayTimeline({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fillHourH, setFillHourH] = useState<number | null>(null);
 
-  // fillHeight: растягиваем часы так, чтобы сетка заняла всю высоту панели без пустоты.
-  // Если контент не помещается — оставляем естественную высоту часа, работает прокрутка.
+  // fillHeight: часы растягиваются/сжимаются так, чтобы сетка заняла всю доступную
+  // высоту без пустот и без прокрутки. Защитный минимум часа — 14px (ниже скрол неизбежен).
   useLayoutEffect(() => {
     if (!fillHeight) { setFillHourH(null); return; }
     const el = scrollRef.current;
     if (!el) return;
     const totalHours = endHour - startHour;
     const compute = () => {
-      const available = el.clientHeight - 44; // минус шапка колонок
+      // Высота ограничена либо родителем, либо maxHeight (в сочетании с maxHeight берём меньшее)
+      const cap = maxHeight ? Math.min(el.clientHeight, maxHeight) : el.clientHeight;
+      const available = cap - 44; // минус шапка колонок
       if (available <= 0 || totalHours <= 0) return;
-      const natural = totalHours * hourHeight;
-      setFillHourH(available >= natural ? available / totalHours : hourHeight);
+      const next = Math.max(available / totalHours, 14);
+      setFillHourH((prev) => (prev !== null && Math.abs(prev - next) < 0.5 ? prev : next));
     };
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [fillHeight, hourHeight, startHour, endHour]);
+  }, [fillHeight, maxHeight, hourHeight, startHour, endHour]);
 
-  // Эффективная высота часа: растянутая (fillHeight) или переданная
+  // Эффективная высота часа: адаптивная (fillHeight) или переданная
   const hh = fillHeight && fillHourH ? fillHourH : hourHeight;
   const gridHeight = (totalMin / 60) * hh;
   const minToY = (m: number) => ((m - startHour * 60) / 60) * hh;

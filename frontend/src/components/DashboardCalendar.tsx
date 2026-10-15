@@ -663,7 +663,7 @@ export function DashboardCalendar() {
             endHour={endHour}
             hourHeight={40}
             maxHeight={timelinePos === 'bottom' ? timelineSize ?? undefined : undefined}
-            fillHeight={timelinePos !== 'bottom'} // справа/слева: шкала растягивается по высоте календаря
+            fillHeight // адаптивная высота: сетка помещается целиком, без прокрутки
             untimedRow={untimedRow}
           />
         ) : untimedRow}
