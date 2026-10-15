@@ -56,6 +56,8 @@ model User {
   role      Role?    @relation(fields: [roleId], references: [id])
   hideCompletedTasks Boolean @default(true)
   darkTheme         Boolean @default(false)
+  // Положение временной шкалы в виджете «Календарь» на дашборде (десктоп): bottom | right | left
+  calendarTimelinePos String @default("bottom") @map("calendar_timeline_pos")
   canBeCurator      Boolean @default(false) @map("can_be_curator")
   // Персональный доступ к складскому учёту (склады, цены, номенклатура) на уровне менеджера,
   // независимо от роли. Итоговый доступ = флаг пользователя ИЛИ флаг роли (Role.stockAccess).

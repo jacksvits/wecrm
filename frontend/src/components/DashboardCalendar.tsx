@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
@@ -57,7 +57,7 @@ const stripHtml = (html: string) => {
 
 export function DashboardCalendar() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   // Доступ к задачам — как в Dashboard: админ или раздел «/tasks» в allowedPages
   const canViewTasks = user?.role === 'admin' || ((user as any)?.allowedPages || []).includes('/tasks');
   const isMobile = useIsMobile();
@@ -72,6 +72,11 @@ export function DashboardCalendar() {
   const [monthData, setMonthData] = useState<any>(null); // агрегаты расписания по дням
   const [dayData, setDayData] = useState<any>(null);     // день расписания (смены + записи)
   const [loading, setLoading] = useState(false);
+
+  // Настройка виджета (десктоп): положение временной шкалы — хранится в профиле пользователя
+  const [showPosSettings, setShowPosSettings] = useState(false);
+  const [savingPos, setSavingPos] = useState(false);
+  const posSettingsRef = useRef<HTMLDivElement>(null);
 
   // ---------- загрузка месяца (источники независимы: сбой одного не ломает остальные) ----------
   const loadMonth = useCallback(() => {
@@ -113,6 +118,36 @@ export function DashboardCalendar() {
 
   // Живое обновление при изменениях задач/напоминаний (как в Dashboard)
   useRealtime(['tasks', 'reminders'], () => { loadMonth(); });
+
+  // Положение временной шкалы: на мобильных всегда снизу (там вместо шкалы — агенда)
+  const timelinePos: 'bottom' | 'right' | 'left' =
+    !isMobile && (user?.calendarTimelinePos === 'right' || user?.calendarTimelinePos === 'left')
+      ? user.calendarTimelinePos
+      : 'bottom';
+
+  const setTimelinePos = async (pos: 'bottom' | 'right' | 'left') => {
+    if (savingPos) return;
+    setSavingPos(true);
+    try {
+      await api.profile.update({ calendarTimelinePos: pos });
+      await refreshUser();
+      setShowPosSettings(false);
+    } catch {
+      /* не критично: останется прежнее положение */
+    } finally {
+      setSavingPos(false);
+    }
+  };
+
+  // Закрытие панели настройки по клику вне неё
+  useEffect(() => {
+    if (!showPosSettings) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (posSettingsRef.current && !posSettingsRef.current.contains(e.target as Node)) setShowPosSettings(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [showPosSettings]);
 
   // ---------- навигация ----------
   const openDay = (iso: string) => {
@@ -399,15 +434,55 @@ export function DashboardCalendar() {
           onClick={() => { const n = new Date(); setYear(n.getFullYear()); setMonth(n.getMonth() + 1); setDate(toISODate(n)); }}
         >Сегодня</button>
         {loading && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Загрузка...</span>}
+        {!isMobile && (
+          <div ref={posSettingsRef} style={{ position: 'relative' }}>
+            <button
+              style={{ ...ghostBtn, fontSize: 13 }}
+              title="Настройка виджета"
+              onClick={() => setShowPosSettings((v) => !v)}
+            >⚙</button>
+            {showPosSettings && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 40,
+                background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                padding: 12, minWidth: 230,
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
+                  Положение временной шкалы
+                </div>
+                {([['bottom', 'Снизу'], ['right', 'Справа'], ['left', 'Слева']] as const).map(([val, label]) => (
+                  <label
+                    key={val}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', fontSize: 14, cursor: 'pointer', color: 'var(--text-primary)' }}
+                  >
+                    <input
+                      type="radio"
+                      name="dash-calendar-timeline-pos"
+                      checked={timelinePos === val}
+                      disabled={savingPos}
+                      onChange={() => setTimelinePos(val)}
+                      style={{ accentColor: '#0077ff' }}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
           📋 — задачи · 🔔 — напоминания · 🗓 — записи расписания
         </span>
       </div>
 
-      <CalendarMonth year={year} month={month} selectedDate={date} onDayClick={openDay} compact={isMobile} renderDay={renderDay} />
+      <div style={timelinePos === 'bottom' ? {} : { display: 'flex', gap: 16, alignItems: 'flex-start', flexDirection: timelinePos === 'left' ? 'row-reverse' : 'row' }}>
+        <div style={timelinePos === 'bottom' ? {} : { flex: 1, minWidth: 0 }}>
+          <CalendarMonth year={year} month={month} selectedDate={date} onDayClick={openDay} compact={isMobile} renderDay={renderDay} />
+        </div>
 
       {/* Шкала выбранного дня */}
-      <div style={{ marginTop: 16 }}>
+      <div style={timelinePos === 'bottom' ? { marginTop: 16 } : { width: 420, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
           <button style={ghostBtn} onClick={() => shiftDay(-1)}>‹</button>
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -442,6 +517,7 @@ export function DashboardCalendar() {
             untimedRow={untimedRow}
           />
         ) : untimedRow}
+      </div>
       </div>
     </div>
   );

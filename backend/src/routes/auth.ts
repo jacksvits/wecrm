@@ -131,6 +131,7 @@ router.post('/register', async (req, res) => {
         mobileNav: user.mobileNav || [],
         stockAccess,
         showCalendarMetric: user.role?.showCalendarMetric ?? true,
+        calendarTimelinePos: user.calendarTimelinePos || 'bottom',
       },
       token,
     });
@@ -182,6 +183,7 @@ router.post('/login', async (req, res) => {
         mobileNav: user.mobileNav || [],
         stockAccess,
         showCalendarMetric: user.role?.showCalendarMetric ?? true,
+        calendarTimelinePos: user.calendarTimelinePos || 'bottom',
       },
       token,
     });
@@ -257,6 +259,7 @@ router.get('/me', async (req, res) => {
       crmIntegrations: await getTenantIntegrations(),
       mobileNav: user.mobileNav || [],
       showFinancesTab: user.role?.showFinancesTab ?? false,
+      calendarTimelinePos: user.calendarTimelinePos || 'bottom',
       showCalendarMetric: user.role?.showCalendarMetric ?? true,
       isGuest: user.email === GUEST_EMAIL,
       stockAccess: user.email === GUEST_EMAIL ? false : (user.stockAccess || user.role?.stockAccess || false),
@@ -309,6 +312,7 @@ const publicUser = (user: any, roleName: string, allowedPages: string[]) => {
     mobileNav: user.mobileNav ?? [],
     isGuest,
     stockAccess: isGuest ? false : (user.stockAccess || user.role?.stockAccess || false),
+    calendarTimelinePos: user.calendarTimelinePos || 'bottom',
     canCreateNews: isGuest ? false : (user.role?.canCreateNews ?? true),
     canEditNews: isGuest ? false : (user.role?.canEditNews ?? true),
   };
