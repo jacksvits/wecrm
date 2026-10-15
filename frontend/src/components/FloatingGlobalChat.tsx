@@ -20,6 +20,9 @@ export function FloatingGlobalChat() {
 
   const role = typeof user?.role === 'string' ? null : user?.role;
   const canAccessChat = role?.canAccessChat !== false;
+  const isAdmin = user?.role === 'admin';
+  const allowedPages = (user as any)?.allowedPages || [];
+  const canAccessChatPage = isAdmin || allowedPages.includes('/chat');
   const isChatPage = location.pathname === '/chat';
 
   useEffect(() => {
@@ -35,7 +38,7 @@ export function FloatingGlobalChat() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
-  if (!user || !canAccessChat || isMobile || isChatPage) return null;
+  if (!user || !canAccessChatPage || !canAccessChat || isMobile || isChatPage) return null;
 
   return (
     <>
