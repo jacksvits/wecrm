@@ -92,9 +92,9 @@ export function DashboardCalendar() {
   const themeSettingsRef = useRef<HTMLDivElement>(null);
   const themeKey: CalendarTheme = user?.calendarTheme ?? 'classic';
   const themeAccent = CALENDAR_THEMES[themeKey].accent;
-  // Фон виджета и «шашечные» фоны ячеек подкрашены акцентом темы (color-mix —
-  // подложка var(--bg-card) сохраняется, тёмная тема не ломается)
-  const themeWidgetBg = `color-mix(in srgb, ${themeAccent} 9%, var(--bg-card))`;
+  // Фон виджета — светло-серый, одинаковый для всех тем; «шашечные» фоны ячеек
+  // подкрашены акцентом темы (color-mix — тёмная тема не ломается)
+  const themeWidgetBg = '#f3f4f6';
   const themeZebra = `color-mix(in srgb, ${themeAccent} 14%, var(--bg-card))`;
   const setTheme = (key: CalendarTheme) => {
     setSavingTheme(true);
