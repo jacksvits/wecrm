@@ -77,7 +77,7 @@ export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, 
                 // Фоны «через одну»: шахматный порядок по (строка + колонка)
                 background: volumetric
                   // Глянец поверх, как у промоблоков витрины
-                  ? `linear-gradient(160deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 38%), ${isSelected ? `${accentColor ?? '#16a34a'}1F` : (zebraColor && (Math.floor(i / 7) + (i % 7)) % 2 === 0 ? zebraColor : 'var(--bg-card)')}`
+                  ? `linear-gradient(160deg, var(--cal-gloss, rgba(255,255,255,0.5)) 0%, rgba(255,255,255,0) 38%), ${isSelected ? `${accentColor ?? '#16a34a'}1F` : (zebraColor && (Math.floor(i / 7) + (i % 7)) % 2 === 0 ? zebraColor : 'var(--bg-card)')}`
                   : (isSelected
                     ? `${accentColor ?? '#16a34a'}1F`
                     : (zebraColor && (Math.floor(i / 7) + (i % 7)) % 2 === 0 ? zebraColor : 'var(--bg-card)')),

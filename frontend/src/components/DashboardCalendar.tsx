@@ -92,9 +92,9 @@ export function DashboardCalendar() {
   const themeSettingsRef = useRef<HTMLDivElement>(null);
   const themeKey: CalendarTheme = user?.calendarTheme ?? 'classic';
   const themeAccent = CALENDAR_THEMES[themeKey].accent;
-  // Фон виджета — светло-серый, одинаковый для всех тем; «шашечные» фоны ячеек
-  // подкрашены акцентом темы (color-mix — тёмная тема не ломается)
-  const themeWidgetBg = '#f3f4f6';
+  // Фон виджета — вторичный фон темы: светло-серый в светлой теме, тёмный в тёмной;
+  // «шашечные» фоны ячеек подкрашены акцентом темы (color-mix — тёмная тема не ломается)
+  const themeWidgetBg = 'var(--bg-secondary)';
   const themeZebra = `color-mix(in srgb, ${themeAccent} 14%, var(--bg-card))`;
   const setTheme = (key: CalendarTheme) => {
     setSavingTheme(true);
@@ -299,10 +299,10 @@ export function DashboardCalendar() {
     color: 'var(--text-primary)',
     ...extra,
   });
-  // Чип с временем (напоминания): белая подложка, цветная рамка
+  // Чип с временем (напоминания): подложка карточки темы, цветная рамка
   const timeChip = (color: string): React.CSSProperties => ({
     flexShrink: 0, fontSize: 10, fontWeight: 600, lineHeight: '15px',
-    color: `${color}BF`, background: '#fff',
+    color: `${color}BF`, background: 'var(--bg-card)',
     border: `1px solid ${color}59`, borderRadius: 4, padding: '0 4px',
   });
   const chipText: React.CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis' };

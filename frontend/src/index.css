@@ -85,6 +85,8 @@
   --border-color: #e5e5e5;
   --accent-color: var(--custom-accent, #007AFF);
   --shadow: 0 8px 30px rgba(0,0,0,0.08);
+  /* Глянец объёмных ячеек календаря: в тёмной теме приглушается */
+  --cal-gloss: rgba(255, 255, 255, 0.5);
   /* Safe-area aware spacing tokens */
   --sat: env(safe-area-inset-top, 0);
   --sab: env(safe-area-inset-bottom, 0);
@@ -106,6 +108,7 @@
   --border-color: #3f3f55;
   --accent-color: var(--custom-accent, #5a9fd4);
   --shadow: 0 8px 30px rgba(0,0,0,0.25);
+  --cal-gloss: rgba(255, 255, 255, 0.07);
 }
 
 
