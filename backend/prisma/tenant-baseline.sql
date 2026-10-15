@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cHTjAwTHgyBENPDrZL8aj8SGTah717zW1ohe1dOUhNGTLa7C2PZ06elVLgirJ8w
+\restrict pKAmW6DXPfAnGF1RYkvzSMNbjSVNKappNazI6ejvahu5w2Qe5xHBQhmhk7JE3IS
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -415,7 +415,8 @@ CREATE TABLE public.deals (
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone NOT NULL,
     "contactId" text,
-    "projectId" text
+    "projectId" text,
+    status_changed_at timestamp(3) without time zone
 );
 
 
@@ -1046,7 +1047,8 @@ CREATE TABLE public.projects (
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone NOT NULL,
     parent_id text,
-    is_locked boolean DEFAULT false NOT NULL
+    is_locked boolean DEFAULT false NOT NULL,
+    status_changed_at timestamp(3) without time zone
 );
 
 
@@ -1189,7 +1191,8 @@ CREATE TABLE public.reminders (
     last_notified_at timestamp(3) without time zone,
     completed_at timestamp(3) without time zone,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp(3) without time zone NOT NULL
+    updated_at timestamp(3) without time zone NOT NULL,
+    status_changed_at timestamp(3) without time zone
 );
 
 
@@ -1425,7 +1428,11 @@ CREATE TABLE public.statuses (
     sort_order integer DEFAULT 0 NOT NULL,
     is_default boolean DEFAULT false NOT NULL,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    is_active boolean DEFAULT true NOT NULL
+    is_active boolean DEFAULT true NOT NULL,
+    auto_change_enabled boolean DEFAULT false NOT NULL,
+    auto_change_minutes integer,
+    auto_change_to_status_id text,
+    auto_change_enabled_at timestamp(3) without time zone
 );
 
 
@@ -1549,7 +1556,8 @@ CREATE TABLE public.tasks (
     telegram_message_id text,
     telegram_chat_id text,
     telegram_user_id text,
-    support_owner_id text
+    support_owner_id text,
+    status_changed_at timestamp(3) without time zone
 );
 
 
@@ -1794,7 +1802,9 @@ CREATE TABLE public.users (
     default_task_curator boolean DEFAULT false NOT NULL,
     mobile_nav text[] DEFAULT '{}'::text[] NOT NULL,
     stock_access boolean DEFAULT false NOT NULL,
-    calendar_timeline_pos text DEFAULT 'bottom'::text NOT NULL
+    calendar_timeline_pos text DEFAULT 'bottom'::text NOT NULL,
+    calendar_timeline_size integer DEFAULT 420 NOT NULL,
+    calendar_theme text DEFAULT 'classic'::text NOT NULL
 );
 
 
@@ -2951,6 +2961,13 @@ CREATE UNIQUE INDEX dashboard_metric_settings_user_id_metric_key_key ON public.d
 
 
 --
+-- Name: deals_status_changed_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX deals_status_changed_at_idx ON public.deals USING btree (status_changed_at);
+
+
+--
 -- Name: email_filter_logs_created_at_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3287,6 +3304,13 @@ CREATE UNIQUE INDEX project_users_user_id_project_id_key ON public.project_users
 
 
 --
+-- Name: projects_status_changed_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX projects_status_changed_at_idx ON public.projects USING btree (status_changed_at);
+
+
+--
 -- Name: push_subscriptions_endpoint_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3305,6 +3329,13 @@ CREATE UNIQUE INDEX reminder_recipients_reminder_id_user_id_key ON public.remind
 --
 
 CREATE INDEX reminders_remind_at_idx ON public.reminders USING btree (remind_at);
+
+
+--
+-- Name: reminders_status_changed_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX reminders_status_changed_at_idx ON public.reminders USING btree (status_changed_at);
 
 
 --
@@ -3424,6 +3455,13 @@ CREATE INDEX sms_messages_received_at_idx ON public.sms_messages USING btree (re
 --
 
 CREATE INDEX sms_messages_task_id_idx ON public.sms_messages USING btree (task_id);
+
+
+--
+-- Name: statuses_auto_change_enabled_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX statuses_auto_change_enabled_idx ON public.statuses USING btree (auto_change_enabled);
 
 
 --
@@ -3557,6 +3595,13 @@ CREATE INDEX tasks_price_idx ON public.tasks USING btree (price);
 --
 
 CREATE INDEX "tasks_projectId_idx" ON public.tasks USING btree ("projectId");
+
+
+--
+-- Name: tasks_status_changed_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tasks_status_changed_at_idx ON public.tasks USING btree (status_changed_at);
 
 
 --
@@ -4309,6 +4354,14 @@ ALTER TABLE ONLY public.sms_messages
 
 
 --
+-- Name: statuses statuses_auto_change_to_status_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.statuses
+    ADD CONSTRAINT statuses_auto_change_to_status_id_fkey FOREIGN KEY (auto_change_to_status_id) REFERENCES public.statuses(id) ON UPDATE CASCADE ON DELETE SET NULL;
+
+
+--
 -- Name: stock_balances stock_balances_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4536,13 +4589,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cHTjAwTHgyBENPDrZL8aj8SGTah717zW1ohe1dOUhNGTLa7C2PZ06elVLgirJ8w
+\unrestrict pKAmW6DXPfAnGF1RYkvzSMNbjSVNKappNazI6ejvahu5w2Qe5xHBQhmhk7JE3IS
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict bkgQJpU6WY3SIOAUCrjJS4HmeOEiCUHbR4ivcgp0fXnz9tvw1GpevOtyeE0vauC
+\restrict IudId30unGp84YkQToBGbIMYqPZpaZlwby0fEMw6RLGRTFFcM4wCkDU8gqQUeEQ
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -4878,6 +4931,7 @@ INSERT INTO public._prisma_migrations VALUES ('6ef2116f-4940-478f-bbc4-e1f4c29a4
 INSERT INTO public._prisma_migrations VALUES ('a59ecdb5-f1a9-4a97-b5de-d0a7f1a57e1b', 'a9839d84e69a5a14e3eec786562d89bf192be7447b6b7624b07a7d4c845a9f88', '2026-10-11 11:05:53.090682+00', '20261011140000_platform_tenants', NULL, NULL, '2026-10-11 11:05:53.076102+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('8140916c-7072-49c3-8751-e818ec92e00a', '07ff4798826c48d98c62f8cfb95ef3f0e13a4cd7ff2453a44a071c29d616c49e', '2026-10-11 13:20:00.517262+00', '20261011160000_tenant_support_tickets', NULL, NULL, '2026-10-11 13:20:00.49503+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('0331f96b-ab54-47de-bbd9-41638fe1d749', '5b7c2aab3e0e490de792d3563b97ba7f4a53569e9353c3ab5298f611880fb4b2', '2026-10-11 15:08:38.288665+00', '20261011180000_crm_tariff_plans', NULL, NULL, '2026-10-11 15:08:38.278259+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('be773c3c-2a15-4944-9f79-a8ed48b59b9e', 'ab711df423380ca189ba16c5efd977231abef4a48cdf4985d923af20fce942b9', '2026-10-15 14:15:23.834491+00', '20261015170000_user_calendar_theme', NULL, NULL, '2026-10-15 14:15:23.827688+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('9f123f6c-76f4-49ec-af45-1b6197200c25', 'f021d1e73d5ef720e722f94842d395891f5016a837a5c8f58aab8e0431aae601', '2026-10-11 22:19:12.432481+00', '20261012012000_crm_calls', NULL, NULL, '2026-10-11 22:19:12.426224+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('f20bc1c5-9591-420a-8d92-9114299ced93', '620e41a9218f61ff62dda63617efb5cf22d906684418ad6fcba38f140160a004', '2026-10-14 09:29:39.665229+00', '20261014150000_schedule_settings', NULL, NULL, '2026-10-14 09:29:39.653542+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('cdb6bfb0-99c9-45a3-900c-e6dc16c8b8da', '41bf312a64ef260c32a6dc66e1fbd7de0e45368e990a6f35e0500db5dcf885c7', '2026-10-11 23:08:13.300651+00', '20261012020000_crm_integrations', NULL, NULL, '2026-10-11 23:08:13.295336+00', 1);
@@ -4886,11 +4940,70 @@ INSERT INTO public._prisma_migrations VALUES ('20c71eb6-c372-4dd9-9c84-7b7a33fb8
 INSERT INTO public._prisma_migrations VALUES ('da941b60-5f9c-43fe-9d07-b2c62918eacf', '7218d83203d2d6b71d22d2d59ccadfc1cc12db0d79c03aeffe20e19d300cac33', '2026-10-15 09:00:09.758132+00', '20261015103000_role_show_calendar_metric', NULL, NULL, '2026-10-15 09:00:09.745693+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('78c74d13-5624-4eb9-87d0-8bcc5e5158ff', '80af48117d48a4494e028d7966bb83e2a17c10e1a26bac28d2432321f2d498a7', '2026-10-13 20:38:22.169439+00', '20261013210000_tenant_ticket_attachments', NULL, NULL, '2026-10-13 20:38:22.150311+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('38f925aa-aff8-412c-b818-9711e608c25d', 'edb74c1bcca8961cfdab0b8fb34d48fdf10aabe6b3e55131a36a998e96401f2b', '2026-10-15 12:28:07.262017+00', '20261015130000_user_calendar_timeline_pos', NULL, NULL, '2026-10-15 12:28:07.247653+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('d130fd95-878f-47ef-bf53-e5d790e8c3c9', '2b9dc1848a66362fef25f661e6b6074d3cc999380df5d79305757578aab15ca5', '2026-10-15 13:07:01.139637+00', '20261015160000_user_calendar_timeline_size', NULL, NULL, '2026-10-15 13:07:01.13274+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('dd6ec94b-024a-4652-be41-41198f8473a5', '069a4f85cd4956520869bd5be22ceb760dd07e7a77c43d2f38e8539fb62b0e37', NULL, '20261015213000_status_auto_change', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
+
+Migration name: 20261015213000_status_auto_change
+
+Database error code: 42703
+
+Database error:
+ERROR: column "updatedAt" does not exist
+HINT: Perhaps you meant to reference the column "reminders.updated_at".
+
+Position:
+[1m 19[0m CREATE INDEX "deals_status_changed_at_idx" ON "deals"("status_changed_at");
+[1m 20[0m CREATE INDEX "reminders_status_changed_at_idx" ON "reminders"("status_changed_at");
+[1m 21[0m
+[1m 22[0m -- Бэкфилл: считаем, что сущности находятся в текущем статусе с момента последнего обновления
+[1m 23[0m UPDATE "tasks" SET "status_changed_at" = "updatedAt" WHERE "status_changed_at" IS NULL;
+[1m 24[1;31m UPDATE "projects" SET "status_changed_at" = "updatedAt" WHERE "status_changed_at" IS NULL;[0m
+
+DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42703), message: "column \"updatedAt\" does not exist", detail: None, hint: Some("Perhaps you meant to reference the column \"reminders.updated_at\"."), position: Some(Original(1666)), where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("parse_relation.c"), line: Some(3729), routine: Some("errorMissingColumn") }
+
+   0: sql_schema_connector::apply_migration::apply_script
+           with migration_name="20261015213000_status_auto_change"
+             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
+   1: schema_core::commands::apply_migrations::Applying migration
+           with migration_name="20261015213000_status_auto_change"
+             at schema-engine/core/src/commands/apply_migrations.rs:91
+   2: schema_core::state::ApplyMigrations
+             at schema-engine/core/src/state.rs:226', '2026-10-15 18:39:49.893284+00', '2026-10-15 18:32:12.768913+00', 0);
+INSERT INTO public._prisma_migrations VALUES ('4648f278-d9ff-43b4-95bb-612338d25046', '069a4f85cd4956520869bd5be22ceb760dd07e7a77c43d2f38e8539fb62b0e37', NULL, '20261015213000_status_auto_change', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
+
+Migration name: 20261015213000_status_auto_change
+
+Database error code: 42703
+
+Database error:
+ERROR: column "updatedAt" does not exist
+HINT: Perhaps you meant to reference the column "reminders.updated_at".
+
+Position:
+[1m 19[0m CREATE INDEX "deals_status_changed_at_idx" ON "deals"("status_changed_at");
+[1m 20[0m CREATE INDEX "reminders_status_changed_at_idx" ON "reminders"("status_changed_at");
+[1m 21[0m
+[1m 22[0m -- Бэкфилл: считаем, что сущности находятся в текущем статусе с момента последнего обновления
+[1m 23[0m UPDATE "tasks" SET "status_changed_at" = "updatedAt" WHERE "status_changed_at" IS NULL;
+[1m 24[1;31m UPDATE "projects" SET "status_changed_at" = "updatedAt" WHERE "status_changed_at" IS NULL;[0m
+
+DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42703), message: "column \"updatedAt\" does not exist", detail: None, hint: Some("Perhaps you meant to reference the column \"reminders.updated_at\"."), position: Some(Original(1666)), where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("parse_relation.c"), line: Some(3729), routine: Some("errorMissingColumn") }
+
+   0: sql_schema_connector::apply_migration::apply_script
+           with migration_name="20261015213000_status_auto_change"
+             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
+   1: schema_core::commands::apply_migrations::Applying migration
+           with migration_name="20261015213000_status_auto_change"
+             at schema-engine/core/src/commands/apply_migrations.rs:91
+   2: schema_core::state::ApplyMigrations
+             at schema-engine/core/src/state.rs:226', '2026-10-15 18:41:47.508723+00', '2026-10-15 18:40:24.389804+00', 0);
+INSERT INTO public._prisma_migrations VALUES ('3a10861b-97d3-4d2a-92c0-2e6850bcbcbf', '95cf5a607326e34932a366477a4518507c960517b3b033a6db65071d3071ccef', '2026-10-15 18:41:49.556912+00', '20261015213000_status_auto_change', NULL, NULL, '2026-10-15 18:41:49.512264+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('a8292bc3-4f8f-4850-b2e0-ea9697b01ccf', '1bfcd143f97094ceb2bdc0549eb14f0aa3cd6c3349d85cd571ff7af04ae03651', '2026-10-15 19:00:19.694101+00', '20261015223000_status_auto_change_enabled_at', NULL, NULL, '2026-10-15 19:00:19.68778+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bkgQJpU6WY3SIOAUCrjJS4HmeOEiCUHbR4ivcgp0fXnz9tvw1GpevOtyeE0vauC
+\unrestrict IudId30unGp84YkQToBGbIMYqPZpaZlwby0fEMw6RLGRTFFcM4wCkDU8gqQUeEQ
 
