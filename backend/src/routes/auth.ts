@@ -133,6 +133,7 @@ router.post('/register', async (req, res) => {
         showCalendarMetric: user.role?.showCalendarMetric ?? true,
         calendarTimelinePos: user.calendarTimelinePos || 'bottom',
         calendarTimelineSize: user.calendarTimelineSize ?? 420,
+        calendarTheme: user.calendarTheme || 'classic',
       },
       token,
     });
@@ -186,6 +187,7 @@ router.post('/login', async (req, res) => {
         showCalendarMetric: user.role?.showCalendarMetric ?? true,
         calendarTimelinePos: user.calendarTimelinePos || 'bottom',
         calendarTimelineSize: user.calendarTimelineSize ?? 420,
+        calendarTheme: user.calendarTheme || 'classic',
       },
       token,
     });
@@ -263,6 +265,7 @@ router.get('/me', async (req, res) => {
       showFinancesTab: user.role?.showFinancesTab ?? false,
       calendarTimelinePos: user.calendarTimelinePos || 'bottom',
       calendarTimelineSize: user.calendarTimelineSize ?? 420,
+      calendarTheme: user.calendarTheme || 'classic',
       showCalendarMetric: user.role?.showCalendarMetric ?? true,
       isGuest: user.email === GUEST_EMAIL,
       stockAccess: user.email === GUEST_EMAIL ? false : (user.stockAccess || user.role?.stockAccess || false),
@@ -317,6 +320,7 @@ const publicUser = (user: any, roleName: string, allowedPages: string[]) => {
     stockAccess: isGuest ? false : (user.stockAccess || user.role?.stockAccess || false),
     calendarTimelinePos: user.calendarTimelinePos || 'bottom',
     calendarTimelineSize: user.calendarTimelineSize ?? 420,
+    calendarTheme: user.calendarTheme || 'classic',
     canCreateNews: isGuest ? false : (user.role?.canCreateNews ?? true),
     canEditNews: isGuest ? false : (user.role?.canEditNews ?? true),
   };

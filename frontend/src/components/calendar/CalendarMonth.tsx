@@ -22,10 +22,12 @@ interface Props {
   dayMinHeight?: number;
   /** растянуть сетку на всю высоту родителя (строки делят высоту поровну) */
   fillHeight?: boolean;
+  /** акцентный цвет темы (кольцо выбранного/сегодняшнего дня), по умолчанию зелёный */
+  accentColor?: string;
   renderDay?: (dateISO: string, compact: boolean) => React.ReactNode;
 }
 
-export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, dayMinHeight, fillHeight, renderDay }: Props) {
+export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, dayMinHeight, fillHeight, accentColor, renderDay }: Props) {
   const todayISO = toISODate(new Date());
   // Сетка: начинаем с понедельника недели, в которую попадает 1-е число
   const first = new Date(year, month - 1, 1);
@@ -67,8 +69,8 @@ export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, 
               onClick={() => onDayClick(iso)}
               style={{
                 minHeight: compact ? 50 : dayMinHeight ?? 86, padding: compact ? 4 : 6, borderRadius: compact ? 8 : 10, cursor: 'pointer',
-                background: isSelected ? 'rgba(22,163,74,0.12)' : 'var(--bg-card)',
-                border: `1px solid ${isToday ? '#16a34a' : isSelected ? '#16a34a' : 'var(--border-color)'}`,
+                background: isSelected ? `${accentColor ?? '#16a34a'}1F` : 'var(--bg-card)',
+                border: `1px solid ${isToday ? (accentColor ?? '#16a34a') : isSelected ? (accentColor ?? '#16a34a') : 'var(--border-color)'}`,
                 opacity: other ? 0.45 : 1,
                 display: 'flex', flexDirection: 'column', gap: compact ? 2 : 3,
                 minWidth: 0, overflow: 'hidden', // содержимое обрезается, а не растягивает колонку

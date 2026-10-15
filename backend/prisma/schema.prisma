@@ -60,6 +60,8 @@ model User {
   calendarTimelinePos String @default("bottom") @map("calendar_timeline_pos")
   // Размер панели временной шкалы виджета «Календарь», px: ширина при положении right/left, высота при bottom
   calendarTimelineSize Int @default(420) @map("calendar_timeline_size")
+  // Цветовая тема виджета «Календарь» на дашборде: classic | ocean | amethyst
+  calendarTheme String @default("classic") @map("calendar_theme")
   canBeCurator      Boolean @default(false) @map("can_be_curator")
   // Персональный доступ к складскому учёту (склады, цены, номенклатура) на уровне менеджера,
   // независимо от роли. Итоговый доступ = флаг пользователя ИЛИ флаг роли (Role.stockAccess).

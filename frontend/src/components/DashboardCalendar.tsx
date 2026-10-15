@@ -55,6 +55,14 @@ const stripHtml = (html: string) => {
   return tmp.textContent || '';
 };
 
+// Цветовые темы виджета (кнопка «Тема») — выбор сохраняется в профиле пользователя
+type CalendarTheme = 'classic' | 'ocean' | 'amethyst';
+const CALENDAR_THEMES: Record<CalendarTheme, { label: string; accent: string; swatch: string }> = {
+  classic:  { label: 'Классика', accent: '#059669', swatch: 'linear-gradient(90deg,#059669,#34d399)' },
+  ocean:    { label: 'Океан',    accent: '#2563eb', swatch: 'linear-gradient(90deg,#2563eb,#60a5fa)' },
+  amethyst: { label: 'Аметист',  accent: '#7c3aed', swatch: 'linear-gradient(90deg,#7c3aed,#a78bfa)' },
+};
+
 export function DashboardCalendar() {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
@@ -77,6 +85,20 @@ export function DashboardCalendar() {
   const [showPosSettings, setShowPosSettings] = useState(false);
   const [savingPos, setSavingPos] = useState(false);
   const posSettingsRef = useRef<HTMLDivElement>(null);
+
+  // Цветовая тема виджета (десктоп) — хранится в профиле пользователя
+  const [showThemeSettings, setShowThemeSettings] = useState(false);
+  const [savingTheme, setSavingTheme] = useState(false);
+  const themeSettingsRef = useRef<HTMLDivElement>(null);
+  const themeKey: CalendarTheme = user?.calendarTheme ?? 'classic';
+  const themeAccent = CALENDAR_THEMES[themeKey].accent;
+  const setTheme = (key: CalendarTheme) => {
+    setSavingTheme(true);
+    api.profile.update({ calendarTheme: key })
+      .then(() => refreshUser())
+      .catch(() => { /* не критично: останется текущая тема */ })
+      .finally(() => { setSavingTheme(false); setShowThemeSettings(false); });
+  };
 
   // Перетаскиваемая граница между календарём и временной шкалой (десктоп).
   // Размер панели шкалы в px: ширина при положении right/left, высота области
@@ -167,15 +189,16 @@ export function DashboardCalendar() {
     }
   };
 
-  // Закрытие панели настройки по клику вне неё
+  // Закрытие панелей настройки по клику вне них
   useEffect(() => {
-    if (!showPosSettings) return;
+    if (!showPosSettings && !showThemeSettings) return;
     const onDocClick = (e: MouseEvent) => {
       if (posSettingsRef.current && !posSettingsRef.current.contains(e.target as Node)) setShowPosSettings(false);
+      if (themeSettingsRef.current && !themeSettingsRef.current.contains(e.target as Node)) setShowThemeSettings(false);
     };
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
-  }, [showPosSettings]);
+  }, [showPosSettings, showThemeSettings]);
 
   // Перетаскивание границы между календарём и временной шкалой (десктоп).
   // Вертикальная граница меняет ширину панели шкалы (right/left), горизонтальная —
@@ -259,12 +282,26 @@ export function DashboardCalendar() {
     statuses.find((s) => s.name === t.status)?.color || TASK_STATUS_COLORS[t.status] || '#3b82f6';
   const reminderColor = (r: Reminder) => ((r as any).status?.color) || (r.completedAt ? '#9ca3af' : '#f59e0b');
 
+  // Объёмные карточки событий: градиентная заливка цветом статуса, цветная кромка слева,
+  // лёгкая тень; текст внутри — в отдельном span, чтобы работало многоточие
   const chipStyle = (color: string, extra?: React.CSSProperties): React.CSSProperties => ({
-    fontSize: 11, padding: '1px 6px', borderRadius: 6, whiteSpace: 'nowrap',
-    overflow: 'hidden', textOverflow: 'ellipsis',
-    background: `${color}22`, borderLeft: `2px solid ${color}`, color: 'var(--text-primary)',
+    display: 'flex', alignItems: 'baseline', gap: 4,
+    fontSize: 11, fontWeight: 500, lineHeight: 1.35,
+    padding: '2px 6px 2px 7px', borderRadius: 9,
+    whiteSpace: 'nowrap', overflow: 'hidden',
+    background: `linear-gradient(180deg, ${color}2E, ${color}17)`,
+    border: `1px solid ${color}55`,
+    boxShadow: `inset 2px 0 0 ${color}, 0 1px 2px rgba(17,24,39,0.08)`,
+    color: 'var(--text-primary)',
     ...extra,
   });
+  // Чип с временем (напоминания): белая подложка, цветная рамка
+  const timeChip = (color: string): React.CSSProperties => ({
+    flexShrink: 0, fontSize: 10, fontWeight: 600, lineHeight: '15px',
+    color: `${color}BF`, background: '#fff',
+    border: `1px solid ${color}59`, borderRadius: 4, padding: '0 4px',
+  });
+  const chipText: React.CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis' };
 
   // ---------- месяц: метки трёх типов на каждой дате ----------
   const renderDay = (iso: string, compact: boolean) => {
@@ -287,17 +324,21 @@ export function DashboardCalendar() {
     const chips: React.ReactNode[] = [];
     for (const t of dayTasks) {
       chips.push(
-        <div key={`t${t.id}`} style={chipStyle(taskColor(t))} title={`Задача: ${t.title}`}>📋 {t.title}</div>
+        <div key={`t${t.id}`} style={chipStyle(taskColor(t))} title={`Задача: ${t.title}`}>
+          <span style={chipText}>📋 {t.title}</span>
+        </div>
       );
     }
     for (const r of dayReminders) {
+      const rColor = reminderColor(r);
       chips.push(
         <div
           key={`r${r.id}`}
-          style={chipStyle(reminderColor(r), r.completedAt ? { textDecoration: 'line-through', opacity: 0.65 } : undefined)}
+          style={chipStyle(rColor, r.completedAt ? { textDecoration: 'line-through', opacity: 0.65 } : undefined)}
           title={`Напоминание: ${r.title}`}
         >
-          🔔 {new Date(r.remindAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} {r.title}
+          <span style={timeChip(rColor)}>{new Date(r.remindAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+          <span style={chipText}>🔔 {r.title}</span>
         </div>
       );
     }
@@ -536,7 +577,7 @@ export function DashboardCalendar() {
             <button
               style={{ ...ghostBtn, fontSize: 13 }}
               title="Настройка виджета"
-              onClick={() => setShowPosSettings((v) => !v)}
+              onClick={() => { setShowPosSettings((v) => !v); setShowThemeSettings(false); }}
             >⚙</button>
             {showPosSettings && (
               <div style={{
@@ -571,7 +612,52 @@ export function DashboardCalendar() {
             )}
           </div>
         )}
-        {/* Справа в шапке: ⚙ (только десктоп) и «Во весь экран» */}
+        {/* Кнопка «Тема» (десктоп): выбор цветовой схемы виджета — рядом с ⚙ */}
+        {!isMobile && (
+          <div ref={themeSettingsRef} style={{ position: 'relative' }}>
+            <button
+              style={{ ...ghostBtn, fontSize: 13 }}
+              title="Цветовая тема виджета"
+              onClick={() => { setShowThemeSettings((v) => !v); setShowPosSettings(false); }}
+            >🎨 Тема</button>
+            {showThemeSettings && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 40,
+                background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                padding: 12, width: 208,
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
+                  Тема виджета
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(Object.keys(CALENDAR_THEMES) as CalendarTheme[]).map((key) => {
+                    const t = CALENDAR_THEMES[key];
+                    const active = themeKey === key;
+                    return (
+                      <button
+                        key={key}
+                        disabled={savingTheme}
+                        onClick={() => setTheme(key)}
+                        title={t.label}
+                        style={{
+                          flex: 1, cursor: 'pointer', background: 'var(--bg-card)',
+                          border: `2px solid ${active ? 'var(--text-primary)' : 'var(--border-color)'}`,
+                          borderRadius: 10, padding: '6px 4px', fontSize: 11,
+                          color: 'var(--text-primary)', opacity: savingTheme ? 0.6 : 1,
+                        }}
+                      >
+                        <div style={{ height: 22, borderRadius: 6, marginBottom: 4, background: t.swatch }} />
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {/* Справа в шапке: ⚙ и «Тема» (только десктоп), «Во весь экран» */}
         <button
           style={{ ...ghostBtn, fontSize: 13 }}
           title={fullscreen ? 'Выйти из полного экрана (Esc)' : 'Развернуть виджет на весь экран'}
@@ -598,6 +684,7 @@ export function DashboardCalendar() {
             year={year} month={month} selectedDate={date} onDayClick={openDay}
             compact={isMobile} dayMinHeight={120}
             fillHeight={fullscreen && !isMobile}
+            accentColor={themeAccent}
             renderDay={renderDay}
           />
         </div>
@@ -617,7 +704,7 @@ export function DashboardCalendar() {
           }}
         >
           <div style={{
-            background: draggingDivider ? '#0077ff' : 'var(--border-color)',
+            background: draggingDivider ? themeAccent : 'var(--border-color)',
             borderRadius: 4, transition: 'background 0.15s',
             ...(timelinePos === 'bottom' ? { height: 4, width: 56 } : { width: 4, height: 56 }),
           }} />
