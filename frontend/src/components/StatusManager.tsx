@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react' ; import { api } from '../api/client
 <label style={{ fontSize: 14, fontWeight: 500 }}>Сменить на статус</label>
 <select value={form.autoChangeToStatusId} onChange={e => setForm({ ...form, autoChangeToStatusId: e.target.value })} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)' }} required>
 <option value=''>— выберите статус —</option>
-{statuses.filter(st => st.entityType === form.entityType && st.isActive && st.id !== editingId).map(st => ( <option key={st.id} value={st.id}>{st.label}</option> ))}
+{statuses.filter(st => st.entityType === form.entityType && st.id !== editingId).map(st => ( <option key={st.id} value={st.id}>{st.label}{st.isActive ? '' : ' (неактивный)'}</option> ))}
 </select>
 </div>
 )}
