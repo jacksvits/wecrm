@@ -78,6 +78,21 @@ export function DashboardCalendar() {
   const [savingPos, setSavingPos] = useState(false);
   const posSettingsRef = useRef<HTMLDivElement>(null);
 
+  // Перетаскиваемая граница между календарём и временной шкалой (десктоп).
+  // Размер панели шкалы в px: ширина при положении right/left, высота области
+  // прокрутки при bottom. null — авто (ширина 420 / высота 72vh). Хранится в профиле,
+  // как и calendarTimelinePos.
+  const [timelineSize, setTimelineSize] = useState<number | null>(user?.calendarTimelineSize ?? null);
+  const [draggingDivider, setDraggingDivider] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);   // контейнер календаря + шкалы
+  const timelineRef = useRef<HTMLDivElement>(null);    // панель шкалы (измерение высоты при bottom)
+  const dividerSizeRef = useRef<number>(0);            // актуальный размер во время перетаскивания
+
+  // Профиль подгружается асинхронно: подхватываем сохранённый размер, когда user появился
+  useEffect(() => {
+    if (user?.calendarTimelineSize) setTimelineSize(user.calendarTimelineSize);
+  }, [user?.calendarTimelineSize]);
+
   // ---------- загрузка месяца (источники независимы: сбой одного не ломает остальные) ----------
   const loadMonth = useCallback(() => {
     setLoading(true);
@@ -148,6 +163,66 @@ export function DashboardCalendar() {
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [showPosSettings]);
+
+  // Перетаскивание границы между календарём и временной шкалой (десктоп).
+  // Вертикальная граница меняет ширину панели шкалы (right/left), горизонтальная —
+  // высоту её области прокрутки (bottom). Финальный размер сохраняется в профиль.
+  const TL_SIZE_DEFAULT = 420;  // ширина панели шкалы по умолчанию (как раньше)
+  const TL_MIN_SIDE = 280;      // минимальная ширина панели шкалы
+  const TL_MIN_BOTTOM = 240;    // минимальная высота области прокрутки
+  const startDividerDrag = (e: React.MouseEvent) => {
+    if (isMobile) return;
+    e.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    let startSize: number;
+    if (timelinePos === 'bottom') {
+      const scrollEl = timelineRef.current?.querySelector('[data-tl-scroll]') as HTMLElement | null;
+      startSize = timelineSize ?? scrollEl?.offsetHeight ?? 480;
+    } else {
+      startSize = timelineSize ?? TL_SIZE_DEFAULT;
+    }
+    dividerSizeRef.current = startSize;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    // Календарю остаётся минимум ~340px от ширины контейнера
+    const maxSide = Math.max(TL_MIN_SIDE + 40, rect.width - 340);
+    const maxBottom = Math.round(window.innerHeight * 0.85);
+
+    const onMove = (ev: MouseEvent) => {
+      let next: number;
+      if (timelinePos === 'bottom') {
+        next = startSize + (ev.clientY - startY);
+        next = Math.max(TL_MIN_BOTTOM, Math.min(maxBottom, next));
+      } else if (timelinePos === 'right') {
+        next = startSize - (ev.clientX - startX);
+        next = Math.max(TL_MIN_SIDE, Math.min(maxSide, next));
+      } else {
+        next = startSize + (ev.clientX - startX);
+        next = Math.max(TL_MIN_SIDE, Math.min(maxSide, next));
+      }
+      dividerSizeRef.current = next;
+      setTimelineSize(next);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setDraggingDivider(false);
+      const saved = Math.round(dividerSizeRef.current);
+      setTimelineSize(saved);
+      api.profile.update({ calendarTimelineSize: saved })
+        .then(() => refreshUser())
+        .catch(() => { /* не критично: останется локальный размер */ });
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = timelinePos === 'bottom' ? 'row-resize' : 'col-resize';
+    document.body.style.userSelect = 'none';
+    setDraggingDivider(true);
+  };
 
   // ---------- навигация ----------
   const openDay = (iso: string) => {
@@ -467,6 +542,9 @@ export function DashboardCalendar() {
                     {label}
                   </label>
                 ))}
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
+                  Границу между календарём и шкалой можно перетаскивать мышью.
+                </div>
               </div>
             )}
           </div>
@@ -476,13 +554,43 @@ export function DashboardCalendar() {
         </span>
       </div>
 
-      <div style={timelinePos === 'bottom' ? {} : { display: 'flex', gap: 16, alignItems: 'flex-start', flexDirection: timelinePos === 'left' ? 'row-reverse' : 'row' }}>
+      <div
+        ref={containerRef}
+        style={timelinePos === 'bottom' ? {} : { display: 'flex', gap: 12, alignItems: 'stretch', flexDirection: timelinePos === 'left' ? 'row-reverse' : 'row' }}
+      >
         <div style={timelinePos === 'bottom' ? {} : { flex: 1, minWidth: 0 }}>
           <CalendarMonth year={year} month={month} selectedDate={date} onDayClick={openDay} compact={isMobile} renderDay={renderDay} />
         </div>
 
+      {/* Граница между календарём и временной шкалой: перетаскивание меняет размер панели шкалы */}
+      {!isMobile && (
+        <div
+          onMouseDown={startDividerDrag}
+          title="Потяните, чтобы изменить размер"
+          style={{
+            flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: timelinePos === 'bottom' ? 'row-resize' : 'col-resize',
+            ...(timelinePos === 'bottom'
+              ? { height: 16, margin: '4px 0' }
+              : { width: 12 }),
+          }}
+        >
+          <div style={{
+            background: draggingDivider ? '#0077ff' : 'var(--border-color)',
+            borderRadius: 4, transition: 'background 0.15s',
+            ...(timelinePos === 'bottom' ? { height: 4, width: 56 } : { width: 4, height: 56 }),
+          }} />
+        </div>
+      )}
+
       {/* Шкала выбранного дня */}
-      <div style={timelinePos === 'bottom' ? { marginTop: 16 } : { width: 420, flexShrink: 0 }}>
+      <div
+        ref={timelineRef}
+        style={timelinePos === 'bottom'
+          ? { marginTop: isMobile ? 16 : 0 }
+          : { width: timelineSize ?? TL_SIZE_DEFAULT, flexShrink: 0 }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
           <button style={ghostBtn} onClick={() => shiftDay(-1)}>‹</button>
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -514,6 +622,7 @@ export function DashboardCalendar() {
             startHour={startHour}
             endHour={endHour}
             hourHeight={40}
+            maxHeight={timelinePos === 'bottom' ? timelineSize ?? undefined : undefined}
             untimedRow={untimedRow}
           />
         ) : untimedRow}

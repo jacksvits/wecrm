@@ -48,6 +48,7 @@ interface Props {
   endHour?: number;
   stepMin?: number;
   hourHeight?: number;
+  maxHeight?: number;           // высота прокручиваемой области, px (по умолчанию 72vh)
   untimedRow?: React.ReactNode; // строка «без времени» над сеткой
   onDrop?: (kind: 'band' | 'item', id: string, columnId: string, startMin: number) => void;
 }
@@ -58,6 +59,7 @@ export const minToTime = (m: number) =>
 export function DayTimeline({
   columns, bands = [], items = [],
   startHour = 8, endHour = 20, stepMin = 30, hourHeight = 48,
+  maxHeight,
   untimedRow, onDrop,
 }: Props) {
   const totalMin = (endHour - startHour) * 60;
@@ -117,7 +119,7 @@ export function DayTimeline({
   return (
     <div>
       {untimedRow}
-      <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '72vh', border: '1px solid var(--border-color)', borderRadius: 12, background: 'var(--bg-card)' }}>
+      <div data-tl-scroll style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: maxHeight ?? '72vh', border: '1px solid var(--border-color)', borderRadius: 12, background: 'var(--bg-card)' }}>
         <div style={{ display: 'flex', minWidth: Math.max(560, 72 + columns.length * 170) }}>
           {/* Колонка времени */}
           <div style={{ width: 72, flexShrink: 0, position: 'sticky', left: 0, zIndex: 3, background: 'var(--bg-card)' }}>

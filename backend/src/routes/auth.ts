@@ -132,6 +132,7 @@ router.post('/register', async (req, res) => {
         stockAccess,
         showCalendarMetric: user.role?.showCalendarMetric ?? true,
         calendarTimelinePos: user.calendarTimelinePos || 'bottom',
+        calendarTimelineSize: user.calendarTimelineSize ?? 420,
       },
       token,
     });
@@ -184,6 +185,7 @@ router.post('/login', async (req, res) => {
         stockAccess,
         showCalendarMetric: user.role?.showCalendarMetric ?? true,
         calendarTimelinePos: user.calendarTimelinePos || 'bottom',
+        calendarTimelineSize: user.calendarTimelineSize ?? 420,
       },
       token,
     });
@@ -260,6 +262,7 @@ router.get('/me', async (req, res) => {
       mobileNav: user.mobileNav || [],
       showFinancesTab: user.role?.showFinancesTab ?? false,
       calendarTimelinePos: user.calendarTimelinePos || 'bottom',
+      calendarTimelineSize: user.calendarTimelineSize ?? 420,
       showCalendarMetric: user.role?.showCalendarMetric ?? true,
       isGuest: user.email === GUEST_EMAIL,
       stockAccess: user.email === GUEST_EMAIL ? false : (user.stockAccess || user.role?.stockAccess || false),
@@ -313,6 +316,7 @@ const publicUser = (user: any, roleName: string, allowedPages: string[]) => {
     isGuest,
     stockAccess: isGuest ? false : (user.stockAccess || user.role?.stockAccess || false),
     calendarTimelinePos: user.calendarTimelinePos || 'bottom',
+    calendarTimelineSize: user.calendarTimelineSize ?? 420,
     canCreateNews: isGuest ? false : (user.role?.canCreateNews ?? true),
     canEditNews: isGuest ? false : (user.role?.canEditNews ?? true),
   };

@@ -58,6 +58,8 @@ model User {
   darkTheme         Boolean @default(false)
   // Положение временной шкалы в виджете «Календарь» на дашборде (десктоп): bottom | right | left
   calendarTimelinePos String @default("bottom") @map("calendar_timeline_pos")
+  // Размер панели временной шкалы виджета «Календарь», px: ширина при положении right/left, высота при bottom
+  calendarTimelineSize Int @default(420) @map("calendar_timeline_size")
   canBeCurator      Boolean @default(false) @map("can_be_curator")
   // Персональный доступ к складскому учёту (склады, цены, номенклатура) на уровне менеджера,
   // независимо от роли. Итоговый доступ = флаг пользователя ИЛИ флаг роли (Role.stockAccess).
