@@ -20,10 +20,18 @@ type AutoChangeRule = {
   entityType: string;
   name: string;
   label: string;
+  autoChangeEnabledAt: Date | null;
   autoChangeMinutes: number | null;
   autoChangeToStatusId: string | null;
   autoChangeToStatus: { id: string; name: string; label: string } | null;
 };
+
+/** Эффективное начало отсчёта: момент входа в статус, но не раньше включения опции */
+function effectiveStart(rule: AutoChangeRule, statusChangedAt: Date | null): Date | null {
+  if (!statusChangedAt) return null;
+  const enabledAt = rule.autoChangeEnabledAt ? new Date(rule.autoChangeEnabledAt).getTime() : 0;
+  return new Date(Math.max(new Date(statusChangedAt).getTime(), enabledAt));
+}
 
 /** Порог времени: сущности, попавшие в статус до этой отметки, подлежат переводу */
 function deadlineFor(rule: AutoChangeRule): Date {
@@ -33,9 +41,9 @@ function deadlineFor(rule: AutoChangeRule): Date {
 async function applyTaskRule(rule: AutoChangeRule, deadline: Date): Promise<void> {
   const tasks = await prisma.task.findMany({
     where: { status: rule.name, statusChangedAt: { lte: deadline } },
-    select: { id: true, title: true },
+    select: { id: true, title: true, statusChangedAt: true },
   });
-  for (const task of tasks) {
+  for (const task of tasks.filter(t => { const start = effectiveStart(rule, t.statusChangedAt); return start !== null && start.getTime() <= deadline.getTime(); })) {
     await prisma.task.update({ where: { id: task.id }, data: { status: rule.autoChangeToStatus!.name } });
     // Запись в историю задачи: userId не задан — изменение выполнено системой
     await prisma.taskHistory.create({ data: { taskId: task.id, field: 'status', oldValue: rule.name, newValue: rule.autoChangeToStatus!.name, userId: null } });
@@ -49,27 +57,48 @@ async function applyTaskRule(rule: AutoChangeRule, deadline: Date): Promise<void
 }
 
 async function applyProjectRule(rule: AutoChangeRule, deadline: Date): Promise<void> {
-  const result = await prisma.project.updateMany({
+  const projects = await prisma.project.findMany({
     where: { status: rule.name, statusChangedAt: { lte: deadline } },
-    data: { status: rule.autoChangeToStatus!.name },
+    select: { id: true, statusChangedAt: true },
   });
-  if (result.count) { broadcast(CHANNELS.PROJECTS, { action: 'update', entity: 'project' }); console.log(`[StatusAutoChange] Проектов переведено: ${result.count} («${rule.label}» → «${rule.autoChangeToStatus!.label}»)`); }
+  let count = 0;
+  for (const p of projects) {
+    const start = effectiveStart(rule, p.statusChangedAt);
+    if (!start || start.getTime() > deadline.getTime()) continue;
+    await prisma.project.update({ where: { id: p.id }, data: { status: rule.autoChangeToStatus!.name } });
+    count++;
+  }
+  if (count) { broadcast(CHANNELS.PROJECTS, { action: 'update', entity: 'project' }); console.log(`[StatusAutoChange] Проектов переведено: ${count} («${rule.label}» → «${rule.autoChangeToStatus!.label}»)`); }
 }
 
 async function applyDealRule(rule: AutoChangeRule, deadline: Date): Promise<void> {
-  const result = await prisma.deal.updateMany({
+  const deals = await prisma.deal.findMany({
     where: { stage: rule.name, statusChangedAt: { lte: deadline } },
-    data: { stage: rule.autoChangeToStatus!.name },
+    select: { id: true, statusChangedAt: true },
   });
-  if (result.count) { broadcast(CHANNELS.DEALS, { action: 'update', entity: 'deal' }); console.log(`[StatusAutoChange] Сделок переведено: ${result.count} («${rule.label}» → «${rule.autoChangeToStatus!.label}»)`); }
+  let count = 0;
+  for (const d of deals) {
+    const start = effectiveStart(rule, d.statusChangedAt);
+    if (!start || start.getTime() > deadline.getTime()) continue;
+    await prisma.deal.update({ where: { id: d.id }, data: { stage: rule.autoChangeToStatus!.name } });
+    count++;
+  }
+  if (count) { broadcast(CHANNELS.DEALS, { action: 'update', entity: 'deal' }); console.log(`[StatusAutoChange] Сделок переведено: ${count} («${rule.label}» → «${rule.autoChangeToStatus!.label}»)`); }
 }
 
 async function applyReminderRule(rule: AutoChangeRule, deadline: Date): Promise<void> {
-  const result = await prisma.reminder.updateMany({
+  const reminders = await prisma.reminder.findMany({
     where: { statusId: rule.id, statusChangedAt: { lte: deadline } },
-    data: { statusId: rule.autoChangeToStatusId },
+    select: { id: true, statusChangedAt: true },
   });
-  if (result.count) { broadcast('reminders', { action: 'update', entity: 'reminder' }); console.log(`[StatusAutoChange] Напоминаний переведено: ${result.count} («${rule.label}» → «${rule.autoChangeToStatus!.label}»)`); }
+  let count = 0;
+  for (const r of reminders) {
+    const start = effectiveStart(rule, r.statusChangedAt);
+    if (!start || start.getTime() > deadline.getTime()) continue;
+    await prisma.reminder.update({ where: { id: r.id }, data: { statusId: rule.autoChangeToStatusId } });
+    count++;
+  }
+  if (count) { broadcast('reminders', { action: 'update', entity: 'reminder' }); console.log(`[StatusAutoChange] Напоминаний переведено: ${count} («${rule.label}» → «${rule.autoChangeToStatus!.label}»)`); }
 }
 
 /** Один проход авто-смены статусов для текущего tenant'а (вызывается из worker) */
@@ -77,6 +106,7 @@ export async function runStatusAutoChange(): Promise<void> {
   const rules = await prisma.status.findMany({
     where: { autoChangeEnabled: true, autoChangeMinutes: { not: null }, autoChangeToStatusId: { not: null }, isActive: true },
     include: { autoChangeToStatus: { select: { id: true, name: true, label: true } } },
+    // autoChangeEnabledAt выбирается по умолчанию
   });
   for (const rule of rules) {
     if (!rule.autoChangeToStatus) continue;

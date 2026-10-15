@@ -813,6 +813,7 @@ model Status {
 
   // Авто смена статуса: через autoChangeMinutes минут сущность переходит в autoChangeToStatus
   autoChangeEnabled    Boolean  @default(false) @map("auto_change_enabled")
+  autoChangeEnabledAt  DateTime? @map("auto_change_enabled_at") // момент включения опции — таймер стартует не раньше него
   autoChangeMinutes    Int?     @map("auto_change_minutes")
   autoChangeToStatusId String?  @map("auto_change_to_status_id")
   autoChangeToStatus   Status?  @relation("StatusAutoChange", fields: [autoChangeToStatusId], references: [id])
