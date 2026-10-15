@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 
 /**
  * Временная шкала дня: колонки × время. Общий компонент.
@@ -49,6 +49,7 @@ interface Props {
   stepMin?: number;
   hourHeight?: number;
   maxHeight?: number;           // высота прокручиваемой области, px (по умолчанию 72vh)
+  fillHeight?: boolean;         // растянуть сетку на всю высоту родителя (часы распределяются равномерно)
   untimedRow?: React.ReactNode; // строка «без времени» над сеткой
   onDrop?: (kind: 'band' | 'item', id: string, columnId: string, startMin: number) => void;
 }
@@ -59,12 +60,36 @@ export const minToTime = (m: number) =>
 export function DayTimeline({
   columns, bands = [], items = [],
   startHour = 8, endHour = 20, stepMin = 30, hourHeight = 48,
-  maxHeight,
+  maxHeight, fillHeight,
   untimedRow, onDrop,
 }: Props) {
   const totalMin = (endHour - startHour) * 60;
-  const gridHeight = (totalMin / 60) * hourHeight;
-  const minToY = (m: number) => ((m - startHour * 60) / 60) * hourHeight;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [fillHourH, setFillHourH] = useState<number | null>(null);
+
+  // fillHeight: растягиваем часы так, чтобы сетка заняла всю высоту панели без пустоты.
+  // Если контент не помещается — оставляем естественную высоту часа, работает прокрутка.
+  useLayoutEffect(() => {
+    if (!fillHeight) { setFillHourH(null); return; }
+    const el = scrollRef.current;
+    if (!el) return;
+    const totalHours = endHour - startHour;
+    const compute = () => {
+      const available = el.clientHeight - 44; // минус шапка колонок
+      if (available <= 0 || totalHours <= 0) return;
+      const natural = totalHours * hourHeight;
+      setFillHourH(available >= natural ? available / totalHours : hourHeight);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fillHeight, hourHeight, startHour, endHour]);
+
+  // Эффективная высота часа: растянутая (fillHeight) или переданная
+  const hh = fillHeight && fillHourH ? fillHourH : hourHeight;
+  const gridHeight = (totalMin / 60) * hh;
+  const minToY = (m: number) => ((m - startHour * 60) / 60) * hh;
 
   const hours: number[] = [];
   for (let h = startHour; h < endHour; h++) hours.push(h);
@@ -109,7 +134,7 @@ export function DayTimeline({
       const { kind, id } = JSON.parse(e.dataTransfer.getData('text/plain'));
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const y = e.clientY - rect.top;
-      let minutes = startHour * 60 + (y / hourHeight) * 60;
+      let minutes = startHour * 60 + (y / hh) * 60;
       minutes = Math.round(minutes / stepMin) * stepMin;
       minutes = Math.max(startHour * 60, Math.min(endHour * 60 - stepMin, minutes));
       onDrop(kind, id, columnId, minutes);
@@ -117,9 +142,17 @@ export function DayTimeline({
   };
 
   return (
-    <div>
+    <div style={fillHeight ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : undefined}>
       {untimedRow}
-      <div data-tl-scroll style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: maxHeight ?? '72vh', border: '1px solid var(--border-color)', borderRadius: 12, background: 'var(--bg-card)' }}>
+      <div
+        ref={scrollRef}
+        data-tl-scroll
+        style={{
+          overflowX: 'auto', overflowY: 'auto',
+          ...(fillHeight ? { flex: 1, minHeight: 0 } : { maxHeight: maxHeight ?? '72vh' }),
+          border: '1px solid var(--border-color)', borderRadius: 12, background: 'var(--bg-card)',
+        }}
+      >
         <div style={{ display: 'flex', minWidth: Math.max(560, 72 + columns.length * 170) }}>
           {/* Колонка времени */}
           <div style={{ width: 72, flexShrink: 0, position: 'sticky', left: 0, zIndex: 3, background: 'var(--bg-card)' }}>
@@ -127,7 +160,7 @@ export function DayTimeline({
             <div style={{ position: 'relative', height: gridHeight }}>
               {hours.map((h) => (
                 <div key={h} style={{
-                  position: 'absolute', top: (h - startHour) * hourHeight, left: 0, right: 0,
+                  position: 'absolute', top: (h - startHour) * hh, left: 0, right: 0,
                   fontSize: 11, color: 'var(--text-muted)', textAlign: 'right', paddingRight: 8,
                   transform: 'translateY(-50%)',
                 }}>{minToTime(h * 60)}</div>
@@ -156,14 +189,14 @@ export function DayTimeline({
                 {/* Часовые линии */}
                 {hours.map((h) => (
                   <div key={h} style={{
-                    position: 'absolute', top: (h - startHour) * hourHeight, left: 0, right: 0,
+                    position: 'absolute', top: (h - startHour) * hh, left: 0, right: 0,
                     borderTop: '1px solid var(--border-color)', opacity: 0.6,
                   }} />
                 ))}
                 {/* Получасовые линии */}
                 {stepMin <= 30 && hours.map((h) => (
                   <div key={`h${h}`} style={{
-                    position: 'absolute', top: (h - startHour) * hourHeight + hourHeight / 2, left: 0, right: 0,
+                    position: 'absolute', top: (h - startHour) * hh + hh / 2, left: 0, right: 0,
                     borderTop: '1px dashed var(--border-color)', opacity: 0.35,
                   }} />
                 ))}

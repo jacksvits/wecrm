@@ -509,7 +509,10 @@ export function DashboardCalendar() {
       marginTop: 20, padding: 20, borderRadius: 16,
       border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: 'var(--shadow)',
       ...(fullscreen
-        ? { position: 'fixed', inset: 0, zIndex: 1000, marginTop: 0, borderRadius: 0, border: 'none', overflowY: 'auto' }
+        ? {
+            position: 'fixed', inset: 0, zIndex: 1000, marginTop: 0, borderRadius: 0, border: 'none',
+            overflowY: 'auto', display: 'flex', flexDirection: 'column',
+          }
         : {}),
     }}>
       {/* Шапка виджета */}
@@ -580,10 +583,23 @@ export function DashboardCalendar() {
 
       <div
         ref={containerRef}
-        style={timelinePos === 'bottom' ? {} : { display: 'flex', gap: 12, alignItems: 'stretch', flexDirection: timelinePos === 'left' ? 'row-reverse' : 'row' }}
+        style={timelinePos === 'bottom'
+          ? (fullscreen ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : {})
+          : {
+              display: 'flex', gap: 12, alignItems: 'stretch',
+              flexDirection: timelinePos === 'left' ? 'row-reverse' : 'row',
+              ...(fullscreen ? { flex: 1, minHeight: 0 } : {}),
+            }}
       >
-        <div style={timelinePos === 'bottom' ? {} : { flex: 1, minWidth: 0 }}>
-          <CalendarMonth year={year} month={month} selectedDate={date} onDayClick={openDay} compact={isMobile} dayMinHeight={120} renderDay={renderDay} />
+        <div style={timelinePos === 'bottom'
+          ? (fullscreen ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : {})
+          : { flex: 1, minWidth: 0, ...(fullscreen ? { display: 'flex', flexDirection: 'column' } : {}) }}>
+          <CalendarMonth
+            year={year} month={month} selectedDate={date} onDayClick={openDay}
+            compact={isMobile} dayMinHeight={120}
+            fillHeight={fullscreen && !isMobile}
+            renderDay={renderDay}
+          />
         </div>
 
       {/* Граница между календарём и временной шкалой: перетаскивание меняет размер панели шкалы */}
@@ -613,7 +629,7 @@ export function DashboardCalendar() {
         ref={timelineRef}
         style={timelinePos === 'bottom'
           ? { marginTop: isMobile ? 16 : 0 }
-          : { width: timelineSize ?? TL_SIZE_DEFAULT, flexShrink: 0 }}
+          : { width: timelineSize ?? TL_SIZE_DEFAULT, flexShrink: 0, display: 'flex', flexDirection: 'column' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
           <button style={ghostBtn} onClick={() => shiftDay(-1)}>‹</button>
@@ -647,6 +663,7 @@ export function DashboardCalendar() {
             endHour={endHour}
             hourHeight={40}
             maxHeight={timelinePos === 'bottom' ? timelineSize ?? undefined : undefined}
+            fillHeight={timelinePos !== 'bottom'} // справа/слева: шкала растягивается по высоте календаря
             untimedRow={untimedRow}
           />
         ) : untimedRow}

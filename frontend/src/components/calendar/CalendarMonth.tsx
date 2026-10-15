@@ -20,10 +20,12 @@ interface Props {
   compact?: boolean;
   /** минимальная высота ячейки дня в десктопном режиме (по умолчанию 86) */
   dayMinHeight?: number;
+  /** растянуть сетку на всю высоту родителя (строки делят высоту поровну) */
+  fillHeight?: boolean;
   renderDay?: (dateISO: string, compact: boolean) => React.ReactNode;
 }
 
-export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, dayMinHeight, renderDay }: Props) {
+export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, dayMinHeight, fillHeight, renderDay }: Props) {
   const todayISO = toISODate(new Date());
   // Сетка: начинаем с понедельника недели, в которую попадает 1-е число
   const first = new Date(year, month - 1, 1);
@@ -39,9 +41,9 @@ export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, 
   const rows = cells.slice(28).every((d) => d.getMonth() !== month - 1) ? 5 : 6;
 
   return (
-    <div>
+    <div style={fillHeight ? { display: 'flex', flexDirection: 'column', height: '100%' } : undefined}>
       {/* minmax(0, 1fr): треки сжимаются ниже ширины контента — длинные названия не ломают сетку */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: compact ? 2 : 4, marginBottom: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: compact ? 2 : 4, marginBottom: 4, flexShrink: 0 }}>
         {WEEKDAYS.map((w, i) => (
           <div key={w} style={{
             textAlign: 'center', fontSize: compact ? 11 : 12, fontWeight: 600, padding: '4px 0',
@@ -49,7 +51,11 @@ export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, 
           }}>{w}</div>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: compact ? 2 : 4 }}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: compact ? 2 : 4,
+        // fillHeight: строки растягиваются, делив доступную высоту поровну
+        ...(fillHeight ? { flex: 1, minHeight: 0, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` } : {}),
+      }}>
         {cells.slice(0, rows * 7).map((d) => {
           const iso = toISODate(d);
           const other = d.getMonth() !== month - 1;
