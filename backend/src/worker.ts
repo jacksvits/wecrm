@@ -8,6 +8,7 @@ import { prisma } from './lib/prisma.js';
 import { runOneCSync } from './lib/onec-sync.js';
 import { syncProductsToOzon } from './lib/ozon.js';
 import { listWorkerTenants, withTenant, TenantInfo } from './lib/tenant.js';
+import { runStatusAutoChange } from './lib/status-auto-change.js';
 
 /**
  * Entry-point для worker-контейнера (мультитенантный).
@@ -21,7 +22,10 @@ import { listWorkerTenants, withTenant, TenantInfo } from './lib/tenant.js';
  * глобальный `prisma` обращается к БД нужной организации.
  */
 
-type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkGroupWorker; onecTimer?: NodeJS.Timeout; ozonTimer?: NodeJS.Timeout };
+type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkGroupWorker; onecTimer?: NodeJS.Timeout; ozonTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
+
+/** Интервал проверки «Авто смены» статусов */
+const STATUS_AUTO_CHANGE_MS = 60_000;
 
 const instances = new Map<string, TimerBag>();
 const SYNC_MS = 30_000;
@@ -36,6 +40,7 @@ function stopBag(key: string, bag: TimerBag) {
   try { bag.vk?.stop(); } catch { /* ignore */ }
   if (bag.onecTimer) clearInterval(bag.onecTimer);
   if (bag.ozonTimer) clearInterval(bag.ozonTimer);
+  if (bag.statusAutoTimer) clearInterval(bag.statusAutoTimer);
   instances.delete(key);
   console.log(`[Worker] Воркеры остановлены для tenant ${key}`);
 }
@@ -147,6 +152,20 @@ async function syncTenant(t: TenantInfo): Promise<void> {
   } else if (bag.ozonTimer) {
     clearInterval(bag.ozonTimer);
     bag.ozonTimer = undefined;
+  }
+
+  // --- «Авто смена» статусов (раз в минуту для каждого tenant'а) ---
+  if (!bag.statusAutoTimer) {
+    const runStatusAutoChangeJob = async () => {
+      try {
+        await runStatusAutoChange();
+      } catch (e: any) {
+        console.error(`[Worker] Status auto-change error (${key}):`, e.message);
+      }
+    };
+    await runStatusAutoChangeJob();
+    bag.statusAutoTimer = setInterval(() => { withTenant(t, runStatusAutoChangeJob).catch((e: any) => console.error(`[Worker] Status auto-change error (${key}):`, e.message)); }, STATUS_AUTO_CHANGE_MS);
+    console.log(`[Worker] Status auto-change scheduled (${key})`);
   }
 }
 

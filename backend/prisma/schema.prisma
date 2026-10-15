@@ -210,6 +210,7 @@ model Project {
   name        String
   description String?
   status      String   @default("active")
+  statusChangedAt DateTime? @map("status_changed_at") // время входа в текущий статус (для «Авто смены»)
   startDate   DateTime?
   endDate     DateTime?
   progress    Int      @default(0)
@@ -412,6 +413,7 @@ model Task {
   title         String
   description   String?
   status        String   @default("open")
+  statusChangedAt DateTime? @map("status_changed_at") // время входа в текущий статус (для «Авто смены»)
   priority      String   @default("medium")
   dueDate       DateTime?
   createdAt     DateTime @default(now())
@@ -529,6 +531,7 @@ model Deal {
   value       Int      @default(0)
   currency    String   @default("RUB")
   stage       String   @default("lead")
+  statusChangedAt DateTime? @map("status_changed_at") // время входа в текущий этап (для «Авто смены»)
   probability Int      @default(10)
   expectedClose DateTime?
   createdAt   DateTime @default(now())
@@ -806,12 +809,20 @@ model Status {
   sortOrder   Int      @default(0)         @map("sort_order")
   isDefault   Boolean  @default(false)     @map("is_default")
   isActive    Boolean  @default(true)      @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")    
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Авто смена статуса: через autoChangeMinutes минут сущность переходит в autoChangeToStatus
+  autoChangeEnabled    Boolean  @default(false) @map("auto_change_enabled")
+  autoChangeMinutes    Int?     @map("auto_change_minutes")
+  autoChangeToStatusId String?  @map("auto_change_to_status_id")
+  autoChangeToStatus   Status?  @relation("StatusAutoChange", fields: [autoChangeToStatusId], references: [id])
 
   @@unique([entityType, name])
   @@index([entityType, sortOrder])
+  @@index([autoChangeEnabled])
   @@map("statuses")
-  reminders   Reminder[]
+  reminders           Reminder[]
+  autoChangeSources   Status[] @relation("StatusAutoChange")
 }
 
 model MaxSettings {
@@ -876,6 +887,7 @@ model Reminder {
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   statusId        String?   @map("status_id")
   status          Status?   @relation(fields: [statusId], references: [id])
+  statusChangedAt DateTime? @map("status_changed_at") // время входа в текущий статус (для «Авто смены»)
   remindAt        DateTime  @map("remind_at")
   notifyBeforeMin Int       @default(0) @map("notify_before_min")
   repeat          String    @default("none") @map("repeat")

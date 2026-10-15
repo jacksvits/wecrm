@@ -24,8 +24,26 @@ export interface TenantInfo {
   isMain: boolean;
 }
 
+/**
+ * Middleware: при смене статуса сущности фиксируем время входа в него.
+ * У задач/проектов статус — поле status, у сделок — stage, у напоминаний —
+ * связь statusId. Значение использует механизм «Авто смена» статусов.
+ */
+function statusChangedAtMiddleware(params: any, next: (params: any) => Promise<any>) {
+  const fieldByModel: Record<string, string> = { task: 'status', project: 'status', deal: 'stage', reminder: 'statusId' };
+  const field = fieldByModel[params.model];
+  if (field && (params.action === 'update' || params.action === 'updateMany') && params.args?.data) {
+    const data = params.args.data;
+    if (data[field] !== undefined && data.statusChangedAt === undefined) {
+      data.statusChangedAt = new Date();
+    }
+  }
+  return next(params);
+}
+
 /** Клиент к платформенной БД (главная организация + таблица tenants) */
 export const platformPrisma = new PrismaClient();
+platformPrisma.$use(statusChangedAtMiddleware);
 
 /** Контекст текущего tenant'а (заполняется middleware/worker-раннером) */
 export const tenantContext = new AsyncLocalStorage<TenantInfo>();
@@ -65,6 +83,7 @@ export function getTenantPrisma(dbName: string): PrismaClient {
   let client = tenantClients.get(dbName);
   if (!client) {
     client = new PrismaClient({ datasources: { db: { url: tenantDbUrl(dbName) } } });
+    client.$use(statusChangedAtMiddleware);
     tenantClients.set(dbName, client);
   }
   return client;
