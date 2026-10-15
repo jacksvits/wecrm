@@ -48,6 +48,210 @@ function TaskMap({ address }: { address: string }) {
     <YandexMap address={address} />
   );
 }
+
+// Автокомплит выбора связанной сущности (контакт, сделка):
+// печатаем несколько букв — под полем выпадает список совпадений,
+// клик или Enter выбирает вариант, крестик очищает выбор
+function EntityAutocomplete({
+  options,
+  valueId,
+  placeholder,
+  onChange,
+}: {
+  options: { id: string; label: string; hint?: string }[];
+  valueId: string;
+  placeholder: string;
+  onChange: (id: string) => void;
+}) {
+  const selected = options.find((o) => o.id === valueId);
+  const [text, setText] = useState(selected?.label || "");
+  const [open, setOpen] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Пока пользователь не печатает — показываем название текущего выбора
+  useEffect(() => {
+    if (!dirty) setText(selected?.label || "");
+  }, [valueId, selected?.label, dirty]);
+
+  // Закрытие списка по клику вне поля
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setDirty(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const q = text.trim().toLowerCase();
+  const filtered = (
+    q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options
+  ).slice(0, 50);
+
+  const pick = (id: string) => {
+    const opt = options.find((o) => o.id === id);
+    setDirty(false);
+    setText(opt?.label || "");
+    onChange(id);
+    setOpen(false);
+    setActiveIndex(-1);
+  };
+
+  return (
+    <div ref={rootRef} style={{ position: "relative" }}>
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={text}
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          setText(e.target.value);
+          setDirty(true);
+          setOpen(true);
+          setActiveIndex(-1);
+          // Ручной ввод сбрасывает прежний выбор — он восстановится при клике по варианту
+          if (valueId) onChange("");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setOpen(true);
+            setActiveIndex((i) => Math.min(i + 1, filtered.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActiveIndex((i) => Math.max(i - 1, 0));
+          } else if (e.key === "Enter" && open) {
+            const target = filtered[activeIndex] || (filtered.length === 1 ? filtered[0] : null);
+            if (target) {
+              e.preventDefault();
+              pick(target.id);
+            }
+          } else if (e.key === "Escape") {
+            setOpen(false);
+            setDirty(false);
+          }
+        }}
+        style={{
+          padding: 10,
+          paddingRight: valueId ? 36 : 10,
+          borderRadius: 12,
+          border: "1px solid var(--border-color)",
+          fontSize: 14,
+          width: "100%",
+          background: "var(--bg-input)",
+          color: "var(--text-primary)",
+        }}
+      />
+      {valueId && (
+        <button
+          type="button"
+          title="Очистить"
+          onClick={() => {
+            setText("");
+            setDirty(false);
+            onChange("");
+          }}
+          style={{
+            position: "absolute",
+            right: 8,
+            top: "50%",
+            transform: "translateY(-50%)",
+            border: "none",
+            background: "transparent",
+            color: "var(--text-secondary)",
+            fontSize: 18,
+            lineHeight: 1,
+            cursor: "pointer",
+            padding: 2,
+          }}
+        >
+          ×
+        </button>
+      )}
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            right: 0,
+            maxHeight: 240,
+            overflowY: "auto",
+            background: "var(--bg-card)",
+            border: "1px solid var(--border-color)",
+            borderRadius: 12,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+            zIndex: 30,
+          }}
+        >
+          {filtered.length === 0 ? (
+            <div
+              style={{
+                padding: "10px 12px",
+                fontSize: 13,
+                color: "var(--text-secondary)",
+              }}
+            >
+              Ничего не найдено
+            </div>
+          ) : (
+            filtered.map((o, i) => (
+              <div
+                key={o.id}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(o.id);
+                }}
+                onMouseEnter={() => setActiveIndex(i)}
+                style={{
+                  padding: "9px 12px",
+                  fontSize: 14,
+                  cursor: "pointer",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  alignItems: "baseline",
+                  background:
+                    i === activeIndex
+                      ? "var(--bg-input)"
+                      : o.id === valueId
+                        ? "var(--bg-input)"
+                        : "transparent",
+                  color: "var(--text-primary)",
+                }}
+              >
+                <span
+                  style={{
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {o.label}
+                </span>
+                {o.hint && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-secondary)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {o.hint}
+                  </span>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i;
 const formatSize = (bytes: number) => {
   if (!bytes) return "0 B";
@@ -854,74 +1058,26 @@ export function TaskDetail() {
               }}
             />{" "}
             {isAdmin && (
-              <div style={{ position: "relative" }}>
-                <input
-                  type="text"
-                  list="contact-options"
-                  placeholder="Поиск контакта..."
-                  value={contacts.find(c => c.id === editForm.contactId)?.name || ""}
-                  onChange={(e) => {
-                    const contact = contacts.find(c => 
-                      c.name.toLowerCase().startsWith(e.target.value.toLowerCase())
-                    );
-                    setEditForm({ ...editForm, contactId: contact?.id || "" });
-                  }}
-                  style={{
-                    padding: 10,
-                    borderRadius: 12,
-                    border: "1px solid var(--border-color)",
-                    fontSize: 14,
-                    width: "100%",
-                    background: "var(--bg-input)",
-                    color: "var(--text-primary)",
-                  }}
-                />
-                <datalist id="contact-options">
-                  {contacts.map(c => (
-                    <option key={c.id} value={c.name} />
-                  ))}
-                </datalist>
-                {editForm.contactId && (
-                  <div style={{ marginTop: 4, fontSize: 12, color: "#1565c0" }}>
-                    Выбран: {contacts.find(c => c.id === editForm.contactId)?.name}
-                  </div>
-                )}
-              </div>
+              <EntityAutocomplete
+                options={contacts.map((c) => ({ id: c.id, label: c.name }))}
+                valueId={editForm.contactId}
+                placeholder="Поиск контакта..."
+                onChange={(cid) =>
+                  setEditForm({ ...editForm, contactId: cid })
+                }
+              />
             )}{" "}
             {isAdmin && (
-              <div style={{ position: "relative" }}>
-                <input
-                  type="text"
-                  list="deal-options"
-                  placeholder="Поиск сделки..."
-                  value={deals.find(d => d.id === editForm.dealId)?.title || ""}
-                  onChange={(e) => {
-                    const deal = deals.find(d =>
-                      d.title.toLowerCase().startsWith(e.target.value.toLowerCase())
-                    );
-                    setEditForm({ ...editForm, dealId: deal?.id || "" });
-                  }}
-                  style={{
-                    padding: 10,
-                    borderRadius: 12,
-                    border: "1px solid var(--border-color)",
-                    fontSize: 14,
-                    width: "100%",
-                    background: "var(--bg-input)",
-                    color: "var(--text-primary)",
-                  }}
-                />
-                <datalist id="deal-options">
-                  {deals.map(d => (
-                    <option key={d.id} value={d.title} />
-                  ))}
-                </datalist>
-                {editForm.dealId && (
-                  <div style={{ marginTop: 4, fontSize: 12, color: "#1565c0" }}>
-                    Выбрана: {deals.find(d => d.id === editForm.dealId)?.title} ({(deals.find(d => d.id === editForm.dealId)?.value || 0).toLocaleString("ru")} ₽)
-                  </div>
-                )}
-              </div>
+              <EntityAutocomplete
+                options={deals.map((d) => ({
+                  id: d.id,
+                  label: d.title,
+                  hint: `${(d.value || 0).toLocaleString("ru")} ₽`,
+                }))}
+                valueId={editForm.dealId}
+                placeholder="Поиск сделки..."
+                onChange={(did) => setEditForm({ ...editForm, dealId: did })}
+              />
             )}{" "}
             <select
               multiple
