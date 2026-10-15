@@ -87,27 +87,43 @@ function probeTcp(host: string, port: number, timeoutMs = 4000): Promise<boolean
 }
 
 // Генерация config.json для sing-box и запись в общий том.
-// Перебирает серверы подписки, пока не найдёт доступный по TCP.
+// Все reality-серверы подписки добавляются в outbound'ы, а выбор рабочего
+// выполняет группа urltest: мёртвые/заблокированные серверы исключаются
+// автоматически (реальная проверка TLS/Reality, а не только TCP-порт).
 async function writeSingBoxConfig(subscriptionUrl: string): Promise<string> {
   const servers = await fetchSubscriptionServers(subscriptionUrl);
   if (servers.length === 0) throw new Error('В подписке нет vless-серверов');
-  let parsed = 0;
+  const outbounds: any[] = [];
+  const tags: string[] = [];
   for (const link of servers) {
     const outbound = parseVless(link);
-    if (!outbound) continue;
-    parsed++;
-    if (!(await probeTcp(outbound.server, outbound.server_port))) continue;
-    const config = {
-      log: { level: 'warn' },
-      inbounds: [{ type: 'mixed', tag: 'in', listen: '::', listen_port: 2080 }],
-      outbounds: [outbound],
-    };
-    fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
-    return `${outbound.server}:${outbound.server_port}`;
+    /* без полного набора reality-ключей outbound неработоспособен — пропускаем */
+    if (!outbound || !outbound.tls.reality.public_key || !outbound.tls.reality.short_id) continue;
+    const tag = `srv-${tags.length}`;
+    outbound.tag = tag;
+    outbounds.push(outbound);
+    tags.push(tag);
   }
-  if (parsed === 0) throw new Error('Ни один сервер подписки не распознан (ожидается vless + reality)');
-  throw new Error('Все серверы подписки недоступны по TCP — проверьте подписку или сеть');
+  if (tags.length === 0) throw new Error('Ни один сервер подписки не распознан (ожидается vless + reality)');
+  const config = {
+    log: { level: 'warn' },
+    inbounds: [{ type: 'mixed', tag: 'in', listen: '::', listen_port: 2080 }],
+    outbounds: [
+      {
+        type: 'urltest',
+        tag: 'proxy',
+        outbounds: tags,
+        url: 'https://www.gstatic.com/generate_204',
+        interval: '3m',
+        tolerance: 100,
+      },
+      ...outbounds,
+    ],
+  };
+  fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  const first = outbounds[0];
+  return `${first.server}:${first.server_port} (urltest: ${tags.length} серверов)`;
 }
 
 router.get('/settings', authMiddleware, async (_req: AuthRequest, res) => {
