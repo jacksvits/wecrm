@@ -18,10 +18,12 @@ interface Props {
   onDayClick: (dateISO: string) => void;
   /** compact — мобильный режим (≤768px): ячейки ниже, содержимое — компактные индикаторы */
   compact?: boolean;
+  /** минимальная высота ячейки дня в десктопном режиме (по умолчанию 86) */
+  dayMinHeight?: number;
   renderDay?: (dateISO: string, compact: boolean) => React.ReactNode;
 }
 
-export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, renderDay }: Props) {
+export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, dayMinHeight, renderDay }: Props) {
   const todayISO = toISODate(new Date());
   // Сетка: начинаем с понедельника недели, в которую попадает 1-е число
   const first = new Date(year, month - 1, 1);
@@ -58,7 +60,7 @@ export function CalendarMonth({ year, month, selectedDate, onDayClick, compact, 
               key={iso}
               onClick={() => onDayClick(iso)}
               style={{
-                minHeight: compact ? 50 : 86, padding: compact ? 4 : 6, borderRadius: compact ? 8 : 10, cursor: 'pointer',
+                minHeight: compact ? 50 : dayMinHeight ?? 86, padding: compact ? 4 : 6, borderRadius: compact ? 8 : 10, cursor: 'pointer',
                 background: isSelected ? 'rgba(22,163,74,0.12)' : 'var(--bg-card)',
                 border: `1px solid ${isToday ? '#16a34a' : isSelected ? '#16a34a' : 'var(--border-color)'}`,
                 opacity: other ? 0.45 : 1,

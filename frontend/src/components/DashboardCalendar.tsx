@@ -93,6 +93,19 @@ export function DashboardCalendar() {
     if (user?.calendarTimelineSize) setTimelineSize(user.calendarTimelineSize);
   }, [user?.calendarTimelineSize]);
 
+  // Полноэкранный режим виджета: оверлей поверх интерфейса, выход — кнопкой или Esc
+  const [fullscreen, setFullscreen] = useState(false);
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false); };
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden'; // прокрутка страницы под оверлеем не мешает
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [fullscreen]);
+
   // ---------- загрузка месяца (источники независимы: сбой одного не ломает остальные) ----------
   const loadMonth = useCallback(() => {
     setLoading(true);
@@ -495,6 +508,9 @@ export function DashboardCalendar() {
     <div style={{
       marginTop: 20, padding: 20, borderRadius: 16,
       border: '1px solid var(--border-color)', background: 'var(--bg-card)', boxShadow: 'var(--shadow)',
+      ...(fullscreen
+        ? { position: 'fixed', inset: 0, zIndex: 1000, marginTop: 0, borderRadius: 0, border: 'none', overflowY: 'auto' }
+        : {}),
     }}>
       {/* Шапка виджета */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -509,6 +525,9 @@ export function DashboardCalendar() {
           onClick={() => { const n = new Date(); setYear(n.getFullYear()); setMonth(n.getMonth() + 1); setDate(toISODate(n)); }}
         >Сегодня</button>
         {loading && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Загрузка...</span>}
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
+          📋 — задачи · 🔔 — напоминания · 🗓 — записи расписания
+        </span>
         {!isMobile && (
           <div ref={posSettingsRef} style={{ position: 'relative' }}>
             <button
@@ -549,9 +568,14 @@ export function DashboardCalendar() {
             )}
           </div>
         )}
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
-          📋 — задачи · 🔔 — напоминания · 🗓 — записи расписания
-        </span>
+        {/* Справа в шапке: ⚙ (только десктоп) и «Во весь экран» */}
+        <button
+          style={{ ...ghostBtn, fontSize: 13 }}
+          title={fullscreen ? 'Выйти из полного экрана (Esc)' : 'Развернуть виджет на весь экран'}
+          onClick={() => setFullscreen((v) => !v)}
+        >
+          {fullscreen ? '✕ Свернуть' : '⛶ Во весь экран'}
+        </button>
       </div>
 
       <div
@@ -559,7 +583,7 @@ export function DashboardCalendar() {
         style={timelinePos === 'bottom' ? {} : { display: 'flex', gap: 12, alignItems: 'stretch', flexDirection: timelinePos === 'left' ? 'row-reverse' : 'row' }}
       >
         <div style={timelinePos === 'bottom' ? {} : { flex: 1, minWidth: 0 }}>
-          <CalendarMonth year={year} month={month} selectedDate={date} onDayClick={openDay} compact={isMobile} renderDay={renderDay} />
+          <CalendarMonth year={year} month={month} selectedDate={date} onDayClick={openDay} compact={isMobile} dayMinHeight={120} renderDay={renderDay} />
         </div>
 
       {/* Граница между календарём и временной шкалой: перетаскивание меняет размер панели шкалы */}
