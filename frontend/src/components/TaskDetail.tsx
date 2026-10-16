@@ -834,20 +834,58 @@ export function TaskDetail() {
           {task && (isAdmin || task.creatorId === user?.id || (task.curators || []).some(c => c.id === user?.id)) && !isEditing && activeTab === "details" && (
             <button
               onClick={() => setIsEditing(true)}
+              title="Редактировать"
               style={{
-                padding: "6px 12px",
+                width: 34,
+                height: 34,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 0,
                 borderRadius: 12,
                 border: "1px solid var(--border-color)",
                 background: "var(--bg-card)",
                 cursor: "pointer",
-                fontSize: 13,
                 color: "var(--text-primary)",
               }}
             >
-              ✏️ Редактировать
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+              </svg>
             </button>
           )}{" "}
-          {/* Выпадающий список статусов — виден при всех вкладках */}
+          {isAdmin && (
+            <button
+              onClick={() => {
+                if (confirm("Удалить задачу?")) {
+                  api.tasks.delete(task.id).then(() => navigate("/tasks"));
+                }
+              }}
+              title="Удалить"
+              style={{
+                width: 34,
+                height: 34,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 0,
+                borderRadius: 12,
+                border: "1px solid var(--border-color)",
+                background: "var(--bg-card)",
+                color: "#dc2626",
+                cursor: "pointer",
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18" />
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+            </button>
+          )}{" "}
+          {/* Выпадающий список статусов — виден при всех вкладках, расположен справа */}
           <div ref={statusDropdownRef} style={{ position: "relative" }}>
             <button
               onClick={() => setShowStatusDropdown(!showStatusDropdown)}
@@ -914,26 +952,6 @@ export function TaskDetail() {
               </div>
             )}
           </div>{" "}
-          {isAdmin && (
-            <button
-              onClick={() => {
-                if (confirm("Удалить задачу?")) {
-                  api.tasks.delete(task.id).then(() => navigate("/tasks"));
-                }
-              }}
-              style={{
-                padding: "6px 12px",
-                borderRadius: 12,
-                border: "1px solid var(--border-color)",
-                background: "var(--bg-card)",
-                color: "#dc2626",
-                cursor: "pointer",
-                fontSize: 13,
-              }}
-            >
-              🗑 Удалить
-            </button>
-          )}{" "}
         </div>{" "}
       </div>{" "}
       {isEditing ? (
