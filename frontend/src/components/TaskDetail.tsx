@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../api/client";
@@ -296,6 +296,7 @@ export function TaskDetail() {
   const [newComment, setNewComment] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<FileAttachment[]>([]);
   const [isInternalComment, setIsInternalComment] = useState(false);
+  const [pinningCommentId, setPinningCommentId] = useState<string | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -497,6 +498,19 @@ export function TaskDetail() {
       alert('Ошибка скачивания: ' + err.message);
     }
   };
+  // Закреплённые сообщения: дублируются компактным блоком поверх всего обсуждения
+  const pinnedComments = useMemo(
+    () =>
+      comments
+        .filter((comment) => Boolean(comment.pinnedAt))
+        .sort(
+          (a, b) =>
+            new Date(b.pinnedAt || 0).getTime() -
+            new Date(a.pinnedAt || 0).getTime(),
+        ),
+    [comments],
+  );
+
   const loadTask = async () => {
     setLoading(true);
     try {
@@ -541,6 +555,14 @@ export function TaskDetail() {
     }
     if (data.action === 'delete_comment' && data.commentId) {
       setComments(prev => prev.filter(c => c.id !== data.commentId));
+      return;
+    }
+    if (data.action === 'update_comment' && data.comment) {
+      setComments(prev =>
+        prev.some(c => c.id === data.comment.id)
+          ? prev.map(c => (c.id === data.comment.id ? { ...c, ...data.comment } : c))
+          : [...prev, data.comment],
+      );
       return;
     }
     loadTask();
@@ -678,6 +700,20 @@ export function TaskDetail() {
       setComments((prev) => prev.filter((c) => c.id !== commentId));
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+  const handleTogglePinComment = async (commentId: string) => {
+    if (pinningCommentId === commentId) return;
+    setPinningCommentId(commentId);
+    try {
+      const updated = await api.comments.pin(id!, commentId);
+      setComments((prev) =>
+        prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)),
+      );
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setPinningCommentId(null);
     }
   };
   const handleCreateSubtask = async (e: React.FormEvent) => {
@@ -1671,6 +1707,123 @@ export function TaskDetail() {
                       Нет сообщений. Напишите первое!
                     </div>
                   )}{" "}
+                  {pinnedComments.length > 0 && (
+                    <div
+                      style={{
+                        padding: 10,
+                        borderRadius: 14,
+                        border: "1px solid rgba(255,193,7,0.40)",
+                        background: "rgba(255,193,7,0.08)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                        scrollMarginTop: 80,
+                      }}
+                    >
+                      {pinnedComments.map((pinnedComment) => (
+                        <div
+                          key={`pinned-${pinnedComment.id}`}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "#b8860b",
+                              }}
+                            >
+                              📌 Закреплено
+                            </span>
+                            <Avatar
+                              name={pinnedComment.author?.name || "—"}
+                              avatar={pinnedComment.author?.avatar}
+                              size={18}
+                            />
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              {pinnedComment.author?.name || "Неизвестный"}
+                            </span>
+                            <span style={{ flex: 1 }} />
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              {formatCommentDateTime(pinnedComment.createdAt)}
+                            </span>
+                            <button
+                              onClick={() => handleTogglePinComment(pinnedComment.id)}
+                              title={pinnedComment.pinnedAt ? "Открепить сообщение" : "Закрепить сообщение"}
+                              disabled={pinningCommentId === pinnedComment.id}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: pinningCommentId === pinnedComment.id ? "default" : "pointer",
+                                fontSize: 12,
+                                padding: 0,
+                                lineHeight: 1,
+                                color: "#ffc107",
+                                opacity: pinningCommentId === pinnedComment.id ? 0.55 : 1,
+                              }}
+                            >
+                              {pinnedComment.pinnedAt ? "★" : "☆"}
+                            </button>
+                          </div>
+                          <div
+                            className="comment-select"
+                            style={{
+                              fontSize: 14,
+                              lineHeight: 1.45,
+                              color: "var(--text-primary)",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {/<[a-z][\s\S]*>/i.test(pinnedComment.content) ? (
+                              <div
+                                className="rich-text"
+                                style={{ fontSize: "inherit", lineHeight: "inherit", color: "inherit" }}
+                                onClick={onTagClick}
+                                dangerouslySetInnerHTML={{
+                                  __html: linkifyTaskTagsHtml(pinnedComment.content),
+                                }}
+                              />
+                            ) : (
+                              <LinkifyText text={pinnedComment.content} />
+                            )}
+                          </div>
+                          {pinnedComment.attachments && pinnedComment.attachments.length > 0 && (
+                            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                              📎 {pinnedComment.attachments.length}
+                            </div>
+                          )}
+                          <a
+                            href={`#comment-${pinnedComment.id}`}
+                            style={{ fontSize: 11, color: "var(--text-muted)", textDecoration: "none" }}
+                          >
+                            Показать в обсуждении
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}{" "}
                   {comments.map((c, idx) => {
                     const isMe = c.authorId === user?.id;
                     // Сообщения с аудио-записью растягиваем на всю ширину чата
@@ -1807,6 +1960,27 @@ export function TaskDetail() {
                               >
                                 {formatCommentDateTime(c.createdAt)}
                               </span>{" "}
+                              <button
+                                onClick={() => handleTogglePinComment(c.id)}
+                                title={c.pinnedAt ? "Открепить сообщение" : "Закрепить сообщение"}
+                                disabled={pinningCommentId === c.id}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: pinningCommentId === c.id ? "default" : "pointer",
+                                  fontSize: 12,
+                                  padding: 0,
+                                  lineHeight: 1,
+                                  color: c.pinnedAt
+                                    ? "#ffc107"
+                                    : isMe
+                                      ? "rgba(255,255,255,0.75)"
+                                      : "var(--text-muted)",
+                                  opacity: pinningCommentId === c.id ? 0.55 : 1,
+                                }}
+                              >
+                                {c.pinnedAt ? "★" : "☆"}
+                              </button>{" "}
                               {isMe && (
                                 <button
                                   onClick={() => handleDeleteComment(c.id)}

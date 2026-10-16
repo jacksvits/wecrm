@@ -565,7 +565,10 @@ model Comment {
   vkMessageId  Int?    @unique @map("vk_message_id")
   maxMessageId String? @unique @map("max_message_id")
   isInternal   Boolean @default(false) @map("is_internal")
+  // Время закрепления сообщения в обсуждении задачи; null — сообщение не закреплено
+  pinnedAt    DateTime? @map("pinned_at")
 
+  @@index([taskId, pinnedAt])
   @@map("comments")
 }
 

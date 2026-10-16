@@ -460,6 +460,46 @@ router.get('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =>
   }
 });
 
+router.patch('/:taskId/comments/:commentId/pin', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { taskId, commentId } = req.params;
+    // Закреплять/откреплять можно участникам обсуждения (тем же, кто видит задачу)
+    const hasAccess = await canAccessTask(taskId, req.user!.id, req.user!.role);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Доступ запрещен' });
+    }
+
+    const comment = await prisma.comment.findUnique({
+      where: { id: commentId },
+      select: { id: true, taskId: true, pinnedAt: true },
+    });
+    if (!comment || comment.taskId !== taskId) {
+      return res.status(404).json({ error: 'Комментарий не найден' });
+    }
+
+    const updated = await prisma.comment.update({
+      where: { id: commentId },
+      data: { pinnedAt: comment.pinnedAt ? null : new Date() },
+      include: {
+        author: { select: { id: true, name: true, avatar: true } },
+      },
+    });
+    const attachments = await prisma.fileAttachment.findMany({
+      where: { entityType: 'comment', entityId: commentId },
+      select: { id: true, originalName: true, mimeType: true, size: true, path: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const updatedWithAttachments = { ...updated, attachments };
+
+    // Real-time broadcast: обновляем закрепление без полной перезагрузки задачи
+    broadcast(CHANNELS.COMMENTS, { action: 'update_comment', entity: 'task', id: taskId, comment: updatedWithAttachments });
+
+    res.json(updatedWithAttachments);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/:taskId/comments/:commentId', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { taskId, commentId } = req.params;
