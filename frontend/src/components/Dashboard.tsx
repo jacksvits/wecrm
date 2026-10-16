@@ -38,6 +38,13 @@ interface Metric {
 // Псевдо-метрика для персональной настройки видимости календаря на главной
 const CALENDAR_METRIC_KEY = 'calendar';
 
+const priorityLabels: Record<string, string> = {
+  low: 'Низкий',
+  medium: 'Средний',
+  high: 'Высокий',
+  urgent: 'Срочный',
+};
+
 // Карточка метрики с ручкой перетаскивания и кнопкой скрытия (стилистика Director.tsx)
 function SortableMetricCard({ metric, onHide, children }: { metric: Metric; onHide: (key: string) => void; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: metric.key });
@@ -152,6 +159,9 @@ export function Dashboard() {
     return taskStatus?.isActive !== false;
   }).length;
 
+  // Избранные задачи (личная отметка «Избранное») — отображаются в дашборде карточками
+  const favoriteTasks = allTasks.filter((t) => t.isFavorite);
+
   // У каждой метрики стабильный ключ: скрытие/порядок хранятся персонально для пользователя
   // Без доступа к задачам задачные метрики не показываем (как и сам раздел «Задачи»)
   const taskMetrics: Metric[] = !canViewTasks || !stats ? [] : [
@@ -170,6 +180,7 @@ export function Dashboard() {
       path: '/tasks?hideCompleted=true'
     },
     { key: 'overdue', label: 'Просрочено', value: String(stats.metrics?.overdueTasks ?? 0), delta: 'задач', path: `/tasks?filter=overdue&assigneeId=${user?.id ?? ''}&hideCompleted=true` },
+    { key: 'favorite_tasks', label: 'Избранные задачи', value: String(favoriteTasks.length), delta: 'в избранном', path: '/tasks?favorite=true' },
   ];
   const metrics: Metric[] = !stats ? [] : [
     ...taskMetrics,
@@ -357,6 +368,81 @@ export function Dashboard() {
           </div>
         </SortableContext>
       </DndContext>
+
+      {/* Избранные задачи — карточки по стилистике канбана */}
+      {canViewTasks && favoriteTasks.length > 0 && (
+        <div style={{ marginBottom: 16, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+            Избранные задачи
+            <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({favoriteTasks.length})</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+            {favoriteTasks.slice(0, 12).map((task) => {
+              const taskStatus = statuses.find((s) => s.name === task.status);
+              const statusColor = taskStatus?.color || '#f0f0f0';
+              const hex = statusColor.replace('#', '');
+              const r = parseInt(hex.substring(0, 2), 16);
+              const g = parseInt(hex.substring(2, 4), 16);
+              const b = parseInt(hex.substring(4, 6), 16);
+              const statusBg = `rgba(${r}, ${g}, ${b}, 0.08)`;
+              return (
+                <div
+                  key={task.id}
+                  onClick={() => navigate(`/tasks/${task.id}`)}
+                  style={{
+                    padding: 12,
+                    borderRadius: 14,
+                    border: '1px solid var(--border-color)',
+                    background: statusBg,
+                    borderLeft: `3px solid ${statusColor}`,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', marginBottom: 6 }}>
+                    {task.ticketNumber != null && (
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', flexShrink: 0 }}>#{task.ticketNumber}</span>
+                    )}
+                    <span style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ padding: '2px 6px', borderRadius: 8, fontSize: 10, background: statusColor, color: taskStatus?.textColor || '#666' }}>
+                      {taskStatus?.label || task.status}
+                    </span>
+                    <span
+                      style={{
+                        padding: '2px 6px',
+                        borderRadius: 8,
+                        fontSize: 10,
+                        background: task.priority === 'urgent' ? '#fee2e2' : task.priority === 'high' ? '#fef3c7' : '#f0f0f0',
+                        color: task.priority === 'urgent' ? '#dc2626' : task.priority === 'high' ? '#92400e' : '#666',
+                      }}
+                    >
+                      {priorityLabels[task.priority] || task.priority}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      {task.dueDate
+                        ? new Date(task.dueDate).toLocaleString('ru-RU', { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                        : 'Без срока'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {favoriteTasks.length > 12 && (
+            <button
+              onClick={() => navigate('/tasks?favorite=true')}
+              style={{ marginTop: 8, padding: '6px 12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' }}
+            >
+              Показать все избранные ({favoriteTasks.length}) →
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Виджет календаря: задачи + напоминания + расписание, шкала дня внутри (персональная опция в «⚙ Метрики») */}
       {isCalendarVisible && <DashboardCalendar />}

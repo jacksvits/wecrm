@@ -43,6 +43,10 @@ export function TaskList() {
     const fromUrl = searchParams.get("hideCompleted");
     return fromUrl !== null ? fromUrl === "true" : true;
   });
+  // Фильтр «Избранное» (приходит из дашборда: /tasks?favorite=true)
+  const [favoriteOnly, setFavoriteOnly] = useState(
+    () => searchParams.get("favorite") === "true",
+  );
   const [filter, setFilter] = useState(() => searchParams.get("filter") || "all");
   const [assigneeFilter, setAssigneeFilter] = useState<string>(() => {
     const fromUrl = searchParams.get("assigneeId");
@@ -98,7 +102,7 @@ export function TaskList() {
     api.users.list().then(setUsers);
     api.projects.list("flat=true").then(setProjects);
     api.statuses.list("task").then(setStatuses);
-  }, [filter, assigneeFilter, projectFilter, contactFilter, search, sortBy, hideCompleted]);
+  }, [filter, assigneeFilter, projectFilter, contactFilter, search, sortBy, hideCompleted, favoriteOnly]);
   const loadTasks = () => {
     let params = new URLSearchParams();
     if (filter !== "all") params.set("filter", filter);
@@ -108,6 +112,7 @@ export function TaskList() {
     if (search) params.set("search", search);
     if (sortBy) params.set("sort", sortBy);
     if (hideCompleted) params.set("hideCompleted", "true");
+    if (favoriteOnly) params.set("favorite", "true");
     api.tasks.list(params.toString()).then(setTasks);
   };
 
@@ -156,6 +161,14 @@ export function TaskList() {
   const getTaskBorderLeft = (statusColor: string) => {
     return `3px solid ${statusColor}`;
   };
+  // Переключение отметки «Избранное» на карточке задачи
+  const handleToggleFavorite = (task: Task) => {
+    api.tasks
+      .update(task.id, { isFavorite: !task.isFavorite })
+      .then(() => loadTasks())
+      .catch(() => {});
+  };
+
   const changeView = (mode: ViewMode) => {
     setViewMode(mode);
     localStorage.setItem("taskViewMode", mode);
@@ -1049,6 +1062,23 @@ export function TaskList() {
                               }}
                             >
                               {" "}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleFavorite(task);
+                                }}
+                                title={task.isFavorite ? "Убрать из избранного" : "В избранное"}
+                                style={{
+                                  width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+                                  borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
+                                  color: task.isFavorite ? "#f59e0b" : "var(--text-muted)", cursor: "pointer",
+                                }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill={task.isFavorite ? "#f59e0b" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                                </svg>
+                              </button>
+                              {" "}
                               {canHandleSpam && task.sourceEmail && task.status !== "spam" && (
                                 <button
                                   onClick={(e) => {
@@ -1113,7 +1143,7 @@ export function TaskList() {
                                 gap: 6,
                                 alignItems: "baseline",
                                 marginBottom: 6,
-                                paddingRight: 72,
+                                paddingRight: 132,
                               }}
                             >
                               {task.ticketNumber != null && (

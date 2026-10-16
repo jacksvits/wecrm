@@ -466,11 +466,15 @@ model Task {
   // Ticket number (unique numeric identifier)
   ticketNumber Int      @unique @default(autoincrement()) @map("ticket_number")
 
+  // Отметка «Избранное» (личная метка пользователя)
+  isFavorite   Boolean  @default(false) @map("is_favorite")
+
   transactions TaskTransaction[]
   financeDocuments FinanceDocument[]
 
   @@index([status])
   @@index([status, dueDate])
+  @@index([isFavorite])
   @@index([price])
   @@index([createdAt])
   @@index([projectId])
