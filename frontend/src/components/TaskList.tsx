@@ -72,7 +72,6 @@ export function TaskList() {
   // Mobile kanban states
   const [isMobile, setIsMobile] = useState(false);
   const [mobileColumnIndex, setMobileColumnIndex] = useState(0);
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const defaultStatus = (statuses.find((s) => s.isDefault)?.name ||
     statuses[0]?.name ||
     "open") as string;
@@ -850,99 +849,76 @@ export function TaskList() {
       .filter((s) => s.entityType === "task")
       .sort((a, b) => a.sortOrder - b.sortOrder);
 
-    // Mobile: filter out empty columns and show one at a time with swipe
-    const nonEmptyStatuses = isMobile
-      ? taskStatuses.filter((s) => rootTasks.some((t) => t.status === s.name))
-      : taskStatuses;
+    // Mobile: all statuses as compact tabs in one row (no swipe, no dots)
+    const currentMobileStatus = taskStatuses[mobileColumnIndex];
 
-    const handleTouchStart = (e: React.TouchEvent) => {
-      setTouchStartX(e.touches[0].clientX);
-    };
-
-    const handleTouchMove = (_e: React.TouchEvent) => {
-      // Swipe detection handled in handleTouchEnd
-    };
-
-    const handleTouchEnd = (e: React.TouchEvent) => {
-      if (touchStartX === null) return;
-      const diff = touchStartX - e.changedTouches[0].clientX;
-      const threshold = 50;
-      if (diff > threshold && mobileColumnIndex < nonEmptyStatuses.length - 1) {
-        setMobileColumnIndex((prev) => prev + 1);
-      } else if (diff < -threshold && mobileColumnIndex > 0) {
-        setMobileColumnIndex((prev) => prev - 1);
-      }
-      setTouchStartX(null);
-    };
-
-    // Mobile column indicator dots
-    const renderMobileIndicator = () => (
+    // Mobile status tabs — все статусы в одну строку
+    const renderMobileTabs = () => (
       <div
         style={{
           display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 12,
-          padding: "8px 0",
+          gap: 4,
           width: "100%",
-          alignSelf: "center",
+          marginBottom: 12,
+          flexWrap: "nowrap",
         }}
       >
-        {nonEmptyStatuses.map((status, idx) => (
-          <button
-            key={status.name}
-            onClick={() => setMobileColumnIndex(idx)}
-            style={{
-              width: idx === mobileColumnIndex ? 24 : 8,
-              height: 8,
-              borderRadius: 4,
-              border: "none",
-              background:
-                idx === mobileColumnIndex ? status.color : "#d1d5db",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            title={status.label}
-          />
-        ))}
+        {taskStatuses.map((status, idx) => {
+          const count = rootTasks.filter((t) => t.status === status.name).length;
+          const active = idx === mobileColumnIndex;
+          return (
+            <button
+              key={status.name}
+              onClick={() => setMobileColumnIndex(idx)}
+              title={status.label}
+              style={{
+                flex: "1 1 0",
+                minWidth: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 3,
+                padding: "7px 2px",
+                borderRadius: 10,
+                border: active ? "none" : "1px solid var(--border-color)",
+                background: active ? status.color : "var(--bg-card)",
+                color: active ? status.textColor : "var(--text-secondary)",
+                cursor: "pointer",
+                fontSize: 11,
+                fontWeight: active ? 600 : 500,
+                overflow: "hidden",
+                whiteSpace: "nowrap",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {status.label}
+              </span>
+              <span
+                style={{
+                  flexShrink: 0,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "1px 5px",
+                  borderRadius: 8,
+                  background: active
+                    ? "rgba(255,255,255,0.25)"
+                    : status.color,
+                  color: active ? status.textColor : status.textColor,
+                }}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
     );
-
-    // Mobile current status header
-    const renderMobileHeader = () => {
-      const status = nonEmptyStatuses[mobileColumnIndex];
-      if (!status) return null;
-      const count = rootTasks.filter((t) => t.status === status.name).length;
-      return (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "10px 12px",
-            background: status.color,
-            borderRadius: 12,
-            marginBottom: 12,
-          }}
-        >
-          <span style={{ fontSize: 14, fontWeight: 600, color: status.textColor }}>
-            {status.label}
-          </span>
-          <span
-            style={{
-              fontSize: 12,
-              padding: "2px 8px",
-              borderRadius: 10,
-              background: "rgba(255,255,255,0.25)",
-              color: status.textColor,
-            }}
-          >
-            {count}
-          </span>
-        </div>
-      );
-    };
 
     return (
       <div
@@ -956,22 +932,15 @@ export function TaskList() {
           alignItems: "flex-start",
           flexDirection: isMobile ? "column" : "row",
         }}
-        onTouchStart={isMobile ? handleTouchStart : undefined}
-        onTouchMove={isMobile ? handleTouchMove : undefined}
-        onTouchEnd={isMobile ? handleTouchEnd : undefined}
       >
-        {isMobile && renderMobileIndicator()}
-        {isMobile && renderMobileHeader()}
+        {isMobile && renderMobileTabs()}
         {taskStatuses.map((status) => {
           const statusTasks = rootTasks.filter((t) => t.status === status.name);
           const projectGroups = groupByProject(statusTasks);
           const isEmpty = statusTasks.length === 0;
 
-          // On mobile: skip empty columns entirely
-          if (isMobile && isEmpty) return null;
-
-          // On mobile: show only current column
-          if (isMobile && status.name !== nonEmptyStatuses[mobileColumnIndex]?.name)
+          // On mobile: show only selected column
+          if (isMobile && status.name !== currentMobileStatus?.name)
             return null;
 
           return (
@@ -1026,6 +995,20 @@ export function TaskList() {
                       {statusTasks.length}
                     </span>
                   )}{" "}
+                </div>
+              )}
+              {isMobile && isEmpty && (
+                <div
+                  style={{
+                    padding: "32px 16px",
+                    borderRadius: 14,
+                    border: "1px dashed var(--border-color)",
+                    color: "var(--text-muted)",
+                    fontSize: 13,
+                    textAlign: "center",
+                  }}
+                >
+                  Задач со статусом «{status.label}» нет
                 </div>
               )}
               {!isEmpty && (
