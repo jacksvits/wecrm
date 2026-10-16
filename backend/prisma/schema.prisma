@@ -32,6 +32,8 @@ model Role {
   canSeeAllSupportTickets Boolean @default(false) @map("can_see_all_support_tickets") // «Видит все запросы тех. поддержки»: роль видит и отвечает на все обращения
   // «Метрика календаря»: роль видит виджет календаря (задачи + напоминания + расписание) на дашборде
   showCalendarMetric Boolean @default(true) @map("show_calendar_metric")
+  // «Системный обработчик»: пользователи роли не учитываются в виджете push-уведомлений на странице Директора
+  isSystemHandler Boolean @default(false) @map("is_system_handler")
   notifyOnNewTask    Boolean @default(true)  @map("notify_on_new_task")
   notifyOnNewDeal    Boolean @default(false) @map("notify_on_new_deal")
   notifyOnNewComment Boolean @default(false) @map("notify_on_new_comment")

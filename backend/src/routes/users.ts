@@ -219,12 +219,13 @@ router.get('/push-status', adminOnly, async (_req, res) => {
         email: true,
         avatar: true,
         pushEnabled: true,
-        role: { select: { name: true, label: true } },
+        role: { select: { name: true, label: true, isSystemHandler: true } },
         _count: { select: { pushSubscriptions: true } },
       },
       orderBy: { name: 'asc' },
     });
-    const mapped = users.map(u => ({
+    // «Системный обработчик»: пользователи таких ролей в виджете push-статуса Директора не учитываются
+    const mapped = users.filter(u => !u.role?.isSystemHandler).map(u => ({
       id: u.id,
       name: u.name,
       email: u.email,

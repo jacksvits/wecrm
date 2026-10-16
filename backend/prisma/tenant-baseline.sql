@@ -1261,7 +1261,8 @@ CREATE TABLE public.roles (
     can_access_projects boolean DEFAULT false NOT NULL,
     can_access_support_chat boolean DEFAULT false NOT NULL,
     can_see_all_support_tickets boolean DEFAULT false NOT NULL,
-    show_calendar_metric boolean DEFAULT true NOT NULL
+    show_calendar_metric boolean DEFAULT true NOT NULL,
+    is_system_handler boolean DEFAULT false NOT NULL
 );
 
 
@@ -5060,6 +5061,7 @@ INSERT INTO public._prisma_migrations VALUES ('a8292bc3-4f8f-4850-b2e0-ea9697b01
 INSERT INTO public._prisma_migrations VALUES ('92a6c4a8-1763-4d60-9bce-c748a92febcb', '57b2e1b922d573b0cc579b8dff719117cbeb789d78bcc924362b85469a10cf58', '2026-10-16 07:14:34.919643+00', '20261016095800_task_is_favorite', NULL, NULL, '2026-10-16 07:14:34.909631+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('9f508fdb-3242-46d8-ac48-7c771fe66712', '60fc5973495f838c35b3aa9b3c82a2c61e518375f763296fc9c6f7a8bc295026', '2026-10-16 17:24:25.270392+00', '20261016203000_comment_pinned', NULL, NULL, '2026-10-16 17:24:25.244524+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('b5a6fe00-10af-4c94-b15d-d9b2a278ed3d', 'fa5549b7ad4078d35685a5a2d8c0067e67e8896e4eb58f922e53ab1ad1d38a16', '2026-10-16 19:12:38.114981+00', '20261016220000_task_favorites_user', NULL, NULL, '2026-10-16 19:12:38.114981+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('5bd40aa3-03ba-47e5-b393-0c49133d37e7', '63c5e3f8b34804f17937dee9d0db63113e1898a820f3b6454799b4f1d7e9fbdc', '2026-10-17 01:05:00.000000+00', '20261017010500_role_is_system_handler', NULL, NULL, '2026-10-17 01:05:00.000000+00', 1);
 
 
 --
