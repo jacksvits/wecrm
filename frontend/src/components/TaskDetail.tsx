@@ -1681,6 +1681,126 @@ export function TaskDetail() {
                 }}
               >
                 {" "}
+                {pinnedComments.length > 0 && (
+                  <div
+                    style={{
+                      padding: 10,
+                      borderRadius: 14,
+                      border: "1px solid rgba(255,193,7,0.40)",
+                      background: "rgba(255,193,7,0.08)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      marginBottom: 8,
+                      flexShrink: 0,
+                      maxHeight: "35%",
+                      overflowY: "auto",
+                    }}
+                  >
+                    {pinnedComments.map((pinnedComment) => (
+                      <div
+                        key={`pinned-${pinnedComment.id}`}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#b8860b",
+                            }}
+                          >
+                            📌 Закреплено
+                          </span>
+                          <Avatar
+                            name={pinnedComment.author?.name || "—"}
+                            avatar={pinnedComment.author?.avatar}
+                            size={18}
+                          />
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "var(--text-muted)",
+                            }}
+                          >
+                            {pinnedComment.author?.name || "Неизвестный"}
+                          </span>
+                          <span style={{ flex: 1 }} />
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "var(--text-muted)",
+                            }}
+                          >
+                            {formatCommentDateTime(pinnedComment.createdAt)}
+                          </span>
+                          <button
+                            onClick={() => handleTogglePinComment(pinnedComment.id)}
+                            title={pinnedComment.pinnedAt ? "Открепить сообщение" : "Закрепить сообщение"}
+                            disabled={pinningCommentId === pinnedComment.id}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              cursor: pinningCommentId === pinnedComment.id ? "default" : "pointer",
+                              fontSize: 12,
+                              padding: 0,
+                              lineHeight: 1,
+                              color: "#ffc107",
+                              opacity: pinningCommentId === pinnedComment.id ? 0.55 : 1,
+                            }}
+                          >
+                            {pinnedComment.pinnedAt ? "★" : "☆"}
+                          </button>
+                        </div>
+                        <div
+                          className="comment-select"
+                          style={{
+                            fontSize: 14,
+                            lineHeight: 1.45,
+                            color: "var(--text-primary)",
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {/<[a-z][\s\S]*>/i.test(pinnedComment.content) ? (
+                            <div
+                              className="rich-text"
+                              style={{ fontSize: "inherit", lineHeight: "inherit", color: "inherit" }}
+                              onClick={onTagClick}
+                              dangerouslySetInnerHTML={{
+                                __html: linkifyTaskTagsHtml(pinnedComment.content),
+                              }}
+                            />
+                          ) : (
+                            <LinkifyText text={pinnedComment.content} />
+                          )}
+                        </div>
+                        {pinnedComment.attachments && pinnedComment.attachments.length > 0 && (
+                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                            📎 {pinnedComment.attachments.length}
+                          </div>
+                        )}
+                        <a
+                          href={`#comment-${pinnedComment.id}`}
+                          style={{ fontSize: 11, color: "var(--text-muted)", textDecoration: "none" }}
+                        >
+                          Показать в обсуждении
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}{" "}
                 <div
                   ref={commentsRef}
                   style={{
@@ -1705,123 +1825,6 @@ export function TaskDetail() {
                       }}
                     >
                       Нет сообщений. Напишите первое!
-                    </div>
-                  )}{" "}
-                  {pinnedComments.length > 0 && (
-                    <div
-                      style={{
-                        padding: 10,
-                        borderRadius: 14,
-                        border: "1px solid rgba(255,193,7,0.40)",
-                        background: "rgba(255,193,7,0.08)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 8,
-                        scrollMarginTop: 80,
-                      }}
-                    >
-                      {pinnedComments.map((pinnedComment) => (
-                        <div
-                          key={`pinned-${pinnedComment.id}`}
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 6,
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: "#b8860b",
-                              }}
-                            >
-                              📌 Закреплено
-                            </span>
-                            <Avatar
-                              name={pinnedComment.author?.name || "—"}
-                              avatar={pinnedComment.author?.avatar}
-                              size={18}
-                            />
-                            <span
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: "var(--text-muted)",
-                              }}
-                            >
-                              {pinnedComment.author?.name || "Неизвестный"}
-                            </span>
-                            <span style={{ flex: 1 }} />
-                            <span
-                              style={{
-                                fontSize: 11,
-                                color: "var(--text-muted)",
-                              }}
-                            >
-                              {formatCommentDateTime(pinnedComment.createdAt)}
-                            </span>
-                            <button
-                              onClick={() => handleTogglePinComment(pinnedComment.id)}
-                              title={pinnedComment.pinnedAt ? "Открепить сообщение" : "Закрепить сообщение"}
-                              disabled={pinningCommentId === pinnedComment.id}
-                              style={{
-                                background: "none",
-                                border: "none",
-                                cursor: pinningCommentId === pinnedComment.id ? "default" : "pointer",
-                                fontSize: 12,
-                                padding: 0,
-                                lineHeight: 1,
-                                color: "#ffc107",
-                                opacity: pinningCommentId === pinnedComment.id ? 0.55 : 1,
-                              }}
-                            >
-                              {pinnedComment.pinnedAt ? "★" : "☆"}
-                            </button>
-                          </div>
-                          <div
-                            className="comment-select"
-                            style={{
-                              fontSize: 14,
-                              lineHeight: 1.45,
-                              color: "var(--text-primary)",
-                              wordBreak: "break-word",
-                            }}
-                          >
-                            {/<[a-z][\s\S]*>/i.test(pinnedComment.content) ? (
-                              <div
-                                className="rich-text"
-                                style={{ fontSize: "inherit", lineHeight: "inherit", color: "inherit" }}
-                                onClick={onTagClick}
-                                dangerouslySetInnerHTML={{
-                                  __html: linkifyTaskTagsHtml(pinnedComment.content),
-                                }}
-                              />
-                            ) : (
-                              <LinkifyText text={pinnedComment.content} />
-                            )}
-                          </div>
-                          {pinnedComment.attachments && pinnedComment.attachments.length > 0 && (
-                            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                              📎 {pinnedComment.attachments.length}
-                            </div>
-                          )}
-                          <a
-                            href={`#comment-${pinnedComment.id}`}
-                            style={{ fontSize: 11, color: "var(--text-muted)", textDecoration: "none" }}
-                          >
-                            Показать в обсуждении
-                          </a>
-                        </div>
-                      ))}
                     </div>
                   )}{" "}
                   {comments.map((c, idx) => {
