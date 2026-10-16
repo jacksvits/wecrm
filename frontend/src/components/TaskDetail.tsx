@@ -21,6 +21,7 @@ import { LinkifyText } from "./LinkifyText";
 import { linkifyTaskTagsHtml, useTaskHashtagClick } from "../lib/taskHashtags";
 import { userOptionLabel } from "../lib/userOptionLabel";
 import { Avatar } from "./Avatar";
+import { ContactPicker } from "./ContactPicker";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 const priorityLabels: Record<string, string> = {
@@ -318,7 +319,7 @@ export function TaskDetail() {
     dealId: "",
     address: "",
   });
-  const [contacts, setContacts] = useState<any[]>([]);
+  const [contactText, setContactText] = useState("");
   const [deals, setDeals] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -353,7 +354,6 @@ export function TaskDetail() {
       loadTask();
       api.users.list().then(setUsers);
       api.statuses.list("task").then(setStatuses);
-      api.contacts.list().then(setContacts).catch(() => {});
       api.deals.list().then(setDeals).catch(() => {});
     }
   }, [id]);
@@ -505,6 +505,7 @@ export function TaskDetail() {
         dealId: data.deal?.id || "",
         address: data.address || "",
       });
+      setContactText(data.contact?.name || "");
     } catch (err: any) {
       if (err.message?.includes('403') || err.message?.includes('Доступ запрещен')) {
         setError('Доступ запрещен: вы не являетесь создателем, исполнителем или куратором этой задачи');
@@ -1082,13 +1083,23 @@ export function TaskDetail() {
               }}
             />{" "}
             {isAdmin && (
-              <EntityAutocomplete
-                options={contacts.map((c) => ({ id: c.id, label: c.name }))}
-                valueId={editForm.contactId}
-                placeholder="Поиск контакта..."
-                onChange={(cid) =>
-                  setEditForm({ ...editForm, contactId: cid })
+              <ContactPicker
+                text={contactText}
+                onTextChange={(t) => {
+                  setContactText(t);
+                  if (editForm.contactId)
+                    setEditForm({ ...editForm, contactId: "" });
+                }}
+                selected={
+                  editForm.contactId
+                    ? { id: editForm.contactId, name: contactText }
+                    : null
                 }
+                onSelect={(c) => {
+                  if (c) setContactText(c.name);
+                  setEditForm({ ...editForm, contactId: c ? c.id : "" });
+                }}
+                placeholder="Поиск контакта..."
               />
             )}{" "}
             {isAdmin && (

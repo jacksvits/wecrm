@@ -7,6 +7,7 @@ import { CalendarMonth, toISODate, MONTH_NAMES } from './calendar/CalendarMonth'
 import { DayTimeline, minToTime, TimelineBand, TimelineColumn, TimelineItem } from './calendar/DayTimeline';
 import { DayAgenda, AgendaSection } from './calendar/DayAgenda';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { ContactPicker } from './ContactPicker';
 
 /**
  * Расписание (календарь): кабинеты, смены сотрудников, записи клиентов.
@@ -412,11 +413,25 @@ export function SchedulePage() {
                     {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
-                <ContactPicker
-                  clientName={apptForm.clientName}
-                  clientPhone={apptForm.clientPhone}
-                  onChange={(name, phone, contactId) => setApptForm({ ...apptForm, clientName: name, clientPhone: phone, contactId })}
-                />
+                <div>
+                  <ContactPicker
+                    label="Клиент"
+                    text={apptForm.clientName}
+                    onTextChange={(t) => setApptForm({ ...apptForm, clientName: t, contactId: null })}
+                    selected={apptForm.contactId ? { id: apptForm.contactId, name: apptForm.clientName, phone: apptForm.clientPhone } : null}
+                    onSelect={(c) => setApptForm((f) => f && ({
+                      ...f,
+                      clientName: c ? c.name : f.clientName,
+                      clientPhone: c ? (c.phone || '') : f.clientPhone,
+                      contactId: c ? c.id : null,
+                    }))}
+                    placeholder="ФИО или название — поиск по клиентам CRM"
+                  />
+                  <div style={{ marginTop: 8 }}>
+                    <label style={labelStyle}>Телефон</label>
+                    <input style={inputStyle} value={apptForm.clientPhone} onChange={(e) => setApptForm({ ...apptForm, clientPhone: e.target.value, contactId: null })} placeholder="+7 ..." />
+                  </div>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                   <div>
                     <label style={labelStyle}>Дата</label>
@@ -559,74 +574,6 @@ function ReadonlyAppt({ appt }: { appt: ApptForm }) {
           <div style={{ fontSize: 14, lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: appt.comment }} />
         </div>
       )}
-    </div>
-  );
-}
-
-/** Выбор клиента: поиск по контактам CRM + ручной ввод */
-function ContactPicker({ clientName, clientPhone, onChange }: {
-  clientName: string; clientPhone: string;
-  onChange: (name: string, phone: string, contactId: string | null) => void;
-}) {
-  const [results, setResults] = useState<any[]>([]);
-  const [searching, setSearching] = useState(false);
-
-  useEffect(() => {
-    const q = clientName.trim();
-    if (q.length < 2) { setResults([]); return; }
-    setSearching(true);
-    const t = setTimeout(() => {
-      api.contacts.list(`search=${encodeURIComponent(q)}&limit=6`)
-        // При передаче limit бэкенд возвращает объект пагинации { contacts, ... }, без limit — массив
-        .then((data: any) => {
-          const list = Array.isArray(data) ? data : (data?.contacts || []);
-          setResults(list.slice(0, 6));
-        })
-        .catch(() => setResults([]))
-        .finally(() => setSearching(false));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [clientName]);
-
-  return (
-    <div>
-      <div style={{ position: 'relative' }}>
-      <label style={labelStyle}>Клиент</label>
-      <input
-        style={inputStyle} value={clientName} placeholder="ФИО или название — поиск по клиентам CRM"
-        onChange={(e) => onChange(e.target.value, clientPhone, null)}
-      />
-      {results.length > 0 && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, marginTop: 4,
-          background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.15)', overflow: 'hidden',
-        }}>
-          {results.map((c) => (
-            <div
-              key={c.id}
-              style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 14, display: 'flex', justifyContent: 'space-between', gap: 8 }}
-              onMouseDown={() => { onChange(c.name, c.phone || '', c.id); setResults([]); }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                {c.kind === 'organization' && (
-                  <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 6, background: 'var(--bg-hover)', color: 'var(--text-muted)', flexShrink: 0 }}>орг.</span>
-                )}
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-              </span>
-              <span style={{ color: 'var(--text-muted)', fontSize: 12, flexShrink: 0 }}>{c.phone || ''}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {searching && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Поиск...</div>}
-      </div>
-      <div style={{ marginTop: 8 }}>
-        <label style={labelStyle}>Телефон</label>
-        <input style={inputStyle} value={clientPhone} onChange={(e) => onChange(clientName, e.target.value, null)} placeholder="+7 ..." />
-      </div>
     </div>
   );
 }
