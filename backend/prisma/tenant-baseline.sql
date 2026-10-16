@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jbDolUiEzBJwdtyxhOR1US42a8c5ETP3fpyzsGNNSCvsUOoHnl8bgXy6dgarP7k
+\restrict 7zrZUfPO1OsRs74f5rUZVEWRGICKcfkabUt2d7rmUrU9nQcVde2xaVxOClbLs7a
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -294,7 +294,8 @@ CREATE TABLE public.comments (
     vk_message_id integer,
     is_internal boolean DEFAULT false NOT NULL,
     max_message_id text,
-    telegram_message_id text
+    telegram_message_id text,
+    pinned_at timestamp(3) without time zone
 );
 
 
@@ -2913,6 +2914,13 @@ CREATE INDEX chat_reactions_user_id_idx ON public.chat_reactions USING btree (us
 
 
 --
+-- Name: comments_task_id_pinned_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX comments_task_id_pinned_at_idx ON public.comments USING btree ("taskId", pinned_at);
+
+
+--
 -- Name: comments_telegram_message_id_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4597,13 +4605,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jbDolUiEzBJwdtyxhOR1US42a8c5ETP3fpyzsGNNSCvsUOoHnl8bgXy6dgarP7k
+\unrestrict 7zrZUfPO1OsRs74f5rUZVEWRGICKcfkabUt2d7rmUrU9nQcVde2xaVxOClbLs7a
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict ThGYHFBY9xbd3Do5rgAioQuubxLmBRRebncH3fgF5NtGSkeAnbIjDNJVp34sHmu
+\restrict 9v2ZeM4baRA2Fnyy8mZb1AgQkuwyL6mpaktt66jcxKoHjyDcZg1dlS7m5PBJOKY
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -5008,11 +5016,12 @@ DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42703
 INSERT INTO public._prisma_migrations VALUES ('3a10861b-97d3-4d2a-92c0-2e6850bcbcbf', '95cf5a607326e34932a366477a4518507c960517b3b033a6db65071d3071ccef', '2026-10-15 18:41:49.556912+00', '20261015213000_status_auto_change', NULL, NULL, '2026-10-15 18:41:49.512264+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('a8292bc3-4f8f-4850-b2e0-ea9697b01ccf', '1bfcd143f97094ceb2bdc0549eb14f0aa3cd6c3349d85cd571ff7af04ae03651', '2026-10-15 19:00:19.694101+00', '20261015223000_status_auto_change_enabled_at', NULL, NULL, '2026-10-15 19:00:19.68778+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('92a6c4a8-1763-4d60-9bce-c748a92febcb', '57b2e1b922d573b0cc579b8dff719117cbeb789d78bcc924362b85469a10cf58', '2026-10-16 07:14:34.919643+00', '20261016095800_task_is_favorite', NULL, NULL, '2026-10-16 07:14:34.909631+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('9f508fdb-3242-46d8-ac48-7c771fe66712', '60fc5973495f838c35b3aa9b3c82a2c61e518375f763296fc9c6f7a8bc295026', '2026-10-16 17:24:25.270392+00', '20261016203000_comment_pinned', NULL, NULL, '2026-10-16 17:24:25.244524+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ThGYHFBY9xbd3Do5rgAioQuubxLmBRRebncH3fgF5NtGSkeAnbIjDNJVp34sHmu
+\unrestrict 9v2ZeM4baRA2Fnyy8mZb1AgQkuwyL6mpaktt66jcxKoHjyDcZg1dlS7m5PBJOKY
 
