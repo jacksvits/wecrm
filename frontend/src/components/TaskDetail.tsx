@@ -1714,29 +1714,11 @@ export function TaskDetail() {
                             flexWrap: "wrap",
                           }}
                         >
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "#b8860b",
-                            }}
-                          >
-                            📌 Закреплено
-                          </span>
                           <Avatar
                             name={pinnedComment.author?.name || "—"}
                             avatar={pinnedComment.author?.avatar}
                             size={18}
                           />
-                          <span
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: "var(--text-muted)",
-                            }}
-                          >
-                            {pinnedComment.author?.name || "Неизвестный"}
-                          </span>
                           <span style={{ flex: 1 }} />
                           <span
                             style={{
