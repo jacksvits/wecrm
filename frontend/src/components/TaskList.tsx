@@ -849,8 +849,14 @@ export function TaskList() {
       .filter((s) => s.entityType === "task")
       .sort((a, b) => a.sortOrder - b.sortOrder);
 
-    // Mobile: all statuses as compact tabs in one row (no swipe, no dots)
-    const currentMobileStatus = taskStatuses[mobileColumnIndex];
+    // Mobile: all statuses as compact tabs in one row (no swipe, no dots).
+    // Если в профиле включено «Скрывать выполненные задачи» — не показываем
+    // вкладки неактивных (завершённых) статусов, как и сами задачи.
+    const visibleTaskStatuses = hideCompleted
+      ? taskStatuses.filter((s) => s.isActive !== false)
+      : taskStatuses;
+    const clampedMobileIndex = Math.min(mobileColumnIndex, visibleTaskStatuses.length - 1);
+    const currentMobileStatus = visibleTaskStatuses[clampedMobileIndex];
 
     // Mobile status tabs — все статусы в одну строку
     const renderMobileTabs = () => (
@@ -863,9 +869,9 @@ export function TaskList() {
           flexWrap: "nowrap",
         }}
       >
-        {taskStatuses.map((status, idx) => {
+        {visibleTaskStatuses.map((status, idx) => {
           const count = rootTasks.filter((t) => t.status === status.name).length;
-          const active = idx === mobileColumnIndex;
+          const active = idx === clampedMobileIndex;
           return (
             <button
               key={status.name}
