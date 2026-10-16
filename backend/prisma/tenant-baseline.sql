@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pKAmW6DXPfAnGF1RYkvzSMNbjSVNKappNazI6ejvahu5w2Qe5xHBQhmhk7JE3IS
+\restrict jbDolUiEzBJwdtyxhOR1US42a8c5ETP3fpyzsGNNSCvsUOoHnl8bgXy6dgarP7k
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -1557,7 +1557,8 @@ CREATE TABLE public.tasks (
     telegram_chat_id text,
     telegram_user_id text,
     support_owner_id text,
-    status_changed_at timestamp(3) without time zone
+    status_changed_at timestamp(3) without time zone,
+    is_favorite boolean DEFAULT false NOT NULL
 );
 
 
@@ -3577,6 +3578,13 @@ CREATE UNIQUE INDEX "tasks_emailMessageId_key" ON public.tasks USING btree ("ema
 
 
 --
+-- Name: tasks_is_favorite_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tasks_is_favorite_idx ON public.tasks USING btree (is_favorite);
+
+
+--
 -- Name: tasks_parent_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4589,13 +4597,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pKAmW6DXPfAnGF1RYkvzSMNbjSVNKappNazI6ejvahu5w2Qe5xHBQhmhk7JE3IS
+\unrestrict jbDolUiEzBJwdtyxhOR1US42a8c5ETP3fpyzsGNNSCvsUOoHnl8bgXy6dgarP7k
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict IudId30unGp84YkQToBGbIMYqPZpaZlwby0fEMw6RLGRTFFcM4wCkDU8gqQUeEQ
+\restrict ThGYHFBY9xbd3Do5rgAioQuubxLmBRRebncH3fgF5NtGSkeAnbIjDNJVp34sHmu
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -4999,11 +5007,12 @@ DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42703
              at schema-engine/core/src/state.rs:226', '2026-10-15 18:41:47.508723+00', '2026-10-15 18:40:24.389804+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('3a10861b-97d3-4d2a-92c0-2e6850bcbcbf', '95cf5a607326e34932a366477a4518507c960517b3b033a6db65071d3071ccef', '2026-10-15 18:41:49.556912+00', '20261015213000_status_auto_change', NULL, NULL, '2026-10-15 18:41:49.512264+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('a8292bc3-4f8f-4850-b2e0-ea9697b01ccf', '1bfcd143f97094ceb2bdc0549eb14f0aa3cd6c3349d85cd571ff7af04ae03651', '2026-10-15 19:00:19.694101+00', '20261015223000_status_auto_change_enabled_at', NULL, NULL, '2026-10-15 19:00:19.68778+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('92a6c4a8-1763-4d60-9bce-c748a92febcb', '57b2e1b922d573b0cc579b8dff719117cbeb789d78bcc924362b85469a10cf58', '2026-10-16 07:14:34.919643+00', '20261016095800_task_is_favorite', NULL, NULL, '2026-10-16 07:14:34.909631+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IudId30unGp84YkQToBGbIMYqPZpaZlwby0fEMw6RLGRTFFcM4wCkDU8gqQUeEQ
+\unrestrict ThGYHFBY9xbd3Do5rgAioQuubxLmBRRebncH3fgF5NtGSkeAnbIjDNJVp34sHmu
 
