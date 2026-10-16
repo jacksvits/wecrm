@@ -31,11 +31,22 @@ export interface TenantInfo {
  */
 function statusChangedAtMiddleware(params: any, next: (params: any) => Promise<any>) {
   const fieldByModel: Record<string, string> = { task: 'status', project: 'status', deal: 'stage', reminder: 'statusId' };
-  const field = fieldByModel[params.model];
-  if (field && (params.action === 'update' || params.action === 'updateMany') && params.args?.data) {
+  // params.model приходит PascalCase-классом модели («Task»), а не именем делегата («task»)
+  const field = fieldByModel[String(params.model || '').toLowerCase()];
+  if (!field || !params.args?.data) return next(params);
+  if (params.action === 'update' || params.action === 'updateMany') {
     const data = params.args.data;
     if (data[field] !== undefined && data.statusChangedAt === undefined) {
       data.statusChangedAt = new Date();
+    }
+  } else if (params.action === 'create' || params.action === 'createMany') {
+    // Сущность может появиться сразу в статусе (email-фильтры, импорты, телефония) —
+    // фиксируем время входа и при создании, иначе «Авто смена» её не увидит
+    const items = Array.isArray(params.args.data) ? params.args.data : [params.args.data];
+    for (const data of items) {
+      if (data && data[field] !== undefined && data.statusChangedAt === undefined) {
+        data.statusChangedAt = new Date();
+      }
     }
   }
   return next(params);
