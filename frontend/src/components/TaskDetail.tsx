@@ -1222,6 +1222,7 @@ export function TaskDetail() {
         <div>
           {" "}
           <div
+            className="task-tabs"
             style={{
               display: "flex",
               gap: 8,
@@ -1231,42 +1232,86 @@ export function TaskDetail() {
           >
             {" "}
             <button
+              className="task-tab"
               style={tabStyle(activeTab === "comments")}
               onClick={() => setActiveTab("comments")}
+              title="Обсуждение"
             >
-              Обсуждение ({comments.length})
+              <svg className="task-tab-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+              </svg>
+              <span className="task-tab-label">Обсуждение ({comments.length})</span>
+              {comments.length > 0 && <span className="task-tab-badge">{comments.length}</span>}
             </button>{" "}
             <button
+              className="task-tab"
               style={tabStyle(activeTab === "details")}
               onClick={() => setActiveTab("details")}
+              title="Задача"
             >
-              Задача
+              <svg className="task-tab-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 11 12 14 22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+              <span className="task-tab-label">Задача</span>
             </button>{" "}
             <button
+              className="task-tab"
               style={tabStyle(activeTab === "subtasks")}
               onClick={() => setActiveTab("subtasks")}
+              title="Подзадачи"
             >
-              Подзадачи ({task.children?.length || 0})
+              <svg className="task-tab-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6" />
+                <line x1="8" y1="12" x2="21" y2="12" />
+                <line x1="8" y1="18" x2="21" y2="18" />
+                <line x1="3" y1="6" x2="3.01" y2="6" />
+                <line x1="3" y1="12" x2="3.01" y2="12" />
+                <line x1="3" y1="18" x2="3.01" y2="18" />
+              </svg>
+              <span className="task-tab-label">Подзадачи ({task.children?.length || 0})</span>
+              {(task.children?.length || 0) > 0 && <span className="task-tab-badge">{task.children?.length}</span>}
             </button>{" "}
             <button
+              className="task-tab"
               style={tabStyle(activeTab === "history")}
               onClick={() => setActiveTab("history")}
+              title="История"
             >
-              История ({taskHistory.length})
+              <svg className="task-tab-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3v5h5" />
+                <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+                <path d="M12 7v5l4 2" />
+              </svg>
+              <span className="task-tab-label">История ({taskHistory.length})</span>
+              {taskHistory.length > 0 && <span className="task-tab-badge">{taskHistory.length}</span>}
             </button>
             {canSeeFinances && (
             <button
+              className="task-tab"
               style={tabStyle(activeTab === "finances")}
               onClick={() => setActiveTab("finances")}
+              title="Финансы"
             >
-              Финансы
+              <svg className="task-tab-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="20" height="12" x="2" y="6" rx="2" />
+                <circle cx="12" cy="12" r="2" />
+                <path d="M6 12h.01M18 12h.01" />
+              </svg>
+              <span className="task-tab-label">Финансы</span>
             </button>
             )}{" "}
             <button
+              className="task-tab"
               style={tabStyle(activeTab === "files")}
               onClick={() => setActiveTab("files")}
+              title="Файлы"
             >
-              Файлы ({taskFiles.length})
+              <svg className="task-tab-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 0 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
+              <span className="task-tab-label">Файлы ({taskFiles.length})</span>
+              {taskFiles.length > 0 && <span className="task-tab-badge">{taskFiles.length}</span>}
             </button>{" "}
           </div>{" "}
           {/* Индикаторы свайпа — видны только в мобильной версии */}

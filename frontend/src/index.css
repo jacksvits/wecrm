@@ -454,11 +454,46 @@ body {
 
 /* Swipe tabs indicator for mobile */
 .tab-swipe-indicator { display: none; }
+/* Иконки и бейджи вкладок задачи — только для мобильной версии (на десктопе вкладки остаются текстовыми) */
+.task-tab { position: relative; }
+.task-tab-icon { display: none; }
+.task-tab-badge { display: none; }
 @media (max-width: 768px) {
   .tab-swipe-indicator { display: flex !important; justify-content: center; gap: 6px; margin-top: 8px; margin-bottom: 12px; }
   .tab-swipe-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border-color); transition: background 0.2s, transform 0.2s; }
   .tab-swipe-dot.active { background: var(--text-primary); transform: scale(1.3); }
   .tab-content-swipeable { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+  /* Вкладки задачи на мобильном — только иконки с бейджами, все в одну строку */
+  .task-tabs { flex-wrap: nowrap !important; gap: 6px; }
+  .task-tabs .task-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 10px 2px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .task-tabs .task-tab-label { display: none; }
+  .task-tabs .task-tab-icon { display: block; }
+  .task-tabs .task-tab-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: -4px;
+    right: calc(50% - 20px);
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--accent-color);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    pointer-events: none;
+  }
   /* Текст описания задачи (rich-text) должен оставаться выделяемым и копируемым */
   .tab-content-swipeable .rich-text, .tab-content-swipeable .rich-text * { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 }
