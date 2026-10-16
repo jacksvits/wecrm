@@ -90,6 +90,7 @@ model User {
 
   taskAssignments TaskAssignee[]
   taskCurations   TaskCurator[]
+  taskFavorites   TaskFavorite[]
   projectUsers    ProjectUser[]
   createdTasks    Task[]         @relation("CreatedTasks")
   supportTickets  Task[]         @relation("SupportTickets")
@@ -466,15 +467,14 @@ model Task {
   // Ticket number (unique numeric identifier)
   ticketNumber Int      @unique @default(autoincrement()) @map("ticket_number")
 
-  // Отметка «Избранное» (личная метка пользователя)
-  isFavorite   Boolean  @default(false) @map("is_favorite")
+  // Отметка «Избранное» — индивидуальная для каждого пользователя (TaskFavorite)
 
   transactions TaskTransaction[]
   financeDocuments FinanceDocument[]
+  favorites    TaskFavorite[]
 
   @@index([status])
   @@index([status, dueDate])
-  @@index([isFavorite])
   @@index([price])
   @@index([createdAt])
   @@index([projectId])
@@ -512,6 +512,22 @@ model TaskCurator {
   @@index([userId])
   @@index([taskId, userId])
   @@map("task_curators")
+}
+
+// Индивидуальные избранные задачи пользователя
+model TaskFavorite {
+  id     String @id @default(cuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@index([taskId, userId])
+  @@map("task_favorites")
 }
 
 model TaskHistory {
