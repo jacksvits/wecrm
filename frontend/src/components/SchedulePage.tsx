@@ -576,7 +576,7 @@ function ContactPicker({ clientName, clientPhone, onChange }: {
     if (q.length < 2) { setResults([]); return; }
     setSearching(true);
     const t = setTimeout(() => {
-      api.contacts.list(`?search=${encodeURIComponent(q)}&limit=6`)
+      api.contacts.list(`search=${encodeURIComponent(q)}&limit=6`)
         // При передаче limit бэкенд возвращает объект пагинации { contacts, ... }, без limit — массив
         .then((data: any) => {
           const list = Array.isArray(data) ? data : (data?.contacts || []);
@@ -589,7 +589,8 @@ function ContactPicker({ clientName, clientPhone, onChange }: {
   }, [clientName]);
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div>
+      <div style={{ position: 'relative' }}>
       <label style={labelStyle}>Клиент</label>
       <input
         style={inputStyle} value={clientName} placeholder="ФИО или название — поиск по клиентам CRM"
@@ -597,7 +598,7 @@ function ContactPicker({ clientName, clientPhone, onChange }: {
       />
       {results.length > 0 && (
         <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, marginTop: 4,
           background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10,
           boxShadow: '0 8px 24px rgba(0,0,0,0.15)', overflow: 'hidden',
         }}>
@@ -621,6 +622,7 @@ function ContactPicker({ clientName, clientPhone, onChange }: {
         </div>
       )}
       {searching && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Поиск...</div>}
+      </div>
       <div style={{ marginTop: 8 }}>
         <label style={labelStyle}>Телефон</label>
         <input style={inputStyle} value={clientPhone} onChange={(e) => onChange(clientName, e.target.value, null)} placeholder="+7 ..." />
