@@ -6,6 +6,7 @@ import { useRealtime } from "../hooks/useRealtime";
 import { Task, User, Project, Status } from "../types";
 import { userOptionLabel } from "../lib/userOptionLabel";
 import { TaskCalendar } from "./TaskCalendar";
+import { ContactPicker } from "./ContactPicker";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 const priorityLabels: Record<string, string> = {
@@ -85,7 +86,9 @@ export function TaskList() {
     curatorIds: [] as string[],
     projectId: "",
     parentId: "",
+    contactId: "",
   });
+  const [contactText, setContactText] = useState("");
   useEffect(() => {
     api.profile
       .get()
@@ -194,7 +197,9 @@ export function TaskList() {
       curatorIds: defaultCuratorIds(),
       projectId: "",
       parentId: parentId || "",
+      contactId: "",
     });
+    setContactText("");
     setShowModal(true);
   };
   const openEdit = (task: Task) => {
@@ -210,7 +215,9 @@ export function TaskList() {
       curatorIds: task.curators?.map((c) => c.id) || [],
       projectId: task.projectId || "",
       parentId: task.parentId || "",
+      contactId: task.contact?.id || "",
     });
+    setContactText(task.contact?.name || "");
     setShowModal(true);
   };
   const handleSubmit = async (e: React.FormEvent) => {
@@ -219,6 +226,7 @@ export function TaskList() {
       ...form,
       assigneeIds: form.assigneeIds.length ? form.assigneeIds : undefined,
       curatorIds: form.curatorIds.length ? form.curatorIds : undefined,
+      contactId: form.contactId || undefined,
     };
     if (editingId) {
       await api.tasks.update(editingId, data);
@@ -1521,6 +1529,24 @@ export function TaskList() {
                   </option>
                 ))}{" "}
               </select>{" "}
+              <ContactPicker
+                text={contactText}
+                onTextChange={(t) => {
+                  setContactText(t);
+                  if (form.contactId)
+                    setForm({ ...form, contactId: "" });
+                }}
+                selected={
+                  form.contactId
+                    ? { id: form.contactId, name: contactText }
+                    : null
+                }
+                onSelect={(c) => {
+                  if (c) setContactText(c.name);
+                  setForm({ ...form, contactId: c ? c.id : "" });
+                }}
+                placeholder="Поиск контакта..."
+              />{" "}
               <select
                 multiple
                 value={form.assigneeIds}
