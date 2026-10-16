@@ -452,27 +452,37 @@ body {
   }
 }
 
-/* Swipe tabs indicator for mobile */
-.tab-swipe-indicator { display: none; }
 /* Иконки и бейджи вкладок задачи — только для мобильной версии (на десктопе вкладки остаются текстовыми) */
 .task-tab { position: relative; }
 .task-tab-icon { display: none; }
 .task-tab-badge { display: none; }
 @media (max-width: 768px) {
-  .tab-swipe-indicator { display: flex !important; justify-content: center; gap: 6px; margin-top: 8px; margin-bottom: 12px; }
-  .tab-swipe-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border-color); transition: background 0.2s, transform 0.2s; }
-  .tab-swipe-dot.active { background: var(--text-primary); transform: scale(1.3); }
-  .tab-content-swipeable { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
-  /* Вкладки задачи на мобильном — только иконки с бейджами, все в одну строку */
-  .task-tabs { flex-wrap: nowrap !important; gap: 6px; }
+  /* Вкладки задачи на мобильном — только иконки с бейджами, все в одну строку.
+     Объёмный стиль: неактивные вкладки — приподнятые «карточки», активная — углублённая кнопка */
+  .task-tabs { flex-wrap: nowrap !important; gap: 8px; padding: 4px 2px; }
   .task-tabs .task-tab {
     flex: 1 1 0;
     min-width: 0;
-    padding: 10px 2px !important;
+    padding: 12px 2px !important;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
+    background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-secondary, #f2f2f7) 100%) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 3px 0 var(--border-color), 0 6px 12px rgba(0, 0, 0, 0.12);
+    transform: translateY(0);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.2s, color 0.2s;
+  }
+  .task-tabs .task-tab:active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 var(--border-color), 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  /* Активная вкладка — тёмная «утопленная» кнопка с глубиной */
+  .task-tabs .task-tab[style*="var(--text-primary)"] {
+    background: linear-gradient(180deg, var(--text-primary) 0%, color-mix(in srgb, var(--text-primary) 78%, #000) 100%) !important;
+    border-color: var(--text-primary) !important;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.08);
   }
   .task-tabs .task-tab-label { display: none; }
   .task-tabs .task-tab-icon { display: block; }
@@ -481,21 +491,20 @@ body {
     align-items: center;
     justify-content: center;
     position: absolute;
-    top: -4px;
-    right: calc(50% - 20px);
-    min-width: 16px;
-    height: 16px;
+    top: -6px;
+    right: calc(50% - 22px);
+    min-width: 17px;
+    height: 17px;
     padding: 0 4px;
-    border-radius: 8px;
-    background: var(--accent-color);
+    border-radius: 9px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 85%, #fff) 0%, var(--accent-color) 100%);
     color: #fff;
     font-size: 10px;
     font-weight: 600;
     line-height: 1;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
     pointer-events: none;
   }
-  /* Текст описания задачи (rich-text) должен оставаться выделяемым и копируемым */
-  .tab-content-swipeable .rich-text, .tab-content-swipeable .rich-text * { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 }
 
 /* ==== Login page — Split Screen (вариант 3, зелёный акцент #5EB21F) ==== */
@@ -1079,10 +1088,9 @@ html, body { overflow-x: hidden; }
 .btn-action-cart:disabled { opacity: .4; cursor: default; box-shadow: none; }
 .btn-action-cart:focus-visible { outline: 2px solid #007aff; outline-offset: 2px; }
 
-/* Текст комментариев в обсуждениях задач доступен для выделения/копирования
-   (контейнер .tab-content-swipeable отключает user-select для свайпа) */
-.tab-content-swipeable .comment-select,
-.tab-content-swipeable .comment-select * {
+/* Текст комментариев в обсуждениях задач доступен для выделения/копирования */
+.comment-select,
+.comment-select * {
   user-select: text;
   -webkit-user-select: text;
   -webkit-touch-callout: default;

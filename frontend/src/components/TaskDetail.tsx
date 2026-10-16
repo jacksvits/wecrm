@@ -345,13 +345,6 @@ export function TaskDetail() {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const commentsRef = useRef<HTMLDivElement>(null);
-  // Свайп-переключение вкладок в мобильной версии
-  const tabContentRef = useRef<HTMLDivElement>(null);
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
-  const [touchEndX, setTouchEndX] = useState<number | null>(null);
-  const tabsOrder: Array<"comments" | "details" | "subtasks" | "history" | "finances" | "files"> = ["comments", "details", "subtasks", "history", "finances", "files"];
-  const visibleTabsOrder = canSeeFinances ? tabsOrder : tabsOrder.filter((t) => t !== "finances");
-  const minSwipeDistance = 50;
   useEffect(() => {
     setIsDark(localStorage.getItem("darkTheme") === "true");
   }, []);
@@ -412,29 +405,6 @@ export function TaskDetail() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-  // Обработчики свайпа для переключения вкладок в мобильной версии
-  const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEndX(null);
-    setTouchStartX(e.targetTouches[0].clientX);
-  };
-  const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEndX(e.targetTouches[0].clientX);
-  };
-  const onTouchEnd = () => {
-    if (touchStartX === null || touchEndX === null) return;
-    const distance = touchStartX - touchEndX;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-    const currentIndex = tabsOrder.indexOf(activeTab);
-    if (isLeftSwipe && currentIndex < tabsOrder.length - 1) {
-      setActiveTab(tabsOrder[currentIndex + 1]);
-    }
-    if (isRightSwipe && currentIndex > 0) {
-      setActiveTab(tabsOrder[currentIndex - 1]);
-    }
-    setTouchStartX(null);
-    setTouchEndX(null);
-  };
   const loadTaskFiles = async () => {
     if (!id) return;
     try {
@@ -1314,22 +1284,7 @@ export function TaskDetail() {
               {taskFiles.length > 0 && <span className="task-tab-badge">{taskFiles.length}</span>}
             </button>{" "}
           </div>{" "}
-          {/* Индикаторы свайпа — видны только в мобильной версии */}
-          <div className="tab-swipe-indicator">
-            {tabsOrder.map((tab) => (
-              <div
-                key={tab}
-                className={`tab-swipe-dot ${activeTab === tab ? "active" : ""}`}
-              />
-            ))}
-          </div>
-          <div
-            ref={tabContentRef}
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
-            className="tab-content-swipeable"
-          >
+          <div>
             {activeTab === "details" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {" "}
