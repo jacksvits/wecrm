@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7zrZUfPO1OsRs74f5rUZVEWRGICKcfkabUt2d7rmUrU9nQcVde2xaVxOClbLs7a
+\restrict 8e2tpIFmQ9KcEceYHoithhXjMNCsEqzwf20xZVbHwE7VTo0rqZp6VcGHLb0W2ck
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -1494,6 +1494,18 @@ CREATE TABLE public.task_curators (
 
 
 --
+-- Name: task_favorites; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.task_favorites (
+    id text NOT NULL,
+    "taskId" text NOT NULL,
+    "userId" text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: task_history; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1558,8 +1570,7 @@ CREATE TABLE public.tasks (
     telegram_chat_id text,
     telegram_user_id text,
     support_owner_id text,
-    status_changed_at timestamp(3) without time zone,
-    is_favorite boolean DEFAULT false NOT NULL
+    status_changed_at timestamp(3) without time zone
 );
 
 
@@ -2620,6 +2631,14 @@ ALTER TABLE ONLY public.task_curators
 
 
 --
+-- Name: task_favorites task_favorites_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_favorites
+    ADD CONSTRAINT task_favorites_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: task_history task_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3544,6 +3563,20 @@ CREATE INDEX "task_curators_userId_idx" ON public.task_curators USING btree ("us
 
 
 --
+-- Name: task_favorites_taskId_userId_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX "task_favorites_taskId_userId_key" ON public.task_favorites USING btree ("taskId", "userId");
+
+
+--
+-- Name: task_favorites_userId_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "task_favorites_userId_idx" ON public.task_favorites USING btree ("userId");
+
+
+--
 -- Name: task_history_task_id_created_at_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3583,13 +3616,6 @@ CREATE INDEX "tasks_creatorId_idx" ON public.tasks USING btree ("creatorId");
 --
 
 CREATE UNIQUE INDEX "tasks_emailMessageId_key" ON public.tasks USING btree ("emailMessageId");
-
-
---
--- Name: tasks_is_favorite_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX tasks_is_favorite_idx ON public.tasks USING btree (is_favorite);
 
 
 --
@@ -4450,6 +4476,22 @@ ALTER TABLE ONLY public.task_curators
 
 
 --
+-- Name: task_favorites task_favorites_taskId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_favorites
+    ADD CONSTRAINT "task_favorites_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES public.tasks(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: task_favorites task_favorites_userId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.task_favorites
+    ADD CONSTRAINT "task_favorites_userId_fkey" FOREIGN KEY ("userId") REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
 -- Name: task_history task_history_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4605,13 +4647,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7zrZUfPO1OsRs74f5rUZVEWRGICKcfkabUt2d7rmUrU9nQcVde2xaVxOClbLs7a
+\unrestrict 8e2tpIFmQ9KcEceYHoithhXjMNCsEqzwf20xZVbHwE7VTo0rqZp6VcGHLb0W2ck
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 9v2ZeM4baRA2Fnyy8mZb1AgQkuwyL6mpaktt66jcxKoHjyDcZg1dlS7m5PBJOKY
+\restrict CNdxUxWK7TjpYZkbfIavHQ8AmhmK3YVA7497rfMGKyctTvVG7FDv6xwDXspZZRx
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -5017,11 +5059,12 @@ INSERT INTO public._prisma_migrations VALUES ('3a10861b-97d3-4d2a-92c0-2e6850bcb
 INSERT INTO public._prisma_migrations VALUES ('a8292bc3-4f8f-4850-b2e0-ea9697b01ccf', '1bfcd143f97094ceb2bdc0549eb14f0aa3cd6c3349d85cd571ff7af04ae03651', '2026-10-15 19:00:19.694101+00', '20261015223000_status_auto_change_enabled_at', NULL, NULL, '2026-10-15 19:00:19.68778+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('92a6c4a8-1763-4d60-9bce-c748a92febcb', '57b2e1b922d573b0cc579b8dff719117cbeb789d78bcc924362b85469a10cf58', '2026-10-16 07:14:34.919643+00', '20261016095800_task_is_favorite', NULL, NULL, '2026-10-16 07:14:34.909631+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('9f508fdb-3242-46d8-ac48-7c771fe66712', '60fc5973495f838c35b3aa9b3c82a2c61e518375f763296fc9c6f7a8bc295026', '2026-10-16 17:24:25.270392+00', '20261016203000_comment_pinned', NULL, NULL, '2026-10-16 17:24:25.244524+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('b5a6fe00-10af-4c94-b15d-d9b2a278ed3d', 'fa5549b7ad4078d35685a5a2d8c0067e67e8896e4eb58f922e53ab1ad1d38a16', '2026-10-16 19:12:38.114981+00', '20261016220000_task_favorites_user', NULL, NULL, '2026-10-16 19:12:38.114981+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9v2ZeM4baRA2Fnyy8mZb1AgQkuwyL6mpaktt66jcxKoHjyDcZg1dlS7m5PBJOKY
+\unrestrict CNdxUxWK7TjpYZkbfIavHQ8AmhmK3YVA7497rfMGKyctTvVG7FDv6xwDXspZZRx
 
