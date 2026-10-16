@@ -15,7 +15,8 @@ router.get('/stats', async (req: AuthRequest, res) => {
     prisma.deal.count({ where: { stage: { notIn: ['won', 'lost'] } } }),
     prisma.deal.aggregate({ where: { stage: { notIn: ['won', 'lost'] } }, _sum: { value: true } }),
     prisma.project.count({ where: { status: 'completed' } }),
-    prisma.user.count(),
+    // Пользователей: не учитываем роли-«системные обработчики» (технические учётки); без роли считаем
+    prisma.user.count({ where: { OR: [{ role: { is: { isSystemHandler: false } } }, { roleId: null }] } }),
     prisma.user.count({ where: { lastActiveAt: { gte: oneMinuteAgo } } }),
     prisma.user.findMany({
       where: { lastActiveAt: { gte: oneMinuteAgo } },
