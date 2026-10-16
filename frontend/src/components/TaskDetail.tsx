@@ -809,7 +809,7 @@ export function TaskDetail() {
             fontSize: 14,
           }}
         >
-          ← Назад к задачам
+          ← Назад
         </button>{" "}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {" "}
