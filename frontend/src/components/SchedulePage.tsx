@@ -577,7 +577,11 @@ function ContactPicker({ clientName, clientPhone, onChange }: {
     setSearching(true);
     const t = setTimeout(() => {
       api.contacts.list(`?search=${encodeURIComponent(q)}&limit=6`)
-        .then((list: any[]) => setResults(list.slice(0, 6)))
+        // При передаче limit бэкенд возвращает объект пагинации { contacts, ... }, без limit — массив
+        .then((data: any) => {
+          const list = Array.isArray(data) ? data : (data?.contacts || []);
+          setResults(list.slice(0, 6));
+        })
         .catch(() => setResults([]))
         .finally(() => setSearching(false));
     }, 300);
@@ -605,8 +609,13 @@ function ContactPicker({ clientName, clientPhone, onChange }: {
               onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
-              <span>{c.name}</span>
-              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{c.phone || ''}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                {c.kind === 'organization' && (
+                  <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 6, background: 'var(--bg-hover)', color: 'var(--text-muted)', flexShrink: 0 }}>орг.</span>
+                )}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+              </span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12, flexShrink: 0 }}>{c.phone || ''}</span>
             </div>
           ))}
         </div>
