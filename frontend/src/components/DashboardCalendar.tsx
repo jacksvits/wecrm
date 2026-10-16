@@ -61,6 +61,9 @@ export function DashboardCalendar() {
   const { user, refreshUser } = useAuth();
   // Доступ к задачам — как в Dashboard: админ или раздел «/tasks» в allowedPages
   const canViewTasks = user?.role === 'admin' || ((user as any)?.allowedPages || []).includes('/tasks');
+  // Доступ к расписанию — по роли: админ или раздел «/schedule» в allowedPages;
+  // без права записи расписания в виджете «Календарь» не показываются
+  const canViewSchedule = user?.role === 'admin' || ((user as any)?.allowedPages || []).includes('/schedule');
   const isMobile = useIsMobile();
 
   const [year, setYear] = useState(() => new Date().getFullYear());
@@ -132,7 +135,7 @@ export function DashboardCalendar() {
     const from = `${year}-${String(month).padStart(2, '0')}-01`;
     const lastDay = new Date(year, month, 0).getDate();
     const to = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-    let pending = canViewTasks ? 3 : 2;
+    let pending = 1 + (canViewTasks ? 1 : 0) + (canViewSchedule ? 1 : 0);
     const done = () => { pending -= 1; if (pending <= 0) setLoading(false); };
     if (canViewTasks) {
       api.tasks.list(new URLSearchParams({ dueFrom: from, dueTo: to, includeChildren: 'true' }).toString())
@@ -144,16 +147,22 @@ export function DashboardCalendar() {
       .then((list) => setReminders(Array.isArray(list) ? list : []))
       .catch(() => setReminders([]))
       .finally(done);
-    // У тенанта может не быть таблиц расписания (старая БД) — тогда блок просто пуст
-    api.schedule.month(year, month)
-      .then(setMonthData)
-      .catch(() => setMonthData(null))
-      .finally(done);
-  }, [year, month, canViewTasks]);
+    // У тенанта может не быть таблиц расписания (старая БД) — тогда блок просто пуст;
+    // без права на раздел «Расписание» агрегаты не запрашиваем — записи не показываем
+    if (canViewSchedule) {
+      api.schedule.month(year, month)
+        .then(setMonthData)
+        .catch(() => setMonthData(null))
+        .finally(done);
+    } else {
+      setMonthData(null);
+    }
+  }, [year, month, canViewTasks, canViewSchedule]);
 
   const loadDay = useCallback(() => {
+    if (!canViewSchedule) { setDayData(null); return; }
     api.schedule.day(date).then(setDayData).catch(() => setDayData(null));
-  }, [date]);
+  }, [date, canViewSchedule]);
 
   useEffect(() => { loadMonth(); }, [loadMonth]);
   useEffect(() => { loadDay(); }, [loadDay]);
@@ -162,8 +171,9 @@ export function DashboardCalendar() {
   }, [canViewTasks]);
   useEffect(() => { api.profile.get().then((u) => setHideCompletedTasks(u.hideCompletedTasks ?? true)).catch(() => {}); }, []);
   useEffect(() => {
+    if (!canViewSchedule) { setRooms([]); return; }
     api.schedule.rooms.list().then(setRooms).catch(() => {});
-  }, []);
+  }, [canViewSchedule]);
 
   // Живое обновление при изменениях задач/напоминаний (как в Dashboard)
   useRealtime(['tasks', 'reminders'], () => { loadMonth(); });
