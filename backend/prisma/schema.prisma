@@ -40,6 +40,10 @@ model Role {
   notifyOnNewChat    Boolean @default(false) @map("notify_on_new_chat")
   notifyOnNewCall    Boolean @default(false) @map("notify_on_new_call")
   notifyOnNewNews    Boolean @default(false) @map("notify_on_new_news")
+  // Права на вкладку «Доступы» у контактов и организаций (логины, пароли, ссылки)
+  canReadContactAccesses    Boolean @default(true)  @map("can_read_contact_accesses")
+  canEditContactAccesses    Boolean @default(false) @map("can_edit_contact_accesses")
+  canDeleteContactAccesses  Boolean @default(false) @map("can_delete_contact_accesses")
   createdAt     DateTime @default(now())
   users         User[]
 

@@ -6,7 +6,10 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 const router = Router();
 router.use(authMiddleware);
 
-const isManagerOrAdmin = (req: AuthRequest) => req.user?.role === 'admin' || req.user?.role === 'manager';
+// Права на вкладку «Доступы» задаются в настройках роли (флаги Role.can*ContactAccesses)
+const canReadAccesses = (req: AuthRequest) => req.user?.role === 'admin' || req.user?.canReadContactAccesses !== false;
+const canEditAccesses = (req: AuthRequest) => req.user?.role === 'admin' || req.user?.canEditContactAccesses === true;
+const canDeleteAccesses = (req: AuthRequest) => req.user?.role === 'admin' || req.user?.canDeleteContactAccesses === true;
 
 // Направления доступа (выпадающий список на фронте)
 const DIRECTIONS = ['videoregistrator', 'cloud', 'remote', 'site_admin', 'server', 'account', 'router'] as const;
@@ -26,6 +29,9 @@ const updateSchema = accessSchema.omit({ contactId: true }).partial();
 // GET /api/contact-accesses?contactId=... — список доступов контакта
 router.get('/', async (req, res) => {
   try {
+    if (!canReadAccesses(req)) {
+      return res.status(403).json({ error: 'Нет прав на просмотр доступов' });
+    }
     const { contactId } = req.query;
     if (!contactId || typeof contactId !== 'string') {
       return res.status(400).json({ error: 'contactId обязателен' });
@@ -44,7 +50,7 @@ router.get('/', async (req, res) => {
 // POST /api/contact-accesses — создать доступ
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    if (!isManagerOrAdmin(req)) {
+    if (!canEditAccesses(req)) {
       return res.status(403).json({ error: 'Нет прав на создание' });
     }
     const data = accessSchema.parse(req.body);
@@ -76,7 +82,7 @@ router.post('/', async (req: AuthRequest, res) => {
 // PATCH /api/contact-accesses/:id — обновить доступ
 router.patch('/:id', async (req: AuthRequest, res) => {
   try {
-    if (!isManagerOrAdmin(req)) {
+    if (!canEditAccesses(req)) {
       return res.status(403).json({ error: 'Нет прав на редактирование' });
     }
     const data = updateSchema.parse(req.body);
@@ -108,7 +114,7 @@ router.patch('/:id', async (req: AuthRequest, res) => {
 // DELETE /api/contact-accesses/:id — удалить доступ
 router.delete('/:id', async (req: AuthRequest, res) => {
   try {
-    if (!isManagerOrAdmin(req)) {
+    if (!canDeleteAccesses(req)) {
       return res.status(403).json({ error: 'Нет прав на удаление' });
     }
     const existing = await prisma.contactAccess.findUnique({ where: { id: req.params.id } });

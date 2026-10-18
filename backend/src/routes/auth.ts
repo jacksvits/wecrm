@@ -107,7 +107,7 @@ router.post('/register', async (req, res) => {
         name: data.name,
         roleId: defaultRole.id,
       },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true, canReadContactAccesses: true, canEditContactAccesses: true, canDeleteContactAccesses: true } } },
     });
 
     const roleName = user.role?.name || 'user';
@@ -131,6 +131,9 @@ router.post('/register', async (req, res) => {
         mobileNav: user.mobileNav || [],
         stockAccess,
         showCalendarMetric: user.role?.showCalendarMetric ?? true,
+        canReadContactAccesses: user.role?.canReadContactAccesses ?? true,
+        canEditContactAccesses: user.role?.canEditContactAccesses ?? false,
+        canDeleteContactAccesses: user.role?.canDeleteContactAccesses ?? false,
         calendarTimelinePos: user.calendarTimelinePos || 'bottom',
         calendarTimelineSize: user.calendarTimelineSize ?? 420,
         calendarTheme: user.calendarTheme || 'classic',
@@ -149,13 +152,13 @@ router.post('/login', async (req, res) => {
     // Try to find by email first, then by username
     let user = await prisma.user.findUnique({
       where: { email: data.login },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true, canReadContactAccesses: true, canEditContactAccesses: true, canDeleteContactAccesses: true } } },
     });
 
     if (!user) {
       user = await prisma.user.findUnique({
         where: { username: data.login },
-        include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true } } },
+        include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true, canReadContactAccesses: true, canEditContactAccesses: true, canDeleteContactAccesses: true } } },
       });
     }
 
@@ -185,6 +188,9 @@ router.post('/login', async (req, res) => {
         mobileNav: user.mobileNav || [],
         stockAccess,
         showCalendarMetric: user.role?.showCalendarMetric ?? true,
+        canReadContactAccesses: user.role?.canReadContactAccesses ?? true,
+        canEditContactAccesses: user.role?.canEditContactAccesses ?? false,
+        canDeleteContactAccesses: user.role?.canDeleteContactAccesses ?? false,
         calendarTimelinePos: user.calendarTimelinePos || 'bottom',
         calendarTimelineSize: user.calendarTimelineSize ?? 420,
         calendarTheme: user.calendarTheme || 'classic',
@@ -207,7 +213,7 @@ router.post('/guest', async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { id: guest.id },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true, canReadContactAccesses: true, canEditContactAccesses: true, canDeleteContactAccesses: true } } },
     });
     if (!user) return res.status(500).json({ error: 'Guest user not found' });
 
@@ -235,7 +241,7 @@ router.get('/me', async (req, res) => {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true, canAccessSupportChat: true, canSeeAllSupportTickets: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true, canAccessSupportChat: true, canSeeAllSupportTickets: true, canReadContactAccesses: true, canEditContactAccesses: true, canDeleteContactAccesses: true } } },
     });
     if (!user) return res.status(401).json({ error: 'User not found' });
 
@@ -273,6 +279,10 @@ router.get('/me', async (req, res) => {
       allowedTaskStatuses: user.role?.allowedTaskStatuses ?? [],
       canCreateNews: user.email === GUEST_EMAIL ? false : (user.role?.canCreateNews ?? true),
     canHandleSpam: user.role?.canHandleSpam ?? false,
+      // Права на вкладку «Доступы» у контактов и организаций
+      canReadContactAccesses: user.role?.canReadContactAccesses ?? true,
+      canEditContactAccesses: user.email === GUEST_EMAIL ? false : (user.role?.canEditContactAccesses ?? false),
+      canDeleteContactAccesses: user.email === GUEST_EMAIL ? false : (user.role?.canDeleteContactAccesses ?? false),
       canAccessSupportChat: user.role?.canAccessSupportChat ?? false,
       canSeeAllSupportTickets: user.role?.canSeeAllSupportTickets ?? false,
       canEditNews: user.email === GUEST_EMAIL ? false : (user.role?.canEditNews ?? true),
@@ -323,6 +333,10 @@ const publicUser = (user: any, roleName: string, allowedPages: string[]) => {
     calendarTheme: user.calendarTheme || 'classic',
     canCreateNews: isGuest ? false : (user.role?.canCreateNews ?? true),
     canEditNews: isGuest ? false : (user.role?.canEditNews ?? true),
+    // Права на вкладку «Доступы» у контактов и организаций
+    canReadContactAccesses: user.role?.canReadContactAccesses ?? true,
+    canEditContactAccesses: isGuest ? false : (user.role?.canEditContactAccesses ?? false),
+    canDeleteContactAccesses: isGuest ? false : (user.role?.canDeleteContactAccesses ?? false),
   };
 };
 
@@ -333,7 +347,7 @@ router.post('/impersonate', authMiddleware, adminOnly, async (req: AuthRequest, 
     if (userId === req.user!.id) return res.status(400).json({ error: 'Вы уже в своём аккаунте' });
     const target = await prisma.user.findUnique({
       where: { id: userId },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true, canReadContactAccesses: true, canEditContactAccesses: true, canDeleteContactAccesses: true } } },
     });
     if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
     const { token, roleName, allowedPages } = issueToken(target, req.user!.id);
@@ -359,7 +373,7 @@ router.post('/stop-impersonation', authMiddleware, async (req: AuthRequest, res)
     if (!impersonatorId) return res.status(400).json({ error: 'Нет активного переключения аккаунта' });
     const admin = await prisma.user.findUnique({
       where: { id: impersonatorId },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true } } },
+      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true, canReadContactAccesses: true, canEditContactAccesses: true, canDeleteContactAccesses: true } } },
     });
     if (!admin) return res.status(401).json({ error: 'User not found' });
     const { token, roleName, allowedPages } = issueToken(admin);

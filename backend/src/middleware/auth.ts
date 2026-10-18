@@ -19,6 +19,9 @@ export interface AuthRequest extends Request {
     canCreateNews?: boolean;
     canEditNews?: boolean;
       canHandleSpam?: boolean;
+      canReadContactAccesses?: boolean;
+      canEditContactAccesses?: boolean;
+      canDeleteContactAccesses?: boolean;
       isGuest?: boolean;
       // Призрачная сессия: вход главного админа платформы в тенант кнопкой «Сменить тенант»
       // (heartbeat не обновляет lastActiveAt — пользователь не светится «онлайн»/«был в сети»)
@@ -49,7 +52,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
     // Always load fresh user data from DB to get current role and name
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      include: { role: { select: { name: true, allowedPages: true, canAccessChat: true, canAccessSupportChat: true, canSeeAllSupportTickets: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true } } },
+      include: { role: { select: { name: true, allowedPages: true, canAccessChat: true, canAccessSupportChat: true, canSeeAllSupportTickets: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, canReadContactAccesses: true, canEditContactAccesses: true, canDeleteContactAccesses: true } } },
     });
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
@@ -72,6 +75,10 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       canCreateNews: isGuest ? false : (user.role?.canCreateNews ?? true),
       canEditNews: isGuest ? false : (user.role?.canEditNews ?? true),
       canHandleSpam: user.role?.canHandleSpam ?? false,
+      // Вкладка «Доступы» у контактов и организаций
+      canReadContactAccesses: user.role?.canReadContactAccesses ?? true,
+      canEditContactAccesses: isGuest ? false : (user.role?.canEditContactAccesses ?? false),
+      canDeleteContactAccesses: isGuest ? false : (user.role?.canDeleteContactAccesses ?? false),
       impersonatorId: decoded.imp,
       ghost: decoded.ghost === true,
     };

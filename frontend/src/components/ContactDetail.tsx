@@ -47,6 +47,10 @@ export function ContactDetail() {
     return t ? { bg: t.color, text: t.textColor } : { bg: '#f5f5f5', text: '#999' };
   };
   const canEdit = user?.role === 'admin' || user?.role === 'manager';
+  // Права на вкладку «Доступы» (настраиваются в роли: чтение/редактирование/удаление)
+  const canReadAccesses = user?.role === 'admin' || user?.canReadContactAccesses !== false;
+  const canEditAccesses = user?.role === 'admin' || user?.canEditContactAccesses === true;
+  const canDeleteAccesses = user?.role === 'admin' || user?.canDeleteContactAccesses === true;
 
   useEffect(() => {
     if (!id) return;
@@ -88,7 +92,7 @@ export function ContactDetail() {
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border-color)' }}>
-        {[{ key: 'info' as const, label: 'Основная информация' }, { key: 'tasks' as const, label: `Задачи (${contact._count?.tasks || 0})` }, { key: 'deals' as const, label: `Сделки (${contact._count?.deals || 0})` }, { key: 'projects' as const, label: `Проекты (${contact.projects?.length || 0})` }, { key: 'accesses' as const, label: `Доступы (${contact._count?.accesses || 0})` }].map((tab) => (
+        {[{ key: 'info' as const, label: 'Основная информация' }, { key: 'tasks' as const, label: `Задачи (${contact._count?.tasks || 0})` }, { key: 'deals' as const, label: `Сделки (${contact._count?.deals || 0})` }, { key: 'projects' as const, label: `Проекты (${contact.projects?.length || 0})` }, { key: 'accesses' as const, label: `Доступы (${contact._count?.accesses || 0})` }].filter(tab => tab.key !== 'accesses' || canReadAccesses).map((tab) => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{ padding: '10px 20px', border: 'none', borderBottom: activeTab === tab.key ? '2px solid #1565c0' : '2px solid transparent', background: 'transparent', color: activeTab === tab.key ? '#1565c0' : 'var(--text-muted)', fontWeight: activeTab === tab.key ? 600 : 400, cursor: 'pointer', fontSize: 14, transition: 'all 0.15s' }}>{tab.label}</button>
         ))}
       </div>
@@ -265,7 +269,7 @@ export function ContactDetail() {
       )}
 
       {activeTab === 'accesses' && (
-        <ContactAccesses contactId={contact.id} canEdit={canEdit} />
+        <ContactAccesses contactId={contact.id} canEdit={canEditAccesses} canDelete={canDeleteAccesses} />
       )}
     </div>
   );

@@ -30,9 +30,10 @@ const getDirection = (value: string) => DIRECTIONS.find(d => d.value === value) 
 interface Props {
   contactId: string;
   canEdit: boolean;
+  canDelete?: boolean;
 }
 
-export function ContactAccesses({ contactId, canEdit }: Props) {
+export function ContactAccesses({ contactId, canEdit, canDelete }: Props) {
   const [accesses, setAccesses] = useState<ContactAccess[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null); // null | 'new' | id
@@ -191,10 +192,14 @@ export function ContactAccesses({ contactId, canEdit }: Props) {
           <div key={access.id} style={{ padding: 14, borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
               <span style={{ padding: '3px 10px', borderRadius: 10, fontSize: 12, fontWeight: 500, background: dir.bg, color: dir.text }}>{dir.label}</span>
-              {canEdit && (
+              {(canEdit || canDelete) && (
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => startEdit(access)} style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>✏️</button>
-                  <button onClick={() => handleDelete(access.id)} style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>🗑</button>
+                  {canEdit && (
+                    <button onClick={() => startEdit(access)} style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>✏️</button>
+                  )}
+                  {canDelete && (
+                    <button onClick={() => handleDelete(access.id)} style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>🗑</button>
+                  )}
                 </div>
               )}
             </div>
