@@ -39,6 +39,9 @@ services:
       NAS_DSM_PASSWORD: "16Fhuevtyn_"
       NAS_BACKEND_HOST: "192.168.8.145"
       NAS_BACKEND_PORT: 80
+      # Базовый домен поддоменов организаций и email для Let's Encrypt на NAS
+      NAS_BASE_DOMAIN: "welans.cc"
+      NAS_DSM_LE_EMAIL: "admin@welans.cc"
       BEGET_PASSWORD: "nyBNQofDm96"
       TOCHKA_CLIENT_ID: "4146da5f3ccc42d6a2e725a08062d8e7"
       TOCHKA_CLIENT_SECRET: "e90a2e242aad441596da65e889d96dad"

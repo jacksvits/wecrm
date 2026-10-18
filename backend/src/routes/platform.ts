@@ -11,7 +11,7 @@ import jwt from 'jsonwebtoken';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { currentTenant, platformPrisma, invalidateTenantCache, getTenantPrisma, asMainTenant } from '../lib/tenant.js';
 import { dbNameForSlug, provisionTenantDb, dropTenantDb, slugTaken, SLUG_PATTERN } from '../lib/tenant-provision.js';
-import { createTenantProxyRule, deleteTenantProxyRule } from '../lib/nas-proxy.js';
+import { createTenantProxyRule, deleteTenantProxyRule, ensureTenantCertificate } from '../lib/nas-proxy.js';
 import { createTenantPaymentLink } from './tochka-acquiring.js';
 
 const router = Router();
@@ -104,9 +104,11 @@ router.post('/register', async (req, res) => {
     });
     invalidateTenantCache(slug);
 
-    // Правило Reverse Proxy на NAS: <slug>.welans.cc -> CRM-сервер.
-    // Ошибки не прерывают регистрацию — правило можно добавить вручную.
+    // Правила Reverse Proxy на NAS (:443 + :80): <slug>.welans.cc -> CRM-сервер,
+    // затем попытка выпуска Let's Encrypt для поддомена.
+    // Ошибки не прерывают регистрацию — всё можно донастроить вручную.
     createTenantProxyRule(slug).catch((e: any) => console.error('[platform] NAS proxy rule:', e.message));
+    ensureTenantCertificate(slug).catch((e: any) => console.error('[platform] NAS certificate:', e.message));
 
     // Уведомляем администраторов платформы о новой регистрации
     try {
