@@ -53,28 +53,10 @@ function applyIconLinks() {
   if (apple && current.appleTouchIconUrl) {
     apple.href = current.appleTouchIconUrl;
   }
-  // Динамический manifest PWA со ссылками на кастомные иконки
-  const manifest = {
-    name: 'WeCRM',
-    short_name: 'WeCRM',
-    description: 'CRM для управления задачами, сделками и контактами',
-    start_url: '/',
-    display: 'standalone',
-    background_color: '#ffffff',
-    theme_color: '#00b300',
-    orientation: 'portrait-primary',
-    icons: [
-      { src: current.iconUrl, sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: current.iconUrl512 || current.iconUrl, sizes: '512x512', type: 'image/png', purpose: 'any' },
-      { src: current.iconUrl, sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-      { src: current.iconUrl512 || current.iconUrl, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-    ],
-  };
-  const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-  const manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-  if (manifestLink) {
-    manifestLink.href = URL.createObjectURL(blob);
-  }
+  // PWA-manifest больше не переопределяем на клиенте: /manifest.json отдаёт
+  // backend с данными текущего tenant'а (имя из SEO-настроек, иконки брендинга).
+  // Раньше здесь создавался Blob-manifest с захардкоженным «WeCRM», который
+  // перекрывал серверный и ломал персонализацию на Android.
 }
 
 export async function loadBranding(): Promise<Branding> {

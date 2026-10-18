@@ -66,6 +66,7 @@ import diadocPluginRoutes from './routes/diadoc-plugin.js';
 import ozonPluginRoutes from './routes/ozon-plugin.js';
 import handlerSettingsRoutes from './routes/handler-settings.js';
 import seoSettingsRoutes from './routes/seo-settings.js';
+import pwaRoutes from './routes/pwa.js';
 import autoReplySettingsRoutes from './routes/auto-reply-settings.js';
 import legalRoutes from './routes/legal.js';
 import browserRoutes from './routes/browser.js';
@@ -198,6 +199,10 @@ app.use('/api/diadoc-plugin', diadocPluginRoutes);
 app.use('/api/ozon-plugin', ozonPluginRoutes);
 app.use('/api/handler-settings', handlerSettingsRoutes);
 app.use('/api/seo-settings', seoSettingsRoutes);
+// PWA с данными tenant'а: index.html (мета-теги iOS «Добавить на экран Домой»)
+// и manifest.json. Пути корневые — tenantMiddleware применяем точечно.
+app.use(['/pwa-index', '/manifest.json'], tenantMiddleware);
+app.use(pwaRoutes);
 app.use('/api/auto-reply-settings', autoReplySettingsRoutes);
 app.use('/api/legal', legalRoutes);
 app.use('/api/browser/vnc', vncRoutes);

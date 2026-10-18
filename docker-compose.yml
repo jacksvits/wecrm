@@ -63,6 +63,8 @@ services:
       - ./vpn/sing-box:/app/vpn-config
       # Docker-сокет: спавн контейнеров VNC-браузера (routes/browser-vnc.ts)
       - /var/run/docker.sock:/var/run/docker.sock
+      # Собранный фронтенд (общий том с frontend) — шаблон index.html для /pwa-index
+      - fe-dist:/fe-dist:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4000/api/health || exit 1"]
@@ -82,6 +84,10 @@ services:
         condition: service_healthy
     volumes:
       - /mnt/nfs/wecrm-uploads:/usr/share/nginx/html/uploads:ro
+      # Общий том с backend: копия собранного dist для /pwa-index (tenant-aware index.html)
+      - fe-dist:/fe-dist
+    # Копируем dist в общий том перед стартом nginx (backend читает index.html оттуда)
+    command: sh -c "mkdir -p /fe-dist && cp -rf /usr/share/nginx/html/. /fe-dist/ && exec nginx -g 'daemon off;'"
     restart: unless-stopped
 
   email-worker:
@@ -133,4 +139,5 @@ services:
 
 volumes:
   pgdata:
+  fe-dist:
 
