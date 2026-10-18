@@ -89,19 +89,25 @@ const handleSubmit = async (e: React.FormEvent) => { e.preventDefault() ; setErr
   <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Права роли</div>
   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Что пользователи с этой ролью могут видеть и делать в системе.</div>
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', columnGap: 16 }}>
-    {tasksAllowed && (<PermToggle checked={form.isAssignable} onChange={e => setForm({ ...form, isAssignable: e.target.checked })} title='Использовать как исполнитель' desc='Пользователи с этой ролью могут быть назначены на задачи' />)}
     <PermToggle checked={form.canAccessChat} onChange={e => setForm({ ...form, canAccessChat: e.target.checked })} title='Доступ к общему чату' desc='Просмотр и отправка сообщений в общем чате' />
     {supportAllowed && (<><PermToggle checked={form.canAccessSupportChat} onChange={e => setForm({ ...form, canAccessSupportChat: e.target.checked })} title='Чат тех. поддержки' desc='Страница «Тех. поддержка» и общение с поддержкой' />
     <PermToggle checked={form.canSeeAllSupportTickets} onChange={e => setForm({ ...form, canSeeAllSupportTickets: e.target.checked })} title='Все запросы тех. поддержки' desc='Просмотр и ответы на все обращения' /></>)}
-    {(currentUser as any)?.crmAccounting !== false && (<PermToggle checked={form.showFinancesTab} onChange={e => setForm({ ...form, showFinancesTab: e.target.checked })} title='Вкладка «Финансы» в задачах' desc='Пользователи с этой ролью видят финансы задач' />)}
     {catalogAllowed && (<PermToggle checked={form.stockAccess} onChange={e => setForm({ ...form, stockAccess: e.target.checked })} title='Складской учёт' desc='Вкладки «Номенклатура», «Склад», «Цены», «Резервы» в «Каталоге»' />)}
     {projectsAllowed && (<PermToggle checked={form.canAccessProjects} onChange={e => setForm({ ...form, canAccessProjects: e.target.checked })} title='Доступ к проектам' desc='Показ в списке участников проекта' />)}
-    <PermToggle checked={form.showCalendarMetric} onChange={e => setForm({ ...form, showCalendarMetric: e.target.checked })} title='Метрика календаря' desc='Календарь на главной странице (дашборде)' />
     <PermToggle checked={form.isSystemHandler} onChange={e => setForm({ ...form, isSystemHandler: e.target.checked })} title='Системный обработчик' desc='Не учитывается в виджете push-уведомлений Директора' />
-    {tasksAllowed && (<PermToggle checked={form.canChangeTaskStatus} onChange={e => setForm({ ...form, canChangeTaskStatus: e.target.checked })} title='Смена статуса у задач' desc='Пользователи с этой ролью могут менять статус задач' />)}
     <PermToggle checked={form.canCreateNews} onChange={e => setForm({ ...form, canCreateNews: e.target.checked })} title='Создание новостей' />
     <PermToggle checked={form.canEditNews} onChange={e => setForm({ ...form, canEditNews: e.target.checked })} title='Редактирование новостей' />
     {tasksAllowed && (<PermToggle checked={form.canHandleSpam ?? false} onChange={e => setForm({ ...form, canHandleSpam: e.target.checked })} title='Обработка СПАМА' desc='Кнопка «череп» на задачах из писем' />)}
+  </div>
+</div>
+<div style={{ border: '1px solid var(--border-color)', borderRadius: 8, padding: 12 }}>
+  <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Управление задачами</div>
+  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Настройки работы с задачами для пользователей с этой ролью.</div>
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', columnGap: 16 }}>
+    {tasksAllowed && (<PermToggle checked={form.isAssignable} onChange={e => setForm({ ...form, isAssignable: e.target.checked })} title='Использовать как исполнитель' desc='Пользователи с этой ролью могут быть назначены на задачи' />)}
+    {(currentUser as any)?.crmAccounting !== false && (<PermToggle checked={form.showFinancesTab} onChange={e => setForm({ ...form, showFinancesTab: e.target.checked })} title='Вкладка «Финансы» в задачах' desc='Пользователи с этой ролью видят финансы задач' />)}
+    <PermToggle checked={form.showCalendarMetric} onChange={e => setForm({ ...form, showCalendarMetric: e.target.checked })} title='Метрика календаря' desc='Календарь на главной странице (дашборде)' />
+    {tasksAllowed && (<PermToggle checked={form.canChangeTaskStatus} onChange={e => setForm({ ...form, canChangeTaskStatus: e.target.checked })} title='Смена статуса у задач' desc='Пользователи с этой ролью могут менять статус задач' />)}
   </div>
 </div>
 <div style={{ border: '1px solid var(--border-color)', borderRadius: 8, padding: 12 }}>
