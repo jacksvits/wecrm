@@ -130,6 +130,21 @@ services:
     volumes:
       - ./vpn/sing-box:/etc/sing-box:ro
 
+
+  # SNI-роутер внешнего HTTPS (443): welans.cc + *.welans.cc -> хостовый nginx :10443
+  # (wildcard ZeroSSL, автообновление acme.sh), остальное -> NAS 192.168.8.3:443
+  # (чужие сайты без изменений). network_mode: host — нужны loopback хоста и LAN.
+  haproxy:
+    image: haproxy:2.9-alpine
+    container_name: wecrm-haproxy-1
+    network_mode: host
+    restart: unless-stopped
+    user: root
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - backend
+
   # Образ VNC-сессии браузера: собирается вручную
   # (docker compose --profile manual build vnc-session), запуск контейнеров —
   # по требованию бэкендом (по сессии на пользователя CRM)
