@@ -19,6 +19,17 @@ declare global {
   }
 }
 
+// Базовый заголовок вкладки без префикса счётчика уведомлений.
+// Приоритет: SEO-заголовок из настроек тенанта (если initSeo уже применил его),
+// иначе текущий document.title без префикса "(N) ", иначе дефолт из index.html.
+// Функция (а не константа): модули-потребители могут загружаться раньше initSeo(),
+// поэтому значение нужно вычислять на момент каждого вызова.
+export function seoBaseTitle(): string {
+  const seo = window.__SEO_BASE_TITLE__;
+  if (seo) return seo;
+  return (document.title || "WeCRM").replace(/^\(\d+\)\s+/, "") || "WeCRM";
+}
+
 function setMeta(attr: "name", key: string, content: string) {
   if (!content) return;
   let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
