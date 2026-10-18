@@ -71,7 +71,10 @@ async function pwaData() {
 // GET /pwa-index — index.html с метатегами текущего tenant'а.
 // nginx хоста проксирует сюда location = / (до отдачи статики фронтендом).
 router.get('/pwa-index', async (_req, res) => {
-  const key = 'index';
+  // Кэш строго per tenant: иначе первый запросивший tenant закэширует свой
+  // HTML для всех остальных (iOS-диалог «Добавить на экран Домой» покажет
+  // чужое название/иконку)
+  const key = `index:${currentTenant()?.slug || 'main'}`;
   const cached = renderCache.get(key);
   if (cached && cached.expires > Date.now()) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
