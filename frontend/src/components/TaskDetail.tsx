@@ -324,6 +324,9 @@ export function TaskDetail() {
   const [discussionContact, setDiscussionContact] = useState<DiscussionContact | null>(null);
   const discussionSplitRef = useRef<HTMLDivElement>(null);
   const [discussionPaneHeight, setDiscussionPaneHeight] = useState<number | null>(null);
+  const [discussionMobile, setDiscussionMobile] = useState<boolean>(
+    window.innerWidth <= 1024,
+  );
   const [deals, setDeals] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -517,6 +520,13 @@ export function TaskDetail() {
       const el = discussionSplitRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top;
+      const isMobile = window.innerWidth <= 1024;
+      setDiscussionMobile(isMobile);
+      // Мобильная версия: блок обсуждения чуть меньше высоты экрана
+      if (isMobile) {
+        setDiscussionPaneHeight(Math.round(window.innerHeight * 0.85));
+        return;
+      }
       if (top < 0) return; // страница уже прокручена — не меряем
       const doc = document.documentElement;
       // clientHeight не включает высоту горизонтального скроллбара,
@@ -2385,11 +2395,12 @@ export function TaskDetail() {
               </div>
               <div
                 className="task-discussion-pane"
-                style={{ height: discussionPaneHeight ?? "calc(100vh - 280px)" }}
+                style={{ height: discussionMobile ? "auto" : discussionPaneHeight ?? "calc(100vh - 280px)" }}
               >
                 <TaskDiscussionContact
                   contact={discussionContact}
                   onUpdate={(updated) => setDiscussionContact(updated)}
+                  maxHeight={discussionMobile ? "70vh" : undefined}
                 />
               </div>
             </div>

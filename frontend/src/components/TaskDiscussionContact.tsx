@@ -189,9 +189,12 @@ function EditButton({ onClick, title }: { onClick: () => void; title: string }) 
 export function TaskDiscussionContact({
   contact,
   onUpdate,
+  maxHeight,
 }: {
   contact: DiscussionContact | null;
   onUpdate?: (updated: DiscussionContact) => void;
+  // Ограничение высоты карточки (используется на мобильных)
+  maxHeight?: string;
 }) {
   const navigate = useNavigate();
   const [editingField, setEditingField] = useState<EditableField>(null);
@@ -446,6 +449,7 @@ export function TaskDiscussionContact({
         minHeight: 300,
         boxSizing: "border-box",
         overflow: "hidden",
+        ...(maxHeight ? { maxHeight } : {}),
       }}
     >
       {/* Шапка карточки контакта */}
