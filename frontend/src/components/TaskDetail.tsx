@@ -528,7 +528,9 @@ export function TaskDetail() {
       // обязан умещаться в видимую область (с учётом шапки/вкладок сверху)
       if (isMobile) {
         if (top < 0) return; // страница прокручена — сохраняем текущую высоту
-        const available = viewport - top - 24;
+        // −80px: нижняя навигация приложения + отступ, чтобы поле ввода
+        // не перекрывалось таб-баром
+        const available = viewport - top - 80;
         setDiscussionPaneHeight(
           Math.max(320, Math.min(Math.round(viewport * 0.85), available)),
         );
