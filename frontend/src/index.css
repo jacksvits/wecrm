@@ -1250,6 +1250,11 @@ html, body { overflow-x: hidden; }
 .task-discussion-pane {
   flex: 1 1 50%;
   min-width: 0;
+  min-height: 0;
+}
+/* На мобильных (колонка) flex-элементы иначе растягиваются по min-content */
+.task-discussion-pane > div {
+  min-height: 0;
 }
 /* На узких экранах блоки выстраиваются друг под другом на всю ширину */
 @media (max-width: 1024px) {
