@@ -1,6 +1,10 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ReactQuill from "react-quill";
+import "react-quill/dist/quill.snow.css";
 import { Contact, Deal } from "../types";
 import { Avatar } from "./Avatar";
+import { api } from "../api/client";
 
 // Контакт с подгруженными связями (эндпоинт GET /api/contacts/:id)
 export type DiscussionContact = Contact & {
@@ -13,6 +17,19 @@ export type DiscussionContact = Contact & {
     createdAt: string;
   }[];
 };
+
+const quillModules = {
+  toolbar: [
+    ["bold", "italic", "underline", "strike"],
+    [{ list: "ordered" }, { list: "bullet" }],
+    ["link"],
+    ["clean"],
+  ],
+};
+
+const quillFormats = ["bold", "italic", "underline", "strike", "list", "bullet", "link"];
+
+type EditableField = "phones" | "emails" | "address" | "notes" | null;
 
 function formatDate(value?: string | null) {
   if (!value) return "";
@@ -84,14 +101,77 @@ const activityMetaStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 
+const editInputStyle: React.CSSProperties = {
+  padding: "8px 12px",
+  borderRadius: 10,
+  border: "1px solid var(--border-color)",
+  background: "var(--bg-input)",
+  color: "var(--text-primary)",
+  fontSize: 14,
+  fontFamily: "inherit",
+  outline: "none",
+  width: "100%",
+  boxSizing: "border-box",
+};
+
+const actionButtonStyle: React.CSSProperties = {
+  padding: "6px 12px",
+  borderRadius: 10,
+  border: "1px solid var(--border-color)",
+  background: "var(--bg-input)",
+  color: "var(--text-primary)",
+  fontSize: 13,
+  cursor: "pointer",
+};
+
+const primaryButtonStyle: React.CSSProperties = {
+  padding: "6px 12px",
+  borderRadius: 10,
+  border: "none",
+  background: "var(--text-primary)",
+  color: "var(--bg-card)",
+  fontSize: 13,
+  cursor: "pointer",
+};
+
+// Кнопка-иконка «изменить» (карандаш), как табы в TaskDetail
+function EditButton({ onClick, title }: { onClick: () => void; title: string }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        padding: 2,
+        lineHeight: 1,
+        color: "var(--text-muted)",
+        display: "inline-flex",
+        alignItems: "center",
+        flexShrink: 0,
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+      </svg>
+    </button>
+  );
+}
+
 export function TaskDiscussionContact({
   contact,
+  onUpdate,
 }: {
   contact: DiscussionContact | null;
+  onUpdate?: (updated: DiscussionContact) => void;
 }) {
   const navigate = useNavigate();
+  const [editingField, setEditingField] = useState<EditableField>(null);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
 
-  // Контакт не привязан к задаче — показываем пустое состояние
   if (!contact) {
     return (
       <div
@@ -134,23 +214,100 @@ export function TaskDiscussionContact({
     : contact.email
       ? [contact.email]
       : [];
-  const infoFields: { label: string; value?: string | null }[] = [
-    { label: "Телефон", value: phones.join(", ") || null },
-    { label: "Email", value: emails.join(", ") || null },
-    {
-      label: "Организация",
-      value: contact.organization?.name || null,
-    },
-    { label: "Должность", value: contact.position || null },
-    { label: "Адрес", value: contact.address || null },
-    {
-      label: "Последняя активность",
-      value: formatDate(contact.lastActivityTime) || null,
-    },
-  ].filter((f) => Boolean(f.value));
+
+  const startEdit = (field: Exclude<EditableField, null>) => {
+    setEditError("");
+    if (field === "phones") setDraft(phones.join(", "));
+    else if (field === "emails") setDraft(emails.join(", "));
+    else if (field === "address") setDraft(contact.address || "");
+    else if (field === "notes") setDraft(contact.notes || "");
+    setEditingField(field);
+  };
+
+  const cancelEdit = () => {
+    setEditingField(null);
+    setDraft("");
+    setEditError("");
+  };
+
+  const saveField = async () => {
+    if (!editingField || saving) return;
+    setSaving(true);
+    setEditError("");
+    try {
+      let payload: Record<string, unknown> = {};
+      if (editingField === "phones") {
+        payload = {
+          phones: draft
+            .split(",")
+            .map((p) => p.trim())
+            .filter(Boolean),
+        };
+      } else if (editingField === "emails") {
+        payload = {
+          emails: draft
+            .split(",")
+            .map((e) => e.trim())
+            .filter(Boolean),
+        };
+      } else if (editingField === "address") {
+        payload = { address: draft.trim() || null };
+      } else if (editingField === "notes") {
+        payload = { notes: draft };
+      }
+      const updated = (await api.contacts.update(contact.id, payload)) as DiscussionContact;
+      // Сохраняем связанные данные (задачи/сделки), которых нет в ответе PATCH
+      onUpdate?.({ ...contact, ...updated, tasks: contact.tasks, deals: contact.deals });
+      setEditingField(null);
+      setDraft("");
+    } catch (err: any) {
+      setEditError(err.message || "Ошибка сохранения");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Редактируемое текстовое поле (телефон / email / адрес)
+  const renderEditableField = (
+    field: Exclude<EditableField, "notes" | null>,
+    label: string,
+    value: string,
+  ) => (
+    <div style={infoRowStyle}>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <span style={infoLabelStyle}>{label}</span>
+        <EditButton onClick={() => startEdit(field)} title={`Изменить: ${label}`} />
+      </div>
+      {editingField === field ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveField();
+              if (e.key === "Escape") cancelEdit();
+            }}
+            style={editInputStyle}
+          />
+          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+            <button onClick={cancelEdit} disabled={saving} style={actionButtonStyle}>
+              Отмена
+            </button>
+            <button onClick={saveField} disabled={saving} style={primaryButtonStyle}>
+              {saving ? "Сохранение..." : "Сохранить"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <span style={infoValueStyle}>{value || "—"}</span>
+      )}
+    </div>
+  );
 
   const tasks = contact.tasks?.slice(0, 8) || [];
   const deals = contact.deals?.slice(0, 8) || [];
+  const isHtml = (text: string) => /<[a-z][\s\S]*>/i.test(text);
 
   return (
     <div
@@ -211,22 +368,13 @@ export function TaskDiscussionContact({
         <button
           onClick={() => navigate(`/contacts/${contact.id}`)}
           title="Открыть карточку контакта"
-          style={{
-            padding: "6px 12px",
-            borderRadius: 10,
-            border: "1px solid var(--border-color)",
-            background: "var(--bg-input)",
-            color: "var(--text-primary)",
-            fontSize: 13,
-            cursor: "pointer",
-            flexShrink: 0,
-          }}
+          style={actionButtonStyle}
         >
           Открыть
         </button>
       </div>
 
-      {/* Поля контакта */}
+      {/* Поля контакта (телефон / email / адрес редактируемые) */}
       <div
         style={{
           display: "flex",
@@ -236,12 +384,27 @@ export function TaskDiscussionContact({
           flexShrink: 0,
         }}
       >
-        {infoFields.map((field) => (
-          <div key={field.label} style={infoRowStyle}>
-            <span style={infoLabelStyle}>{field.label}</span>
-            <span style={infoValueStyle}>{field.value}</span>
+        {renderEditableField("phones", "Телефон", phones.join(", "))}
+        {renderEditableField("emails", "Email", emails.join(", "))}
+        {renderEditableField("address", "Адрес", contact.address || "")}
+        {contact.organization && (
+          <div style={infoRowStyle}>
+            <span style={infoLabelStyle}>Организация</span>
+            <span style={infoValueStyle}>{contact.organization.name}</span>
           </div>
-        ))}
+        )}
+        {contact.position && (
+          <div style={infoRowStyle}>
+            <span style={infoLabelStyle}>Должность</span>
+            <span style={infoValueStyle}>{contact.position}</span>
+          </div>
+        )}
+        {contact.lastActivityTime && (
+          <div style={infoRowStyle}>
+            <span style={infoLabelStyle}>Последняя активность</span>
+            <span style={infoValueStyle}>{formatDate(contact.lastActivityTime)}</span>
+          </div>
+        )}
         {contact.tags && contact.tags.length > 0 && (
           <div
             style={{
@@ -268,6 +431,53 @@ export function TaskDiscussionContact({
               </span>
             ))}
           </div>
+        )}
+
+        {/* Комментарий (WYSIWYG) */}
+        <div style={infoRowStyle}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={infoLabelStyle}>Комментарий</span>
+            {editingField !== "notes" && (
+              <EditButton onClick={() => startEdit("notes")} title="Изменить: комментарий" />
+            )}
+          </div>
+          {editingField === "notes" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ background: "var(--bg-input)", borderRadius: 10 }}>
+                <ReactQuill
+                  theme="snow"
+                  value={draft}
+                  onChange={setDraft}
+                  modules={quillModules}
+                  formats={quillFormats}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                <button onClick={cancelEdit} disabled={saving} style={actionButtonStyle}>
+                  Отмена
+                </button>
+                <button onClick={saveField} disabled={saving} style={primaryButtonStyle}>
+                  {saving ? "Сохранение..." : "Сохранить"}
+                </button>
+              </div>
+            </div>
+          ) : contact.notes ? (
+            isHtml(contact.notes) ? (
+              <div
+                className="rich-text"
+                style={{ fontSize: 14, color: "var(--text-primary)", wordBreak: "break-word" }}
+                dangerouslySetInnerHTML={{ __html: contact.notes }}
+              />
+            ) : (
+              <span style={infoValueStyle}>{contact.notes}</span>
+            )
+          ) : (
+            <span style={{ ...infoValueStyle, color: "var(--text-muted)" }}>—</span>
+          )}
+        </div>
+
+        {editError && (
+          <div style={{ fontSize: 12, color: "var(--color-danger, #dc2626)" }}>{editError}</div>
         )}
       </div>
 

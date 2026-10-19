@@ -2320,7 +2320,10 @@ export function TaskDetail() {
               </div>{" "}
               </div>
               <div className="task-discussion-pane">
-                <TaskDiscussionContact contact={discussionContact} />
+                <TaskDiscussionContact
+                  contact={discussionContact}
+                  onUpdate={(updated) => setDiscussionContact(updated)}
+                />
               </div>
             </div>
           )}{" "}
