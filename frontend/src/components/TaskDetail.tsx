@@ -322,6 +322,8 @@ export function TaskDetail() {
   });
   const [contactText, setContactText] = useState("");
   const [discussionContact, setDiscussionContact] = useState<DiscussionContact | null>(null);
+  const discussionSplitRef = useRef<HTMLDivElement>(null);
+  const [discussionPaneHeight, setDiscussionPaneHeight] = useState<number | null>(null);
   const [deals, setDeals] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -503,6 +505,26 @@ export function TaskDetail() {
       cancelled = true;
     };
   }, [task?.contact?.id]);
+
+  // Высота панелей обсуждения — ровно до низа экрана (пересчёт при скролле/ресайзе)
+  useEffect(() => {
+    if (activeTab !== "comments") return;
+    const measure = () => {
+      const el = discussionSplitRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      setDiscussionPaneHeight(
+        Math.max(320, Math.min(window.innerHeight - top, window.innerHeight)),
+      );
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [activeTab]);
 
   const loadTask = async () => {
     setLoading(true);
@@ -1717,9 +1739,12 @@ export function TaskDetail() {
             </div>
           )}{" "}
           {activeTab === "comments" && (
-            <div className="task-discussion-split">
+            <div className="task-discussion-split" ref={discussionSplitRef}>
               {" "}
-              <div className="task-discussion-pane">
+              <div
+                className="task-discussion-pane"
+                style={{ height: discussionPaneHeight ?? "calc(100vh - 280px)" }}
+              >
               {" "}
               <div
                 style={{
@@ -1730,8 +1755,9 @@ export function TaskDetail() {
                   boxShadow: "var(--shadow)",
                   display: "flex",
                   flexDirection: "column",
-                  height: "calc(100vh - 280px)",
-                  minHeight: 400,
+                  height: "100%",
+                  minHeight: 300,
+                  boxSizing: "border-box",
                 }}
               >
                 {" "}
@@ -2319,7 +2345,10 @@ export function TaskDetail() {
                 </div>{" "}
               </div>{" "}
               </div>
-              <div className="task-discussion-pane">
+              <div
+                className="task-discussion-pane"
+                style={{ height: discussionPaneHeight ?? "calc(100vh - 280px)" }}
+              >
                 <TaskDiscussionContact
                   contact={discussionContact}
                   onUpdate={(updated) => setDiscussionContact(updated)}

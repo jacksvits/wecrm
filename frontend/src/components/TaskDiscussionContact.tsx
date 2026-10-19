@@ -215,11 +215,23 @@ export function TaskDiscussionContact({
     }
   };
 
+  // Пользователь системы, соответствующий контакту: у резервов/заказов
+  // может быть другой получатель (например, организация), но автор совпадает
+  const isContactAuthor = (u: any) => {
+    if (!u || !contact) return false;
+    const contactEmails = [contact.email, ...(contact.emails || [])].filter(Boolean);
+    return (
+      (u.email && contactEmails.includes(u.email)) || u.name === contact.name
+    );
+  };
+
   const loadOrders = async () => {
     if (orders !== null || !contact) return;
     try {
       const list = await api.sales.list();
-      setOrders(list.filter((s: any) => s.contactId === contact.id));
+      setOrders(
+        list.filter((s: any) => s.contactId === contact.id || isContactAuthor(s.user)),
+      );
     } catch {
       setOrders([]);
     }
@@ -229,7 +241,9 @@ export function TaskDiscussionContact({
     if (reserves !== null || !contact) return;
     try {
       const list = await api.reservations.list();
-      setReserves(list.filter((r: any) => r.contactId === contact.id));
+      setReserves(
+        list.filter((r: any) => r.contactId === contact.id || isContactAuthor(r.user)),
+      );
     } catch {
       setReserves([]);
     }
@@ -256,8 +270,9 @@ export function TaskDiscussionContact({
           alignItems: "center",
           justifyContent: "center",
           gap: 8,
-          height: "calc(100vh - 280px)",
-          minHeight: 400,
+          height: "100%",
+          minHeight: 300,
+          boxSizing: "border-box",
           color: "var(--text-muted)",
           fontSize: 14,
           textAlign: "center",
@@ -413,8 +428,9 @@ export function TaskDiscussionContact({
         boxShadow: "var(--shadow)",
         display: "flex",
         flexDirection: "column",
-        height: "calc(100vh - 280px)",
-        minHeight: 400,
+        height: "100%",
+        minHeight: 300,
+        boxSizing: "border-box",
         overflow: "hidden",
       }}
     >
