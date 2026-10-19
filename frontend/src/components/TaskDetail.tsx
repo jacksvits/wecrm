@@ -519,10 +519,13 @@ export function TaskDetail() {
     };
     measure();
     window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
+    // Скролл может идти и на window, и на внутреннем контейнере страницы
+    window.addEventListener("scroll", measure);
+    document.addEventListener("scroll", measure, true);
     return () => {
       window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("scroll", measure);
+      document.removeEventListener("scroll", measure, true);
     };
   }, [activeTab]);
 

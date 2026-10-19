@@ -219,10 +219,14 @@ export function TaskDiscussionContact({
   // может быть другой получатель (например, организация), но автор совпадает
   const isContactAuthor = (u: any) => {
     if (!u || !contact) return false;
-    const contactEmails = [contact.email, ...(contact.emails || [])].filter(Boolean);
-    return (
-      (u.email && contactEmails.includes(u.email)) || u.name === contact.name
-    );
+    const contactEmails = [contact.email, ...(contact.emails || [])]
+      .map((e) => (e || "").trim().toLowerCase())
+      .filter(Boolean);
+    const userEmail = typeof u.email === "string" ? u.email.trim().toLowerCase() : "";
+    const sameName =
+      typeof u.name === "string" &&
+      u.name.trim().toLowerCase() === contact.name.trim().toLowerCase();
+    return (userEmail && contactEmails.includes(userEmail)) || sameName;
   };
 
   const loadOrders = async () => {
@@ -472,7 +476,11 @@ export function TaskDiscussionContact({
             {contact.name}
           </span>
           <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
-            {contact.type || (contact.kind === "organization" ? "Организация" : "Контакт")}
+            {[contact.organization?.name, contact.position]
+              .filter(Boolean)
+              .join(" · ") ||
+              contact.type ||
+              (contact.kind === "organization" ? "Организация" : "Контакт")}
           </span>
         </div>
         <button
@@ -497,18 +505,6 @@ export function TaskDiscussionContact({
         {renderEditableField("phones", "Телефон", phones.join(", "))}
         {renderEditableField("emails", "Email", emails.join(", "))}
         {renderEditableField("address", "Адрес", contact.address || "")}
-        {contact.organization && (
-          <div style={infoRowStyle}>
-            <span style={infoLabelStyle}>Организация</span>
-            <span style={infoValueStyle}>{contact.organization.name}</span>
-          </div>
-        )}
-        {contact.position && (
-          <div style={infoRowStyle}>
-            <span style={infoLabelStyle}>Должность</span>
-            <span style={infoValueStyle}>{contact.position}</span>
-          </div>
-        )}
         {contact.lastActivityTime && (
           <div style={infoRowStyle}>
             <span style={infoLabelStyle}>Последняя активность</span>
