@@ -29,7 +29,7 @@ function runTenantMigrations(tenants: any[]): Promise<void> {
       if (i >= tenants.length) return resolve();
       const t = tenants[i++];
       // CLI prisma применяет миграции из каталога приложения (/app) с подменой DATABASE_URL
-      execFile('npx', ['prisma', 'migrate', 'deploy', '--skip-generate'], {
+      execFile('npx', ['prisma', 'migrate', 'deploy'], {
         cwd: '/app',
         env: { ...process.env, DATABASE_URL: tenantDbUrl(t.dbName) },
         timeout: 120000,
