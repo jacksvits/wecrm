@@ -337,7 +337,7 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
     // Отправляем только если задача привязана к ВК и комментарий не внутренний
     if (task.vkPeerId && task.vkGroupId && !isInternal) {
       try {
-        const vkSettings = await prisma.vkGroupSettings.findFirst({
+        const vkSettings = await prisma.vkCommunitySettings.findFirst({
           where: { groupId: task.vkGroupId, isActive: true },
         });
 
@@ -361,21 +361,21 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
           const randomId = Date.now() + Math.floor(Math.random() * 1000);
           const vkUrl = `https://api.vk.com/method/messages.send?peer_id=${task.vkPeerId}&message=${encodeURIComponent(vkMessageText)}&random_id=${randomId}&access_token=${vkSettings.accessToken}&v=5.199`;
 
-          console.log('[VK Comment Send] Sending reply to peer', task.vkPeerId, 'text:', vkMessageText.substring(0, 100));
+          console.log('[VK Community Comment Send] Sending reply to peer', task.vkPeerId, 'text:', vkMessageText.substring(0, 100));
 
           const vkResponse = await fetch(vkUrl, { method: 'POST' });
           const vkData: any = await vkResponse.json();
 
           if (vkData.error) {
-            console.error('[VK Comment Send] VK API error:', vkData.error.error_msg, '(code', vkData.error.error_code, ')');
+            console.error('[VK Community Comment Send] VK API error:', vkData.error.error_msg, '(code', vkData.error.error_code, ')');
           } else {
-            console.log('[VK Comment Send] Sent successfully, msg_id:', vkData.response);
+            console.log('[VK Community Comment Send] Sent successfully, msg_id:', vkData.response);
           }
         } else {
-          console.log('[VK Comment Send] No active VK settings for group', task.vkGroupId);
+          console.log('[VK Community Comment Send] No active VK settings for group', task.vkGroupId);
         }
       } catch (vkErr: any) {
-        console.error('[VK Comment Send] Error:', vkErr.message || vkErr);
+        console.error('[VK Community Comment Send] Error:', vkErr.message || vkErr);
       }
     }
     // ======================================================

@@ -16,7 +16,7 @@ async function getHandlerConfig() {
   const [max, telegram, vk] = await Promise.all([
     prisma.maxSettings.findFirst({ select: { isActive: true, autoReply: true } }),
     prisma.telegramSettings.findFirst({ select: { isActive: true, autoReply: true } }),
-    prisma.vkGroupSettings.findFirst({ select: { isActive: true, autoReply: true } }),
+    prisma.vkCommunitySettings.findFirst({ select: { isActive: true, autoReply: true } }),
   ]);
   return {
     settings,
@@ -102,7 +102,7 @@ export async function sendToChannel(task: any, text: string): Promise<void> {
   // ВК Группа: peer_id задачи
   if (task.vkPeerId && task.vkGroupId) {
     try {
-      const vkSettings = await prisma.vkGroupSettings.findFirst({ where: { groupId: task.vkGroupId, isActive: true } });
+      const vkSettings = await prisma.vkCommunitySettings.findFirst({ where: { groupId: task.vkGroupId, isActive: true } });
       if (vkSettings?.accessToken) {
         const randomId = Date.now() + Math.floor(Math.random() * 1000);
         const vkUrl = `https://api.vk.com/method/messages.send?peer_id=${task.vkPeerId}&message=${encodeURIComponent(text)}&random_id=${randomId}&access_token=${vkSettings.accessToken}&v=5.199`;

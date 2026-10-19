@@ -10,7 +10,9 @@ import { useAuth } from "../hooks/useAuth";
 import { TelegramSettings } from "./TelegramSettings";
 import { VpnSettings } from "./VpnSettings";
 import { UserList } from "./UserList";
-import { VkGroupSettings } from "./VkGroupSettings";
+import { VkAuthSettings } from "./VkAuthSettings";
+import { VkMarketSettings } from "./VkMarketSettings";
+import { VkCommunitySettings } from "./VkCommunitySettings";
 import { ContactTypeManager } from "./ContactTypeManager";
 import { SmsJournal } from "./SmsJournal";
 import { YandexSettings } from "./YandexSettings";
@@ -26,7 +28,7 @@ import { SystemSettings } from "./SystemSettings";
 import { ScheduleSettings } from "./ScheduleSettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "schedule" | "integrations" | "system";
-type PluginKey = "email" | "telephony" | "max" | "telegram" | "vk" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "vpn";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "vpn";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
 const PLUGINS: { key: PluginKey; label: string; group: string; description: string }[] = [
@@ -35,7 +37,9 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "sms", label: "SMS журнал", group: "Коммуникации", description: "Журнал входящих и исходящих SMS" },
   { key: "max", label: "MAX", group: "Мессенджеры", description: "Уведомления в мессенджер MAX" },
   { key: "telegram", label: "Telegram", group: "Мессенджеры", description: "Уведомления и задачи из Telegram" },
-  { key: "vk", label: "ВК Группа", group: "Мессенджеры", description: "Комментарии и товары ВКонтакте" },
+  { key: "vkCommunity", label: "ВК сообщество", group: "Мессенджеры", description: "Сообщения сообщества ВК: обсуждения в задачах и автосоздание задач" },
+  { key: "vkMarket", label: "ВК товары", group: "Маркетплейсы", description: "Синхронизация товаров и услуг с ВК Маркетом" },
+  { key: "vkAuth", label: "ВК авторизация", group: "Сервисы", description: "Вход сотрудников в CRM через VK ID" },
   { key: "yandex", label: "Яндекс", group: "Сервисы", description: "API-ключ Яндекс.Карт" },
   { key: "dgis", label: "2GIS", group: "Сервисы", description: "API-ключ 2GIS (карты)" },
   { key: "beget", label: "Beget", group: "Хостинг", description: "Хостинг-аккаунт: тариф, баланс, домены" },
@@ -55,7 +59,9 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
     sms: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
     max: "M12.2 21.08c-1.8 0-2.64-0.26-4.09-1.31-0.92 1.18-3.83 2.11-3.96 0.53 0-1.19-0.26-2.19-0.56-3.29-0.35-1.35-0.76-2.85-0.76-5.03 0-5.2 4.27-9.11 9.32-9.11 5.06 0 9.02 4.1 9.02 9.16.17 4.98-4 9.03-8.97 9.05m0.07-13.72c-2.46-0.13-4.38 1.58-4.8 4.25-0.35 2.21 0.27 4.91 0.8 5.05 0.25 0.06 0.89-0.46 1.29-0.85a4.56 4.56 0 0 0 2.23 0.79c2.55 0.12 4.73-1.82 4.9-4.37 0.1-2.55-1.86-4.72-4.42-4.86Z",
     telegram: "M20.99 3.71C21.15 3.71 21.49 3.75 21.71 3.93A0.51 0.51 0 0 1 21.97 4.43C21.99 4.57 22.02 4.9 22 5.15C21.72 8.07 20.52 15.14 19.91 18.4C19.65 19.78 19.15 20.24 18.65 20.29C17.58 20.39 16.77 19.58 15.73 18.9C14.11 17.84 13.2 17.18 11.62 16.14C9.8 14.94 10.98 14.28 12.02 13.21C12.29 12.92 17 8.63 17.1 8.25C17.11 8.2 17.12 8.01 17.01 7.92C16.9 7.82 16.74 7.86 16.63 7.88C16.47 7.92 13.87 9.63 8.86 13.02C8.12 13.53 7.45 13.77 6.86 13.76C6.2 13.74 4.93 13.39 3.99 13.08C2.84 12.7 1.92 12.51 2 11.87C2.04 11.54 2.5 11.2 3.37 10.85C8.74 8.51 12.32 6.97 14.12 6.22C19.24 4.09 20.3 3.72 20.99 3.71Z",
-    vk: "M 5.75 6.07 L 2.5 6.07 C 2.65 13.48 6.36 17.93 12.85 17.93 L 13.22 17.93 L 13.22 13.69 C 15.6 13.93 17.41 15.67 18.13 17.93 L 21.5 17.93 C 20.57 14.56 18.14 12.69 16.62 11.98 C 18.14 11.1 20.28 8.97 20.79 6.07 L 17.73 6.07 C 17.06 8.42 15.09 10.56 13.22 10.76 L 13.22 6.07 L 10.15 6.07 L 10.15 14.28 C 8.26 13.81 5.86 11.51 5.75 6.07 Z",
+    vkAuth: "M 5.75 6.07 L 2.5 6.07 C 2.65 13.48 6.36 17.93 12.85 17.93 L 13.22 17.93 L 13.22 13.69 C 15.6 13.93 17.41 15.67 18.13 17.93 L 21.5 17.93 C 20.57 14.56 18.14 12.69 16.62 11.98 C 18.14 11.1 20.28 8.97 20.79 6.07 L 17.73 6.07 C 17.06 8.42 15.09 10.56 13.22 10.76 L 13.22 6.07 L 10.15 6.07 L 10.15 14.28 C 8.26 13.81 5.86 11.51 5.75 6.07 Z",
+    vkMarket: "M 5.75 6.07 L 2.5 6.07 C 2.65 13.48 6.36 17.93 12.85 17.93 L 13.22 17.93 L 13.22 13.69 C 15.6 13.93 17.41 15.67 18.13 17.93 L 21.5 17.93 C 20.57 14.56 18.14 12.69 16.62 11.98 C 18.14 11.1 20.28 8.97 20.79 6.07 L 17.73 6.07 C 17.06 8.42 15.09 10.56 13.22 10.76 L 13.22 6.07 L 10.15 6.07 L 10.15 14.28 C 8.26 13.81 5.86 11.51 5.75 6.07 Z",
+    vkCommunity: "M 5.75 6.07 L 2.5 6.07 C 2.65 13.48 6.36 17.93 12.85 17.93 L 13.22 17.93 L 13.22 13.69 C 15.6 13.93 17.41 15.67 18.13 17.93 L 21.5 17.93 C 20.57 14.56 18.14 12.69 16.62 11.98 C 18.14 11.1 20.28 8.97 20.79 6.07 L 17.73 6.07 C 17.06 8.42 15.09 10.56 13.22 10.76 L 13.22 6.07 L 10.15 6.07 L 10.15 14.28 C 8.26 13.81 5.86 11.51 5.75 6.07 Z",
     yandex: "M8.67 2L2 8.67L2.83 16.48L7.83 21.48L15.65 21.48L21.48 15.65L21.48 7.83L16.48 2.83ZM9.08 6.48L15.33 6.17L15.23 17.42L13.15 17.31L13.15 7.83L9.92 9.08L12.83 13.56L10.23 17.42L7.73 17.31L9.81 13.98L7.73 11.06Z",
     dgis: "M20.25 7.14L20 7.14L20 10.25L19.71 10.29L19.71 11.11L19.43 11.14L19.14 12.25L18.86 12.29L18.86 12.54L18.57 12.57L18.57 12.82L18.29 12.86L15.11 16.29L14.86 16.29L14.86 17.11L15.39 17.11L15.43 17.39L19.39 17.39L19.43 17.11L20.25 17.11L20.25 16.86L20.54 16.82L20.54 16.29L20.82 16.25L20.82 15.71L21.11 15.68L21.11 14.86L21.39 14.82L21.39 14L21.96 13.96L21.96 10L21.39 9.96L21.11 8.29L20.82 8.25L20.82 7.71L20.57 7.71ZM8 2.29L5.71 3.71L2 8.29L2 15.68L3.43 17.96L8 21.68L15.39 21.68L17.68 19.43L11.14 19.14L11.11 17.71L16.82 12.25L17.68 8L16.54 6.86L14.57 6.86L13.11 10.29L11.39 10.25L11.39 8L13.43 5.39L17.39 5.11L18.86 5.96L19.11 5.43L15.39 2.29Z",
     beget: "M 8.47 11.38 C 8.72 10.37 8.93 9.42 9.19 8.49 C 9.22 8.36 9.42 8.24 9.57 8.18 C 11.79 7.33 14.28 8.05 15.86 10 C 18.44 13.17 17.48 18.19 13.94 19.99 C 10.97 21.51 7.39 20.06 6.11 16.75 C 5.82 16.02 5.63 15.19 5.62 14.4 C 5.58 10.52 5.6 6.64 5.6 2.76 C 5.6 2.68 5.61 2.6 5.61 2.5 C 6.28 2.5 6.92 2.5 7.62 2.5 C 7.62 2.66 7.62 2.82 7.62 2.98 C 7.62 6.71 7.62 10.44 7.62 14.17 C 7.62 15.32 7.96 16.36 8.72 17.23 C 10.26 18.99 12.72 18.97 14.24 17.19 C 15.76 15.42 15.63 12.57 13.97 10.95 C 12.53 9.54 10.39 9.54 8.95 10.95 C 8.81 11.08 8.67 11.2 8.47 11.38 Z",
@@ -90,8 +96,12 @@ function renderPluginSettings(pluginKey: PluginKey) {
       return <MaxSettings />;
     case "telegram":
       return <TelegramSettings />;
-    case "vk":
-      return <VkGroupSettings />;
+    case "vkAuth":
+      return <VkAuthSettings />;
+    case "vkMarket":
+      return <VkMarketSettings />;
+    case "vkCommunity":
+      return <VkCommunitySettings />;
     case "sms":
       return <SmsJournal />;
     case "yandex":
@@ -126,7 +136,9 @@ export function Settings() {
     telephony: false,
     max: false,
     telegram: false,
-    vk: false,
+    vkAuth: false,
+    vkMarket: false,
+    vkCommunity: false,
     sms: false,
     yandex: false,
     dgis: false,

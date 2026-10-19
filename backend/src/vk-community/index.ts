@@ -1,18 +1,18 @@
 import { prisma } from '../lib/prisma.js';
 import { processVkMessage, VkMessage } from './processor.js';
 
-export class VkGroupWorker {
+export class VkCommunityWorker {
   private timer?: NodeJS.Timeout;
   private isRunning = false;
   private settings: any = null;
 
   async start() {
-    this.settings = await prisma.vkGroupSettings.findFirst();
+    this.settings = await prisma.vkCommunitySettings.findFirst();
     if (!this.settings || !this.settings.isActive) {
-      console.log('[VK Worker] No active VK group settings found. Exiting.');
+      console.log('[VK Community Worker] No active VK group settings found. Exiting.');
       return;
     }
-    console.log(`[VK Worker] Starting polling for group ${this.settings.groupId}`);
+    console.log(`[VK Community Worker] Starting polling for group ${this.settings.groupId}`);
     this.isRunning = true;
     await this.loop();
   }
@@ -23,21 +23,21 @@ export class VkGroupWorker {
   }
 
   private async loop() {
-    console.log('[VK Worker] loop() called, isRunning=' + this.isRunning);
+    console.log('[VK Community Worker] loop() called, isRunning=' + this.isRunning);
     if (!this.isRunning) return;
     try {
-      console.log('[VK Worker] Calling tick()...');
+      console.log('[VK Community Worker] Calling tick()...');
       await this.tick();
-      console.log('[VK Worker] tick() completed');
+      console.log('[VK Community Worker] tick() completed');
     } catch (err) {
-      console.error('[VK Worker] Tick error:', err);
+      console.error('[VK Community Worker] Tick error:', err);
     }
-    console.log('[VK Worker] Scheduling next tick in 60s');
+    console.log('[VK Community Worker] Scheduling next tick in 60s');
     this.timer = setTimeout(() => this.loop(), 60000);
   }
 
   private async tick() {
-    console.log('[VK Worker] tick() started');
+    console.log('[VK Community Worker] tick() started');
 
     // Get all unique peerIds from existing tasks (including completed ones)
     const taskPeers = await prisma.task.findMany({
@@ -54,13 +54,13 @@ export class VkGroupWorker {
         for (const item of convs.items) {
           peerIds.add(item.conversation.peer.id);
         }
-        console.log('[VK Worker] Conversations peers: ' + convs.items.length);
+        console.log('[VK Community Worker] Conversations peers: ' + convs.items.length);
       }
     } catch (e) {
-      console.log('[VK Worker] getConversations error:', e);
+      console.log('[VK Community Worker] getConversations error:', e);
     }
 
-    console.log('[VK Worker] Total peers to check: ' + peerIds.size);
+    console.log('[VK Community Worker] Total peers to check: ' + peerIds.size);
 
     for (const peerId of peerIds) {
       try {
@@ -75,11 +75,11 @@ export class VkGroupWorker {
           try {
             await processVkMessage(msg, this.settings);
           } catch (err) {
-            console.error(`[VK Worker] processVkMessage error for msg ${msg.id} peer ${msg.peer_id}:`, err);
+            console.error(`[VK Community Worker] processVkMessage error for msg ${msg.id} peer ${msg.peer_id}:`, err);
           }
         }
       } catch (e) {
-        console.error('[VK Worker] History error for peer ' + peerId + ':', e);
+        console.error('[VK Community Worker] History error for peer ' + peerId + ':', e);
       }
       // Sleep 350ms between peers to avoid VK flood control
       await new Promise(r => setTimeout(r, 350));
@@ -87,7 +87,7 @@ export class VkGroupWorker {
   }
 
   private async api(method: string, params: Record<string, any> = {}) {
-    console.log('[VK Worker] API call: ' + method);
+    console.log('[VK Community Worker] API call: ' + method);
     const qs = new URLSearchParams({
       v: '5.199',
       access_token: this.settings.accessToken,

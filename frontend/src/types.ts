@@ -42,7 +42,9 @@ export interface TaskFinances {
   deal?: { id: string; title: string; value: number } | null;
   transactions: TaskTransaction[];
 }
-export interface VkGroupSettings { id: string; groupId: number; accessToken: string; defaultCreatorId?: string | null; assigneeIds: string[]; autoCreateContact: boolean; isActive: boolean; lastTs?: number | null; callbackSecret?: string | null; confirmationString?: string | null; createdAt: string; updatedAt: string; }
+export interface VkAuthSettings { id: string; appId: number | null; clientSecret?: string | null; redirectUri?: string | null; isActive: boolean; createdAt: string; updatedAt: string; }
+export interface VkMarketSettings { id: string; groupId: number; marketToken?: string | null; marketAppId?: number | null; marketAppSecret?: string | null; isActive: boolean; createdAt: string; updatedAt: string; }
+export interface VkCommunitySettings { id: string; groupId: number; accessToken: string; defaultCreatorId?: string | null; assigneeIds: string[]; autoCreateContact: boolean; autoReply: boolean; isActive: boolean; lastTs?: number | null; callbackSecret?: string | null; confirmationString?: string | null; createdAt: string; updatedAt: string; }
 
 export interface SmsMessage {
   id: string;

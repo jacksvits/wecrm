@@ -112,7 +112,7 @@ model User {
   telephonySettings TelephonySettings[]
   maxUserChats      MaxUserChat[]
   taskHistory       TaskHistory[]
-  vkGroupSettings   VkGroupSettings[]
+  vkCommunitySettings VkCommunitySettings[]
   reminderRecipients ReminderRecipient[]
   maxSettings       MaxSettings[]
 
@@ -1133,16 +1133,38 @@ model CameraSettings {
   @@map("camera_settings")
 }
 
-model VkGroupSettings {
+model VkAuthSettings {
+  id           String   @id @default(cuid())
+  appId        Int?     @map("app_id") // VK ID app id (fallback: env VK_CLIENT_ID)
+  clientSecret String?  @map("client_secret") // fallback: env VK_CLIENT_SECRET
+  redirectUri  String?  @map("redirect_uri") // fallback: env VK_REDIRECT_URI
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("vk_auth_settings")
+}
+
+model VkMarketSettings {
   id                String   @id @default(cuid())
-  groupId           Int      @map("group_id")
-  accessToken       String   @map("access_token")
+  groupId           Int      @map("group_id") // группа, чей маркет синхронизируем (owner_id = -groupId)
   marketToken       String?  @map("market_token") // пользовательский токен с scope market (импорт/синхронизация товаров)
   marketRefreshToken String? @map("market_refresh_token") // refresh_token VK ID для автообновления токена маркета
   marketDeviceId    String?  @map("market_device_id") // device_id VK ID (обязателен для refresh_token)
   marketTokenExpiresAt DateTime? @map("market_token_expires_at") // срок жизни access_token маркета
   marketAppId       Int?     @map("market_app_id")
   marketAppSecret   String?  @map("market_app_secret")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("vk_market_settings")
+}
+
+model VkCommunitySettings {
+  id                String   @id @default(cuid())
+  groupId           Int      @map("group_id")
+  accessToken       String   @map("access_token")
   defaultCreatorId  String?  @map("default_creator_id")
   defaultCreator    User?    @relation(fields: [defaultCreatorId], references: [id])
   assigneeIds       String[] @default([]) @map("assignee_ids")
@@ -1155,7 +1177,7 @@ model VkGroupSettings {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  @@map("vk_group_settings")
+  @@map("vk_community_settings")
 }
 
 model TaskTransaction {

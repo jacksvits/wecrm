@@ -3,7 +3,7 @@ dotenv.config();
 
 import { EmailWorker } from './email-worker/index.js';
 import { AccountingWorker } from './accounting-worker/index.js';
-import { VkGroupWorker } from './vk-worker/index.js';
+import { VkCommunityWorker } from './vk-community/index.js';
 import { prisma } from './lib/prisma.js';
 import { runOneCSync } from './lib/onec-sync.js';
 import { syncProductsToOzon } from './lib/ozon.js';
@@ -22,7 +22,7 @@ import { runStatusAutoChange } from './lib/status-auto-change.js';
  * глобальный `prisma` обращается к БД нужной организации.
  */
 
-type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkGroupWorker; onecTimer?: NodeJS.Timeout; ozonTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
+type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkCommunityWorker; onecTimer?: NodeJS.Timeout; ozonTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
 
 /** Интервал проверки «Авто смены» статусов */
 const STATUS_AUTO_CHANGE_MS = 60_000;
@@ -114,13 +114,13 @@ async function syncTenant(t: TenantInfo): Promise<void> {
     bag.accounting = undefined;
   }
 
-  // --- VK Group Worker ---
-  const vkSettings = await prisma.vkGroupSettings.findFirst();
+  // --- VK Community Worker ---
+  const vkSettings = await prisma.vkCommunitySettings.findFirst();
   if (vkSettings && vkSettings.isActive) {
     if (!bag.vk) {
-      bag.vk = new VkGroupWorker();
+      bag.vk = new VkCommunityWorker();
       await bag.vk.start();
-      console.log(`[Worker] VK Group worker started (${key})`);
+      console.log(`[Worker] VK Community worker started (${key})`);
     }
   } else if (bag.vk) {
     bag.vk.stop();

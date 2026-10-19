@@ -10,12 +10,14 @@ router.use(authMiddleware);
 // GET /api/integrations/status — статус активности интеграций («плагинов»)
 router.get('/status', async (_req, res) => {
   try {
-    const [email, telephony, max, telegram, vk, yandex, dgis, beget, pskovline, onec, tochka, vpn, diadoc, tochkaAcquiring, ozon] = await Promise.all([
+    const [email, telephony, max, telegram, vkAuth, vkMarket, vkCommunity, yandex, dgis, beget, pskovline, onec, tochka, vpn, diadoc, tochkaAcquiring, ozon] = await Promise.all([
       prisma.emailSettings.findFirst({ select: { isActive: true } }),
       prisma.telephonySettings.findFirst({ select: { isActive: true } }),
       prisma.maxSettings.findFirst({ select: { isActive: true } }),
       prisma.telegramSettings.findFirst({ select: { isActive: true } }),
-      prisma.vkGroupSettings.findFirst({ select: { isActive: true } }),
+      prisma.vkAuthSettings.findFirst({ select: { isActive: true } }),
+      prisma.vkMarketSettings.findFirst({ select: { isActive: true } }),
+      prisma.vkCommunitySettings.findFirst({ select: { isActive: true } }),
       prisma.yandexSettings.findFirst({ select: { apiKey: true } }),
       prisma.dgisSettings.findFirst({ select: { apiKey: true } }),
       prisma.begetSettings.findFirst({ select: { isActive: true } }),
@@ -32,7 +34,9 @@ router.get('/status', async (_req, res) => {
       telephony: telephony?.isActive ?? false,
       max: max?.isActive ?? false,
       telegram: telegram?.isActive ?? false,
-      vk: vk?.isActive ?? false,
+      vkAuth: vkAuth?.isActive ?? false,
+      vkMarket: vkMarket?.isActive ?? false,
+      vkCommunity: vkCommunity?.isActive ?? false,
       // SMS через Novofon — зависит от телефонии
       sms: telephony?.isActive ?? false,
       yandex: !!yandex?.apiKey,
