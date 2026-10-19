@@ -1730,8 +1730,8 @@ export function TaskDetail() {
                   boxShadow: "var(--shadow)",
                   display: "flex",
                   flexDirection: "column",
-                  height: "calc(100vh - 280px)",
-                  minHeight: 400,
+                  maxHeight: "calc(100vh - 280px)",
+                  minHeight: 300,
                 }}
               >
                 {" "}

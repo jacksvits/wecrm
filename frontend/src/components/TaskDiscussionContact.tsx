@@ -186,8 +186,8 @@ export function TaskDiscussionContact({
           alignItems: "center",
           justifyContent: "center",
           gap: 8,
-          height: "calc(100vh - 280px)",
-          minHeight: 400,
+          maxHeight: "calc(100vh - 280px)",
+          minHeight: 300,
           color: "var(--text-muted)",
           fontSize: 14,
           textAlign: "center",
@@ -319,8 +319,8 @@ export function TaskDiscussionContact({
         boxShadow: "var(--shadow)",
         display: "flex",
         flexDirection: "column",
-        height: "calc(100vh - 280px)",
-        minHeight: 400,
+        maxHeight: "calc(100vh - 280px)",
+        minHeight: 300,
         overflow: "hidden",
       }}
     >

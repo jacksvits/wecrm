@@ -1245,15 +1245,16 @@ html, body { overflow-x: hidden; }
 .task-discussion-split {
   display: flex;
   gap: 16px;
-  align-items: stretch;
+  align-items: flex-start;
 }
 .task-discussion-pane {
   flex: 1 1 50%;
   min-width: 0;
 }
-/* На узких экранах блоки выстраиваются друг под другом */
+/* На узких экранах блоки выстраиваются друг под другом на всю ширину */
 @media (max-width: 1024px) {
   .task-discussion-split {
     flex-direction: column;
+    align-items: stretch;
   }
 }
