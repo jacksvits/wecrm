@@ -506,28 +506,29 @@ export function TaskDetail() {
     };
   }, [task?.contact?.id]);
 
-  // Высота панелей обсуждения — ровно до низа экрана (пересчёт при скролле/ресайзе)
+  // Высота панелей обсуждения — до низа экрана, измеряется один раз
+  // при открытии вкладки (и при ресайзе); без пересчёта на скролле,
+  // иначе рост блоков порождает скролл страницы
   useEffect(() => {
     if (activeTab !== "comments") return;
     const measure = () => {
       const el = discussionSplitRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top;
+      if (top < 0) return; // страница уже прокручена — не меряем
       setDiscussionPaneHeight(
-        Math.max(320, Math.min(window.innerHeight - top, window.innerHeight)),
+        Math.max(320, window.innerHeight - top),
       );
     };
     measure();
+    // повторное измерение после полной отрисовки контента
+    const timer = setTimeout(measure, 300);
     window.addEventListener("resize", measure);
-    // Скролл может идти и на window, и на внутреннем контейнере страницы
-    window.addEventListener("scroll", measure);
-    document.addEventListener("scroll", measure, true);
     return () => {
+      clearTimeout(timer);
       window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure);
-      document.removeEventListener("scroll", measure, true);
     };
-  }, [activeTab]);
+  }, [activeTab, task?.id]);
 
   const loadTask = async () => {
     setLoading(true);
