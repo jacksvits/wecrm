@@ -1517,9 +1517,17 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
         <input type="checkbox" checked={form.crmIntegrations.includes('telegram')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('telegram') ? form.crmIntegrations.filter(x => x !== 'telegram') : [...form.crmIntegrations, 'telegram'] })} style={{ width: 15, height: 15 }} />
         Telegram
       </label>
-      <label key='vk' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('vk')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('vk') ? form.crmIntegrations.filter(x => x !== 'vk') : [...form.crmIntegrations, 'vk'] })} style={{ width: 15, height: 15 }} />
-        ВК Группа
+      <label key='vkCommunity' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+        <input type="checkbox" checked={form.crmIntegrations.includes('vkCommunity') || form.crmIntegrations.includes('vk')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('vkCommunity') ? form.crmIntegrations.filter(x => x !== 'vkCommunity') : [...form.crmIntegrations, 'vkCommunity'] })} style={{ width: 15, height: 15 }} />
+        ВК сообщество
+      </label>
+      <label key='vkMarket' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+        <input type="checkbox" checked={form.crmIntegrations.includes('vkMarket') || form.crmIntegrations.includes('vk')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('vkMarket') ? form.crmIntegrations.filter(x => x !== 'vkMarket') : [...form.crmIntegrations, 'vkMarket'] })} style={{ width: 15, height: 15 }} />
+        ВК товары
+      </label>
+      <label key='vkAuth' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+        <input type="checkbox" checked={form.crmIntegrations.includes('vkAuth') || form.crmIntegrations.includes('vk')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('vkAuth') ? form.crmIntegrations.filter(x => x !== 'vkAuth') : [...form.crmIntegrations, 'vkAuth'] })} style={{ width: 15, height: 15 }} />
+        ВК авторизация
       </label>
       <label key='yandex' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
         <input type="checkbox" checked={form.crmIntegrations.includes('yandex')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('yandex') ? form.crmIntegrations.filter(x => x !== 'yandex') : [...form.crmIntegrations, 'yandex'] })} style={{ width: 15, height: 15 }} />

@@ -99,7 +99,7 @@ export async function sendToChannel(task: any, text: string): Promise<void> {
     return;
   }
 
-  // ВК Группа: peer_id задачи
+  // ВК сообщество: peer_id задачи
   if (task.vkPeerId && task.vkGroupId) {
     try {
       const vkSettings = await prisma.vkCommunitySettings.findFirst({ where: { groupId: task.vkGroupId, isActive: true } });

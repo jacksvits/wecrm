@@ -253,7 +253,8 @@ export function Settings() {
             >
               {group.plugins.map((plugin) => {
                 const integList: string[] | null = (stUser as any)?.crmIntegrations ?? null ;
-                const integBlocked = integList !== null && !integList.includes(plugin.key) ;
+                const VK_PLUGINS = ['vkAuth', 'vkMarket', 'vkCommunity'];
+                const integBlocked = integList !== null && !integList.includes(plugin.key) && !(integList.includes('vk') && VK_PLUGINS.includes(plugin.key)) ;
             const isActive = pluginStatus[plugin.key];
                 return (
                   <button
