@@ -22,6 +22,7 @@ import { linkifyTaskTagsHtml, useTaskHashtagClick } from "../lib/taskHashtags";
 import { userOptionLabel } from "../lib/userOptionLabel";
 import { Avatar } from "./Avatar";
 import { ContactPicker } from "./ContactPicker";
+import { TaskDiscussionContact, DiscussionContact } from "./TaskDiscussionContact";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 const priorityLabels: Record<string, string> = {
@@ -320,6 +321,7 @@ export function TaskDetail() {
     address: "",
   });
   const [contactText, setContactText] = useState("");
+  const [discussionContact, setDiscussionContact] = useState<DiscussionContact | null>(null);
   const [deals, setDeals] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -480,6 +482,27 @@ export function TaskDetail() {
         ),
     [comments],
   );
+
+  // Контакт для правой панели обсуждения (карточка + активность)
+  useEffect(() => {
+    const contactId = task?.contact?.id || null;
+    if (!contactId) {
+      setDiscussionContact(null);
+      return;
+    }
+    let cancelled = false;
+    api.contacts
+      .get(contactId)
+      .then((c) => {
+        if (!cancelled) setDiscussionContact(c as DiscussionContact);
+      })
+      .catch(() => {
+        if (!cancelled) setDiscussionContact(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [task?.contact?.id]);
 
   const loadTask = async () => {
     setLoading(true);
@@ -1694,7 +1717,9 @@ export function TaskDetail() {
             </div>
           )}{" "}
           {activeTab === "comments" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="task-discussion-split">
+              {" "}
+              <div className="task-discussion-pane">
               {" "}
               <div
                 style={{
@@ -2293,6 +2318,10 @@ export function TaskDetail() {
                   </div>
                 </div>{" "}
               </div>{" "}
+              </div>
+              <div className="task-discussion-pane">
+                <TaskDiscussionContact contact={discussionContact} />
+              </div>
             </div>
           )}{" "}
           {activeTab === "history" && (

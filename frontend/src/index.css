@@ -1240,3 +1240,20 @@ html, body { overflow-x: hidden; }
   .pres-slide { max-height: calc(100vh - 190px); border-radius: 10px; }
   .pres-footer { flex-wrap: wrap; gap: 12px; padding: 10px 16px 20px; }
 }
+
+/* Вкладка «Обсуждение» задачи: сплит 50/50 — обсуждение слева, информация о контакте справа */
+.task-discussion-split {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+.task-discussion-pane {
+  flex: 1 1 50%;
+  min-width: 0;
+}
+/* На узких экранах блоки выстраиваются друг под другом */
+@media (max-width: 1024px) {
+  .task-discussion-split {
+    flex-direction: column;
+  }
+}
