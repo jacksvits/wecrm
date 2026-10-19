@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { EmailSettings } from "./EmailSettings";
 import { EmailFilters } from "./EmailFilters";
 import { AccountingSettings } from "./AccountingSettings";
@@ -31,25 +32,25 @@ type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "schedule" | "i
 type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "vpn";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
-const PLUGINS: { key: PluginKey; label: string; group: string; description: string }[] = [
-  { key: "email", label: "Почта", group: "Коммуникации", description: "Приём писем через IMAP и создание задач" },
-  { key: "telephony", label: "Телефония", group: "Коммуникации", description: "Звонки и SMS через Novofon" },
-  { key: "sms", label: "SMS журнал", group: "Коммуникации", description: "Журнал входящих и исходящих SMS" },
-  { key: "max", label: "MAX", group: "Мессенджеры", description: "Уведомления в мессенджер MAX" },
-  { key: "telegram", label: "Telegram", group: "Мессенджеры", description: "Уведомления и задачи из Telegram" },
-  { key: "vkCommunity", label: "ВК сообщество", group: "Мессенджеры", description: "Сообщения сообщества ВК: обсуждения в задачах и автосоздание задач" },
-  { key: "vkMarket", label: "ВК товары", group: "Маркетплейсы", description: "Синхронизация товаров и услуг с ВК Маркетом" },
-  { key: "vkAuth", label: "ВК авторизация", group: "Сервисы", description: "Вход сотрудников в CRM через VK ID" },
-  { key: "yandex", label: "Яндекс", group: "Сервисы", description: "API-ключ Яндекс.Карт" },
-  { key: "dgis", label: "2GIS", group: "Сервисы", description: "API-ключ 2GIS (карты)" },
-  { key: "beget", label: "Beget", group: "Хостинг", description: "Хостинг-аккаунт: тариф, баланс, домены" },
-  { key: "pskovline", label: "Псковлайн", group: "Провайдер", description: "Баланс лицевых счетов провайдера" },
-  { key: "tochka", label: "Точка Банк", group: "Финансы", description: "Счета и балансы банка (OAuth)" },
-  { key: "tochkaAcquiring", label: "Эквайринг от Точки", group: "Финансы", description: "Онлайн-оплата заказов на витрине банковской картой и через СБП" },
-  { key: "onec", label: "1С УТ 8.3", group: "Учётные системы", description: "Двусторонняя синхронизация номенклатуры и контрагентов" },
-  { key: "diadoc", label: "Контур.Диадок", group: "Учётные системы", description: "ЭДО: получение, отправка и подписание документов" },
-  { key: "ozon", label: "OZON Seller", group: "Маркетплейсы", description: "Двусторонняя синхронизация каталога товаров с маркетплейсом OZON" },
-  { key: "vpn", label: "Прокси через VPN", group: "Сервисы", description: "Локальный VPN-прокси для Telegram API (sing-box)" },
+const PLUGINS: { key: PluginKey; label: string; group: string; description: string; helpSlug: string }[] = [
+  { key: "email", helpSlug: "int-email", label: "Почта", group: "Коммуникации", description: "Приём писем через IMAP и создание задач" },
+  { key: "telephony", helpSlug: "int-telephony", label: "Телефония", group: "Коммуникации", description: "Звонки и SMS через Novofon" },
+  { key: "sms", helpSlug: "int-sms", label: "SMS журнал", group: "Коммуникации", description: "Журнал входящих и исходящих SMS" },
+  { key: "max", helpSlug: "int-max", label: "MAX", group: "Мессенджеры", description: "Уведомления в мессенджер MAX" },
+  { key: "telegram", helpSlug: "int-telegram", label: "Telegram", group: "Мессенджеры", description: "Уведомления и задачи из Telegram" },
+  { key: "vkCommunity", helpSlug: "int-vk-community", label: "ВК сообщество", group: "Мессенджеры", description: "Сообщения сообщества ВК: обсуждения в задачах и автосоздание задач" },
+  { key: "vkMarket", helpSlug: "int-vk-market", label: "ВК товары", group: "Маркетплейсы", description: "Синхронизация товаров и услуг с ВК Маркетом" },
+  { key: "vkAuth", helpSlug: "int-vk-auth", label: "ВК авторизация", group: "Сервисы", description: "Вход сотрудников в CRM через VK ID" },
+  { key: "yandex", helpSlug: "int-yandex", label: "Яндекс", group: "Сервисы", description: "API-ключ Яндекс.Карт" },
+  { key: "dgis", helpSlug: "int-dgis", label: "2GIS", group: "Сервисы", description: "API-ключ 2GIS (карты)" },
+  { key: "beget", helpSlug: "int-beget", label: "Beget", group: "Хостинг", description: "Хостинг-аккаунт: тариф, баланс, домены" },
+  { key: "pskovline", helpSlug: "int-pskovline", label: "Псковлайн", group: "Провайдер", description: "Баланс лицевых счетов провайдера" },
+  { key: "tochka", helpSlug: "int-tochka", label: "Точка Банк", group: "Финансы", description: "Счета и балансы банка (OAuth)" },
+  { key: "tochkaAcquiring", helpSlug: "int-acquiring", label: "Эквайринг от Точки", group: "Финансы", description: "Онлайн-оплата заказов на витрине банковской картой и через СБП" },
+  { key: "onec", helpSlug: "int-1c", label: "1С УТ 8.3", group: "Учётные системы", description: "Двусторонняя синхронизация номенклатуры и контрагентов" },
+  { key: "diadoc", helpSlug: "int-diadoc", label: "Контур.Диадок", group: "Учётные системы", description: "ЭДО: получение, отправка и подписание документов" },
+  { key: "ozon", helpSlug: "int-ozon", label: "OZON Seller", group: "Маркетплейсы", description: "Двусторонняя синхронизация каталога товаров с маркетплейсом OZON" },
+  { key: "vpn", helpSlug: "int-vpn", label: "Прокси через VPN", group: "Сервисы", description: "Локальный VPN-прокси для Telegram API (sing-box)" },
 ];
 
 function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
@@ -128,6 +129,7 @@ function renderPluginSettings(pluginKey: PluginKey) {
 }
 
 export function Settings() {
+  const navigate = useNavigate();
   // По умолчанию открываем «Системные» настройки
   const [activeTab, setActiveTab] = useState<MainTab>("system");
   const [selectedPlugin, setSelectedPlugin] = useState<PluginKey | null>(null);
@@ -306,6 +308,25 @@ export function Settings() {
                         />
                         {integBlocked ? "Недоступно в тарифе" : (isActive ? "Активен" : "Не активен")}
                       </span>
+                      <span
+                        onClick={(e) => { e.stopPropagation(); navigate(`/help/${plugin.helpSlug}`); }}
+                        title={`Справка: ${plugin.label}`}
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: "50%",
+                          border: "1px solid var(--border-color)",
+                          color: "var(--text-muted)",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          cursor: "pointer",
+                          userSelect: "none",
+                        }}
+                      >?</span>
                     </div>
                     <span style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.4 }}>
                       {plugin.description}
