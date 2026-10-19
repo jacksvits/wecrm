@@ -522,16 +522,19 @@ export function TaskDetail() {
       const top = el.getBoundingClientRect().top;
       const isMobile = window.innerWidth <= 1024;
       setDiscussionMobile(isMobile);
-      // Мобильная версия: блок обсуждения чуть меньше высоты экрана
+      const doc = document.documentElement;
+      const viewport = Math.min(window.innerHeight, doc.clientHeight);
+      // Мобильная версия: блок обсуждения чуть меньше высоты экрана, но
+      // обязан умещаться в видимую область (с учётом шапки/вкладок сверху)
       if (isMobile) {
-        setDiscussionPaneHeight(Math.round(window.innerHeight * 0.85));
+        if (top < 0) return; // страница прокручена — сохраняем текущую высоту
+        const available = viewport - top - 24;
+        setDiscussionPaneHeight(
+          Math.max(320, Math.min(Math.round(viewport * 0.85), available)),
+        );
         return;
       }
       if (top < 0) return; // страница уже прокручена — не меряем
-      const doc = document.documentElement;
-      // clientHeight не включает высоту горизонтального скроллбара,
-      // поэтому ориентируемся на него, а не на innerHeight
-      const viewport = Math.min(window.innerHeight, doc.clientHeight);
       // −24px: отступ снизу под блоками
       setDiscussionPaneHeight(Math.max(MIN_HEIGHT, viewport - top - 24));
     };
