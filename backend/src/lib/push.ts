@@ -1,4 +1,4 @@
-import webpush from 'web-push' ; import { EventEmitter } from 'events' ; import { prisma } from './prisma.js' ; import { tenantKey } from './tenant.js' ; const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '' ; const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '' ; const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@welans.cc' ; webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey) ;
+import webpush from 'web-push' ; import { EventEmitter } from 'events' ; import { prisma } from './prisma.js' ; import { tenantKey, tenantUploadPrefix } from './tenant.js' ; const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '' ; const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '' ; const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@welans.cc' ; webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey) ;
 
 // === In-process relay for native WebSocket push clients (Capacitor APK) ===
 // Нативный Android-клиент (APK без Google-сервисов) держит WebSocket к /api/push/ws;
@@ -18,8 +18,10 @@ async function getPushIcon(): Promise<string | null> {
   let entry: { url: string | null; ts: number } ;
   try {
     const branding = await prisma.branding.findUnique({ where: { id: 1 } }) ;
+    // Статика /uploads отдаётся с диска без учёта Host, поэтому URL обязан
+    // содержать префикс tenant'а — как fileUrl() в routes/branding.ts
     entry = {
-      url: branding?.iconPath ? `/uploads/branding/icon-192x192.png?v=${branding.updatedAt.getTime()}` : null,
+      url: branding?.iconPath ? `/uploads${tenantUploadPrefix()}/branding/icon-192x192.png?v=${branding.updatedAt.getTime()}` : null,
       ts: Date.now(),
     } ;
   } catch {
