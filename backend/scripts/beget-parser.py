@@ -65,8 +65,8 @@ def fetch_account_api(login, password):
     with urllib.request.urlopen(req, timeout=30) as resp:
         payload = json.loads(resp.read().decode("utf-8"))
     if payload.get("status") != "success":
-        return None
-    return payload.get("answer", {}).get("result")
+        return None, (payload.get("error_text") or "Beget API error")
+    return payload.get("answer", {}).get("result"), None
 
 
 def parse_beget(settings, login, password):
@@ -97,9 +97,10 @@ def parse_beget(settings, login, password):
 
     if partner_enabled:
       with sync_playwright() as p:
+        # snap-chromium (/usr/bin/chromium-browser) playwright не запускает
+        # (требует snap cgroup) — используем браузер из ~/.cache/ms-playwright
         browser = p.chromium.launch(
             headless=False,
-            executable_path='/usr/bin/chromium-browser',
             args=['--no-sandbox', '--disable-setuid-sandbox'],
             timeout=30000
         )
@@ -160,17 +161,27 @@ def parse_beget(settings, login, password):
     os.system("pkill Xvfb 2>/dev/null")
 
     # Данные личного кабинета через API (партнёрский баланс не перезаписываем)
+    api_ok = False
     try:
-        api_data = fetch_account_api(login, password)
+        api_data, api_error = fetch_account_api(login, password)
         if api_data:
+            api_ok = True
             for key in API_FIELDS:
                 if key in api_data:
                     result[key] = api_data[key]
+        elif api_error:
+            msg = str(api_error).lower()
+            if "auth" in msg or "password" in msg or "парол" in msg or "невер" in msg or "login" in msg:
+                result["error"] = "Неверный логин/пароль Beget, обновите в настройках"
+            elif result["error"] is None:
+                result["error"] = f"API: {api_error}"
     except Exception as e:
         if result["error"] is None:
             result["error"] = f"API: {e}"
 
-    if result["balance"] is not None:
+    # Успех: партнёрский баланс ИЛИ данные личного кабинета по API —
+    # у tenant'ов без партнёрского кабинета виджет показывает тариф/баланс/диск
+    if result["balance"] is not None or api_ok:
         result["status"] = "ok"
     else:
         result["error"] = result["error"] or "Не удалось извлечь данные"
