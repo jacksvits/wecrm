@@ -516,8 +516,18 @@ export function TaskDetail() {
       if (!el) return;
       const top = el.getBoundingClientRect().top;
       if (top < 0) return; // страница уже прокручена — не меряем
+      // Вычитаем нижние отступы, чтобы страница не имела лишнего скролла
+      let bottomGap = 0;
+      const parent = el.parentElement;
+      if (parent) {
+        const cs = getComputedStyle(parent);
+        bottomGap =
+          (parseFloat(cs.paddingBottom) || 0) +
+          (parseFloat(cs.marginBottom) || 0);
+      }
+      const bodyMargin = parseFloat(getComputedStyle(document.body).marginBottom) || 0;
       setDiscussionPaneHeight(
-        Math.max(320, window.innerHeight - top),
+        Math.max(320, window.innerHeight - top - bottomGap - bodyMargin),
       );
     };
     measure();

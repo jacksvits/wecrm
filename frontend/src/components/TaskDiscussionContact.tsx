@@ -35,6 +35,15 @@ function accessDirectionLabel(value: string) {
   return ACCESS_DIRECTIONS.find((d) => d.value === value)?.label || value;
 }
 
+// Статусы резервов (совпадают с бэкендом)
+const RESERVE_STATUSES: Record<string, { label: string; color: string; bg: string }> = {
+  held: { label: "Отложено", color: "#b45309", bg: "#fef3c7" },
+  issued: { label: "Выдано", color: "#15803d", bg: "#dcfce7" },
+  paid: { label: "Оплачен", color: "#1d4ed8", bg: "#dbeafe" },
+  completed: { label: "Завершён", color: "#6b21a8", bg: "#f3e8ff" },
+  canceled: { label: "Отменено", color: "#b91c1c", bg: "#fee2e2" },
+};
+
 const quillModules = {
   toolbar: [
     ["bold", "italic", "underline", "strike"],
@@ -194,6 +203,7 @@ export function TaskDiscussionContact({
   const [accesses, setAccesses] = useState<ContactAccess[] | null>(null);
   const [orders, setOrders] = useState<any[] | null>(null);
   const [reserves, setReserves] = useState<any[] | null>(null);
+  const [expandedReserveId, setExpandedReserveId] = useState<string | null>(null);
 
   // Смена контакта — сброс вкладок и кэша
   useEffect(() => {
@@ -731,22 +741,111 @@ export function TaskDiscussionContact({
           ) : reserves.length === 0 ? (
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Резервов нет</div>
           ) : (
-            reserves.map((r) => (
-              <div
-                key={r.id}
-                style={{ ...activityRowStyle, cursor: "default" }}
-                title={r.comment || `Резерв №${r.number}`}
-              >
-                <span style={activityTextStyle}>
-                  Резерв №{r.number}
-                  {r.warehouse?.name ? ` · ${r.warehouse.name}` : ""}
-                </span>
-                <span style={activityMetaStyle}>
-                  {formatMoney(r.total)}
-                  {r.createdAt ? ` · ${formatDate(r.createdAt)}` : ""}
-                </span>
-              </div>
-            ))
+            reserves.map((r) => {
+              const status = RESERVE_STATUSES[r.status] || null;
+              const expanded = expandedReserveId === r.id;
+              return (
+                <div
+                  key={r.id}
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                >
+                  <div
+                    onClick={() => setExpandedReserveId(expanded ? null : r.id)}
+                    style={{ ...activityRowStyle, cursor: "pointer" }}
+                    title={r.comment || `Резерв №${r.number}`}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text-muted)",
+                        flexShrink: 0,
+                        transition: "transform 0.15s",
+                        transform: expanded ? "rotate(90deg)" : "none",
+                        display: "inline-block",
+                      }}
+                    >
+                      ▸
+                    </span>
+                    <span style={{ ...activityTextStyle, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                        Резерв №{r.number}
+                        {r.warehouse?.name ? ` · ${r.warehouse.name}` : ""}
+                      </span>
+                      {status && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            padding: "1px 8px",
+                            borderRadius: 8,
+                            background: status.bg,
+                            color: status.color,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {status.label}
+                        </span>
+                      )}
+                    </span>
+                    <span style={activityMetaStyle}>
+                      {formatMoney(r.total)}
+                      {r.createdAt ? ` · ${formatDate(r.createdAt)}` : ""}
+                    </span>
+                  </div>
+                  {expanded && (
+                    <div
+                      style={{
+                        marginLeft: 20,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                        paddingBottom: 4,
+                      }}
+                    >
+                      {r.items && r.items.length > 0 ? (
+                        r.items.map((it: any) => (
+                          <div
+                            key={it.id}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              fontSize: 13,
+                              color: "var(--text-primary)",
+                              minWidth: 0,
+                            }}
+                          >
+                            <span
+                              style={{
+                                flex: 1,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                              title={it.product?.name}
+                            >
+                              {it.product?.name || "Товар"}
+                            </span>
+                            <span style={{ color: "var(--text-muted)", flexShrink: 0 }}>
+                              {Number(it.quantity)} шт × {formatMoney(it.price)} ={" "}
+                              {formatMoney(Number(it.quantity) * Number(it.price))}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                          Позиции не указаны
+                        </div>
+                      )}
+                      {r.issuedAt && (
+                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                          Выдан: {formatDate(r.issuedAt)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           ))}
       </div>
     </div>
