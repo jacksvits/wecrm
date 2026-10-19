@@ -8,7 +8,7 @@ import { isMainPlatformHost } from './TenantSwitcher' ;
 // === Страница одной статьи справки ===
 // Контент из API (един для всех доменов); при сбое — встроенная копия.
 // Блоки 'p' и 'tip' содержат HTML из WYSIWYG-редактора.
-function Block({ block }: { block: HelpBlock }) {
+export function Block({ block }: { block: HelpBlock }) {
   switch (block.type) {
     case 'h':
       return <h2 style={{ fontSize: 16, margin: '22px 0 10px', color: 'var(--text-primary)' }}>{block.text}</h2> ;
