@@ -323,7 +323,6 @@ export function TaskDetail() {
   const [contactText, setContactText] = useState("");
   const [discussionContact, setDiscussionContact] = useState<DiscussionContact | null>(null);
   const discussionSplitRef = useRef<HTMLDivElement>(null);
-  const correctedRef = useRef(false);
   const [discussionPaneHeight, setDiscussionPaneHeight] = useState<number | null>(null);
   const [deals, setDeals] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
@@ -512,33 +511,43 @@ export function TaskDetail() {
   // иначе рост блоков порождает скролл страницы
   useEffect(() => {
     if (activeTab !== "comments") return;
-    correctedRef.current = false;
+    const MIN_HEIGHT = 240;
+    const MAX_TRIM = 400; // суммарно не ужимаем блоки больше чем на это
     const measure = () => {
       const el = discussionSplitRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top;
       if (top < 0) return; // страница уже прокручена — не меряем
-      let h = window.innerHeight - top;
-      // Самокоррекция (однократная): если документ выше окна — уменьшаем
-      // блоки ровно на величину небольшого переполнения; если скролл
-      // вызван чем-то другим (например, футером) — блоки не трогаем
-      const doc = document.documentElement;
-      const overflow = doc.scrollHeight - doc.clientHeight;
-      if (overflow > 0 && overflow <= 300 && !correctedRef.current) {
-        correctedRef.current = true;
-        h -= overflow + 1;
-      }
-      setDiscussionPaneHeight(Math.max(320, h));
+      setDiscussionPaneHeight(
+        Math.max(MIN_HEIGHT, window.innerHeight - top),
+      );
     };
     measure();
-    // повторные измерения после отрисовки и загрузки контента
-    const timer1 = setTimeout(measure, 150);
-    const timer2 = setTimeout(measure, 600);
+    // повторное измерение после полной отрисовки
+    const timer = setTimeout(measure, 300);
     window.addEventListener("resize", measure);
     window.addEventListener("load", measure);
+    // Защита от поздних сдвигов вёрстки (шрифты, аватары, картинки):
+    // пока документ выше окна — поджимаем блоки ровно на переполнение
+    let trimmed = 0;
+    const safety = setInterval(() => {
+      const el = discussionSplitRef.current;
+      if (!el) return;
+      const doc = document.documentElement;
+      const overflow = doc.scrollHeight - doc.clientHeight;
+      if (overflow > 0 && trimmed < MAX_TRIM) {
+        const delta = Math.min(overflow + 1, MAX_TRIM - trimmed);
+        trimmed += delta;
+        setDiscussionPaneHeight((h) =>
+          Math.max(MIN_HEIGHT, (h ?? window.innerHeight) - delta),
+        );
+      }
+    }, 500);
+    const safetyStop = setTimeout(() => clearInterval(safety), 15000);
     return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
+      clearTimeout(timer);
+      clearTimeout(safetyStop);
+      clearInterval(safety);
       window.removeEventListener("resize", measure);
       window.removeEventListener("load", measure);
     };
