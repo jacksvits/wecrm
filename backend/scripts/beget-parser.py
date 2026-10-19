@@ -86,6 +86,7 @@ def parse_beget(settings, login, password):
 
     result = {
         "updated_at": datetime.now().isoformat(),
+        "login": login,
         "balance": None,
         "partner_balance": None,
         "active_referrals": None,

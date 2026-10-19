@@ -88,6 +88,9 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
       update: data,
     });
     syncParserFile(data.login, data.password, data.isActive, data.isPartner, data.updateTime);
+    // Кэш собранных данных с прежними кредами больше не валиден — удаляем,
+    // чтобы cron-парсер пересобрал данные при ближайшем запуске
+    try { fs.rmSync(path.join(dataDir(), 'beget.json'), { force: true }); } catch { /* некритично */ }
     console.log(`[beget-settings] saved: login=${data.login}, isActive=${isActive}`);
     res.json({ login: data.login, hasPassword: !!data.password, isActive: data.isActive, isPartner: data.isPartner, updateTime: data.updateTime });
   } catch (err: any) {
