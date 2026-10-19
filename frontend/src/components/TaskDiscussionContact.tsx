@@ -18,7 +18,7 @@ export type DiscussionContact = Contact & {
   }[];
 };
 
-type SectionKey = "tasks" | "deals" | "accesses" | "orders" | "reserves";
+type SectionKey = "tasks" | "accesses" | "orders" | "reserves";
 
 // Метки направлений доступов, как в ContactAccesses
 const ACCESS_DIRECTIONS: { value: ContactAccessDirection; label: string }[] = [
@@ -59,7 +59,6 @@ type EditableField = "phones" | "emails" | "address" | "notes" | null;
 
 const SECTION_TITLES: Record<SectionKey, string> = {
   tasks: "Задачи",
-  deals: "Сделки",
   accesses: "Доступы",
   orders: "Заказы",
   reserves: "Резервы",
@@ -408,13 +407,11 @@ export function TaskDiscussionContact({
   );
 
   const tasks = contact.tasks?.slice(0, 8) || [];
-  const deals = contact.deals?.slice(0, 8) || [];
   const isHtml = (text: string) => /<[a-z][\s\S]*>/i.test(text);
 
   // Счётчики для вкладок
   const sectionCounts: Record<SectionKey, string> = {
     tasks: String(contact._count?.tasks ?? tasks.length),
-    deals: String(contact._count?.deals ?? deals.length),
     accesses: accesses !== null ? String(accesses.length) : contact._count?.accesses !== undefined ? String(contact._count.accesses) : "",
     orders: orders !== null ? String(orders.length) : "",
     reserves: reserves !== null ? String(reserves.length) : "",
@@ -653,25 +650,6 @@ export function TaskDiscussionContact({
                 <span style={activityTextStyle}>{t.title}</span>
                 <span style={activityMetaStyle}>
                   {formatDate(t.dueDate) || formatDate(t.createdAt)}
-                </span>
-              </div>
-            ))
-          ))}
-
-        {activeSection === "deals" &&
-          (deals.length === 0 ? (
-            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Сделок нет</div>
-          ) : (
-            deals.map((d) => (
-              <div
-                key={d.id}
-                onClick={() => navigate(`/deals?deal=${d.id}`)}
-                style={activityRowStyle}
-                title={d.title}
-              >
-                <span style={activityTextStyle}>{d.title}</span>
-                <span style={activityMetaStyle}>
-                  {formatMoney(d.value, d.currency)}
                 </span>
               </div>
             ))
