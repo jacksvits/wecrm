@@ -556,6 +556,9 @@ export function TaskDetail() {
     const safety = setInterval(() => {
       const el = discussionSplitRef.current;
       if (!el) return;
+      // На мобильных блоки идут друг под другом — скролл страницы легитимен,
+      // поджимать высоту не нужно
+      if (window.innerWidth <= 1024) return;
       const scroller = scrollerOf();
       const overflow = scroller.scrollHeight - scroller.clientHeight;
       if (overflow > 0 && trimmed < MAX_TRIM) {
