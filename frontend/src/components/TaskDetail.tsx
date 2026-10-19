@@ -518,17 +518,20 @@ export function TaskDetail() {
       if (!el) return;
       const top = el.getBoundingClientRect().top;
       if (top < 0) return; // страница уже прокручена — не меряем
-      setDiscussionPaneHeight(
-        Math.max(MIN_HEIGHT, window.innerHeight - top),
-      );
+      const doc = document.documentElement;
+      // clientHeight не включает высоту горизонтального скроллбара,
+      // поэтому ориентируемся на него, а не на innerHeight
+      const viewport = Math.min(window.innerHeight, doc.clientHeight);
+      setDiscussionPaneHeight(Math.max(MIN_HEIGHT, viewport - top));
     };
     measure();
     // повторное измерение после полной отрисовки
     const timer = setTimeout(measure, 300);
     window.addEventListener("resize", measure);
     window.addEventListener("load", measure);
-    // Защита от поздних сдвигов вёрстки (шрифты, аватары, картинки):
-    // пока документ выше окна — поджимаем блоки ровно на переполнение
+    // Постоянная защита: пока документ выше окна (поздние шрифты,
+    // картинки, появление горизонтального скроллбара) — поджимаем блоки
+    // ровно на величину переполнения
     let trimmed = 0;
     const safety = setInterval(() => {
       const el = discussionSplitRef.current;
@@ -543,10 +546,8 @@ export function TaskDetail() {
         );
       }
     }, 500);
-    const safetyStop = setTimeout(() => clearInterval(safety), 15000);
     return () => {
       clearTimeout(timer);
-      clearTimeout(safetyStop);
       clearInterval(safety);
       window.removeEventListener("resize", measure);
       window.removeEventListener("load", measure);
