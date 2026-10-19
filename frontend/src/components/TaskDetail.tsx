@@ -522,7 +522,8 @@ export function TaskDetail() {
       // clientHeight не включает высоту горизонтального скроллбара,
       // поэтому ориентируемся на него, а не на innerHeight
       const viewport = Math.min(window.innerHeight, doc.clientHeight);
-      setDiscussionPaneHeight(Math.max(MIN_HEIGHT, viewport - top));
+      // −24px: отступ снизу под блоками
+      setDiscussionPaneHeight(Math.max(MIN_HEIGHT, viewport - top - 24));
     };
     measure();
     // повторное измерение после полной отрисовки
