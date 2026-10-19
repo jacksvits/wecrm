@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useRealtime } from "../hooks/useRealtime";
-import { User, Role } from "../types";
+import { User, Role, UserDeletePreview } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { useCall } from "../context/CallContext";
 function isRoleObject(role: Role | string | undefined): role is Role {
@@ -110,13 +110,41 @@ export function UserList() {
       setPasswordError(err.message || "Ошибка");
     }
   };
-  const handleDelete = async (id: string) => {
-    if (!confirm("Удалить пользователя?")) return;
+  const [deleteModal, setDeleteModal] = useState<{
+    id: string;
+    name: string;
+    preview: UserDeletePreview | null;
+    loading: boolean;
+  } | null>(null);
+  const [reassignToId, setReassignToId] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const openDelete = async (u: User) => {
+    setDeleteModal({ id: u.id, name: u.name, preview: null, loading: true });
+    setReassignToId("");
+    setDeleteError("");
     try {
-      await api.users.delete(id);
+      const preview = await api.users.deletePreview(u.id);
+      setDeleteModal((m) => (m && m.id === u.id ? { ...m, preview, loading: false } : m));
+    } catch (err: any) {
+      setDeleteModal((m) => (m && m.id === u.id ? { ...m, loading: false } : m));
+      setDeleteError(err.message || "Ошибка загрузки данных");
+    }
+  };
+  const handleDelete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deleteModal) return;
+    setDeleteError("");
+    const { id, preview } = deleteModal;
+    if (preview && preview.reassign.length > 0 && !reassignToId) {
+      setDeleteError("Выберите пользователя, на которого переназначить записи");
+      return;
+    }
+    try {
+      await api.users.delete(id, reassignToId || undefined);
+      setDeleteModal(null);
       loadUsers();
     } catch (err: any) {
-      alert(err.message || "Ошибка удаления");
+      setDeleteError(err.message || "Ошибка удаления");
     }
   };
   const filteredUsers = users.filter(
@@ -419,7 +447,7 @@ export function UserList() {
                         ✏️
                       </button>{" "}
                       <button
-                        onClick={() => handleDelete(u.id)}
+                        onClick={() => openDelete(u)}
                         style={{
                           background: "none",
                           border: "none",
@@ -682,6 +710,185 @@ export function UserList() {
                   {editingId ? "Сохранить" : "Создать"}
                 </button>{" "}
               </div>{" "}
+            </form>{" "}
+          </div>{" "}
+        </div>
+      )}{" "}
+      {deleteModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          {" "}
+          <div
+            style={{
+              background: "var(--bg-card)",
+              borderRadius: 12,
+              padding: 24,
+              width: "100%",
+              maxWidth: 440,
+              maxHeight: "90vh",
+              overflow: "auto",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            }}
+          >
+            {" "}
+            <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>
+              Удалить пользователя «{deleteModal.name}»?
+            </h3>{" "}
+            {deleteModal.loading && (
+              <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 12 }}>
+                Загрузка связанных записей...
+              </div>
+            )}{" "}
+            {!deleteModal.loading && deleteModal.preview && deleteModal.preview.reassign.length === 0 && deleteModal.preview.remove.length === 0 && (
+              <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 12 }}>
+                У пользователя нет связанных записей. Удаление безопасно.
+              </div>
+            )}{" "}
+            {!deleteModal.loading && deleteModal.preview && deleteModal.preview.reassign.length > 0 && (
+              <>
+                <div
+                  style={{
+                    fontSize: 14,
+                    marginBottom: 8,
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  У пользователя есть связанные записи. Выберите, на кого их переназначить:
+                </div>
+                <div
+                  style={{
+                    border: "1px solid var(--border-color)",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    marginBottom: 12,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    maxHeight: 180,
+                    overflow: "auto",
+                  }}
+                >
+                  {deleteModal.preview.reassign.map((l) => (
+                    <div
+                      key={l.key}
+                      style={{ fontSize: 13, display: "flex", justifyContent: "space-between" }}
+                    >
+                      <span>{l.label}</span>
+                      <span style={{ color: "var(--text-muted)" }}>{l.count}</span>
+                    </div>
+                  ))}
+                </div>
+                <select
+                  value={reassignToId}
+                  onChange={(e) => setReassignToId(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid var(--border-color)",
+                    fontSize: 14,
+                    marginBottom: 8,
+                  }}
+                >
+                  <option value="">— Выберите пользователя —</option>
+                  {deleteModal.preview.candidates.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.role?.label ? ` (${c.role.label})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}{" "}
+            {!deleteModal.loading && deleteModal.preview && deleteModal.preview.remove.length > 0 && (
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-muted)",
+                  marginBottom: 12,
+                  padding: "8px 12px",
+                  background: "var(--bg-secondary, rgba(0,0,0,0.04))",
+                  borderRadius: 10,
+                }}
+              >
+                Также будут удалены:{" "}
+                {deleteModal.preview.remove
+                  .map((l) => `${l.label.toLowerCase()} (${l.count})`)
+                  .join(", ")}
+              </div>
+            )}{" "}
+            {deleteModal.preview && deleteModal.preview.reassign.length > 0 && deleteModal.preview.candidates.length === 0 && (
+              <div
+                style={{
+                  color: "#dc2626",
+                  fontSize: 13,
+                  marginBottom: 12,
+                  padding: "8px 12px",
+                  background: "#fef2f2",
+                  borderRadius: 10,
+                }}
+              >
+                В системе нет других пользователей для переназначения записей
+              </div>
+            )}{" "}
+            {deleteError && (
+              <div
+                style={{
+                  color: "#dc2626",
+                  fontSize: 13,
+                  marginBottom: 12,
+                  padding: "8px 12px",
+                  background: "#fef2f2",
+                  borderRadius: 10,
+                }}
+              >
+                {deleteError}
+              </div>
+            )}{" "}
+            <form
+              onSubmit={handleDelete}
+              style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}
+            >
+              {" "}
+              <button
+                type="button"
+                onClick={() => setDeleteModal(null)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 12,
+                  border: "1px solid var(--border-color)",
+                  background: "var(--bg-card)",
+                  cursor: "pointer",
+                }}
+              >
+                Отмена
+              </button>{" "}
+              <button
+                type="submit"
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: "#dc2626",
+                  color: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                Удалить
+              </button>{" "}
             </form>{" "}
           </div>{" "}
         </div>

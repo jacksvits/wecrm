@@ -292,3 +292,24 @@ export interface ProductSubscription {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface UserDeletePreviewLink {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface UserDeletePreviewCandidate {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string | null;
+  role?: { label: string } | null;
+}
+
+export interface UserDeletePreview {
+  user: { id: string; name: string };
+  reassign: UserDeletePreviewLink[];
+  remove: UserDeletePreviewLink[];
+  candidates: UserDeletePreviewCandidate[];
+}
