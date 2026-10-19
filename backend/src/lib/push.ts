@@ -1,4 +1,4 @@
-import webpush from 'web-push' ; import { EventEmitter } from 'events' ; import { prisma } from './prisma.js' ; const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '' ; const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '' ; const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@welans.cc' ; webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey) ;
+import webpush from 'web-push' ; import { EventEmitter } from 'events' ; import { prisma } from './prisma.js' ; import { tenantKey } from './tenant.js' ; const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '' ; const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '' ; const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@welans.cc' ; webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey) ;
 
 // === In-process relay for native WebSocket push clients (Capacitor APK) ===
 // Нативный Android-клиент (APK без Google-сервисов) держит WebSocket к /api/push/ws;
@@ -6,20 +6,27 @@ import webpush from 'web-push' ; import { EventEmitter } from 'events' ; import 
 export const pushRelay = new EventEmitter() ;
 pushRelay.setMaxListeners(1000) ;
 
-// Иконка push-уведомлений из настроек брендинга (кэш 60 сек)
-let pushIconCache: { url: string | null; ts: number } = { url: null, ts: 0 } ;
+// Иконка push-уведомлений из настроек брендинга (кэш 60 сек).
+// В одном процессе работают несколько организаций (роуты всех поддоменов и
+// мультитенантный worker), поэтому кэш разбит по tenant'ам — глобальный слот
+// отдавал иконку главного домена tenant'ам (и наоборот)
+const pushIconCache = new Map<string, { url: string | null; ts: number }>() ;
 async function getPushIcon(): Promise<string | null> {
-  if (Date.now() - pushIconCache.ts < 60000) return pushIconCache.url ;
+  const key = tenantKey() ;
+  const cached = pushIconCache.get(key) ;
+  if (cached && Date.now() - cached.ts < 60000) return cached.url ;
+  let entry: { url: string | null; ts: number } ;
   try {
     const branding = await prisma.branding.findUnique({ where: { id: 1 } }) ;
-    pushIconCache = {
+    entry = {
       url: branding?.iconPath ? `/uploads/branding/icon-192x192.png?v=${branding.updatedAt.getTime()}` : null,
       ts: Date.now(),
     } ;
   } catch {
-    pushIconCache = { url: null, ts: Date.now() } ;
+    entry = { url: null, ts: Date.now() } ;
   }
-  return pushIconCache.url ;
+  pushIconCache.set(key, entry) ;
+  return entry.url ;
 }
 
 export async function sendPushToUser(userId: string, payload: { title: string; body: string; url?: string; kind?: string; callId?: string; callType?: string }, type?: 'task' | 'comment' | 'chat' | 'call' | 'deal' | 'news') { const user = await prisma.user.findUnique({ where: { id: userId }, select: { pushEnabled: true, notifyTask: true, notifyComment: true, notifyChat: true, notifyCall: true, notifyDeal: true, notifyNews: true }, }) ; if (!user || !user.pushEnabled) { console.log(`[Push] Skipped for user ${userId}: push disabled`) ; return ; } if (type) { const typeMap: Record<string, boolean | undefined> = { task: user.notifyTask, comment: user.notifyComment, chat: user.notifyChat, call: user.notifyCall, deal: user.notifyDeal, news: user.notifyNews, } ; if (typeMap[type] === false) { console.log(`[Push] Skipped for user ${userId}: ${type} notifications disabled`) ; return ; } } const subs = await prisma.pushSubscription.findMany({ where: { userId } }) ; const data = JSON.stringify({ icon: await getPushIcon(), ...payload }) ; pushRelay.emit('push', { userId, data }) ; // ретрансляция в нативные WS-клиенты (Capacitor APK)
