@@ -230,6 +230,10 @@ router.get('/login-url', async (_req, res) => {
       scope: 'email',
       code_challenge: challenge,
       code_challenge_method: 'S256',
+      // принудительно показываем форму согласия: без неё VK ID в цикле редиректит
+      // уже авторизованного пользователя при повторном запросе (страница бесконечно
+      // обновляется) — тот же фикс, что и в market-auth
+      prompt: 'consent',
     });
     res.json({ url: `https://id.vk.ru/authorize?${params.toString()}` });
   } catch (err: any) {
