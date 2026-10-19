@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import { Contact, Deal } from "../types";
+import { Contact, ContactAccess, ContactAccessDirection, Deal } from "../types";
 import { Avatar } from "./Avatar";
 import { api } from "../api/client";
 
@@ -18,6 +18,23 @@ export type DiscussionContact = Contact & {
   }[];
 };
 
+type SectionKey = "tasks" | "deals" | "accesses" | "orders" | "reserves";
+
+// Метки направлений доступов, как в ContactAccesses
+const ACCESS_DIRECTIONS: { value: ContactAccessDirection; label: string }[] = [
+  { value: "videoregistrator", label: "Видеорегистратор" },
+  { value: "cloud", label: "Облачное хранилище" },
+  { value: "remote", label: "Удалённое управление" },
+  { value: "site_admin", label: "Админка сайта" },
+  { value: "server", label: "Сервер" },
+  { value: "account", label: "Учётная запись" },
+  { value: "router", label: "Роутер" },
+];
+
+function accessDirectionLabel(value: string) {
+  return ACCESS_DIRECTIONS.find((d) => d.value === value)?.label || value;
+}
+
 const quillModules = {
   toolbar: [
     ["bold", "italic", "underline", "strike"],
@@ -31,6 +48,14 @@ const quillFormats = ["bold", "italic", "underline", "strike", "list", "bullet",
 
 type EditableField = "phones" | "emails" | "address" | "notes" | null;
 
+const SECTION_TITLES: Record<SectionKey, string> = {
+  tasks: "Задачи",
+  deals: "Сделки",
+  accesses: "Доступы",
+  orders: "Заказы",
+  reserves: "Резервы",
+};
+
 function formatDate(value?: string | null) {
   if (!value) return "";
   const d = new Date(value);
@@ -42,13 +67,13 @@ function formatDate(value?: string | null) {
   });
 }
 
-// Форматирование суммы сделки, как в остальном проекте
-function formatMoney(value?: number, currency?: string) {
-  if (value === undefined || value === null) return "";
-  const amount = Number(value).toLocaleString("ru-RU", {
-    maximumFractionDigits: 0,
-  });
-  return currency ? `${amount} ${currency}` : amount;
+// Форматирование суммы, как в остальном проекте
+function formatMoney(value?: number | string | null, currency?: string) {
+  if (value === undefined || value === null || value === "") return "";
+  const num = Number(value);
+  if (isNaN(num)) return String(value);
+  const amount = num.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
+  return currency ? `${amount} ${currency}` : `${amount} ₽`;
 }
 
 const infoRowStyle: React.CSSProperties = {
@@ -66,13 +91,6 @@ const infoValueStyle: React.CSSProperties = {
   fontSize: 14,
   color: "var(--text-primary)",
   wordBreak: "break-word",
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontSize: 14,
-  fontWeight: 600,
-  color: "var(--text-primary)",
-  marginBottom: 8,
 };
 
 const activityRowStyle: React.CSSProperties = {
@@ -171,6 +189,58 @@ export function TaskDiscussionContact({
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState("");
+  const [activeSection, setActiveSection] = useState<SectionKey>("tasks");
+  // Данные вкладок подгружаются лениво (при первом открытии вкладки)
+  const [accesses, setAccesses] = useState<ContactAccess[] | null>(null);
+  const [orders, setOrders] = useState<any[] | null>(null);
+  const [reserves, setReserves] = useState<any[] | null>(null);
+
+  // Смена контакта — сброс вкладок и кэша
+  useEffect(() => {
+    setActiveSection("tasks");
+    setAccesses(null);
+    setOrders(null);
+    setReserves(null);
+    setEditingField(null);
+    setEditError("");
+  }, [contact?.id]);
+
+  const loadAccesses = async () => {
+    if (accesses !== null || !contact) return;
+    try {
+      const list = await api.contactAccesses.list(contact.id);
+      setAccesses(list);
+    } catch {
+      setAccesses([]);
+    }
+  };
+
+  const loadOrders = async () => {
+    if (orders !== null || !contact) return;
+    try {
+      const list = await api.sales.list();
+      setOrders(list.filter((s: any) => s.contactId === contact.id));
+    } catch {
+      setOrders([]);
+    }
+  };
+
+  const loadReserves = async () => {
+    if (reserves !== null || !contact) return;
+    try {
+      const list = await api.reservations.list();
+      setReserves(list.filter((r: any) => r.contactId === contact.id));
+    } catch {
+      setReserves([]);
+    }
+  };
+
+  const switchSection = (key: SectionKey) => {
+    setActiveSection(key);
+    if (key === "accesses") loadAccesses();
+    if (key === "orders") loadOrders();
+    if (key === "reserves") loadReserves();
+  };
 
   if (!contact) {
     return (
@@ -186,8 +256,8 @@ export function TaskDiscussionContact({
           alignItems: "center",
           justifyContent: "center",
           gap: 8,
-          maxHeight: "calc(100vh - 280px)",
-          minHeight: 300,
+          height: "calc(100vh - 280px)",
+          minHeight: 400,
           color: "var(--text-muted)",
           fontSize: 14,
           textAlign: "center",
@@ -309,6 +379,30 @@ export function TaskDiscussionContact({
   const deals = contact.deals?.slice(0, 8) || [];
   const isHtml = (text: string) => /<[a-z][\s\S]*>/i.test(text);
 
+  // Счётчики для вкладок
+  const sectionCounts: Record<SectionKey, string> = {
+    tasks: String(contact._count?.tasks ?? tasks.length),
+    deals: String(contact._count?.deals ?? deals.length),
+    accesses: accesses !== null ? String(accesses.length) : contact._count?.accesses !== undefined ? String(contact._count.accesses) : "",
+    orders: orders !== null ? String(orders.length) : "",
+    reserves: reserves !== null ? String(reserves.length) : "",
+  };
+
+  const sectionTabStyle = (active: boolean): React.CSSProperties => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    padding: "5px 12px",
+    borderRadius: 20,
+    border: active ? "none" : "1px solid var(--border-color)",
+    background: active ? "var(--text-primary)" : "var(--bg-input)",
+    color: active ? "var(--bg-card)" : "var(--text-secondary)",
+    fontSize: 13,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+  });
+
   return (
     <div
       style={{
@@ -319,8 +413,8 @@ export function TaskDiscussionContact({
         boxShadow: "var(--shadow)",
         display: "flex",
         flexDirection: "column",
-        maxHeight: "calc(100vh - 280px)",
-        minHeight: 300,
+        height: "calc(100vh - 280px)",
+        minHeight: 400,
         overflow: "hidden",
       }}
     >
@@ -477,72 +571,171 @@ export function TaskDiscussionContact({
         </div>
 
         {editError && (
-          <div style={{ fontSize: 12, color: "var(--color-danger, #dc2626)" }}>{editError}</div>
+          <div style={{ fontSize: 12, color: "#dc2626" }}>{editError}</div>
         )}
       </div>
 
-      {/* Активность: задачи и сделки контакта */}
+      {/* Вкладки активности контакта */}
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          overflowX: "auto",
+          paddingBottom: 10,
+          borderBottom: "1px solid var(--border-color)",
+          flexShrink: 0,
+        }}
+        className="no-scrollbar"
+      >
+        {(Object.keys(SECTION_TITLES) as SectionKey[]).map((key) => (
+          <button
+            key={key}
+            onClick={() => switchSection(key)}
+            style={sectionTabStyle(activeSection === key)}
+          >
+            {SECTION_TITLES[key]}
+            {sectionCounts[key] !== "" && (
+              <span style={{ fontSize: 11, opacity: 0.8 }}>({sectionCounts[key]})</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Содержимое активной вкладки */}
       <div
         className="no-scrollbar"
         style={{
           flex: 1,
           overflowY: "auto",
-          borderTop: "1px solid var(--border-color)",
           paddingTop: 12,
           display: "flex",
           flexDirection: "column",
-          gap: 16,
+          gap: 6,
         }}
       >
-        <div>
-          <div style={sectionTitleStyle}>
-            Задачи ({contact._count?.tasks ?? tasks.length})
-          </div>
-          {tasks.length === 0 ? (
-            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-              Задач нет
-            </div>
+        {activeSection === "tasks" &&
+          (tasks.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Задач нет</div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {tasks.map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => navigate(`/tasks/${t.id}`)}
-                  style={activityRowStyle}
-                  title={t.title}
-                >
-                  <span style={activityTextStyle}>{t.title}</span>
-                  <span style={activityMetaStyle}>
-                    {formatDate(t.dueDate) || formatDate(t.createdAt)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+            tasks.map((t) => (
+              <div
+                key={t.id}
+                onClick={() => navigate(`/tasks/${t.id}`)}
+                style={activityRowStyle}
+                title={t.title}
+              >
+                <span style={activityTextStyle}>{t.title}</span>
+                <span style={activityMetaStyle}>
+                  {formatDate(t.dueDate) || formatDate(t.createdAt)}
+                </span>
+              </div>
+            ))
+          ))}
 
-        {deals.length > 0 && (
-          <div>
-            <div style={sectionTitleStyle}>
-              Сделки ({contact._count?.deals ?? deals.length})
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {deals.map((d) => (
-                <div
-                  key={d.id}
-                  onClick={() => navigate(`/deals?deal=${d.id}`)}
-                  style={activityRowStyle}
-                  title={d.title}
+        {activeSection === "deals" &&
+          (deals.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Сделок нет</div>
+          ) : (
+            deals.map((d) => (
+              <div
+                key={d.id}
+                onClick={() => navigate(`/deals?deal=${d.id}`)}
+                style={activityRowStyle}
+                title={d.title}
+              >
+                <span style={activityTextStyle}>{d.title}</span>
+                <span style={activityMetaStyle}>
+                  {formatMoney(d.value, d.currency)}
+                </span>
+              </div>
+            ))
+          ))}
+
+        {activeSection === "accesses" &&
+          (accesses === null ? (
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Загрузка...</div>
+          ) : accesses.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Доступов нет</div>
+          ) : (
+            accesses.map((a) => (
+              <div
+                key={a.id}
+                onClick={() => navigate(`/contacts/${contact.id}`)}
+                style={activityRowStyle}
+                title={a.description || accessDirectionLabel(a.direction)}
+              >
+                <span
+                  style={{
+                    ...activityTextStyle,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                    whiteSpace: "normal",
+                  }}
                 >
-                  <span style={activityTextStyle}>{d.title}</span>
-                  <span style={activityMetaStyle}>
-                    {formatMoney(d.value, d.currency)}
+                  <span style={{ fontWeight: 500 }}>
+                    {accessDirectionLabel(a.direction)}
+                    {a.description ? ` — ${a.description}` : ""}
                   </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                  {a.login && (
+                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                      {a.login}
+                      {a.password ? " · " + a.password : ""}
+                    </span>
+                  )}
+                </span>
+                <span style={activityMetaStyle}>{formatDate(a.updatedAt)}</span>
+              </div>
+            ))
+          ))}
+
+        {activeSection === "orders" &&
+          (orders === null ? (
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Загрузка...</div>
+          ) : orders.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Заказов нет</div>
+          ) : (
+            orders.map((s) => (
+              <div
+                key={s.id}
+                style={{ ...activityRowStyle, cursor: "default" }}
+                title={s.comment || `Заказ №${s.number}`}
+              >
+                <span style={activityTextStyle}>
+                  Заказ №{s.number}
+                  {s.warehouse?.name ? ` · ${s.warehouse.name}` : ""}
+                </span>
+                <span style={activityMetaStyle}>
+                  {formatMoney(s.total)}
+                  {s.createdAt ? ` · ${formatDate(s.createdAt)}` : ""}
+                </span>
+              </div>
+            ))
+          ))}
+
+        {activeSection === "reserves" &&
+          (reserves === null ? (
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Загрузка...</div>
+          ) : reserves.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Резервов нет</div>
+          ) : (
+            reserves.map((r) => (
+              <div
+                key={r.id}
+                style={{ ...activityRowStyle, cursor: "default" }}
+                title={r.comment || `Резерв №${r.number}`}
+              >
+                <span style={activityTextStyle}>
+                  Резерв №{r.number}
+                  {r.warehouse?.name ? ` · ${r.warehouse.name}` : ""}
+                </span>
+                <span style={activityMetaStyle}>
+                  {formatMoney(r.total)}
+                  {r.createdAt ? ` · ${formatDate(r.createdAt)}` : ""}
+                </span>
+              </div>
+            ))
+          ))}
       </div>
     </div>
   );

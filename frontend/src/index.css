@@ -1245,7 +1245,7 @@ html, body { overflow-x: hidden; }
 .task-discussion-split {
   display: flex;
   gap: 16px;
-  align-items: flex-start;
+  align-items: stretch;
 }
 .task-discussion-pane {
   flex: 1 1 50%;
