@@ -1794,7 +1794,12 @@ export function TaskDetail() {
               {" "}
               <div
                 className="task-discussion-pane"
-                style={{ height: discussionPaneHeight ?? "calc(100vh - 280px)" }}
+                style={{
+                  height: discussionPaneHeight ?? "calc(100vh - 280px)",
+                  // на мобильном отключаем flex-растяжение, иначе колонка
+                  // игнорирует заданную высоту
+                  ...(discussionMobile ? { flex: "0 0 auto" } : {}),
+                }}
               >
               {" "}
               <div
