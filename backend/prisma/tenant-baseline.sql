@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8e2tpIFmQ9KcEceYHoithhXjMNCsEqzwf20xZVbHwE7VTo0rqZp6VcGHLb0W2ck
+\restrict mfPRPH3ZTYYl7vy2K3g1zv0wFBcDwsgxqmFdw4Qc3WwqkDddUp4ZyzIATuOLAdf
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -1262,7 +1262,10 @@ CREATE TABLE public.roles (
     can_access_support_chat boolean DEFAULT false NOT NULL,
     can_see_all_support_tickets boolean DEFAULT false NOT NULL,
     show_calendar_metric boolean DEFAULT true NOT NULL,
-    is_system_handler boolean DEFAULT false NOT NULL
+    is_system_handler boolean DEFAULT false NOT NULL,
+    can_read_contact_accesses boolean DEFAULT true NOT NULL,
+    can_edit_contact_accesses boolean DEFAULT false NOT NULL,
+    can_delete_contact_accesses boolean DEFAULT false NOT NULL
 );
 
 
@@ -1823,29 +1826,57 @@ CREATE TABLE public.users (
 
 
 --
--- Name: vk_group_settings; Type: TABLE; Schema: public; Owner: -
+-- Name: vk_auth_settings; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.vk_group_settings (
+CREATE TABLE public.vk_auth_settings (
+    id text NOT NULL,
+    app_id integer,
+    client_secret text,
+    redirect_uri text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: vk_community_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vk_community_settings (
     id text NOT NULL,
     group_id integer NOT NULL,
     access_token text NOT NULL,
     default_creator_id text,
-    assignee_ids text[] DEFAULT ARRAY[]::text[],
+    assignee_ids text[] DEFAULT ARRAY[]::text[] NOT NULL,
     auto_create_contact boolean DEFAULT true NOT NULL,
+    auto_reply boolean DEFAULT false NOT NULL,
     is_active boolean DEFAULT true NOT NULL,
     last_ts integer,
-    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp(3) without time zone NOT NULL,
     callback_secret text,
     confirmation_string text,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: vk_market_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vk_market_settings (
+    id text NOT NULL,
+    group_id integer NOT NULL,
     market_token text,
-    market_app_id integer,
-    market_app_secret text,
-    auto_reply boolean DEFAULT false NOT NULL,
     market_refresh_token text,
     market_device_id text,
-    market_token_expires_at timestamp(3) without time zone
+    market_token_expires_at timestamp(3) without time zone,
+    market_app_id integer,
+    market_app_secret text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL
 );
 
 
@@ -2768,11 +2799,27 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: vk_group_settings vk_group_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: vk_auth_settings vk_auth_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.vk_group_settings
-    ADD CONSTRAINT vk_group_settings_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.vk_auth_settings
+    ADD CONSTRAINT vk_auth_settings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: vk_community_settings vk_community_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vk_community_settings
+    ADD CONSTRAINT vk_community_settings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: vk_market_settings vk_market_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vk_market_settings
+    ADD CONSTRAINT vk_market_settings_pkey PRIMARY KEY (id);
 
 
 --
@@ -3760,6 +3807,13 @@ CREATE UNIQUE INDEX users_username_key ON public.users USING btree (username);
 
 
 --
+-- Name: vk_community_settings_group_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vk_community_settings_group_id_idx ON public.vk_community_settings USING btree (group_id);
+
+
+--
 -- Name: web_calls_callee_id_created_at_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4621,11 +4675,11 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: vk_group_settings vk_group_settings_default_creator_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: vk_community_settings vk_community_settings_default_creator_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.vk_group_settings
-    ADD CONSTRAINT vk_group_settings_default_creator_id_fkey FOREIGN KEY (default_creator_id) REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE SET NULL;
+ALTER TABLE ONLY public.vk_community_settings
+    ADD CONSTRAINT vk_community_settings_default_creator_id_fkey FOREIGN KEY (default_creator_id) REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE SET NULL;
 
 
 --
@@ -4648,13 +4702,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8e2tpIFmQ9KcEceYHoithhXjMNCsEqzwf20xZVbHwE7VTo0rqZp6VcGHLb0W2ck
+\unrestrict mfPRPH3ZTYYl7vy2K3g1zv0wFBcDwsgxqmFdw4Qc3WwqkDddUp4ZyzIATuOLAdf
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict CNdxUxWK7TjpYZkbfIavHQ8AmhmK3YVA7497rfMGKyctTvVG7FDv6xwDXspZZRx
+\restrict 6ZE7700uokzTrS3JkS9H8WLy8lcrIEBu6rIRnt3LEmqxj6hLKKrmVq1uUcJxRlD
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -5061,12 +5115,14 @@ INSERT INTO public._prisma_migrations VALUES ('a8292bc3-4f8f-4850-b2e0-ea9697b01
 INSERT INTO public._prisma_migrations VALUES ('92a6c4a8-1763-4d60-9bce-c748a92febcb', '57b2e1b922d573b0cc579b8dff719117cbeb789d78bcc924362b85469a10cf58', '2026-10-16 07:14:34.919643+00', '20261016095800_task_is_favorite', NULL, NULL, '2026-10-16 07:14:34.909631+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('9f508fdb-3242-46d8-ac48-7c771fe66712', '60fc5973495f838c35b3aa9b3c82a2c61e518375f763296fc9c6f7a8bc295026', '2026-10-16 17:24:25.270392+00', '20261016203000_comment_pinned', NULL, NULL, '2026-10-16 17:24:25.244524+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('b5a6fe00-10af-4c94-b15d-d9b2a278ed3d', 'fa5549b7ad4078d35685a5a2d8c0067e67e8896e4eb58f922e53ab1ad1d38a16', '2026-10-16 19:12:38.114981+00', '20261016220000_task_favorites_user', NULL, NULL, '2026-10-16 19:12:38.114981+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('5bd40aa3-03ba-47e5-b393-0c49133d37e7', '63c5e3f8b34804f17937dee9d0db63113e1898a820f3b6454799b4f1d7e9fbdc', '2026-10-17 01:05:00.000000+00', '20261017010500_role_is_system_handler', NULL, NULL, '2026-10-17 01:05:00.000000+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('67ed3296-b393-4c23-b7a1-ad08a4d5759e', '63c5e3f8b34804f17937dee9d0db63113e1898a820f3b6454799b4f1d7e9fbdc', '2026-10-16 22:12:31.337225+00', '20261017010500_role_is_system_handler', NULL, NULL, '2026-10-16 22:12:31.33041+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('86af7f6c-83c5-47e1-929c-9a0c231fffa7', '2903da31c71ec49195ad6c84f5f85e4530bc2b49bfce95690685f8e12438db45', '2026-10-18 13:57:30.35164+00', '20261018164500_role_contact_accesses', NULL, NULL, '2026-10-18 13:57:30.343023+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('1b55bd4d-d9c6-4a1c-b03c-7fc19e34c82b', '33309f2d26c9ef6e6f9d75b911028acb91c3cee679ed1dbba64d7c71cbcf518f', '2026-10-19 09:11:13.04667+00', '20261019120000_split_vk_group_plugin', NULL, NULL, '2026-10-19 09:11:13.013249+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CNdxUxWK7TjpYZkbfIavHQ8AmhmK3YVA7497rfMGKyctTvVG7FDv6xwDXspZZRx
+\unrestrict 6ZE7700uokzTrS3JkS9H8WLy8lcrIEBu6rIRnt3LEmqxj6hLKKrmVq1uUcJxRlD
 
