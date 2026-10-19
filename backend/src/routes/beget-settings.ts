@@ -8,14 +8,17 @@ import { tenantDataDir } from '../lib/tenant.js';
 const router = Router();
 
 function dataDir() { return tenantDataDir(); }
-const PARSER_SETTINGS_FILE = path.join(dataDir(), 'beget_settings.json');
 
-// Синхронизация с парсером: cron на хосте читает этот файл (scripts/beget-parser.py)
+// Синхронизация с парсером: cron на хосте читает этот файл (scripts/beget-parser.py).
+// ВАЖНО: путь считается в момент вызова — в контексте tenant'а текущего запроса.
+// При вычислении пути на уровне модуля контекста ещё нет, и настройки ВСЕХ
+// организаций записывались бы в файл главного tenant'а.
 function syncParserFile(login: string, password: string, isActive: boolean, isPartner: boolean, updateTime: string) {
   try {
-    if (!fs.existsSync(dataDir())) fs.mkdirSync(dataDir(), { recursive: true });
+    const dir = dataDir();
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
-      PARSER_SETTINGS_FILE,
+      path.join(dir, 'beget_settings.json'),
       JSON.stringify({ login, password, is_active: isActive, is_partner: isPartner, update_time: updateTime })
     );
   } catch (e: any) {
@@ -27,6 +30,13 @@ function syncParserFile(login: string, password: string, isActive: boolean, isPa
 router.get('/', authMiddleware, async (_req, res) => {
   try {
     const s = await prisma.begetSettings.findUnique({ where: { id: 1 } });
+    if (s) {
+      // Досинхронизация: файл настроек парсера создаётся при сохранении (POST),
+      // но если синхронизация тогда не сработала, при открытии настроек
+      // файл будет создан заново — cron-парсер подхватит tenant'а.
+      // Для главной организации без записи настроек файл не трогаем (креды по умолчанию).
+      syncParserFile(s.login, s.password ?? '', s.isActive, s.isPartner, s.updateTime);
+    }
     res.json({
       login: s?.login ?? '',
       hasPassword: !!s?.password,

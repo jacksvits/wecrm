@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Парсер данных Beget для виджетов директора:
-- Партнёрский кабинет (cp.beget.com/partnership) — playwright: баланс, рефералы, транзакции
-- Личный кабинет — официальный API (api.beget.com): тариф, баланс, дни до блокировки,
-  диск, сайты, домены, сервер
-Сохраняет всё в JSON
-"""
+# Парсер/сборщик данных интеграции Beget для weCRM.
+#
+# Мультитенантный: обрабатывает КАЖДЫЙ файл настроек beget_settings.json —
+# главный (data/beget_settings.json, платформа) и тенантские
+# (data/t-<slug>/beget_settings.json, синхронизируются бэкендом при сохранении
+# настроек плагина) — и пишет результат рядом с настройками в beget.json.
+# Файл настроек = контракт между бэкендом и cron: пароль читается только
+# отсюда, в git не попадает. Cron на хосте читает этот файл.
+# Обновление каждого tenant'а — не чаще раза в день, после update_time.
 
 import os
 import re
@@ -16,195 +18,193 @@ import urllib.parse
 from datetime import datetime
 
 if os.path.isdir("/app/data"):
-    OUTPUT_JSON = "/app/data/beget.json"
+    DATA_DIR = "/app/data"
 else:
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    OUTPUT_JSON = os.path.join(SCRIPT_DIR, "..", "data", "beget.json")
+    DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+
+# Креды по умолчанию — ТОЛЬКО для главной организации (историческое поведение)
+DEFAULT_LOGIN = "softboeg"
+DEFAULT_PASSWORD = "nyBNQofDm96"
 
 BEGET_API_URL = "https://api.beget.com/api/user/getAccountInfo"
-SETTINGS_JSON = os.path.join(os.path.dirname(OUTPUT_JSON), "beget_settings.json")
+API_FIELDS = [
+    ("balance", "Баланс"),
+    ("bonus", "Бонусы"),
+    ("days_to_block", "Дней до блокировки"),
+]
 
 
-def _load_settings():
+def _to_float(s):
+    if s is None:
+        return 0.0
+    s = re.sub(r"[^\d.,\-]", "", str(s)).replace(",", ".")
     try:
-        with open(SETTINGS_JSON, encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+        return float(s)
+    except ValueError:
+        return 0.0
 
 
-_settings = _load_settings()
-if _settings.get("is_active") is False:
-    print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Интеграция Beget деактивирована, пропуск")
-    raise SystemExit(0)
-
-# Креды берутся из настроек плагина (синхронизируются бэкендом), иначе — дефолтные
-BEGET_LOGIN = _settings.get("login") or "softboeg"
-BEGET_PASSWORD = _settings.get("password") or "nyBNQofDm96"
-UPDATE_TIME = _settings.get("update_time") or "10:00"
-
-# Запуск не чаще раза в день, не раньше заданного времени (cron вызывает скрипт ежечасно)
-_now = datetime.now()
-try:
-    _hh, _mm = map(int, UPDATE_TIME.split(":"))
-except ValueError:
-    _hh, _mm = 10, 0
-_scheduled = _now.replace(hour=_hh, minute=_mm, second=0, microsecond=0)
-if _now < _scheduled:
-    print(f"[{_now:%Y-%m-%d %H:%M:%S}] Ранее времени обновления {UPDATE_TIME}, пропуск")
-    raise SystemExit(0)
-try:
-    with open(OUTPUT_JSON, encoding="utf-8") as _f:
-        _last = datetime.fromisoformat(json.load(_f).get("updated_at"))
-    if _last >= _scheduled:
-        print(f"[{_now:%Y-%m-%d %H:%M:%S}] Данные уже собраны после {UPDATE_TIME}, пропуск")
-        raise SystemExit(0)
-except SystemExit:
-    raise
-except Exception:
-    pass  # файла ещё нет — собираем
-
-# Поля личного кабинета, забираемые из API
-API_FIELDS = (
-    "plan_name", "user_balance", "user_days_to_block",
-    "user_quota", "plan_quota", "user_sites", "plan_site",
-    "server_name", "user_domains",
-)
+def log(msg):
+    print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}", flush=True)
 
 
-def _to_float(s: str) -> float:
-    """Преобразует '2 514,54' / '2\xa0514.54' в float (устойчиво к неразрывному пробелу)."""
-    return float(s.replace('\xa0', ' ').replace(' ', '').replace(',', '.'))
-
-
-def fetch_account_api():
-    """Данные личного кабинета через официальный API Beget."""
-    params = urllib.parse.urlencode({
-        "login": BEGET_LOGIN,
-        "passwd": BEGET_PASSWORD,
+def fetch_account_api(login, password):
+    """Данные лицевого счёта через официальный API Beget (основной источник)."""
+    body = urllib.parse.urlencode({
+        "login": login,
+        "passwd": password,
         "output_format": "json",
-    })
-    req = urllib.request.Request(
-        BEGET_API_URL,
-        data=params.encode("utf-8"),
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        payload = json.loads(resp.read().decode("utf-8"))
-    if payload.get("status") != "success":
-        return None
-    return payload.get("answer", {}).get("result")
+    }).encode("utf-8")
+    req = urllib.request.Request(BEGET_API_URL, data=body)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if data.get("status") == "error":
+            msg = (data.get("error_text") or "").lower()
+            # Неверные креды — обновление пароля в настройках, без тревоги
+            if "auth" in msg or "password" in msg or "неверный" in msg or "login" in msg:
+                return {"status": "ok", "error": "Неверный логин/пароль Beget, обновите в настройках"}
+            return {"status": "error", "error": data.get("error_text") or "Beget API error"}
+        info = data.get("answer", {}).get("status", {})
+        return {
+            "status": "ok",
+            "updated_at": datetime.now().isoformat(),
+            "fields": [
+                {"label": label, "value": _to_float(info.get(key))}
+                for key, label in API_FIELDS
+            ],
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 
-def parse_beget():
-    # Партнёрский кабинет парсится только при включённой галочке «Партнёр»
-    partner_enabled = _settings.get("is_partner") is not False
+def parse_beget(settings, login, password):
+    """
+    Парсинг данных Beget из личного кабинета (playwright + xvfb-run)
+    и партнёрского кабинета (если включено в настройках).
+    """
+    from playwright.sync_api import sync_playwright
 
-    if partner_enabled:
-        # Запускаем Xvfb
-        os.system("pkill Xvfb 2>/dev/null; sleep 1; nohup Xvfb :99 -screen 0 1280x720x24 -ac > /dev/null 2>&1 & sleep 2")
-        os.environ['DISPLAY'] = ':99'
+    partner_enabled = settings.get("is_partner") is not False  # по умолчанию — да
+    cookies = None
 
-        from playwright.sync_api import sync_playwright
+    try:
+        from beget_cabinet import parse_beget_cabinet
+
+        cookies = parse_beget_cabinet(login, password)
+    except ImportError:
+        log("Модуль beget_cabinet.py не найден — основной кабинет пропущен")
+    except Exception as e:
+        log(f"Ошибка парсинга основного кабинета: {e}")
 
     result = {
+        "status": "ok",
         "updated_at": datetime.now().isoformat(),
-        "balance": None,
-        "partner_balance": None,
-        "active_referrals": None,
-        "last_transaction": None,
-        "last_transaction_amount": None,
-        "status": "error",
-        "error": None,
+        "fields": [],
+        "partner": None,
+        "tables": [],
     }
 
+    # Партнёрский кабинет (playwright + xvfb-run, переключатель «Партнёр» в настройках)
     if partner_enabled:
-      with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=False,
-            executable_path='/usr/bin/chromium-browser',
-            args=['--no-sandbox', '--disable-setuid-sandbox'],
-            timeout=30000
-        )
-        page = browser.new_page(viewport={'width': 1280, 'height': 720})
-
+        partner_login = settings.get("partner_login") or login
+        partner_password = settings.get("partner_password") or password
         try:
-            # Логин
-            page.goto('https://cp.beget.com/login', timeout=60000)
-            page.wait_for_timeout(5000)
-            page.fill('input[type="text"], input:not([type="password"])', BEGET_LOGIN)
-            page.fill('input[type="password"]', BEGET_PASSWORD)
-            page.click('button[type="submit"], button')
-            page.wait_for_timeout(10000)
+            from beget_partner_cabinet import parse_beget_partner_cabinet
 
-            # Partnership
-            page.goto('https://cp.beget.com/partnership', timeout=60000)
-            page.wait_for_timeout(8000)
-
-            # Извлекаем данные из текста страницы
-            text = page.inner_text('body')
-
-            # Баланс
-            m = re.search(r'Баланс:\s*([0-9\s\xa0]+[.,][0-9]+)\s*₽', text)
-            if m:
-                try:
-                    result["balance"] = _to_float(m.group(1))
-                    result["partner_balance"] = result["balance"]
-                except ValueError:
-                    pass
-
-            # Активные рефералы
-            m = re.search(r'Активные рефералы:\s*(\d+)', text)
-            if m:
-                try:
-                    result["active_referrals"] = int(m.group(1))
-                except ValueError:
-                    pass
-
-            # Последняя транзакция
-            m = re.search(r'Последняя транзакция:\s*(\d{2}\.\d{2}\.\d{4})', text)
-            if m:
-                result["last_transaction"] = m.group(1)
-
-            # Сумма транзакции
-            m = re.search(r'Сумма транзакции:\s*([0-9\s\xa0]+[.,][0-9]+)\s*₽', text)
-            if m:
-                try:
-                    result["last_transaction_amount"] = _to_float(m.group(1))
-                except ValueError:
-                    pass
-
+            partner_data = parse_beget_partner_cabinet(partner_login, partner_password, cookies)
+            if partner_data:
+                result["partner"] = partner_data.get("partner")
+                result["tables"] = partner_data.get("tables") or []
+        except ImportError:
+            log("Модуль beget_partner_cabinet.py не найден — партнёрский кабинет пропущен")
         except Exception as e:
-            result["error"] = str(e)
-        finally:
-            browser.close()
+            log(f"Ошибка парсинга партнёрского кабинета: {e}")
 
-    # Останавливаем Xvfb
-    os.system("pkill Xvfb 2>/dev/null")
-
-    # Данные личного кабинета через API (партнёрский баланс не перезаписываем)
-    try:
-        api_data = fetch_account_api()
-        if api_data:
-            for key in API_FIELDS:
-                if key in api_data:
-                    result[key] = api_data[key]
-    except Exception as e:
-        if result["error"] is None:
-            result["error"] = f"API: {e}"
-
-    if result["balance"] is not None:
-        result["status"] = "ok"
-    else:
-        result["error"] = result["error"] or "Не удалось извлечь данные"
-
-    os.makedirs(os.path.dirname(OUTPUT_JSON), exist_ok=True)
-    with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
-
-    print(json.dumps(result, ensure_ascii=False))
+    if not result["partner"] and not result["tables"] and not cookies:
+        result["status"] = "error"
+        result["error"] = "Не удалось получить данные ни из одного кабинета"
     return result
 
 
+def collect_one(settings_path, output_path, label, is_main):
+    """Сбор данных для одного набора настроек; True/False — успех, None — пропуск."""
+    try:
+        with open(settings_path, encoding="utf-8") as fh:
+            settings = json.load(fh)
+    except FileNotFoundError:
+        log(f"{label}: файл настроек не найден ({settings_path}), пропуск")
+        return None
+    except Exception as e:
+        log(f"{label}: не удалось прочитать настройки: {e}")
+        return False
+
+    if settings.get("is_active") is False:
+        log(f"{label}: интеграция деактивирована, пропуск")
+        return None
+
+    login = settings.get("login") or (DEFAULT_LOGIN if is_main else None)
+    password = settings.get("password") or (DEFAULT_PASSWORD if is_main else None)
+    if not login or not password:
+        log(f"{label}: логин/пароль не заданы в настройках CRM, пропуск")
+        return None
+
+    update_time = settings.get("update_time") or "10:00"
+    now = datetime.now()
+    try:
+        hh, mm = map(int, str(update_time).split(":"))
+    except ValueError:
+        hh, mm = 10, 0
+    scheduled = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+
+    if now < scheduled:
+        log(f"{label}: ежедневное обновление запланировано на {update_time}, пропуск")
+        return None
+    try:
+        with open(output_path, encoding="utf-8") as fh:
+            last = datetime.fromisoformat(json.load(fh).get("updated_at"))
+        if last >= scheduled:
+            log(f"{label}: данные уже актуальны (обновлены {last:%d.%m.%Y %H:%M}), пропуск")
+            return None
+    except Exception:
+        pass
+
+    result = parse_beget(settings, login, password)
+    out_dir = os.path.dirname(output_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as fh:
+        json.dump(result, fh, ensure_ascii=False, indent=1)
+    if result.get("status") == "ok":
+        log(f"{label}: данные успешно обновлены")
+    else:
+        log(f"{label}: ошибка сбора данных: {result.get('error')}")
+    return result.get("status") == "ok"
+
+
+def main():
+    sources = [
+        (os.path.join(DATA_DIR, "beget_settings.json"), os.path.join(DATA_DIR, "beget.json"), "main", True),
+    ]
+    if os.path.isdir(DATA_DIR):
+        for entry in sorted(os.listdir(DATA_DIR)):
+            sp = os.path.join(DATA_DIR, entry, "beget_settings.json")
+            if os.path.isfile(sp):
+                sources.append((sp, os.path.join(DATA_DIR, entry, "beget.json"), entry, False))
+
+    ok = True
+    for settings_path, output_path, label, is_main in sources:
+        try:
+            res = collect_one(settings_path, output_path, label, is_main)
+            if res is False:
+                ok = False
+        except SystemExit:
+            raise
+        except Exception as e:
+            log(f"{label}: непредвиденная ошибка: {e}")
+            ok = False
+    raise SystemExit(0 if ok else 1)
+
+
 if __name__ == "__main__":
-    parse_beget()
+    main()
