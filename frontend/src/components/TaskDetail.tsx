@@ -529,15 +529,24 @@ export function TaskDetail() {
     const timer = setTimeout(measure, 300);
     window.addEventListener("resize", measure);
     window.addEventListener("load", measure);
-    // Постоянная защита: пока документ выше окна (поздние шрифты,
-    // картинки, появление горизонтального скроллбара) — поджимаем блоки
-    // ровно на величину переполнения
+    // Постоянная защита: пока контент выше своего скролл-контейнера —
+    // поджимаем блоки ровно на величину переполнения. Скроллится не
+    // document, а внутренний контейнер лейаута, поэтому ищем его явно
     let trimmed = 0;
+    const scrollerOf = (): HTMLElement => {
+      let p = discussionSplitRef.current?.parentElement ?? null;
+      while (p && p !== document.body) {
+        const oy = getComputedStyle(p).overflowY;
+        if (oy === "auto" || oy === "scroll") return p;
+        p = p.parentElement;
+      }
+      return document.documentElement;
+    };
     const safety = setInterval(() => {
       const el = discussionSplitRef.current;
       if (!el) return;
-      const doc = document.documentElement;
-      const overflow = doc.scrollHeight - doc.clientHeight;
+      const scroller = scrollerOf();
+      const overflow = scroller.scrollHeight - scroller.clientHeight;
       if (overflow > 0 && trimmed < MAX_TRIM) {
         const delta = Math.min(overflow + 1, MAX_TRIM - trimmed);
         trimmed += delta;
