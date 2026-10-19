@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { EmailSettings } from "./EmailSettings";
 import { EmailFilters } from "./EmailFilters";
 import { AccountingSettings } from "./AccountingSettings";
@@ -8,6 +7,9 @@ import { TelephonySettings } from "./TelephonySettings";
 import { StatusManager } from "./StatusManager";
 import { MaxSettings } from "./MaxSettings";
 import { useAuth } from "../hooks/useAuth";
+import { api } from "../api/client";
+import { Block } from "./HelpArticle";
+import { HELP_ARTICLES, HelpArticle as HelpArticleData } from "../lib/helpContent";
 import { TelegramSettings } from "./TelegramSettings";
 import { VpnSettings } from "./VpnSettings";
 import { UserList } from "./UserList";
@@ -129,10 +131,18 @@ function renderPluginSettings(pluginKey: PluginKey) {
 }
 
 export function Settings() {
-  const navigate = useNavigate();
   // По умолчанию открываем «Системные» настройки
   const [activeTab, setActiveTab] = useState<MainTab>("system");
   const [selectedPlugin, setSelectedPlugin] = useState<PluginKey | null>(null);
+  const [helpSlug, setHelpSlug] = useState<string | null>(null);
+  const [helpArticles, setHelpArticles] = useState<HelpArticleData[]>(HELP_ARTICLES);
+
+  const openHelp = (slug: string) => {
+    setHelpSlug(slug);
+    api.help.list()
+      .then((list) => { if (Array.isArray(list) && list.length) setHelpArticles(list as any); })
+      .catch(() => {});
+  };
   const [pluginStatus, setPluginStatus] = useState<Record<PluginKey, boolean>>({
     email: false,
     telephony: false,
@@ -153,6 +163,13 @@ export function Settings() {
     ozon: false,
     vpn: false,
   });
+  useEffect(() => {
+    if (!helpSlug) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setHelpSlug(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [helpSlug]);
+
   const { user: stUser } = useAuth() ;
 
   // Возврат из OAuth банка: сразу открываем интеграции
@@ -229,6 +246,7 @@ export function Settings() {
     });
 
     const selected = selectedPlugin ? PLUGINS.find((p) => p.key === selectedPlugin) : null;
+    const helpArticle = helpSlug ? helpArticles.find((a) => a.slug === helpSlug) : null;
 
     return (
       <div>
@@ -309,7 +327,7 @@ export function Settings() {
                         {integBlocked ? "Недоступно в тарифе" : (isActive ? "Активен" : "Не активен")}
                       </span>
                       <span
-                        onClick={(e) => { e.stopPropagation(); navigate(`/help/${plugin.helpSlug}`); }}
+                        onClick={(e) => { e.stopPropagation(); openHelp(plugin.helpSlug); }}
                         title={`Справка: ${plugin.label}`}
                         style={{
                           width: 20,
@@ -412,6 +430,95 @@ export function Settings() {
               {/* Тело модального окна */}
               <div style={{ padding: 20, overflowY: "auto" }}>
                 {renderPluginSettings(selected.key)}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Модальное окно справки по плагину */}
+        {helpSlug && (
+          <div
+            onClick={() => setHelpSlug(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1000,
+              background: "rgba(0, 0, 0, 0.45)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 20,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: 720,
+                maxHeight: "85vh",
+                display: "flex",
+                flexDirection: "column",
+                borderRadius: 16,
+                background: "var(--bg-card)",
+                border: "1px solid var(--border-color)",
+                boxShadow: "0 20px 60px rgba(0, 0, 0, 0.25)",
+                overflow: "hidden",
+              }}
+            >
+              {/* Шапка модального окна */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "16px 20px",
+                  borderBottom: "1px solid var(--border-color)",
+                  flexShrink: 0,
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)" }}>
+                    {helpArticle ? helpArticle.title : "Справка"}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setHelpSlug(null)}
+                  title="Закрыть"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--text-muted)",
+                    fontSize: 20,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              {/* Тело модального окна */}
+              <div style={{ padding: 20, overflowY: "auto" }}>
+                {!helpArticle ? (
+                  <p style={{ margin: 0, fontSize: 14, color: "var(--text-muted)" }}>
+                    Статья не найдена.
+                  </p>
+                ) : (
+                  helpArticle.blocks.map((b, i) => <Block key={i} block={b} />)
+                )}
+                <div style={{ marginTop: 8, textAlign: "right" }}>
+                  <a
+                    href={`/help/${helpSlug}`}
+                    style={{ fontSize: 13, color: "var(--text-muted)" }}
+                  >
+                    Открыть полную версию на странице справки →
+                  </a>
+                </div>
               </div>
             </div>
           </div>
