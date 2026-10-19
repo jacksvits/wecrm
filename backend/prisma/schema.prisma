@@ -1632,6 +1632,7 @@ model OzonSellerSettings {
   clientId              String    @default("") @map("client_id")
   apiKey                String    @default("") @map("api_key")
   isActive              Boolean   @default(false) @map("is_active")
+  autoSync              Boolean   @default(true) @map("auto_sync") // авто-синхронизация по расписанию (worker); ручная синхронизация доступна всегда
   updateIntervalMinutes Int       @default(60) @map("update_interval_minutes")
   // Категория OZON (type_id) по умолчанию для новых товаров — выбирается из дерева категорий OZON
   defaultTypeId         Int?      @map("default_type_id")

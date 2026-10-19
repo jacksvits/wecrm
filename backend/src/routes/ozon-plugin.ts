@@ -19,6 +19,8 @@ router.get('/', authMiddleware, async (_req, res) => {
     }
     res.json({
       isActive: s?.isActive ?? false,
+      // опция «Авто синхронизация»: фоновая синхронизация по расписанию (worker)
+      autoSync: s?.autoSync ?? true,
       clientId: s?.clientId ?? '',
       apiKeySet: !!s?.apiKey,
       updateIntervalMinutes: s?.updateIntervalMinutes ?? 60,
@@ -40,7 +42,7 @@ router.get('/', authMiddleware, async (_req, res) => {
 router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
-    const { clientId, apiKey, updateIntervalMinutes, defaultTypeId } = req.body || {};
+    const { clientId, apiKey, updateIntervalMinutes, defaultTypeId, autoSync } = req.body || {};
     if (clientId !== undefined && typeof clientId !== 'string') return res.status(400).json({ error: 'Некорректный Client-Id' });
 
     const existing = await prisma.ozonSellerSettings.findUnique({ where: { id: 1 } });
@@ -55,6 +57,8 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
         defaultTypeId !== undefined
           ? (defaultTypeId === null || defaultTypeId === '' ? null : Math.max(1, Number(defaultTypeId)))
           : (existing?.defaultTypeId ?? null),
+      // опция «Авто синхронизация»: не передана (старые клиенты) — сохраняем текущее значение
+      autoSync: typeof autoSync === 'boolean' ? autoSync : (existing?.autoSync ?? true),
     };
 
     // Проверка подключения при сохранении
@@ -73,6 +77,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
     });
     res.json({
       isActive: saved.isActive,
+      autoSync: saved.autoSync,
       clientId: saved.clientId,
       apiKeySet: !!saved.apiKey,
       updateIntervalMinutes: saved.updateIntervalMinutes,

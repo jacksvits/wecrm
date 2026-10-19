@@ -33,7 +33,7 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
 
 export default function OzonSellerSettings() {
   const [settings, setSettings] = useState<any>(null);
-  const [form, setForm] = useState({ clientId: '', apiKey: '', updateIntervalMinutes: 60, defaultTypeId: null as number | null });
+  const [form, setForm] = useState({ clientId: '', apiKey: '', updateIntervalMinutes: 60, defaultTypeId: null as number | null, autoSync: true });
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState('');
@@ -52,7 +52,7 @@ export default function OzonSellerSettings() {
     try {
       const s = await api.ozonPlugin.get();
       setSettings(s);
-      setForm({ clientId: s.clientId || '', apiKey: '', updateIntervalMinutes: s.updateIntervalMinutes || 60, defaultTypeId: s.defaultTypeId ?? null });
+      setForm({ clientId: s.clientId || '', apiKey: '', updateIntervalMinutes: s.updateIntervalMinutes || 60, defaultTypeId: s.defaultTypeId ?? null, autoSync: s.autoSync ?? true });
     } catch (e: any) {
       flash(e.message || 'Ошибка загрузки настроек', true);
     }
@@ -113,6 +113,7 @@ export default function OzonSellerSettings() {
         clientId: form.clientId.trim(),
         apiKey: form.apiKey || undefined,
         updateIntervalMinutes: Number(form.updateIntervalMinutes) || 60,
+        autoSync: form.autoSync,
         defaultTypeId: form.defaultTypeId,
       });
       setSettings((prev: any) => ({ ...prev, ...res }));
@@ -220,6 +221,19 @@ export default function OzonSellerSettings() {
       </div>
 
       <div>
+        <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={form.autoSync}
+            onChange={e => setForm({ ...form, autoSync: e.target.checked })}
+            style={{ width: 16, height: 16 }}
+          />
+          Авто синхронизация
+        </label>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -6 }}>
+          Когда включено, товары с отметкой «OZON Seller» выгружаются в маркетплейс автоматически по расписанию.
+          Когда выключено — только вручную, кнопкой «Синхронизировать сейчас».
+        </div>
         <label style={labelStyle}>Интервал автообновления, мин</label>
         <input
           type="number"
@@ -227,7 +241,8 @@ export default function OzonSellerSettings() {
           max={1440}
           value={form.updateIntervalMinutes}
           onChange={e => setForm({ ...form, updateIntervalMinutes: Number(e.target.value) })}
-          style={{ ...inputStyle, maxWidth: 120 }}
+          disabled={!form.autoSync}
+          style={{ ...inputStyle, maxWidth: 120, opacity: form.autoSync ? 1 : 0.5 }}
         />
       </div>
 

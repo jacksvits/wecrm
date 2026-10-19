@@ -149,8 +149,10 @@ async function syncTenant(t: TenantInfo): Promise<void> {
   }
 
   // --- OZON Seller sync (выгрузка отмеченных товаров по расписанию) ---
+  // Авто-синхронизация запускается только при включённой опции «Авто синхронизация»;
+  // ручная синхронизация из настроек плагина доступна независимо от неё
   const ozonSettings = await prisma.ozonSellerSettings.findFirst();
-  if (ozonSettings?.isActive) {
+  if (ozonSettings?.isActive && ozonSettings.autoSync) {
     if (!bag.ozonTimer) {
       const runOzonSyncJob = async () => {
         try {
