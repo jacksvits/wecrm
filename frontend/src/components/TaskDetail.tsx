@@ -323,6 +323,7 @@ export function TaskDetail() {
   const [contactText, setContactText] = useState("");
   const [discussionContact, setDiscussionContact] = useState<DiscussionContact | null>(null);
   const discussionSplitRef = useRef<HTMLDivElement>(null);
+  const correctedRef = useRef(false);
   const [discussionPaneHeight, setDiscussionPaneHeight] = useState<number | null>(null);
   const [deals, setDeals] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
@@ -511,32 +512,35 @@ export function TaskDetail() {
   // иначе рост блоков порождает скролл страницы
   useEffect(() => {
     if (activeTab !== "comments") return;
+    correctedRef.current = false;
     const measure = () => {
       const el = discussionSplitRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top;
       if (top < 0) return; // страница уже прокручена — не меряем
-      // Вычитаем нижние отступы, чтобы страница не имела лишнего скролла
-      let bottomGap = 0;
-      const parent = el.parentElement;
-      if (parent) {
-        const cs = getComputedStyle(parent);
-        bottomGap =
-          (parseFloat(cs.paddingBottom) || 0) +
-          (parseFloat(cs.marginBottom) || 0);
+      let h = window.innerHeight - top;
+      // Самокоррекция (однократная): если документ выше окна — уменьшаем
+      // блоки ровно на величину небольшого переполнения; если скролл
+      // вызван чем-то другим (например, футером) — блоки не трогаем
+      const doc = document.documentElement;
+      const overflow = doc.scrollHeight - doc.clientHeight;
+      if (overflow > 0 && overflow <= 300 && !correctedRef.current) {
+        correctedRef.current = true;
+        h -= overflow + 1;
       }
-      const bodyMargin = parseFloat(getComputedStyle(document.body).marginBottom) || 0;
-      setDiscussionPaneHeight(
-        Math.max(320, window.innerHeight - top - bottomGap - bodyMargin),
-      );
+      setDiscussionPaneHeight(Math.max(320, h));
     };
     measure();
-    // повторное измерение после полной отрисовки контента
-    const timer = setTimeout(measure, 300);
+    // повторные измерения после отрисовки и загрузки контента
+    const timer1 = setTimeout(measure, 150);
+    const timer2 = setTimeout(measure, 600);
     window.addEventListener("resize", measure);
+    window.addEventListener("load", measure);
     return () => {
-      clearTimeout(timer);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       window.removeEventListener("resize", measure);
+      window.removeEventListener("load", measure);
     };
   }, [activeTab, task?.id]);
 
