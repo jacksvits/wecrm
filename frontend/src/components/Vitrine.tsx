@@ -33,6 +33,35 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
   const cardStyle = useBrandProductCardStyle();
   // Во встроенной витрине (панель задачи) каталог по умолчанию свёрнут
   const [catalogOpen, setCatalogOpen] = useState(!embedded);
+
+  // Встроенная витрина (панель задачи): локальный поиск — та же фильтрация,
+  // что и у пропа search на странице «Каталог»
+  const [embeddedQuery, setEmbeddedQuery] = useState("");
+  const effectiveSearch = embedded ? embeddedQuery : search;
+  // Счётчик резерва: тот же localStorage + событие wecrm:reserve, что и в шапке страницы
+  const [reserveCount, setReserveCount] = useState(0);
+  useEffect(() => {
+    const read = () => {
+      try {
+        setReserveCount(
+          (JSON.parse(localStorage.getItem("wecrm_vitrine_reserve") || "[]") as any[])
+            .reduce((s, i) => s + i.quantity, 0),
+        );
+      } catch {
+        setReserveCount(0);
+      }
+    };
+    read();
+    window.addEventListener("wecrm:reserve", read);
+    return () => window.removeEventListener("wecrm:reserve", read);
+  }, []);
+  // Открытие резерв-листа — та же логика, что по событию wecrm:open-reserve
+  const openReserveListInternal = () => {
+    setSaveError("");
+    setSaveOk("");
+    setPaymentMethod("postpone");
+    setReserveOpen(true);
+  };
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -183,7 +212,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
     }
     // Услуги не зависят от остатков — фильтр «В наличии» их не скрывает
     if (inStockOnly) list = list.filter((c) => c.inStock || c.product.kind === 'service');
-    const s = search.trim().toLowerCase();
+    const s = effectiveSearch.trim().toLowerCase();
     if (s) {
       list = list.filter((c) =>
         c.product.name.toLowerCase().includes(s) ||
@@ -193,7 +222,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, activeCategoryId, inStockOnly, categories, search]);
+  }, [cards, activeCategoryId, inStockOnly, categories, effectiveSearch]);
 
   // Теги, указанные в показанных карточках (алфавит) — источник фильтра на витрине
   const availableTags = useMemo(() => {
@@ -561,17 +590,42 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
         }
       `}</style>
       {embedded && (
-        <button
-          type="button"
-          className="vitrine-embedded-catalog-btn"
-          onClick={() => setCatalogOpen(o => !o)}
-          aria-label={catalogOpen ? 'Скрыть каталог' : 'Показать каталог'}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: catalogOpen ? 'rotate(180deg)' : 'none', transition: 'transform .18s ease' }}>
-            <polyline points="5 10 12 16 19 10" />
+        <div className="vitrine-embedded-toolbar">
+          <button
+            type="button"
+            className="vitrine-embedded-catalog-btn"
+            onClick={() => setCatalogOpen(o => !o)}
+            aria-label={catalogOpen ? 'Скрыть каталог' : 'Показать каталог'}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: catalogOpen ? 'rotate(180deg)' : 'none', transition: 'transform .18s ease' }}>
+              <polyline points="5 10 12 16 19 10" />
+            </svg>
+            {catalogOpen ? 'Скрыть каталог' : 'Каталог'}
+          </button>
+          <input
+            className="vitrine-embedded-search"
+            value={embeddedQuery}
+            onChange={(e) => setEmbeddedQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+            placeholder="Поиск: название, артикул, категория"
+            aria-label="Поиск по витрине"
+          />
+          <button
+            type="button"
+            className="vitrine-embedded-reserve"
+            onClick={openReserveListInternal}
+            title="В резерве"
+            aria-label="В резерве"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path fillRule="evenodd" clipRule="evenodd" d="M17 3.8H7C5.78497 3.8 4.8 4.78497 4.8 6V15.7647C4.8 16.574 5.24438 17.318 5.95698 17.7017L10.957 20.394C11.6081 20.7446 12.3919 20.7446 13.043 20.394L18.043 17.7017C18.7556 17.318 19.2 16.574 19.2 15.7647V6C19.2 4.78497 18.215 3.8 17 3.8ZM7 2C4.79086 2 3 3.79086 3 6V15.7647C3 17.2362 3.80796 18.5889 5.1036 19.2866L10.1036 21.9789C11.2875 22.6164 12.7125 22.6164 13.8964 21.9789L18.8964 19.2866C20.192 18.5889 21 17.2362 21 15.7647V6C21 3.79086 19.2091 2 17 2H7Z" fill="currentColor"/>
+            <path fillRule="evenodd" clipRule="evenodd" d="M16.7248 8.63051C17.0763 8.98198 17.0763 9.55183 16.7248 9.9033L11.7627 14.8654C11.4113 15.2169 10.8414 15.2169 10.4899 14.8654L7.81839 12.1939C7.46692 11.8424 7.46691 11.2726 7.81839 10.9211C8.16986 10.5696 8.7397 10.5696 9.09118 10.9211L11.1263 12.9562L15.4521 8.63051C15.8035 8.27904 16.3734 8.27904 16.7248 8.63051Z" fill="currentColor"/>
           </svg>
-          {catalogOpen ? 'Скрыть каталог' : 'Каталог'}
-        </button>
+            {reserveCount > 0 && (
+              <span className="vitrine-embedded-reserve-badge">{reserveCount}</span>
+            )}
+          </button>
+        </div>
       )}
       <div className="vitrine-layout" style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
         <aside className={'vitrine-catalog' + (catalogOpen ? ' open' : '') + (embedded ? ' embedded' + (catalogOpen ? '' : ' cat-collapsed') : '')} style={{ width: 240, flexShrink: 0, overflowY: 'auto', paddingRight: 4 }}>
@@ -590,7 +644,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
             В наличии
           </label>
         </aside>
-        {!activeCategoryId && !search.trim() ? (
+        {!activeCategoryId && !effectiveSearch.trim() ? (
           <PromoMosaic onOpenCategory={(id) => setActiveCategoryId(id)} />
         ) : (
         <div className={viewMode === 'cards' ? 'vitrine-grid' : 'vitrine-list'}>
@@ -660,7 +714,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
           )}
           {filteredCards.length === 0 && (
             <div style={{ gridColumn: '1 / -1', padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
-              По запросу «{search.trim()}» ничего не найдено
+              По запросу «{effectiveSearch.trim()}» ничего не найдено
             </div>
           )}
           {viewMode === 'list' && filteredCards.length > 0 && (
