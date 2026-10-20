@@ -49,7 +49,18 @@ self.addEventListener('fetch', (event) => {
           if (res && res.status === 200) return res;
           throw new Error('Network failed for navigation');
         })
-        .catch(() => caches.match(event.request))
+        .catch(async () => {
+          // ВАЖНО: respondWith не принимает undefined — иначе навигация
+          // падает с «Failed to convert value to 'Response'» и вкладка
+          // остаётся на «Загрузка…». Фолбэк — кэшированный index.html
+          // (любой путь, т.к. SPA-роутинг разрулит внутри приложения).
+          const cached = (await caches.match(event.request)) || (await caches.match('/index.html')) || (await caches.match('/'));
+          if (cached) return cached;
+          return new Response('Нет соединения с сервером. Проверьте интернет и обновите страницу.', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          });
+        })
     );
     return;
   }
@@ -62,7 +73,15 @@ self.addEventListener('fetch', (event) => {
           if (res && res.status === 200) return res;
           throw new Error('Network failed for index.html');
         })
-        .catch(() => caches.match(event.request))
+        .catch(async () => {
+          // Тот же фолбэк: undefined в respondWith ломал загрузку страницы
+          const cached = (await caches.match(event.request)) || (await caches.match('/index.html')) || (await caches.match('/'));
+          if (cached) return cached;
+          return new Response('Нет соединения с сервером. Проверьте интернет и обновите страницу.', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          });
+        })
     );
     return;
   }

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { getTochkaState, loadAccountUsers } from './tochka.js';
+import { getTochkaStateNonBlocking, loadAccountUsers } from './tochka.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -42,7 +42,7 @@ router.get('/stats', async (req: AuthRequest, res) => {
     const accountUsers = loadAccountUsers();
     const myAccountIds = Object.keys(accountUsers).filter((accId) => accountUsers[accId] === req.user!.id);
     if (myAccountIds.length > 0) {
-      const state = await getTochkaState();
+      const state = getTochkaStateNonBlocking();
       const byId = new Map((state.accounts || []).map((a: any) => [a.id, a]));
       tochkaBalances = myAccountIds
         .map((accId) => byId.get(accId))

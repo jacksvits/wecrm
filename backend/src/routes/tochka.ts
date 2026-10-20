@@ -152,6 +152,12 @@ async function authHeadersWithRetry(getResponse: (headers: Record<string, string
   return { response, refreshed: false };
 }
 
+// Жёсткий таймаут на все запросы к API Точки: раньше запрос мог повиснуть
+// бесконечно (нет дефолтного таймаута в https.request), из-за чего эндпоинт
+// /api/dashboard/stats, дожидающийся балансов, «висел» у пользователей
+// минутами. 10 с на коннект+ответ — с запасом для банковского API.
+const TOCHKA_REQUEST_TIMEOUT_MS = 10_000;
+
 export function tochkaRequest(urlPath: string, options: { headers?: Record<string, string>; method?: string; body?: string } = {}): Promise<{ status: number; body: any; text: string }> {
   return new Promise((resolve, reject) => {
     const url = urlPath.startsWith('http') ? urlPath : `${TOCHKA_BASE}${urlPath}`;
@@ -170,6 +176,7 @@ export function tochkaRequest(urlPath: string, options: { headers?: Record<strin
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
+        clearTimeout(timeout);
         try {
           const json = JSON.parse(data);
           resolve({ status: res.statusCode || 0, body: json, text: data });
@@ -177,8 +184,13 @@ export function tochkaRequest(urlPath: string, options: { headers?: Record<strin
           resolve({ status: res.statusCode || 0, body: null, text: data });
         }
       });
+      // Ответ начался, но «завис» на середине тела — рвём по тому же таймауту
+      res.on('error', () => clearTimeout(timeout));
     });
-    req.on('error', (err) => reject(err));
+    const timeout = setTimeout(() => {
+      req.destroy(new Error(`tochkaRequest timeout after ${TOCHKA_REQUEST_TIMEOUT_MS}ms`));
+    }, TOCHKA_REQUEST_TIMEOUT_MS);
+    req.on('error', (err) => { clearTimeout(timeout); reject(err); });
     if (options.body) req.write(options.body);
     req.end();
   });
@@ -344,6 +356,34 @@ export async function getTochkaState() {
   (data as any).__cachedAt = new Date().toISOString();
   tochkaStateCache.set(key, { data, ts: Date.now() });
   return data;
+}
+
+// Флаг фонового обновления по tenant'у — не запускаем параллельные рефреши
+const tochkaRefreshing = new Set<string>();
+
+// Неблокирующий вариант для дашборда: сразу отдаём кэш (даже протухший),
+// а свежие данные подтягиваем в фоне. Иначе внешний API банка добавлял
+// секунды (или вечность, до появления таймаута) к загрузке дашборда.
+export function getTochkaStateNonBlocking(): any {
+  const key = tenantKey();
+  const cached = tochkaStateCache.get(key);
+  if (!tochkaRefreshing.has(key)) {
+    const stale = !cached || Date.now() - cached.ts >= tochkaStateTtlMs;
+    if (stale) {
+      tochkaRefreshing.add(key);
+      fetchTochkaState()
+        .then((data) => {
+          (data as any).__cachedAt = new Date().toISOString();
+          tochkaStateCache.set(key, { data, ts: Date.now() });
+        })
+        .catch((e) => console.error('[Tochka] Background refresh error:', e.message))
+        .finally(() => tochkaRefreshing.delete(key));
+    }
+  }
+  if (cached) return cached.data;
+  // Кэша ещё нет — вернём пустое состояние, балансы появятся со следующим
+  // фоновым обновлением/перезаходом на дашборд
+  return { accounts: [], totalBalance: 0, connected: false, __pending: true };
 }
 
 async function fetchTochkaState() {

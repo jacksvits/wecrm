@@ -81,6 +81,13 @@ services:
     # Только localhost: отдачу наружу делает nginx на хосте
     ports:
       - "127.0.0.1:3000:80"
+    # Лимит fd по умолчанию в контейнере — 1024; при десятках долгоживущих
+    # SSE-потоков и виджетов камер nginx исчерпывает дескрипторы и рвёт
+    # новые соединения (симптом «Failed to fetch» у клиентов)
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     depends_on:
       backend:
         condition: service_healthy
