@@ -607,6 +607,12 @@ router.get("/webrtc/key", authMiddleware, async (req: AuthRequest, res) => {
     }
     // SIP-логин сотрудника: ищем по внутреннему номеру среди номеров сотрудников АТС
     let sipLogin = user.novofonExtension;
+    // Без apiSecret подписать запрос get_key невозможно (нужен HMAC-SHA1) —
+    // отдаём пустой ключ, чтобы виджет тихо не загружался, а не валился с 500
+    if (!settings.apiSecret) {
+      console.warn("[Novofon WebRTC] apiSecret не задан — виджет WebRTC недоступен");
+      return res.json({ key: null, sip: null });
+    }
     try {
       const employees = await novofon.getEmployees({
         apiKey: settings.apiKey,
@@ -644,7 +650,12 @@ router.get("/webrtc/key", authMiddleware, async (req: AuthRequest, res) => {
     );
     const data: any = await response.json();
     if (data.status !== "success" || !data.key) {
-      throw new Error(data.message || "Novofon API вернул ошибку");
+      // not_authorized и прочие ошибки Novofon — не рвём запрос 500, виджет
+      // просто не загружается; причина видна в логах сервера
+      console.warn(
+        `[Novofon WebRTC] Ключ не получен (${data.status}): ${data.message || "без описания"} — пользователь=${req.user!.id}`
+      );
+      return res.json({ key: null, sip: null, error: data.message || "Novofon API вернул ошибку" });
     }
     console.log(
       `[Novofon WebRTC] Ключ виджета выдан: пользователь=${req.user!.id}, sip=${sipLogin}`,
@@ -768,25 +779,36 @@ router.post("/callback", async (req: AuthRequest, res) => {
   if (!settings?.isActive) {
     return res.status(400).json({ error: "Телефония не настроена" });
   }
-  const employees = await novofon.getEmployees({
-    apiKey: settings.apiKey,
-    apiSecret: settings.apiSecret,
-  });
+  let employees: novofon.NovofonEmployee[];
+  try {
+    employees = await novofon.getEmployees({
+      apiKey: settings.apiKey,
+      apiSecret: settings.apiSecret,
+    });
+  } catch (err: any) {
+    console.error("[Novofon] get.employees не удался в /callback:", err.message);
+    return res.status(502).json({ error: "Не удалось получить список сотрудников АТС: " + err.message });
+  }
   const targetEmployee = employeeId
     ? employees.find((e) => e.id === employeeId)
     : employees[0];
   if (!targetEmployee) {
     return res.status(400).json({ error: "Сотрудник не найден" });
   }
-  const result = await novofon.startEmployeeCall(
-    { apiKey: settings.apiKey, apiSecret: settings.apiSecret },
-    {
-      virtualPhoneNumber: settings.virtualNumber || "",
-      employeeId: targetEmployee.id,
-      contactPhone: normalizePhone(phone),
-    },
-  );
-  res.json({ success: true, callSessionId: result.call_session_id });
+  try {
+    const result = await novofon.startEmployeeCall(
+      { apiKey: settings.apiKey, apiSecret: settings.apiSecret },
+      {
+        virtualPhoneNumber: settings.virtualNumber || "",
+        employeeId: targetEmployee.id,
+        contactPhone: normalizePhone(phone),
+      },
+    );
+    res.json({ success: true, callSessionId: result.call_session_id });
+  } catch (err: any) {
+    console.error("[Novofon] start.employee_call не удался:", err.message);
+    res.status(502).json({ error: "АТС не смогла начать звонок: " + err.message });
+  }
 });
 router.get("/employees", async (_req, res) => {
   const settings = await prisma.telephonySettings.findFirst();

@@ -74,11 +74,28 @@ async function jsonRpcRequest<T = any>(
     throw new Error(`Novofon API error: ${data.error.message || JSON.stringify(data.error)}`);
   }
 
-  return (data.result?.data ?? data.result) as T;
+  const result = data.result?.data ?? data.result;
+  // API может вернуть ответ без result (и без error) — не отдаём undefined,
+  // чтобы вызывающий код не падал на .find()/.length() и т.п.
+  if (result === undefined || result === null) {
+    throw new Error(`Novofon API: пустой result для ${method}: ${JSON.stringify(data).slice(0, 300)}`);
+  }
+
+  return result as T;
 }
 
 export async function getEmployees(credentials: NovofonCredentials): Promise<NovofonEmployee[]> {
-  return jsonRpcRequest(DATA_API_URL, 'get.employees', {}, credentials);
+  const data = await jsonRpcRequest<any>(DATA_API_URL, 'get.employees', {}, credentials);
+  // API иногда оборачивает список объектом/строкой вместо массива — нормализуем,
+  // чтобы вызывающий код всегда получал массив
+  if (Array.isArray(data)) return data as NovofonEmployee[];
+  if (data && typeof data === 'object') {
+    const values = Object.values(data);
+    if (values.length && values.every((v) => v && typeof v === 'object')) {
+      return values as NovofonEmployee[];
+    }
+  }
+  return [];
 }
 
 export async function getSipLines(credentials: NovofonCredentials) {
