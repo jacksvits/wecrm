@@ -130,7 +130,10 @@ router.get('/snapshot/:index', authMiddleware, async (req: AuthRequest, res) => 
     res.setHeader('Content-Type', upstream.headers.get('content-type') || 'image/jpeg');
     res.setHeader('Cache-Control', 'no-store');
     const { Readable } = await import('stream');
-    Readable.fromWeb(upstream.body as any).pipe(res);
+    const readable = Readable.fromWeb(upstream.body as any);
+    // см. обработчик 'error' в /stream/:index — иначе падение процесса
+    readable.on('error', () => { try { res.end(); } catch {} });
+    readable.pipe(res);
   } catch (e: any) {
     if (!res.headersSent) res.status(502).json({ error: e.message });
   }
@@ -154,7 +157,11 @@ router.get('/stream/:index', authMiddleware, async (req: AuthRequest, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     const { Readable } = await import('stream');
-    Readable.fromWeb(upstream.body as any).pipe(res);
+    const readable = Readable.fromWeb(upstream.body as any);
+    // AbortSignal.timeout / обрыв соединения бросают 'error' на потоке —
+    // без обработчика это unhandled error и падение всего процесса Node
+    readable.on('error', () => { try { res.end(); } catch {} });
+    readable.pipe(res);
     req.on('close', () => { try { res.end(); } catch {} });
   } catch (e: any) {
     if (!res.headersSent) res.status(502).json({ error: e.message });
