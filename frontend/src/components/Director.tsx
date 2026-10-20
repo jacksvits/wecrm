@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CameraWidget } from "./CameraWidget";
+import { CameraStreamImage } from "./CameraStreamImage";
 
 import { useNavigate } from "react-router-dom";
 import {
@@ -1395,8 +1396,9 @@ export function Director() {
             </button>
           </div>
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-            <img
-              src={`/api/camera/stream/${fullscreenCamera.id}?t=${cameraRefreshKey}`}
+            <CameraStreamImage
+              cameraId={fullscreenCamera.id}
+              refreshKey={cameraRefreshKey}
               alt={fullscreenCamera.label}
               style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
               onClick={(e) => e.stopPropagation()}

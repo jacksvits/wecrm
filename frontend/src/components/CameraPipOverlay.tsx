@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
+import { CameraStreamImage } from "./CameraStreamImage";
 
 const STORAGE_KEY = "camera_pip_ids";
 const STORAGE_WIDTH = "camera_pip_width";
@@ -187,9 +188,9 @@ export function CameraPipOverlay() {
             </button>
           </div>
           <div style={{ position: "relative" }}>
-            <img
-              key={`${cam.id}-${refreshKey}`}
-              src={`/api/camera/stream/${cam.id}?t=${refreshKey}`}
+            <CameraStreamImage
+              cameraId={cam.id}
+              refreshKey={refreshKey}
               alt={cam.label || "Камера"}
               onClick={() => setExpandedId(cam.id)}
               onLoad={(e) => {
@@ -199,7 +200,7 @@ export function CameraPipOverlay() {
                   setAspects((prev) => (prev[cam.id] === a ? prev : { ...prev, [cam.id]: a }));
                 }
               }}
-              style={{ width: "100%", height: imgH, objectFit: "cover", display: "block", cursor: "pointer" }}
+              style={{ width: "100%", height: imgH, objectFit: "cover", cursor: "pointer" }}
             />
             {/* «Ручка» изменения размера — левый нижний угол */}
             <div
@@ -246,8 +247,9 @@ export function CameraPipOverlay() {
             </button>
           </div>
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-            <img
-              src={`/api/camera/stream/${expanded.id}?t=${refreshKey}`}
+            <CameraStreamImage
+              cameraId={expanded.id}
+              refreshKey={refreshKey}
               alt={expanded.label || "Камера"}
               style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
               onClick={(e) => e.stopPropagation()}
