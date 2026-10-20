@@ -1298,13 +1298,16 @@ html, body { overflow-x: hidden; }
   letter-spacing: 0.04em;
 }
 
-/* Подложка: клик вне панели закрывает её; затемнение появляется с анимацией */
+/* Подложка: клик вне панели НЕ закрывает её (панель закрывается только
+   по крестику или Escape); подложка пропускает клики на задачу под ней,
+   затемнение появляется с анимацией */
 .task-vitrine-overlay {
   position: fixed;
   inset: 0;
   z-index: 1002;
   background: rgba(0, 0, 0, 0);
   transition: background 0.35s ease;
+  pointer-events: none;
 }
 .task-vitrine-overlay.open {
   background: rgba(0, 0, 0, 0.35);
@@ -1317,6 +1320,7 @@ html, body { overflow-x: hidden; }
   right: 0;
   width: 50vw;
   height: 100%;
+  pointer-events: auto;
   background: var(--bg-body);
   border-left: 1px solid var(--border-color);
   box-shadow: -8px 0 30px rgba(0, 0, 0, 0.15);

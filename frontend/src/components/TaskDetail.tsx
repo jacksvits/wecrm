@@ -3350,12 +3350,10 @@ export function TaskDetail() {
       {vitrineMounted && (
         <div
           className={"task-vitrine-overlay" + (vitrineOpen ? " open" : "")}
-          onClick={closeVitrinePanel}
         >
           <div
             className={"task-vitrine-panel" + (vitrineOpen ? " open" : "")}
             style={{ width: vitrineWidth ?? undefined }}
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="task-vitrine-head">
               <span className="task-vitrine-title">Витрина</span>
