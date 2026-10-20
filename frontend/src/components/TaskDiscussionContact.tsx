@@ -406,7 +406,9 @@ export function TaskDiscussionContact({
     </div>
   );
 
-  const tasks = contact.tasks?.slice(0, 8) || [];
+  // Полный список: контейнер вкладки сам скроллится (overflowY: auto),
+  // счётчик вкладки при этом совпадает с показанными строками
+  const tasks = contact.tasks || [];
   const isHtml = (text: string) => /<[a-z][\s\S]*>/i.test(text);
 
   // Счётчики для вкладок
