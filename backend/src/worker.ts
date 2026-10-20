@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
+// BigInt (vkUserId, ozonProductId) сериализуется в JSON как строка
+(BigInt.prototype as any).toJSON = function () { return this.toString(); };
 
 import { EmailWorker } from './email-worker/index.js';
 import { AccountingWorker } from './accounting-worker/index.js';

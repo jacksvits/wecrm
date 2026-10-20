@@ -171,7 +171,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
 
   let contactId: string | undefined;
   const vkProfileUrl = `https://vk.com/id${fromId}`;
-  const contact = await prisma.contact.findUnique({ where: { vkUserId: fromId } });
+  const contact = await prisma.contact.findUnique({ where: { vkUserId: BigInt(fromId) } });
   if (contact) {
     contactId = contact.id;
     console.log(`[VK Processor] Found contact ${contactId} for VK user ${fromId}`);
@@ -204,7 +204,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
     const newContact = await prisma.contact.create({
       data: {
         name,
-        vkUserId: fromId,
+        vkUserId: BigInt(fromId),
         vkProfileUrl,
         avatarUrl,
         birthDate: parseVkBdate(userInfo?.bdate),
@@ -221,7 +221,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
   console.log(`[VK Processor] Looking for latest task for peer ${fromId} group ${settings.groupId}`);
   const latestTask = await prisma.task.findFirst({
     where: {
-      vkPeerId: fromId,
+      vkPeerId: BigInt(fromId),
       vkGroupId: settings.groupId,
     },
     orderBy: { createdAt: 'desc' },
@@ -337,7 +337,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
           priority: 'medium',
           creatorId,
           contactId,
-          vkPeerId: fromId,
+          vkPeerId: BigInt(fromId),
           vkGroupId: settings.groupId,
           vkMessageId: msg.id,
           assignees: mergedAssigneeIds.length

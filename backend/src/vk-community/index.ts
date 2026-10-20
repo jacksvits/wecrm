@@ -45,7 +45,7 @@ export class VkCommunityWorker {
       distinct: ['vkPeerId'],
       select: { vkPeerId: true },
     });
-    const peerIds = new Set<number>(taskPeers.map(t => t.vkPeerId!).filter(Boolean));
+    const peerIds = new Set<bigint | number>(taskPeers.map(t => t.vkPeerId!).filter(Boolean));
 
     // Also add peers from getConversations (for new clients)
     try {
