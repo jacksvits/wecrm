@@ -140,10 +140,12 @@ function stopCameraStream(id: string) {
 }
 
 function spawnCameraFfmpeg(id: string, rtspUrl: string, state: CameraStreamState) {
-  // stimeout — таймаут RTSP-сокета: мёртвая камера падает быстро, а не висит
+  // timeout — таймаут RTSP-сокета (в микросекундах): мёртвая камера
+  // падает быстро, а не висит. NB: в ffmpeg >= 5.1 опция -stimeout
+  // переименована в -timeout
   const ffmpeg = spawn('ffmpeg', [
     '-rtsp_transport', 'tcp',
-    '-stimeout', '10000000',
+    '-timeout', '10000000',
     '-i', rtspUrl,
     '-an',
     '-f', 'mpjpeg',
