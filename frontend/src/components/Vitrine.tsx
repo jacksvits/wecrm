@@ -31,8 +31,9 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
   const defaultProductImage = useBrandProductDefaultImage();
   // Стиль карточек из настроек дизайна: gloss (глянец) | flat (классика) | neomorph
   const cardStyle = useBrandProductCardStyle();
-  // Во встроенной витрине (панель задачи) каталог по умолчанию свёрнут
-  const [catalogOpen, setCatalogOpen] = useState(!embedded);
+  // Панель категорий по умолчанию свёрнута — на странице «Каталог» и во
+  // встроенной витрине (панель задачи): пользователь открывает её сам
+  const [catalogOpen, setCatalogOpen] = useState(false);
 
   // Встроенная витрина (панель задачи): локальный поиск — та же фильтрация,
   // что и у пропа search на странице «Каталог»
