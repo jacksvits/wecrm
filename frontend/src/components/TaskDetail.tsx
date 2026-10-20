@@ -331,6 +331,9 @@ export function TaskDetail() {
 
   // Десктопный «лепесток» витрины на странице задачи: показывается только
   // на ширине больше 1024px (на мобильных отсутствует полностью)
+  const taskRootRef = useRef<HTMLDivElement>(null);
+  // Ширина панели = половина рабочей области задачи (контент справа от сайдбара)
+  const [vitrineWidth, setVitrineWidth] = useState<number | null>(null);
   const [vitrineDesktop, setVitrineDesktop] = useState<boolean>(
     window.innerWidth > 1024,
   );
@@ -375,6 +378,25 @@ export function TaskDetail() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  // Ширина панели витрины — половина рабочей области страницы задачи.
+  // Корневой div страницы тянется на всю область контента (справа от сайдбара),
+  // поэтому меряем его; пересчёт при ресайзе и при каждом открытии панели.
+  useEffect(() => {
+    const measure = () => {
+      const el = taskRootRef.current;
+      if (!el) return;
+      const w = Math.round(el.getBoundingClientRect().width / 2);
+      setVitrineWidth(w > 0 ? w : null);
+    };
+    measure();
+    const timer = setTimeout(measure, 300);
+    window.addEventListener("resize", measure);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", measure);
+    };
+  }, [vitrineMounted]);
   const [deals, setDeals] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -936,7 +958,7 @@ export function TaskDetail() {
     return <span>{value}</span>;
   };
   return (
-    <div>
+    <div ref={taskRootRef}>
       {" "}
       <div
         style={{
@@ -3332,6 +3354,7 @@ export function TaskDetail() {
         >
           <div
             className={"task-vitrine-panel" + (vitrineOpen ? " open" : "")}
+            style={{ width: vitrineWidth ?? undefined }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="task-vitrine-head">
