@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 
 const STORAGE_KEY = "camera_pip_ids";
+const STORAGE_WIDTH = "camera_pip_width";
+const DESKTOP_MIN = 1024;
+const MIN_W = 160;
+const HEADER_H = 25; // заголовок окна
+const GAP = 10;      // отступ между окнами
+const DEFAULT_ASPECT = 16 / 9; // до загрузки первого снимка
 
 function loadPipIds(): string[] {
   try {
@@ -14,26 +20,55 @@ function loadPipIds(): string[] {
   return [];
 }
 
-// Глобальный overlay «картинка в картинке»: маленькие окна камер
-// закреплены в правом верхнем углу поверх всех страниц. Состояние
-// сохраняется в localStorage и переживает переходы между страницами
-// и перезагрузку. Переключение — кнопкой ⤢ на виджете камеры (Director)
-// или событием window "camera-pip-toggle".
+function loadWidth(): number {
+  try {
+    const w = parseInt(localStorage.getItem(STORAGE_WIDTH) || "", 10);
+    if (Number.isFinite(w) && w >= MIN_W) return w;
+  } catch {}
+  return 190;
+}
+
+function clampW(w: number): number {
+  const max = Math.floor(window.innerWidth * 0.45);
+  return Math.max(MIN_W, Math.min(w, max));
+}
+
+// Глобальный overlay «картинка в картинке» (только десктоп): маленькие окна
+// камер в правом верхнем углу поверх всех страниц. Размер окна меняется
+// «ручкой» в левом нижнем углу — пропорционально картинке (пропорции
+// определяются по фактическому снимку камеры). Состояние в localStorage.
 export function CameraPipOverlay() {
   const [pipIds, setPipIds] = useState<string[]>(loadPipIds);
   const [cameras, setCameras] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const listRef = useRef<any[]>([]);
+  const [width, setWidth] = useState<number>(loadWidth);
+  // Фактические пропорции снимка каждой камеры (width/height)
+  const [aspects, setAspects] = useState<Record<string, number>>({});
+  const [isDesktop, setIsDesktop] = useState<boolean>(
+    () => typeof window !== "undefined" && window.innerWidth >= DESKTOP_MIN,
+  );
+  const dragRef = useRef<{ pointerId: number; startX: number; startW: number } | null>(null);
+
+  // Только десктоп: отслеживаем ширину окна
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${DESKTOP_MIN}px)`);
+    const onChange = () => setIsDesktop(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  // Сохраняем размер окна
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_WIDTH, String(width)); } catch {}
+  }, [width]);
 
   useEffect(() => {
     let cancelled = false;
     const load = () => {
       api.camera.getSettings().then((list: any[]) => {
-        if (!cancelled) {
-          listRef.current = list;
-          setCameras(list);
-        }
+        if (!cancelled) setCameras(list);
       }).catch(() => {});
     };
     load();
@@ -68,32 +103,59 @@ export function CameraPipOverlay() {
     };
   }, []);
 
-  const close = useCallback((id: string) => {
+  // Растяжение «ручкой» в левом нижнем углу: тянем влево — окно растёт
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = { pointerId: e.pointerId, startX: e.clientX, startW: width };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onResizeMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    setWidth(clampW(d.startW + (d.startX - e.clientX)));
+  };
+  const endResize = (e: React.PointerEvent) => {
+    if (dragRef.current?.pointerId === e.pointerId) dragRef.current = null;
+  };
+
+  const close = (id: string) => {
     setPipIds((prev) => {
       const next = prev.filter((x) => x !== id);
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
-  }, []);
+  };
 
   const pipCameras = pipIds
     .map((id) => cameras.find((c) => c.id === id))
     .filter(Boolean);
 
-  if (pipCameras.length === 0) return null;
+  // PiP — только на десктопной версии
+  if (!isDesktop || pipCameras.length === 0) return null;
+
+  // Вертикальный стек с учётом фактической высоты каждого окна
+  let topOffset = 16;
+  const wins = pipCameras.map((cam: any) => {
+    const aspect = aspects[cam.id] || DEFAULT_ASPECT;
+    const imgH = Math.max(56, Math.round((width - 2) / aspect));
+    const top = topOffset;
+    topOffset += HEADER_H + imgH + GAP + 2;
+    return { cam, imgH, top };
+  });
 
   const expanded = expandedId ? cameras.find((c) => c.id === expandedId) : null;
 
   return (
     <>
-      {pipCameras.map((cam: any, idx: number) => (
+      {wins.map(({ cam, imgH, top }) => (
         <div
           key={cam.id}
           style={{
             position: "fixed",
-            top: `calc(16px + env(safe-area-inset-top, 0px) + ${idx * 132}px)`,
+            top: `calc(${top}px + env(safe-area-inset-top, 0px))`,
             right: "calc(16px + env(safe-area-inset-right, 0px))",
-            width: 190,
+            width,
             zIndex: 3000,
             background: "var(--bg-card)",
             border: "1px solid var(--border-color)",
@@ -105,7 +167,7 @@ export function CameraPipOverlay() {
           <div
             style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "4px 8px", cursor: "pointer",
+              height: HEADER_H - 1, padding: "0 8px", cursor: "pointer",
             }}
             onClick={() => setExpandedId(cam.id)}
             title="Развернуть"
@@ -124,13 +186,40 @@ export function CameraPipOverlay() {
               ✕
             </button>
           </div>
-          <img
-            key={`${cam.id}-${refreshKey}`}
-            src={`/api/camera/stream/${cam.id}?t=${refreshKey}`}
-            alt={cam.label || "Камера"}
-            onClick={() => setExpandedId(cam.id)}
-            style={{ width: "100%", height: 100, objectFit: "cover", display: "block", cursor: "pointer" }}
-          />
+          <div style={{ position: "relative" }}>
+            <img
+              key={`${cam.id}-${refreshKey}`}
+              src={`/api/camera/stream/${cam.id}?t=${refreshKey}`}
+              alt={cam.label || "Камера"}
+              onClick={() => setExpandedId(cam.id)}
+              onLoad={(e) => {
+                const img = e.target as HTMLImageElement;
+                if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                  const a = img.naturalWidth / img.naturalHeight;
+                  setAspects((prev) => (prev[cam.id] === a ? prev : { ...prev, [cam.id]: a }));
+                }
+              }}
+              style={{ width: "100%", height: imgH, objectFit: "cover", display: "block", cursor: "pointer" }}
+            />
+            {/* «Ручка» изменения размера — левый нижний угол */}
+            <div
+              onPointerDown={startResize}
+              onPointerMove={onResizeMove}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+              title="Изменить размер"
+              style={{
+                position: "absolute", left: 0, bottom: 0, width: 22, height: 22,
+                cursor: "nesw-resize", touchAction: "none", zIndex: 2,
+                display: "flex", alignItems: "flex-end", justifyContent: "flex-start",
+                padding: "0 0 3px 3px",
+                background: "linear-gradient(45deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 55%)",
+                borderBottomLeftRadius: 12,
+              }}
+            >
+              <span style={{ color: "rgba(255,255,255,0.9)", fontSize: 10, lineHeight: 1, userSelect: "none" }}>◢</span>
+            </div>
+          </div>
         </div>
       ))}
 

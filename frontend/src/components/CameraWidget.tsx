@@ -1,4 +1,5 @@
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
+
 
 type CameraWidgetProps = {
   cam: any;
@@ -12,6 +13,15 @@ type CameraWidgetProps = {
 // Контент виджета камеры на странице «Директор» — вкладка «Камеры».
 // Поток обновляется принудительной сменой key у <img> (refreshKey).
 export const CameraWidget = memo(function CameraWidget({ cam, refreshKey, onEdit, pipActive, onTogglePip, onFullscreen }: CameraWidgetProps) {
+  // PiP — только десктоп (viewport >= 1024px)
+  const [isDesktop, setIsDesktop] = useState<boolean>(() => window.innerWidth >= 1024);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => setIsDesktop(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
   const fallbackId = `camera-fallback-${cam?.id || "none"}`;
   const iconBtn: React.CSSProperties = {
     background: "none", border: "none", cursor: "pointer",
@@ -23,6 +33,7 @@ export const CameraWidget = memo(function CameraWidget({ cam, refreshKey, onEdit
       <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span>{cam?.label || "Видеокамера"}</span>
         <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {isDesktop && (
           <button
             onClick={(e) => { e.stopPropagation(); onTogglePip(); }}
             style={{ ...iconBtn, opacity: pipActive ? 1 : 0.5, color: pipActive ? "#007AFF" : "var(--text-muted)" }}
@@ -32,6 +43,7 @@ export const CameraWidget = memo(function CameraWidget({ cam, refreshKey, onEdit
           >
             ⤢
           </button>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(); }}
             style={iconBtn}
