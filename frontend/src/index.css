@@ -1373,3 +1373,56 @@ html, body { overflow-x: hidden; }
     display: none;
   }
 }
+
+/* === Витрина в панели задачи: сворачиваемый каталог ===
+   Во встроенной витрине каталог живёт inline в ряду с товарами и не
+   превращается в fixed-dropdown (как на мобильных). Перекрываем правила
+   из компонента повышенной специфичностью. */
+.vitrine-embedded-catalog-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.vitrine-embedded-catalog-btn:hover {
+  background: var(--bg-hover);
+}
+.task-vitrine-body .vitrine-catalog.embedded,
+.task-vitrine-body .vitrine-catalog.embedded.open {
+  display: block !important;
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  width: 240px !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  z-index: auto !important;
+  padding: 0 4px 0 0 !important;
+  animation: none !important;
+}
+.task-vitrine-body .vitrine-catalog.embedded.cat-collapsed {
+  display: none !important;
+}
+/* Шапка «Каталог ✕» во встроенном режиме видна всегда */
+.task-vitrine-body .vitrine-catalog.embedded .vitrine-catalog-head {
+  display: flex !important;
+  width: 100%;
+}
+/* Мобильная кнопка-«шторка» каталога внутри панели не нужна */
+.task-vitrine-body .vitrine-catalog-toggle {
+  display: none !important;
+}

@@ -14,7 +14,7 @@ interface VitrineCard {
   image: any;
 }
 
-export function Vitrine({ search = '' }: { search?: string }) {
+export function Vitrine({ search = '', embedded = false }: { search?: string; embedded?: boolean }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
@@ -31,7 +31,8 @@ export function Vitrine({ search = '' }: { search?: string }) {
   const defaultProductImage = useBrandProductDefaultImage();
   // Стиль карточек из настроек дизайна: gloss (глянец) | flat (классика) | neomorph
   const cardStyle = useBrandProductCardStyle();
-  const [catalogOpen, setCatalogOpen] = useState(false);
+  // Во встроенной витрине (панель задачи) каталог по умолчанию свёрнут
+  const [catalogOpen, setCatalogOpen] = useState(!embedded);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -559,8 +560,21 @@ export function Vitrine({ search = '' }: { search?: string }) {
           .vitrine-details-modal { max-width: 100% !important; border-radius: 16px 16px 0 0 !important; max-height: 92vh !important; }
         }
       `}</style>
+      {embedded && (
+        <button
+          type="button"
+          className="vitrine-embedded-catalog-btn"
+          onClick={() => setCatalogOpen(o => !o)}
+          aria-label={catalogOpen ? 'Скрыть каталог' : 'Показать каталог'}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: catalogOpen ? 'rotate(180deg)' : 'none', transition: 'transform .18s ease' }}>
+            <polyline points="5 10 12 16 19 10" />
+          </svg>
+          {catalogOpen ? 'Скрыть каталог' : 'Каталог'}
+        </button>
+      )}
       <div className="vitrine-layout" style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
-        <aside className={'vitrine-catalog' + (catalogOpen ? ' open' : '')} style={{ width: 240, flexShrink: 0, overflowY: 'auto', paddingRight: 4 }}>
+        <aside className={'vitrine-catalog' + (catalogOpen ? ' open' : '') + (embedded ? ' embedded' + (catalogOpen ? '' : ' cat-collapsed') : '')} style={{ width: 240, flexShrink: 0, overflowY: 'auto', paddingRight: 4 }}>
           <div className="vitrine-catalog-head" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '2px 2px 8px' }}>
             <strong style={{ fontSize: 14 }}>Каталог</strong>
             <button type="button" onClick={() => setCatalogOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: 15, cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>✕</button>

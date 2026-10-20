@@ -3369,7 +3369,7 @@ export function TaskDetail() {
               </button>
             </div>
             <div className="task-vitrine-body">
-              <Vitrine />
+              <Vitrine embedded />
             </div>
           </div>
         </div>
