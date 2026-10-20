@@ -1314,7 +1314,7 @@ html, body { overflow-x: hidden; }
 .task-vitrine-panel {
   position: absolute;
   right: 0;
-  width: 50vw;
+  width: calc(50vw + 16px);
   pointer-events: auto;
   border-radius: 14px 0 0 14px;
   overflow: hidden;

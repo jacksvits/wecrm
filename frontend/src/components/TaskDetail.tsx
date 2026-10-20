@@ -391,8 +391,9 @@ export function TaskDetail() {
     const measure = () => {
       const el = taskRootRef.current;
       if (!el) return;
-      const w = Math.round(el.getBoundingClientRect().width / 2);
-      setVitrineWidth(w > 0 ? w : null);
+      // +16px к половине рабочей области — панель чуть шире середины
+      const w = Math.round(el.getBoundingClientRect().width / 2) + 16;
+      setVitrineWidth(w > 16 ? w : null);
     };
     // Вертикальная геометрия панели — ровно как у блока обсуждения:
     // меряем сплит обсуждения; если открыта другая вкладка — считаем
