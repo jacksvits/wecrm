@@ -10,7 +10,7 @@ Node-бэкенда wecrm.
 Эндпоинты:
   GET  /health            — проверка жизни
   POST /cameras           — {login, password, apiBaseUrl} -> список камер
-                            (?snapshot=1 — добавить JPEG-снапшот base64)
+                            (быстро: без снапшотов; превью — /snapshot/<index>)
   GET  /mjpeg/<index>     — ?login&password&api&streamType -> MJPEG-поток
                             камеры с 1-based index из /cameras
 """
@@ -21,6 +21,7 @@ import base64
 import os
 import queue
 import threading
+import time
 
 from flask import Flask, Response, jsonify, request
 from hikcloudstream import Credentials, HikConnectClient
@@ -57,6 +58,46 @@ def camera_to_dict(cam) -> dict:
 @app.get("/health")
 def health():
     return jsonify(ok=True)
+
+
+# Кэш облачных снапшотов: cloud capture идёт 20–30+ с на камеру,
+# поэтому список камер отдаём без снапшотов, а превью грузятся
+# по одному через /snapshot/<index> (TTL 30 с, защита от спама облаком).
+_SNAPSHOT_CACHE: dict[int, tuple[float, bytes]] = {}
+SNAPSHOT_TTL = 30.0
+
+
+@app.get("/snapshot/<int:index>")
+def snapshot(index: int):
+    login = request.args.get("login", "")
+    password = request.args.get("password", "")
+    api_base = request.args.get("api") or DEFAULT_API_BASE
+    if not login or not password:
+        return jsonify(error="login/password required"), 400
+
+    now = time.time()
+    hit = _SNAPSHOT_CACHE.get(index)
+    if hit and now - hit[0] < SNAPSHOT_TTL:
+        return Response(hit[1], mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
+
+    client = None
+    try:
+        client = make_client(login, password, api_base)
+        cams = client.list_cameras()
+        cam = next((c for c in cams if c.index == index), None)
+        if cam is None:
+            return jsonify(error=f"camera {index} not found"), 404
+        jpeg = client.capture_snapshot(cam)
+        _SNAPSHOT_CACHE[index] = (time.time(), jpeg)
+        return Response(jpeg, mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
+    except Exception as exc:
+        return jsonify(error=str(exc)), 502
+    finally:
+        if client is not None:
+            try:
+                client.close()
+            except Exception:
+                pass
 
 
 @app.post("/cameras")

@@ -27,11 +27,12 @@ import TochkaAcquiringSettings from "./TochkaAcquiringSettings";
 import OneCSettings from "./OneCSettings";
 import DiadocSettings from "./DiadocSettings";
 import OzonSellerSettings from "./OzonSellerSettings";
+import { HikvisionSettings } from "./HikvisionSettings";
 import { SystemSettings } from "./SystemSettings";
 import { ScheduleSettings } from "./ScheduleSettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "schedule" | "integrations" | "system";
-type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "vpn";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "vpn" | "hikvision";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
 const PLUGINS: { key: PluginKey; label: string; group: string; description: string; helpSlug: string }[] = [
@@ -53,6 +54,7 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "diadoc", helpSlug: "int-diadoc", label: "Контур.Диадок", group: "Учётные системы", description: "ЭДО: получение, отправка и подписание документов" },
   { key: "ozon", helpSlug: "int-ozon", label: "OZON Seller", group: "Маркетплейсы", description: "Двусторонняя синхронизация каталога товаров с маркетплейсом OZON" },
   { key: "vpn", helpSlug: "int-vpn", label: "Прокси через VPN", group: "Сервисы", description: "Локальный VPN-прокси для Telegram API (sing-box)" },
+  { key: "hikvision", helpSlug: "int-hikvision", label: "Камеры Hik-Connect", group: "Видеонаблюдение", description: "Онлайн-просмотр облачных камер Hik-Connect по логину/паролю аккаунта" },
 ];
 
 function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
@@ -75,6 +77,7 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
     diadoc: "M18 6v12a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6h6a6 6 0 0 1 6 6zM7.59 5.32C7.83 4.53 8.56 4 9.38 4H17.13C18.16 4 19 4.84 19 5.88V18.13C19 19.16 18.16 20 17.13 20H5.55C4.29 20 3.38 18.77 3.76 17.57L7.59 5.32ZM11 7.5H15.13C15.33 7.5 15.5 7.67 15.5 7.88V15M8.59 17.38L8.08 15.74a.26.26 0 0 1 .25-.24H16.74a.26.26 0 0 1 .25.24l-.51 1.63M9 12.5H13M9.5 10.5H13",
     ozon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 8v6M9 11h6",
     vpn: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
+    hikvision: "M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z",
   };
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -125,6 +128,8 @@ function renderPluginSettings(pluginKey: PluginKey) {
       return <OzonSellerSettings />;
     case "vpn":
       return <VpnSettings />;
+    case "hikvision":
+      return <HikvisionSettings />;
     default:
       return null;
   }
@@ -159,6 +164,7 @@ export function Settings() {
     tochka: false,
     tochkaAcquiring: false,
     onec: false,
+    hikvision: false,
     diadoc: false,
     ozon: false,
     vpn: false,
