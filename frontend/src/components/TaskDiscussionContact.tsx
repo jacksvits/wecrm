@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import { Contact, ContactAccess, ContactAccessDirection, Deal } from "../types";
+import { Contact, ContactAccess, ContactAccessDirection, Deal, Status } from "../types";
 import { Avatar } from "./Avatar";
 import { api } from "../api/client";
 
@@ -13,6 +13,7 @@ export type DiscussionContact = Contact & {
     id: string;
     title: string;
     status: string;
+    ticketNumber?: number | null;
     dueDate?: string | null;
     createdAt: string;
   }[];
@@ -203,6 +204,7 @@ export function TaskDiscussionContact({
   const [activeSection, setActiveSection] = useState<SectionKey>("tasks");
   // Данные вкладок подгружаются лениво (при первом открытии вкладки)
   const [accesses, setAccesses] = useState<ContactAccess[] | null>(null);
+  const [statuses, setStatuses] = useState<Status[]>([]);
   const [orders, setOrders] = useState<any[] | null>(null);
   const [reserves, setReserves] = useState<any[] | null>(null);
   const [expandedReserveId, setExpandedReserveId] = useState<string | null>(null);
@@ -216,6 +218,14 @@ export function TaskDiscussionContact({
     setEditingField(null);
     setEditError("");
   }, [contact?.id]);
+
+  // Статусы задач — для подписи/цвета чипа в списке (как в TaskDetail)
+  useEffect(() => {
+    api.statuses
+      .list("task")
+      .then(setStatuses)
+      .catch(() => {});
+  }, []);
 
   const loadAccesses = async () => {
     if (accesses !== null || !contact) return;
@@ -642,19 +652,39 @@ export function TaskDiscussionContact({
           (tasks.length === 0 ? (
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Задач нет</div>
           ) : (
-            tasks.map((t) => (
-              <div
-                key={t.id}
-                onClick={() => navigate(`/tasks/${t.id}`)}
-                style={activityRowStyle}
-                title={t.title}
-              >
-                <span style={activityTextStyle}>{t.title}</span>
-                <span style={activityMetaStyle}>
-                  {formatDate(t.dueDate) || formatDate(t.createdAt)}
-                </span>
-              </div>
-            ))
+            tasks.map((t) => {
+              const tStatus = statuses.find((s) => s.name === t.status);
+              return (
+                <div
+                  key={t.id}
+                  onClick={() => navigate(`/tasks/${t.id}`)}
+                  style={activityRowStyle}
+                  title={t.title}
+                >
+                  {t.ticketNumber != null && (
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", flexShrink: 0 }}>
+                      #{t.ticketNumber}
+                    </span>
+                  )}
+                  <span style={activityTextStyle}>{t.title}</span>
+                  <span
+                    style={{
+                      padding: "2px 6px",
+                      borderRadius: 8,
+                      fontSize: 10,
+                      background: tStatus?.color || "#f0f0f0",
+                      color: tStatus?.textColor || "#666",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {tStatus?.label || t.status}
+                  </span>
+                  <span style={activityMetaStyle}>
+                    {formatDate(t.dueDate) || formatDate(t.createdAt)}
+                  </span>
+                </div>
+              );
+            })
           ))}
 
         {activeSection === "accesses" &&
