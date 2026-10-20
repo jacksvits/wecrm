@@ -268,18 +268,39 @@ def stream_mjpeg_auto(
 
 
 class _QueueWriter:
-    """Файл-подобный writer: stream_mjpeg пишет кадры, генератор Flask читает."""
+    """Файл-подобный writer: stream_mjpeg пишет кадры, генератор Flask читает.
+
+    ВАЖНО: put_nowait. Блокирующий put оставлял produce-нити навсегда
+    зависшими при ушедшем клиенте — каждая держала VTM-сессию, исчерпывая
+    лимит потоков аккаунта Hik-Connect (облако начинало КВЕВИТЬ новые
+    сессии — session.start() вис минутами). Просроченные кадры просто
+    выбрасываем: для live-превью это правильнее, чем накапливать лаг.
+    """
 
     def __init__(self, q: "queue.Queue[bytes | None]") -> None:
         self._q = q
 
     def write(self, data: bytes) -> int:
         if data:
-            self._q.put(data)
+            try:
+                self._q.put_nowait(data)
+            except queue.Full:
+                pass  # клиент не успевает — дропаем кадр
         return len(data)
 
     def flush(self) -> None:
         pass
+
+
+# Лимит одновременных VTM-сессий на аккаунт: облако Hik-Connect держит
+# ~2 потока; лишние запросы получают 429 и клиент переподключается позже,
+# а не встают в облачную очередь зависших сессий.
+_ACCOUNT_STREAMS: dict[str, int] = {}
+MAX_STREAMS_PER_ACCOUNT = 2
+
+
+def _account_key(login: str, password: str, api_base: str) -> str:
+    return _creds_key(login, password, api_base)
 
 
 @app.get("/mjpeg/<int:index>")
@@ -292,6 +313,14 @@ def mjpeg(index: int):
         return jsonify(error="login/password required"), 400
 
     q: "queue.Queue[bytes | None]" = queue.Queue(maxsize=200)
+
+    acc_key = _account_key(login, password, api_base)
+    if _ACCOUNT_STREAMS.get(acc_key, 0) >= MAX_STREAMS_PER_ACCOUNT:
+        return (
+            jsonify(error=f"stream limit ({MAX_STREAMS_PER_ACCOUNT}) for account, retry later"),
+            429,
+        )
+    _ACCOUNT_STREAMS[acc_key] = _ACCOUNT_STREAMS.get(acc_key, 0) + 1
 
     def produce() -> None:
         t0 = time.time()
@@ -307,7 +336,7 @@ def mjpeg(index: int):
                 info = session.start()
                 t2 = time.time()
                 # Замер: сколько уходит на пробуждение камеры через облачный relay
-                app.logger.info(
+                app.logger.warning(
                     "mjpeg camera=%s: lookup=%.1fs vtm_wakeup=%.1fs",
                     index, t1 - t0, t2 - t1,
                 )
@@ -324,6 +353,9 @@ def mjpeg(index: int):
             app.logger.warning("mjpeg camera=%s ended: %s", index, exc)
             drop_client(login, password, api_base)
         finally:
+            # освобождаем слот потока аккаунта ВСЕГДА — иначе счётчик
+            # «протекал» и аккаунт вечно оставался на лимите
+            _ACCOUNT_STREAMS[acc_key] = max(0, _ACCOUNT_STREAMS.get(acc_key, 1) - 1)
             try:
                 q.put_nowait(None)  # сигнал конца генератору
             except queue.Full:
