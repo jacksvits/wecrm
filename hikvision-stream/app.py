@@ -29,7 +29,12 @@ from hikcloudstream._config import MJPEG_BOUNDARY
 from hikcloudstream.exceptions import HikCloudStreamError
 from hikcloudstream.models import ClientConfig, StreamType
 from hikcloudstream.stream.session import open_live_stream
-from hikcloudstream.stream.sinks.mjpeg import stream_mjpeg
+from hikcloudstream.stream.sinks.annex_b import iter_annex_b_chunks
+from hikcloudstream.stream.sinks.mjpeg import (
+    av_frame_to_jpeg,
+    placeholder_jpeg,
+    write_mjpeg_frame,
+)
 
 app = Flask(__name__)
 
@@ -176,6 +181,92 @@ def cameras():
         return jsonify(error=str(exc)), 502
 
 
+def stream_mjpeg_auto(
+    stream,
+    output,
+    *,
+    frame_fps: float = 8.0,
+    stream_type: int = 2,
+    jpeg_quality: int = 75,
+):
+    """MJPEG-поток с авто-детекцией кодека (H.264 / H.265-HEVC).
+
+    Библиотечный stream_mjpeg жёстко декодирует H.264: для H.265-камер
+    codec.parse() молча возвращает пустоту и клиент вечно видит placeholder
+    «Waiting for video...». Здесь чанки кормим в ОБА декодера, а как только
+    первый реальный кадр получен от одного — второй отключаем.
+    """
+    import av
+
+    codecs = {
+        "h264": av.CodecContext.create("h264", "r"),
+        "hevc": av.CodecContext.create("hevc", "r"),
+    }
+    active = set(codecs)
+    produced: dict[str, bool] = {k: False for k in codecs}
+    got_keyframe = {k: False for k in codecs}
+    frame_period = 1.0 / frame_fps
+    next_emit = 0.0
+    started_at = time.monotonic()
+    sent_placeholder = False
+    max_width = 1920 if stream_type == 1 else 1408
+    quality = max(50, min(jpeg_quality, 95))
+
+    try:
+        chunk_iter = iter_annex_b_chunks(stream)
+        while True:
+            try:
+                _transport, chunk = next(chunk_iter)
+            except StopIteration:
+                return
+            except OSError:
+                return
+
+            for name in list(active):
+                codec = codecs[name]
+                try:
+                    packets = codec.parse(chunk)
+                except av.error.InvalidDataError:
+                    continue
+                for packet in packets:
+                    try:
+                        frames = codec.decode(packet)
+                    except av.error.InvalidDataError:
+                        continue
+                    for frame in frames:
+                        if not got_keyframe[name]:
+                            if getattr(frame, "key_frame", False):
+                                got_keyframe[name] = True
+                            elif time.monotonic() - started_at < 3.0:
+                                continue
+                            else:
+                                got_keyframe[name] = True
+                        now = time.monotonic()
+                        if now < next_emit:
+                            continue
+                        next_emit = now + frame_period
+                        try:
+                            jpeg = av_frame_to_jpeg(frame, max_width=max_width, quality=quality)
+                        except Exception:
+                            continue
+                        write_mjpeg_frame(output, jpeg)
+                        produced[name] = True
+                        sent_placeholder = True
+
+            if any(produced.values()):
+                # реальные кадры пошли — отключаем проигрышный декодер
+                winner = next(k for k, v in produced.items() if v)
+                for loser in list(active):
+                    if loser != winner:
+                        active.discard(loser)
+
+            if not sent_placeholder and time.monotonic() - started_at > 2.0:
+                write_mjpeg_frame(output, placeholder_jpeg("Waiting for video..."))
+                sent_placeholder = True
+    except (BrokenPipeError, ConnectionResetError):
+        return
+
+
 class _QueueWriter:
     """Файл-подобный writer: stream_mjpeg пишет кадры, генератор Flask читает."""
 
@@ -222,7 +313,7 @@ def mjpeg(index: int):
                 )
                 if getattr(info, "result", 0) not in (0, None):
                     raise HikCloudStreamError(f"VTM negotiation failed (code {info.result})")
-                stream_mjpeg(
+                stream_mjpeg_auto(
                     session._client,
                     _QueueWriter(q),
                     frame_fps=PREVIEW_FPS,
