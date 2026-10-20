@@ -45,6 +45,57 @@ def make_client(login: str, password: str, api_base: str) -> HikConnectClient:
     return client
 
 
+# --- Кэш сессий Hik-Connect ---
+# Каждый запрос камеры раньше делал полный цикл login + list_cameras
+# (2–4 с облачных round-trip на каждый старт потока). Клиент с валидной
+# сессией и список камер кэшируются; при любой ошибке клиент пересоздаётся.
+import hashlib
+
+CLIENT_TTL = 25 * 60.0          # сессия живёт ~30 мин — обновляем чуть раньше
+CAMERAS_CACHE_TTL = 5 * 60.0    # состав камер меняется редко
+
+_client_cache: dict[str, tuple[float, HikConnectClient]] = {}
+_cameras_cache: dict[str, tuple[float, list]] = {}
+
+
+def _creds_key(login: str, password: str, api_base: str) -> str:
+    raw = f"{login}|{password}|{api_base or DEFAULT_API_BASE}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def get_client(login: str, password: str, api_base: str) -> HikConnectClient:
+    """Клиент из кэша (свежий) или новый логин. Вызывающий НЕ закрывает его."""
+    key = _creds_key(login, password, api_base)
+    now = time.time()
+    hit = _client_cache.get(key)
+    if hit and now - hit[0] < CLIENT_TTL:
+        return hit[1]
+    client = make_client(login, password, api_base)
+    _client_cache[key] = (now, client)
+    return client
+
+
+def drop_client(login: str, password: str, api_base: str) -> None:
+    key = _creds_key(login, password, api_base)
+    client = _client_cache.pop(key, None)
+    if client:
+        try:
+            client[1].close()
+        except Exception:
+            pass
+
+
+def get_cameras(client: HikConnectClient, login: str, password: str, api_base: str) -> list:
+    key = _creds_key(login, password, api_base)
+    now = time.time()
+    hit = _cameras_cache.get(key)
+    if hit and now - hit[0] < CAMERAS_CACHE_TTL:
+        return hit[1]
+    cams = client.list_cameras()
+    _cameras_cache[key] = (now, cams)
+    return cams
+
+
 def camera_to_dict(cam) -> dict:
     return {
         "index": cam.index,
@@ -80,10 +131,9 @@ def snapshot(index: int):
     if hit and now - hit[0] < SNAPSHOT_TTL:
         return Response(hit[1], mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
 
-    client = None
     try:
-        client = make_client(login, password, api_base)
-        cams = client.list_cameras()
+        client = get_client(login, password, api_base)
+        cams = get_cameras(client, login, password, api_base)
         cam = next((c for c in cams if c.index == index), None)
         if cam is None:
             return jsonify(error=f"camera {index} not found"), 404
@@ -91,13 +141,8 @@ def snapshot(index: int):
         _SNAPSHOT_CACHE[index] = (time.time(), jpeg)
         return Response(jpeg, mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
     except Exception as exc:
+        drop_client(login, password, api_base)
         return jsonify(error=str(exc)), 502
-    finally:
-        if client is not None:
-            try:
-                client.close()
-            except Exception:
-                pass
 
 
 @app.post("/cameras")
@@ -110,20 +155,21 @@ def cameras():
     if not login or not password:
         return jsonify(error="login/password required"), 400
     try:
-        with make_client(login, password, api_base) as client:
-            result = []
-            for cam in client.list_cameras():
-                item = camera_to_dict(cam)
-                if with_snapshot:
-                    try:
-                        jpeg = client.capture_snapshot(cam)
-                        item["snapshot"] = base64.b64encode(jpeg).decode("ascii")
-                    except Exception:
-                        # Снапшот недоступен (камера офлайн/зашифрована) — не роняем список
-                        item["snapshot"] = None
-                result.append(item)
-            return jsonify(result)
+        client = get_client(login, password, api_base)
+        result = []
+        for cam in get_cameras(client, login, password, api_base):
+            item = camera_to_dict(cam)
+            if with_snapshot:
+                try:
+                    jpeg = client.capture_snapshot(cam)
+                    item["snapshot"] = base64.b64encode(jpeg).decode("ascii")
+                except Exception:
+                    # Снапшот недоступен (камера офлайн/зашифрована) — не роняем список
+                    item["snapshot"] = None
+            result.append(item)
+        return jsonify(result)
     except Exception as exc:
+        drop_client(login, password, api_base)
         return jsonify(error=str(exc)), 502
 
 
@@ -154,19 +200,25 @@ def mjpeg(index: int):
     q: "queue.Queue[bytes | None]" = queue.Queue(maxsize=200)
 
     def produce() -> None:
-        client = None
+        t0 = time.time()
         try:
-            client = make_client(login, password, api_base)
-            cams = client.list_cameras()
+            client = get_client(login, password, api_base)
+            cams = get_cameras(client, login, password, api_base)
             cam = next((c for c in cams if c.index == index), None)
             if cam is None:
                 app.logger.warning("mjpeg: camera %s not found", index)
                 return
+            t1 = time.time()
             with open_live_stream(client, cam, stream_type=stream_type or StreamType.AUTO) as session:
                 info = session.start()
+                t2 = time.time()
+                # Замер: сколько уходит на пробуждение камеры через облачный relay
+                app.logger.info(
+                    "mjpeg camera=%s: lookup=%.1fs vtm_wakeup=%.1fs",
+                    index, t1 - t0, t2 - t1,
+                )
                 if getattr(info, "result", 0) not in (0, None):
                     raise HikCloudStreamError(f"VTM negotiation failed (code {info.result})")
-                app.logger.info("mjpeg: stream started camera=%s type=%s", index, session.stream_type)
                 stream_mjpeg(
                     session._client,
                     _QueueWriter(q),
@@ -176,12 +228,8 @@ def mjpeg(index: int):
                 )
         except Exception as exc:
             app.logger.warning("mjpeg camera=%s ended: %s", index, exc)
+            drop_client(login, password, api_base)
         finally:
-            if client is not None:
-                try:
-                    client.close()
-                except Exception:
-                    pass
             try:
                 q.put_nowait(None)  # сигнал конца генератору
             except queue.Full:

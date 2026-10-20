@@ -87,6 +87,9 @@ export function HikvisionCameras() {
   const [camerasLoading, setCamerasLoading] = useState(false);
   const [camerasError, setCamerasError] = useState<string | null>(null);
   const [liveCamera, setLiveCamera] = useState<HikCamera | null>(null);
+  // 1 — основной поток (макс. качество), 2 — дополнительный (быстрее просыпается,
+  // меньше тратит трафик relay — рекомендуется для предпросмотра)
+  const [liveStreamType, setLiveStreamType] = useState<1 | 2>(2);
 
   useEffect(() => {
     apiFetch("/api/hikvision-plugin/settings")
@@ -188,12 +191,30 @@ export function HikvisionCameras() {
           </div>
           {/* Поток идёт через токен в query: authMiddleware принимает ?token= */}
           <img
-            src={`/api/hikvision-plugin/stream/${liveCamera.index}?token=${encodeURIComponent(getToken())}`}
+            src={`/api/hikvision-plugin/stream/${liveCamera.index}?streamType=${liveStreamType}&token=${encodeURIComponent(getToken())}`}
             alt={liveCamera.name}
-            style={{ maxWidth: "100%", maxHeight: "calc(90vh - 60px)", borderRadius: 10, background: "#000" }}
+            style={{ maxWidth: "100%", maxHeight: "calc(85vh - 90px)", borderRadius: 10, background: "#000" }}
             onClick={(e) => e.stopPropagation()}
           />
-          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, marginTop: 10 }}>Нажмите в любое место, чтобы закрыть</div>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12, flexWrap: "wrap", justifyContent: "center" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <label style={{ color: "rgba(255,255,255,0.85)", fontSize: 13, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              Поток:
+              <select
+                value={liveStreamType}
+                onChange={(e) => setLiveStreamType(Number(e.target.value) as 1 | 2)}
+                style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.3)", background: "#1c1c1e", color: "#fff", fontSize: 13 }}
+              >
+                <option value={2}>Дополнительный (быстрее)</option>
+                <option value={1}>Основной (качество)</option>
+              </select>
+            </label>
+            <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 12 }}>
+              Подключение через облако: пробуждение камеры обычно занимает 3–15 с. Нажмите в любое место, чтобы закрыть.
+            </span>
+          </div>
         </div>
       )}
     </div>
