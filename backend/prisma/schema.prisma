@@ -1657,6 +1657,20 @@ model DiadocPluginSettings {
   @@map("diadoc_plugin_settings")
 }
 
+// Плагин «Камеры Hik-Connect»: облачные камеры по учётным данным аккаунта.
+// Страница камер доступна только администраторам и только при is_active = true.
+// apiBaseUrl — региональный домен облака (api.hik-connect.com / api.hik-connectru.com).
+model HikvisionPluginSettings {
+  id         Int      @id @default(1)
+  login      String   @default("")
+  password   String   @default("")
+  apiBaseUrl String   @default("https://api.hik-connect.com") @map("api_base_url")
+  isActive   Boolean  @default(false) @map("is_active")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("hikvision_plugin_settings")
+}
+
 model Reservation {
   id          String      @id @default(cuid())
   number      Int         @unique

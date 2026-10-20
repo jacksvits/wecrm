@@ -138,6 +138,18 @@ services:
       - ./vpn/sing-box:/etc/sing-box:ro
 
 
+  # Плагин «Камеры Hik-Connect»: Python-сервис (библиотека hikcloudstream) —
+  # вход в облако Hik-Connect по логину/паролю, список камер и live-потоки
+  # через облачный VTM relay в MJPEG. Слушает только внутреннюю docker-сеть;
+  # Node-бэкенд проксирует его наружу (/api/hikvision-plugin/*) с проверкой
+  # роли admin и флага is_active плагина.
+  hikvision:
+    build: ./hikvision-stream
+    image: wecrm-hikvision:latest
+    expose:
+      - "8557"
+    restart: unless-stopped
+
   # SNI-роутер внешнего HTTPS (443): welans.cc + *.welans.cc -> хостовый nginx :10443
   # (wildcard ZeroSSL, автообновление acme.sh), остальное -> NAS 192.168.8.3:443
   # (чужие сайты без изменений). network_mode: host — нужны loopback хоста и LAN.

@@ -68,6 +68,7 @@ import tochkaAcquiringRoutes from './routes/tochka-acquiring.js';
 import onecPluginRoutes from './routes/onec-plugin.js';
 import diadocPluginRoutes from './routes/diadoc-plugin.js';
 import ozonPluginRoutes from './routes/ozon-plugin.js';
+import hikvisionPluginRoutes from './routes/hikvision-plugin.js';
 import handlerSettingsRoutes from './routes/handler-settings.js';
 import seoSettingsRoutes from './routes/seo-settings.js';
 import pwaRoutes from './routes/pwa.js';
@@ -207,6 +208,7 @@ app.use('/api/tochka-acquiring', tochkaAcquiringRoutes);
 app.use('/api/onec-plugin', onecPluginRoutes);
 app.use('/api/diadoc-plugin', diadocPluginRoutes);
 app.use('/api/ozon-plugin', ozonPluginRoutes);
+app.use('/api/hikvision-plugin', hikvisionPluginRoutes);
 app.use('/api/handler-settings', handlerSettingsRoutes);
 app.use('/api/seo-settings', seoSettingsRoutes);
 // PWA с данными tenant'а: index.html (мета-теги iOS «Добавить на экран Домой»)
