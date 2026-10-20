@@ -379,7 +379,7 @@ export function Dashboard() {
             Избранные задачи
             <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({favoriteTasks.length})</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
             {favoriteTasks.slice(0, 12).map((task) => {
               const taskStatus = statuses.find((s) => s.name === task.status);
               const statusColor = taskStatus?.color || '#f0f0f0';
@@ -402,11 +402,40 @@ export function Dashboard() {
                     boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
                   }}
                 >
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
                     {task.ticketNumber != null && (
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', flexShrink: 0 }}>#{task.ticketNumber}</span>
                     )}
-                    <span style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
+                    <button
+                      type="button"
+                      title="Убрать из избранного"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        api.tasks
+                          .update(task.id, { isFavorite: false })
+                          .then(() => loadAllTasks())
+                          .catch(() => {});
+                      }}
+                      style={{
+                        flexShrink: 0,
+                        border: 'none',
+                        background: 'transparent',
+                        padding: 2,
+                        marginRight: -2,
+                        cursor: 'pointer',
+                        color: '#f59e0b',
+                        lineHeight: 0,
+                        borderRadius: 6,
+                        transition: 'transform 0.15s ease, opacity 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.transform = 'scale(1.1)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1)'; }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                      </svg>
+                    </button>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{ padding: '2px 6px', borderRadius: 8, fontSize: 10, background: statusColor, color: taskStatus?.textColor || '#666' }}>
