@@ -114,7 +114,9 @@ def health():
 # Кэш облачных снапшотов: cloud capture идёт 20–30+ с на камеру,
 # поэтому список камер отдаём без снапшотов, а превью грузятся
 # по одному через /snapshot/<index> (TTL 30 с, защита от спама облаком).
-_SNAPSHOT_CACHE: dict[int, tuple[float, bytes]] = {}
+# Ключ — (учётные данные, index): разные tenant'ы могут иметь одинаковые
+# индексы камер при разных аккаунтах Hik-Connect.
+_SNAPSHOT_CACHE: dict[tuple[str, int], tuple[float, bytes]] = {}
 SNAPSHOT_TTL = 30.0
 
 
@@ -126,8 +128,9 @@ def snapshot(index: int):
     if not login or not password:
         return jsonify(error="login/password required"), 400
 
+    cache_key = (_creds_key(login, password, api_base), index)
     now = time.time()
-    hit = _SNAPSHOT_CACHE.get(index)
+    hit = _SNAPSHOT_CACHE.get(cache_key)
     if hit and now - hit[0] < SNAPSHOT_TTL:
         return Response(hit[1], mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
 
@@ -138,7 +141,7 @@ def snapshot(index: int):
         if cam is None:
             return jsonify(error=f"camera {index} not found"), 404
         jpeg = client.capture_snapshot(cam)
-        _SNAPSHOT_CACHE[index] = (time.time(), jpeg)
+        _SNAPSHOT_CACHE[cache_key] = (time.time(), jpeg)
         return Response(jpeg, mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
     except Exception as exc:
         drop_client(login, password, api_base)

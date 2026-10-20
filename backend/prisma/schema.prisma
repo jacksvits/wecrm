@@ -1658,6 +1658,9 @@ model DiadocPluginSettings {
 }
 
 // Плагин «Камеры Hik-Connect»: облачные камеры по учётным данным аккаунта.
+// Таблица живёт в БД каждого tenant'а (main + wecrm_t_*) — настройки, камеры
+// и доступ у каждой организации свои; глобальный prisma-прокси маршрутизирует
+// запросы в БД текущего tenant'а автоматически.
 // Страница камер доступна только администраторам и только при is_active = true.
 // apiBaseUrl — региональный домен облака (api.hik-connect.com / api.hik-connectru.com).
 model HikvisionPluginSettings {
