@@ -23,6 +23,7 @@ import { userOptionLabel } from "../lib/userOptionLabel";
 import { Avatar } from "./Avatar";
 import { ContactPicker } from "./ContactPicker";
 import { TaskDiscussionContact, DiscussionContact } from "./TaskDiscussionContact";
+import { Vitrine } from "./Vitrine";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 const priorityLabels: Record<string, string> = {
@@ -327,6 +328,53 @@ export function TaskDetail() {
   const [discussionMobile, setDiscussionMobile] = useState<boolean>(
     window.innerWidth <= 1024,
   );
+
+  // Десктопный «лепесток» витрины на странице задачи: показывается только
+  // на ширине больше 1024px (на мобильных отсутствует полностью)
+  const [vitrineDesktop, setVitrineDesktop] = useState<boolean>(
+    window.innerWidth > 1024,
+  );
+  const [vitrineOpen, setVitrineOpen] = useState(false);
+  // Панель остаётся смонтированной на время анимации закрытия
+  const [vitrineMounted, setVitrineMounted] = useState(false);
+
+  const openVitrinePanel = () => setVitrineMounted(true);
+  const closeVitrinePanel = () => {
+    setVitrineOpen(false);
+    window.setTimeout(() => setVitrineMounted(false), 350);
+  };
+
+  // Плавный выезд: сначала монтируем панель, класс open — на следующем кадре
+  useEffect(() => {
+    if (!vitrineMounted) return;
+    const raf = requestAnimationFrame(() => setVitrineOpen(true));
+    return () => cancelAnimationFrame(raf);
+  }, [vitrineMounted]);
+
+  // Закрытие панели витрины по Escape
+  useEffect(() => {
+    if (!vitrineMounted) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeVitrinePanel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vitrineMounted]);
+
+  // При переходе на мобильную ширину прячем лепесток и закрываем панель
+  useEffect(() => {
+    const onResize = () => {
+      const desktop = window.innerWidth > 1024;
+      setVitrineDesktop(desktop);
+      if (!desktop) {
+        setVitrineOpen(false);
+        setVitrineMounted(false);
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const [deals, setDeals] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -3250,6 +3298,57 @@ export function TaskDetail() {
             }}
             onClick={(e) => e.stopPropagation()}
           />{" "}
+        </div>
+      )}{" "}
+      {vitrineDesktop && !vitrineMounted && (
+        <button
+          type="button"
+          className="task-vitrine-petal"
+          onClick={openVitrinePanel}
+          title="Витрина"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3 9l1.7-5h14.6L21 9" />
+            <path d="M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9" />
+            <path d="M3 9h18" />
+            <path d="M9 21v-6h6v6" />
+          </svg>
+          <span className="task-vitrine-petal-label">Витрина</span>
+        </button>
+      )}{" "}
+      {vitrineMounted && (
+        <div
+          className={"task-vitrine-overlay" + (vitrineOpen ? " open" : "")}
+          onClick={closeVitrinePanel}
+        >
+          <div
+            className={"task-vitrine-panel" + (vitrineOpen ? " open" : "")}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="task-vitrine-head">
+              <span className="task-vitrine-title">Витрина</span>
+              <button
+                type="button"
+                className="task-vitrine-close"
+                onClick={closeVitrinePanel}
+                title="Закрыть"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="task-vitrine-body">
+              <Vitrine />
+            </div>
+          </div>
         </div>
       )}{" "}
     </div>
