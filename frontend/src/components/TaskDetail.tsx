@@ -527,10 +527,10 @@ export function TaskDetail() {
       console.error("Failed to load task files:", err);
     }
   };
-  // Сброс текущей подпапки при смене задачи
-  useEffect(() => { setTaskFilesPath(""); }, [id]);
-  // Перезагрузка списка файлов при смене подпапки
-  useEffect(() => { loadTaskFiles(); }, [taskFilesPath]);
+  // Сброс текущей подпапки и списка файлов при смене задачи
+  useEffect(() => { setTaskFilesPath(""); setTaskFiles([]); }, [id]);
+  // Перезагрузка списка файлов при смене задачи/подпапки
+  useEffect(() => { loadTaskFiles(); }, [id, taskFilesPath]);
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setDragOver(true); };
   const handleDragLeave = () => setDragOver(false);
   const handleDrop = async (e: React.DragEvent) => {
@@ -540,7 +540,7 @@ export function TaskDetail() {
     for (const file of files) {
       const formData = new FormData();
       formData.append('files', file);
-      await api.tasks.files.upload(id, formData);
+      await api.tasks.files.upload(id, formData, taskFilesPath || undefined);
     }
     loadTaskFiles();
   };
@@ -550,20 +550,19 @@ export function TaskDetail() {
     for (const file of files) {
       const formData = new FormData();
       formData.append('files', file);
-      await api.tasks.files.upload(id, formData);
+      await api.tasks.files.upload(id, formData, taskFilesPath || undefined);
     }
     loadTaskFiles();
     e.target.value = '';
   };
-  const relFilePath = (name: string) => (taskFilesPath ? taskFilesPath + "/" + name : name);
   const handleDeleteFile = async (filename: string) => {
     if (!confirm('Удалить файл?')) return;
-    await api.tasks.files.delete(id!, relFilePath(filename));
+    await api.tasks.files.delete(id!, filename, taskFilesPath || undefined);
     loadTaskFiles();
   };
   const handleDownloadFile = async (filename: string) => {
     try {
-      const response = await api.tasks.files.download(id!, relFilePath(filename));
+      const response = await api.tasks.files.download(id!, filename, taskFilesPath || undefined);
       if (!response.ok) {
         alert('Ошибка скачивания файла');
         return;

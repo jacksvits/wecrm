@@ -15,12 +15,27 @@ function getCacheKey(userId: string, query: any) {
 // Папка задач текущего tenant'а (для tenant'ов — с префиксом /t-<slug>, см. lib/tenant.ts)
 const taskDirFor = (ticketNum: string | number) => path.join(uploadsRoot(), 'tasks', String(ticketNum)) ;
 
+// Санитизация относительного пути внутри папки задачи (защита от path traversal)
+const safeTaskFilesPath = (value: unknown) => String(value || '')
+  .split('/')
+  .filter((segment) => segment && segment !== '.' && segment !== '..')
+  .join('/');
+const taskFilesDirFor = (ticketNum: string | number, subPath = '') => {
+  const safeSubPath = safeTaskFilesPath(subPath);
+  return safeSubPath ? path.join(taskDirFor(ticketNum), safeSubPath) : taskDirFor(ticketNum);
+};
+const taskFileRelPathFor = (subPath: unknown, filename: string) => {
+  const safeSubPath = safeTaskFilesPath(subPath);
+  const safeFilename = safeTaskFilesPath(filename);
+  return safeSubPath ? `${safeSubPath}/${safeFilename}` : safeFilename;
+};
+
 const taskFileStorage = multer.diskStorage({
   destination: async (_req, _file, cb) => {
     const taskId = _req.params.id;
     const task = await prisma.task.findUnique({ where: { id: taskId }, select: { ticketNumber: true } });
     const ticketNum = task?.ticketNumber ?? taskId;
-    const taskDir = taskDirFor(ticketNum);
+    const taskDir = taskFilesDirFor(ticketNum, typeof _req.query.path === 'string' ? _req.query.path : '');
     if (!fs.existsSync(taskDir)) { fs.mkdirSync(taskDir, { recursive: true }); }
     cb(null, taskDir);
   },
@@ -142,10 +157,7 @@ router.get('/:id/files', async (req: AuthRequest, res) => {
     if (!hasAccess) return res.status(403).json({ error: 'Доступ запрещен' });
     const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true } });
     if (!task) return res.status(404).json({ error: 'Задача не найдена' });
-    // Санитизация относительного пути подпапки (защита от path traversal)
-    const rawPath = typeof req.query.path === 'string' ? req.query.path : '';
-    const safePath = rawPath.split('/').filter((p) => p && p !== '.' && p !== '..').join('/');
-    const taskDir = path.join(taskDirFor(task.ticketNumber), safePath);
+    const taskDir = taskFilesDirFor(task.ticketNumber, typeof req.query.path === 'string' ? req.query.path : '');
     if (!fs.existsSync(taskDir) || !fs.statSync(taskDir).isDirectory()) return res.json([]);
     const files = fs.readdirSync(taskDir).map(name => {
       const stat = fs.statSync(path.join(taskDir, name));
@@ -162,7 +174,7 @@ router.get('/:id/files', async (req: AuthRequest, res) => {
   }
 });
 
-// Upload files to task folder
+// Upload files to current task folder (or selected subfolder via ?path=)
 router.post('/:id/files', authMiddleware, taskFileUpload.array('files', 10), async (req: AuthRequest, res) => {
   try {
     const hasAccess = await canAccessTask(req.params.id, req.user!.id, req.user!.role);
@@ -170,12 +182,16 @@ router.post('/:id/files', authMiddleware, taskFileUpload.array('files', 10), asy
     const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true } });
     if (!task) return res.status(404).json({ error: 'Задача не найдена' });
     const files = (req.files as Express.Multer.File[]) || [];
-    const uploaded = files.map(f => ({
-      name: f.filename,
-      originalName: f.originalname,
-      size: f.size,
-      path: `/uploads/tasks/${task.ticketNumber}/${f.filename}`,
-    }));
+    const subPath = typeof req.query.path === 'string' ? req.query.path : '';
+    const uploaded = files.map(f => {
+      const relPath = taskFileRelPathFor(subPath, f.filename);
+      return {
+        name: f.filename,
+        originalName: f.originalname,
+        size: f.size,
+        path: `/uploads/tasks/${task.ticketNumber}/${relPath.split('/').map(encodeURIComponent).join('/')}`,
+      };
+    });
     res.status(201).json(uploaded);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -189,8 +205,10 @@ router.delete('/:id/files/:filename', async (req: AuthRequest, res) => {
     if (!hasAccess) return res.status(403).json({ error: 'Доступ запрещен' });
     const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true } });
     if (!task) return res.status(404).json({ error: 'Задача не найдена' });
-    const filePath = path.join(taskDirFor(task.ticketNumber), req.params.filename);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    const relPath = taskFileRelPathFor(req.query.path, req.params.filename);
+    if (!relPath) return res.status(400).json({ error: 'Некорректный путь файла' });
+    const filePath = path.join(taskDirFor(task.ticketNumber), relPath);
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) fs.unlinkSync(filePath);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -204,10 +222,13 @@ router.get('/:id/files/:filename/download', async (req: AuthRequest, res) => {
     if (!hasAccess) return res.status(403).json({ error: 'Доступ запрещен' });
     const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true } });
     if (!task) return res.status(404).json({ error: 'Задача не найдена' });
-    const filePath = path.join(taskDirFor(task.ticketNumber), req.params.filename);
+    const relPath = taskFileRelPathFor(req.query.path, req.params.filename);
+    if (!relPath) return res.status(400).json({ error: 'Некорректный путь файла' });
+    const filePath = path.join(taskDirFor(task.ticketNumber), relPath);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Файл не найден' });
-    const asciiName = req.params.filename.replace(/[^\x20-\x7E]/g, '_');
-    const utf8Name = encodeURIComponent(req.params.filename);
+    const filename = relPath.split('/').pop() || relPath;
+    const asciiName = filename.replace(/[^ -~]/g, '_');
+    const utf8Name = encodeURIComponent(filename);
     res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`);
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
