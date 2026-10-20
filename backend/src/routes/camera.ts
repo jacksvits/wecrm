@@ -167,13 +167,12 @@ function spawnCameraFfmpeg(id: string, rtspUrl: string, state: CameraStreamState
       started = true;
       console.log(`[Camera ${id}] ffmpeg stream started (${state.clients.size} client(s))`);
     }
-    for (const client of state.clients) {
+    for (const client of [...state.clients]) {
       try {
-        if (!client.write(chunk)) {
-          // Медленный клиент: снимаем его, чтобы не раздувать буфер
-          state.clients.delete(client);
-          try { client.end(); } catch {}
-        }
+        // write может вернуть false (backpressure) — не страшно: Node
+        // буферизует исходящие данные сокета. Клиент снимется сам по
+        // событию close/error, если соединение реально оборвалось.
+        client.write(chunk);
       } catch {
         state.clients.delete(client);
       }
