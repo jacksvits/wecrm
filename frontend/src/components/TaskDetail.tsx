@@ -332,8 +332,13 @@ export function TaskDetail() {
   // Десктопный «лепесток» витрины на странице задачи: показывается только
   // на ширине больше 1024px (на мобильных отсутствует полностью)
   const taskRootRef = useRef<HTMLDivElement>(null);
+  const taskTabsRef = useRef<HTMLDivElement>(null);
   // Ширина панели = половина рабочей области задачи (контент справа от сайдбара)
   const [vitrineWidth, setVitrineWidth] = useState<number | null>(null);
+  const [vitrineGeom, setVitrineGeom] = useState<{
+    top: number;
+    height: number;
+  } | null>(null);
   const [vitrineDesktop, setVitrineDesktop] = useState<boolean>(
     window.innerWidth > 1024,
   );
@@ -389,12 +394,42 @@ export function TaskDetail() {
       const w = Math.round(el.getBoundingClientRect().width / 2);
       setVitrineWidth(w > 0 ? w : null);
     };
+    // Вертикальная геометрия панели — ровно как у блока обсуждения:
+    // меряем сплит обсуждения; если открыта другая вкладка — считаем
+    // по нижней границе вкладок той же формулой (viewport - top - 24)
+    const measureGeom = () => {
+      const split = discussionSplitRef.current;
+      if (split) {
+        const r = split.getBoundingClientRect();
+        setVitrineGeom({
+          top: Math.round(r.top),
+          height: Math.round(r.height),
+        });
+        return;
+      }
+      const tabs = taskTabsRef.current;
+      if (tabs) {
+        const top = Math.round(tabs.getBoundingClientRect().bottom) + 16;
+        setVitrineGeom({
+          top,
+          height: Math.max(240, window.innerHeight - top - 24),
+        });
+      }
+    };
     measure();
-    const timer = setTimeout(measure, 300);
-    window.addEventListener("resize", measure);
+    measureGeom();
+    const timer = setTimeout(() => {
+      measure();
+      measureGeom();
+    }, 300);
+    const onResize = () => {
+      measure();
+      measureGeom();
+    };
+    window.addEventListener("resize", onResize);
     return () => {
       clearTimeout(timer);
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", onResize);
     };
   }, [vitrineMounted]);
   const [deals, setDeals] = useState<any[]>([]);
@@ -1393,6 +1428,7 @@ export function TaskDetail() {
           {" "}
           <div
             className="task-tabs"
+            ref={taskTabsRef}
             style={{
               display: "flex",
               gap: 8,
@@ -3353,7 +3389,11 @@ export function TaskDetail() {
         >
           <div
             className={"task-vitrine-panel" + (vitrineOpen ? " open" : "")}
-            style={{ width: vitrineWidth ?? undefined }}
+            style={{
+              width: vitrineWidth ?? undefined,
+              top: vitrineGeom?.top ?? 180,
+              height: vitrineGeom?.height ?? "calc(100vh - 280px)",
+            }}
           >
             <div className="task-vitrine-head">
               <span className="task-vitrine-title">Витрина</span>

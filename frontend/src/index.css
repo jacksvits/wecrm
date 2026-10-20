@@ -1299,28 +1299,25 @@ html, body { overflow-x: hidden; }
 }
 
 /* Подложка: клик вне панели НЕ закрывает её (панель закрывается только
-   по крестику или Escape); подложка пропускает клики на задачу под ней,
-   затемнение появляется с анимацией */
+   по крестику или Escape); подложка прозрачна и пропускает клики на задачу
+   под панелью — без затемнения, чтобы можно было работать в обсуждениях */
 .task-vitrine-overlay {
   position: fixed;
   inset: 0;
   z-index: 1002;
-  background: rgba(0, 0, 0, 0);
-  transition: background 0.35s ease;
   pointer-events: none;
 }
-.task-vitrine-overlay.open {
-  background: rgba(0, 0, 0, 0.35);
-}
 
-/* Панель витрины: выезжает справа на половину экрана */
+/* Панель витрины: выезжает справа на половину экрана; вертикальная
+   геометрия (top/height) задаётся inline из TaskDetail — как у блока
+   обсуждения. Левые углы скруглены как стандартные скругления проекта. */
 .task-vitrine-panel {
   position: absolute;
-  top: 0;
   right: 0;
   width: 50vw;
-  height: 100%;
   pointer-events: auto;
+  border-radius: 14px 0 0 14px;
+  overflow: hidden;
   background: var(--bg-body);
   border-left: 1px solid var(--border-color);
   box-shadow: -8px 0 30px rgba(0, 0, 0, 0.15);
