@@ -148,13 +148,25 @@ router.get('/stream/:index', authMiddleware, async (req: AuthRequest, res) => {
     const index = encodeURIComponent(req.params.index);
     const streamType = req.query.streamType ? `&streamType=${encodeURIComponent(String(req.query.streamType))}` : '';
     const url = `${HIK_SERVICE}/mjpeg/${index}?login=${encodeURIComponent(s.login)}&password=${encodeURIComponent(s.password)}&api=${encodeURIComponent(s.apiBaseUrl)}${streamType}`;
-    const upstream = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    // Таймаут только на старт (получение заголовков): AbortSignal.timeout рвал бы
+    // весь поток через N секунд — картинка «замерзала» у клиента. После старта
+    // соединение живёт, пока его не разорвёт клиент или камера.
+    const controller = new AbortController();
+    const startTimer = setTimeout(() => controller.abort(), 15_000);
+    let upstream: Response;
+    try {
+      upstream = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(startTimer);
+    }
     if (!upstream.ok || !upstream.body) {
       const text = await upstream.text().catch(() => '');
       return res.status(502).json({ error: text || `Сервис камер вернул HTTP ${upstream.status}` });
     }
     res.setHeader('Content-Type', upstream.headers.get('content-type') || 'multipart/x-mixed-replace; boundary=hikframe');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    // отключаем буферизацию nginx для беспрерывного MJPEG-потока
+    res.setHeader('X-Accel-Buffering', 'no');
     res.setHeader('Pragma', 'no-cache');
     const { Readable } = await import('stream');
     const readable = Readable.fromWeb(upstream.body as any);
