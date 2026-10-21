@@ -69,8 +69,15 @@ export function TaskCalendar({ onOpenTask }: Props) {
   useEffect(() => { api.statuses.list('task').then(setStatuses).catch(() => setStatuses([])); }, []);
   useEffect(() => { api.profile.get().then((u) => setHideCompletedTasks(u.hideCompletedTasks ?? true)).catch(() => {}); }, []);
 
-  const byDate = (iso: string) => tasks.filter((t) => t.dueDate && taskDate(t.dueDate) === iso && taskVisible(t));
-  const noDueTasks = tasks.filter((t) => !t.dueDate && !t.parentId);
+  // Задача показывается в день начала срока и в день срока окончания
+  const anchorOn = (t: Task, iso: string): string | null => {
+    if (t.startDate && taskDate(t.startDate) === iso) return t.startDate;
+    if (t.dueDate && taskDate(t.dueDate) === iso) return t.dueDate;
+    return null;
+  };
+  const byDate = (iso: string) => tasks.filter((t) => anchorOn(t, iso) !== null && taskVisible(t));
+  // «Без срока»: только задачи вообще без дат (с началом срока задача уже показана в сетке)
+  const noDueTasks = tasks.filter((t) => !t.dueDate && !t.startDate && !t.parentId);
   const visibleNoDueTasks = noDueTasks.filter(taskVisible);
 
   const openDay = (iso: string) => {
@@ -125,11 +132,11 @@ export function TaskCalendar({ onOpenTask }: Props) {
 
   // ---------- день ----------
   const dayTasks = byDate(date);
-  const timed = dayTasks.filter((t) => taskMin(t.dueDate!) !== 0);
-  const untimed = dayTasks.filter((t) => taskMin(t.dueDate!) === 0);
+  const timed = dayTasks.filter((t) => { const a = anchorOn(t, date); return a !== null && taskMin(a) !== 0; });
+  const untimed = dayTasks.filter((t) => { const a = anchorOn(t, date); return a !== null && taskMin(a) === 0; });
 
   const items: TimelineItem[] = timed.map((t) => {
-    const start = taskMin(t.dueDate!);
+    const start = taskMin(anchorOn(t, date)!);
     const assignees = assigneeNames(t);
     return {
       id: t.id, columnId: 'tasks', startMin: start, endMin: start + 30,
@@ -223,8 +230,8 @@ export function TaskCalendar({ onOpenTask }: Props) {
               sections={[{
                 id: 'tasks', title: '', color: '#3b82f6',
                 items: timed.map((t) => ({
-                  id: t.id, startMin: taskMin(t.dueDate!),
-                  time: `${t.dueDate!.slice(11, 16)}–${minToTime(taskMin(t.dueDate!) + 30)}`,
+                  id: t.id, startMin: taskMin(anchorOn(t, date)!),
+                  time: `${anchorOn(t, date)!.slice(11, 16)}–${minToTime(taskMin(anchorOn(t, date)!) + 30)}`,
                   title: t.title,
                   subtitle: [statusLabel(t.status), (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ')].filter(Boolean).join(' · '),
                   color: statusColor(t.status),

@@ -289,7 +289,13 @@ export function DashboardCalendar() {
   // в метриках месяца, счётчике дня и временной шкале
   const taskVisible = (t: Task) =>
     !hideCompletedTasks || statuses.find((s) => s.name === t.status)?.isActive !== false;
-  const tasksByDate = (iso: string) => tasks.filter((t) => t.dueDate && taskDate(t.dueDate) === iso && taskVisible(t));
+  // Задача показывается в день начала срока и в день срока окончания
+  const taskAnchorOn = (t: Task, iso: string): string | null => {
+    if (t.startDate && taskDate(t.startDate) === iso) return t.startDate;
+    if (t.dueDate && taskDate(t.dueDate) === iso) return t.dueDate;
+    return null;
+  };
+  const tasksByDate = (iso: string) => tasks.filter((t) => taskAnchorOn(t, iso) !== null && taskVisible(t));
   const remindersByDate = (iso: string) => reminders.filter((r) => r.remindAt && toISODate(new Date(r.remindAt)) === iso);
   const taskLabel = (t: Task) => statuses.find((s) => s.name === t.status)?.label || t.status;
   const taskColor = (t: Task) =>
@@ -387,8 +393,8 @@ export function DashboardCalendar() {
   const dayTasks = tasksByDate(date);
   const dayReminders = remindersByDate(date);
   // Время 00:00 считаем «без времени» (как в TaskCalendar)
-  const timedTasks = dayTasks.filter((t) => taskMin(t.dueDate!) !== 0);
-  const untimedTasks = dayTasks.filter((t) => taskMin(t.dueDate!) === 0);
+  const timedTasks = dayTasks.filter((t) => { const a = taskAnchorOn(t, date); return a !== null && taskMin(a) !== 0; });
+  const untimedTasks = dayTasks.filter((t) => { const a = taskAnchorOn(t, date); return a !== null && taskMin(a) === 0; });
   const timedReminders = dayReminders.filter((r) => toMin(new Date(r.remindAt)) !== 0);
   const untimedReminders = dayReminders.filter((r) => toMin(new Date(r.remindAt)) === 0);
 
@@ -429,7 +435,7 @@ export function DashboardCalendar() {
     if (canViewTasks && timedTasks.length > 0) {
       cols.push({ id: '__tasks__', title: 'Задачи', color: '#3b82f6' });
       for (const t of timedTasks) {
-        const start = taskMin(t.dueDate!);
+        const start = taskMin(taskAnchorOn(t, date)!);
         const assignees = (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ');
         itms.push({
           id: `t${t.id}`, columnId: '__tasks__', startMin: start, endMin: start + 30,
@@ -493,9 +499,10 @@ export function DashboardCalendar() {
     }
     if (canViewTasks) {
       for (const t of timedTasks) {
+        const anchor = taskAnchorOn(t, date)!;
         merged.push({
-          id: `task_${t.id}`, startMin: taskMin(t.dueDate!), icon: '📋',
-          time: `${t.dueDate!.slice(11, 16)}–${minToTime(taskMin(t.dueDate!) + 30)}`,
+          id: `task_${t.id}`, startMin: taskMin(anchor), icon: '📋',
+          time: `${anchor.slice(11, 16)}–${minToTime(taskMin(anchor) + 30)}`,
           title: t.title,
           subtitle: [taskLabel(t), (t.assignees || []).map((a: any) => a.user?.name || a.name).filter(Boolean).join(', ')].filter(Boolean).join(' · '),
           color: taskColor(t),
