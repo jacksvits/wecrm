@@ -188,6 +188,7 @@ def stream_mjpeg_auto(
     frame_fps: float = 8.0,
     stream_type: int = 2,
     jpeg_quality: int = 75,
+    chunks_iter=None,
 ):
     """MJPEG-поток с авто-детекцией кодека (H.264 / H.265-HEVC).
 
@@ -213,7 +214,7 @@ def stream_mjpeg_auto(
     quality = max(50, min(jpeg_quality, 95))
 
     try:
-        chunk_iter = iter_annex_b_chunks(stream)
+        chunk_iter = chunks_iter if chunks_iter is not None else iter_annex_b_chunks(stream)
         while True:
             try:
                 _transport, chunk = next(chunk_iter)
@@ -292,6 +293,120 @@ class _QueueWriter:
         pass
 
 
+class _AnnexBDecryptor:
+    """Инкрементальная расшифровка Hikvision Annex-B (порт логики
+    hikcloudstream.stream.crypto на потоковый режим, т.к. библиотека
+    расшифровывает только целые записи, а не live-поток).
+
+    Схема: у каждого NAL зашифрованы первые 4096 байт тела (после чистого
+    codec-заголовка: 2 байта для HEVC, 1 для H.264, 0 — H.264 полностью).
+    Шифрование: независимые 16-байтные AES-CBC блоки с нулевым IV,
+    выравнивание блоков — от начала зашифрованной области каждого NAL.
+    """
+
+    PREFIX = 4096
+    HOLD = 8192  # хвост буфера, который не отдаём, пока NAL не завершится
+
+    def __init__(self, key: str | bytes) -> None:
+        from Crypto.Cipher import AES  # pycryptodome — зависимость библиотеки
+        kb = key.encode() if isinstance(key, str) else key
+        self._key = kb.ljust(16, b"\0")[:16]
+        self._aes = AES
+        self._buf = bytearray()
+        self._header_size: int | None = None
+        self._final = False
+        # конец уже расшифрованной зоны (байты до неё финализированы)
+        self._processed_until = 0
+
+    def finalize(self) -> bytes:
+        """Смыть хвост при закрытии потока (EOF считаем концом последнего NAL)."""
+        self._final = True
+        return self.feed(b"")
+
+    def _decrypt_region(self, buf: bytearray, start: int, end: int) -> None:
+        end16 = start + ((end - start) // 16) * 16
+        for pos in range(start, end16, 16):
+            cipher = self._aes.new(self._key, self._aes.MODE_CBC, bytes(16))
+            buf[pos : pos + 16] = cipher.decrypt(bytes(buf[pos : pos + 16]))
+
+    def _decrypt_guarded(self, buf: bytearray, rs: int, re_: int) -> None:
+        """Расшифровать [rs, re_), пропустив уже обработанные 16-байтные блоки
+        (зоны могут пересекаться между вызовами feed — повторная расшифровка
+        испортила бы данные). Блоки выравниваются от rs."""
+        tip = self._processed_until
+        if re_ <= tip:
+            return
+        start = rs if rs > tip else rs + ((tip - rs + 15) // 16) * 16
+        if start < re_:
+            self._decrypt_region(buf, start, re_)
+        if re_ > tip:
+            self._processed_until = re_
+
+    def feed(self, chunk: bytes) -> bytes:
+        self._buf += chunk
+        buf = self._buf
+        if len(buf) < 4096 + 64 and not self._final:
+            return b""
+        if self._header_size is None:
+            from pyezvizapi.stream import detect_hikvision_ps_video_nalu_header_size
+            hs = detect_hikvision_ps_video_nalu_header_size(bytes(buf[:65536]), self._key, default=2)
+            self._header_size = 2 if hs is None else hs
+        hs = self._header_size
+        n = len(buf)
+        watermark = 0
+        i = 0
+        while True:
+            p = buf.find(b"\x00\x00\x01", i)
+            if p == -1:
+                break
+            body = p + 3
+            if body >= n:
+                break
+            q = buf.find(b"\x00\x00\x01", body)
+            # ноль перед start code 00 00 00 01 принадлежит ему, не NAL
+            if q != -1:
+                # NAL завершился — точная длина, точный конец префикса
+                nal_end = q - 1 if buf[q - 1] == 0 else q
+                rs = body + hs
+                re_ = min(rs + self.PREFIX, nal_end)
+                if re_ > rs + 16:
+                    self._decrypt_guarded(buf, rs, re_)
+                watermark = max(watermark, nal_end)
+                i = q
+            else:
+                # NAL ещё течёт: префикс (4096 байт) расшифровываем, как только
+                # он целиком в буфере; хвост NAL остаётся шифротекстом
+                rs = body + hs
+                if rs + self.PREFIX <= n:
+                    self._decrypt_guarded(buf, rs, rs + self.PREFIX)
+                    watermark = max(watermark, rs + self.PREFIX)
+                    i = rs + self.PREFIX
+                elif self._final:
+                    re_ = min(rs + self.PREFIX, n)
+                    if re_ > rs + 16:
+                        self._decrypt_guarded(buf, rs, re_)
+                    watermark = n
+                    break
+                else:
+                    break
+        # эмитим только финализированный префикс буфера
+        if watermark <= 0:
+            return b""
+        out = bytes(buf[:watermark])
+        self._buf = buf[watermark:]
+        self._processed_until = max(0, self._processed_until - watermark)
+        return out
+
+
+def decrypting_chunks(stream, key: str):
+    """Обертка над iter_annex_b_chunks: расшифровывает на лету."""
+    dec = _AnnexBDecryptor(key)
+    for _transport, chunk in iter_annex_b_chunks(stream):
+        out = dec.feed(chunk)
+        if out:
+            yield out
+
+
 # Лимит одновременных VTM-сессий на аккаунт: облако Hik-Connect держит
 # ~2 потока; лишние запросы получают 429 и клиент переподключается позже,
 # а не встают в облачную очередь зависших сессий.
@@ -309,6 +424,7 @@ def mjpeg(index: int):
     password = request.args.get("password", "")
     api_base = request.args.get("api") or DEFAULT_API_BASE
     stream_type = int(request.args.get("streamType", "0") or 0)
+    validate_code = request.args.get("validateCode", "")
     if not login or not password:
         return jsonify(error="login/password required"), 400
 
@@ -345,12 +461,19 @@ def mjpeg(index: int):
                 )
                 if getattr(info, "result", 0) not in (0, None):
                     raise HikCloudStreamError(f"VTM negotiation failed (code {info.result})")
+                # Зашифрованные потоки: ключ получаем кодом верификации устройства
+                chunks_iter = None
+                if validate_code:
+                    enc_key = client.query_device_encrypt_key(cam.device_serial, validate_code)
+                    chunks_iter = decrypting_chunks(session._client, enc_key)
+                    app.logger.warning("mjpeg camera=%s: stream decryption enabled", index)
                 stream_mjpeg_auto(
                     session._client,
                     _QueueWriter(q),
                     frame_fps=PREVIEW_FPS,
                     stream_type=session.stream_type,
                     jpeg_quality=JPEG_QUALITY,
+                    chunks_iter=chunks_iter,
                 )
             finally:
                 try:

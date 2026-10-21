@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 export type HikvisionSettingsData = {
   login: string;
   password: string; // «••••••» = сохранён, не менять
+  validateCode: string; // код верификации устройства (для зашифрованных потоков)
   apiBaseUrl: string;
   isActive: boolean;
 };
@@ -61,6 +62,7 @@ export function HikvisionSettings({ onSaved }: { onSaved?: (s: HikvisionSettings
   const [settings, setSettings] = useState<HikvisionSettingsData>({
     login: "",
     password: "",
+    validateCode: "",
     apiBaseUrl: HIKVISION_API_REGIONS[0].value,
     isActive: false,
   });
@@ -76,6 +78,7 @@ export function HikvisionSettings({ onSaved }: { onSaved?: (s: HikvisionSettings
         setSettings({
           login: s.login || "",
           password: s.password || "",
+          validateCode: s.validateCode || "",
           apiBaseUrl: s.apiBaseUrl || HIKVISION_API_REGIONS[0].value,
           isActive: !!s.isActive,
         })
@@ -93,6 +96,7 @@ export function HikvisionSettings({ onSaved }: { onSaved?: (s: HikvisionSettings
       const next: HikvisionSettingsData = {
         login: s.login || "",
         password: s.password || "",
+        validateCode: s.validateCode || "",
         apiBaseUrl: s.apiBaseUrl || HIKVISION_API_REGIONS[0].value,
         isActive: !!s.isActive,
       };
@@ -143,6 +147,16 @@ export function HikvisionSettings({ onSaved }: { onSaved?: (s: HikvisionSettings
             onChange={(e) => setSettings({ ...settings, password: e.target.value })}
             placeholder={settings.password === "••••••" ? "сохранён (не менять)" : "пароль"}
             autoComplete="new-password"
+          />
+        </label>
+        <label style={{ fontSize: 13, color: "var(--text-muted)" }}>
+          Код верификации (если поток зашифрован)
+          <input
+            style={{ ...inputStyle, marginTop: 4 }}
+            value={settings.validateCode}
+            onChange={(e) => setSettings({ ...settings, validateCode: e.target.value.trim() })}
+            placeholder="6 символов с наклейки устройства"
+            autoComplete="off"
           />
         </label>
         <label style={{ fontSize: 13, color: "var(--text-muted)" }}>

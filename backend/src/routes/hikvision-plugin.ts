@@ -51,18 +51,20 @@ router.get('/settings', authMiddleware, async (req: AuthRequest, res) => {
 router.put('/settings', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (!requireAdmin(req, res)) return;
-    const { login, password, apiBaseUrl, isActive } = req.body;
+    const { login, password, validateCode, apiBaseUrl, isActive } = req.body;
     const s = await prisma.hikvisionPluginSettings.upsert({
       where: { id: 1 },
       create: {
         login: login || '',
         password: password || '',
+        validateCode: validateCode || '',
         apiBaseUrl: apiBaseUrl || 'https://api.hik-connect.com',
         isActive: !!isActive,
       },
       update: {
         ...(login !== undefined && { login }),
         ...(password && password !== '••••••' && { password }),
+        ...(validateCode !== undefined && { validateCode: validateCode || '' }),
         ...(apiBaseUrl !== undefined && { apiBaseUrl: apiBaseUrl || 'https://api.hik-connect.com' }),
         ...(isActive !== undefined && { isActive: !!isActive }),
       },
@@ -121,7 +123,7 @@ router.get('/snapshot/:index', authMiddleware, async (req: AuthRequest, res) => 
     const s = await getSettings();
     if (!s?.isActive) return res.status(503).json({ error: 'Плагин выключен' });
     const index = encodeURIComponent(req.params.index);
-    const url = `${HIK_SERVICE}/snapshot/${index}?login=${encodeURIComponent(s.login)}&password=${encodeURIComponent(s.password)}&api=${encodeURIComponent(s.apiBaseUrl)}`;
+    const url = `${HIK_SERVICE}/snapshot/${index}?login=${encodeURIComponent(s.login)}&password=${encodeURIComponent(s.password)}&api=${encodeURIComponent(s.apiBaseUrl)}&validateCode=${encodeURIComponent(s.validateCode || '')}`;
     const upstream = await fetch(url, { signal: AbortSignal.timeout(90_000) });
     if (!upstream.ok || !upstream.body) {
       const text = await upstream.text().catch(() => '');
@@ -147,7 +149,7 @@ router.get('/stream/:index', authMiddleware, async (req: AuthRequest, res) => {
     if (!s?.isActive) return res.status(503).json({ error: 'Плагин выключен' });
     const index = encodeURIComponent(req.params.index);
     const streamType = req.query.streamType ? `&streamType=${encodeURIComponent(String(req.query.streamType))}` : '';
-    const url = `${HIK_SERVICE}/mjpeg/${index}?login=${encodeURIComponent(s.login)}&password=${encodeURIComponent(s.password)}&api=${encodeURIComponent(s.apiBaseUrl)}${streamType}`;
+    const url = `${HIK_SERVICE}/mjpeg/${index}?login=${encodeURIComponent(s.login)}&password=${encodeURIComponent(s.password)}&api=${encodeURIComponent(s.apiBaseUrl)}&validateCode=${encodeURIComponent(s.validateCode || '')}${streamType}`;
     // Таймаут только на старт (получение заголовков): AbortSignal.timeout рвал бы
     // весь поток через N секунд — картинка «замерзала» у клиента. После старта
     // соединение живёт, пока его не разорвёт клиент или камера.
