@@ -13,7 +13,7 @@
  */
 import { AsyncLocalStorage } from 'async_hooks';
 import { PrismaClient } from '@prisma/client';
-import { clientKeyMiddleware } from './client-key.js';
+import { makeClientKeyMiddleware } from './client-key.js';
 
 /** Данные tenant'а, доступные в рамках текущего запроса/задачи */
 export interface TenantInfo {
@@ -56,7 +56,7 @@ function statusChangedAtMiddleware(params: any, next: (params: any) => Promise<a
 /** Клиент к платформенной БД (главная организация + таблица tenants) */
 export const platformPrisma = new PrismaClient();
 platformPrisma.$use(statusChangedAtMiddleware);
-platformPrisma.$use(clientKeyMiddleware);
+platformPrisma.$use(makeClientKeyMiddleware(() => (platformPrisma as any).contact));
 
 /** Контекст текущего tenant'а (заполняется middleware/worker-раннером) */
 export const tenantContext = new AsyncLocalStorage<TenantInfo>();
@@ -97,7 +97,7 @@ export function getTenantPrisma(dbName: string): PrismaClient {
   if (!client) {
     client = new PrismaClient({ datasources: { db: { url: tenantDbUrl(dbName) } } });
     client.$use(statusChangedAtMiddleware);
-    client.$use(clientKeyMiddleware);
+    client.$use(makeClientKeyMiddleware(() => (client as any).contact));
     tenantClients.set(dbName, client);
   }
   return client;

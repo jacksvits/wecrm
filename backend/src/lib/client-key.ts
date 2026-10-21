@@ -23,21 +23,39 @@ export async function generateUniqueClientKey(prisma: PrismaClient): Promise<str
 
 /**
  * Prisma-middleware: автоматически проставляет clientKey при создании
- * контакта без ключа. Регистрируется на платформенном и всех tenant-клиентах,
- * поэтому любой путь создания контакта (роуты, telegram/vk-воркеры,
+ * контакта/организации без ключа. Регистрируется на платформенном и всех
+ * tenant-клиентах, поэтому любой путь создания (роуты, telegram/vk-воркеры,
  * импорты, гостевые демо) получает ключ единообразно.
+ *
+ * Уникальность гарантируем двойно:
+ *  1) ключ проверяется запросом в БД до вставки (несколько попыток);
+ *  2) уникальный индекс contacts_client_key_key не допустит дубль даже
+ *     при гонке параллельных вставок.
  */
-export function clientKeyMiddleware(params: any, next: (params: any) => Promise<any>) {
-  if (params.model === 'Contact' && params.args?.data) {
+export function makeClientKeyMiddleware(getDelegate: () => any) {
+  return async function clientKeyMiddleware(params: any, next: (params: any) => Promise<any>) {
+    if (params.model !== 'Contact' || !params.args?.data) return next(params);
+
+    const ensureUnique = async () => {
+      // до 5 попыток: сгенерировать ключ и убедиться, что его ещё нет
+      for (let i = 0; i < 5; i++) {
+        const key = generateClientKey();
+        const exists = await getDelegate().findUnique({ where: { clientKey: key }, select: { id: true } });
+        if (!exists) return key;
+      }
+      // крайне маловероятно; уникальный индекс БД всё равно отсечёт дубль
+      return generateClientKey();
+    };
+
     if (params.action === 'create' && params.args.data.clientKey === undefined) {
-      params.args.data.clientKey = generateClientKey();
+      params.args.data.clientKey = await ensureUnique();
     } else if (params.action === 'createMany' && Array.isArray(params.args.data)) {
       for (const data of params.args.data) {
-        if (data && data.clientKey === undefined) data.clientKey = generateClientKey();
+        if (data && data.clientKey === undefined) data.clientKey = await ensureUnique();
       }
     }
-  }
-  return next(params);
+    return next(params);
+  };
 }
 
 /** Дозаполняет clientKey контактам, у которых его ещё нет (например, из
