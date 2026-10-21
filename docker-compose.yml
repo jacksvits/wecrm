@@ -146,6 +146,11 @@ services:
   hikvision:
     build: ./hikvision-stream
     image: wecrm-hikvision:latest
+    # каждая VTM-сессия + сокеты облака = FD; дефолтного 1024 мало при шторме
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     expose:
       - "8557"
     restart: unless-stopped

@@ -332,7 +332,10 @@ def mjpeg(index: int):
                 app.logger.warning("mjpeg: camera %s not found", index)
                 return
             t1 = time.time()
-            with open_live_stream(client, cam, stream_type=stream_type or StreamType.AUTO) as session:
+            # БЕЗ «with»: если start() бросит, __exit__ не отработал бы и
+            # сокет VTM-сессии утёк бы (каждая ошибка старта = минус FD).
+            session = open_live_stream(client, cam, stream_type=stream_type or StreamType.AUTO)
+            try:
                 info = session.start()
                 t2 = time.time()
                 # Замер: сколько уходит на пробуждение камеры через облачный relay
@@ -349,6 +352,11 @@ def mjpeg(index: int):
                     stream_type=session.stream_type,
                     jpeg_quality=JPEG_QUALITY,
                 )
+            finally:
+                try:
+                    session.close()
+                except Exception:
+                    pass
         except Exception as exc:
             app.logger.warning("mjpeg camera=%s ended: %s", index, exc)
             drop_client(login, password, api_base)
