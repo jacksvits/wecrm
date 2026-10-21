@@ -51,6 +51,7 @@ function trimFrame(f: Uint8Array): Uint8Array {
 function MjpegPlayer({ src, style }: { src: string; style?: React.CSSProperties }) {
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(true);
+  const [limitMsg, setLimitMsg] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,14 +62,22 @@ function MjpegPlayer({ src, style }: { src: string; style?: React.CSSProperties 
 
     const scheduleReconnect = () => {
       attempts += 1;
-      reconnectTimer = setTimeout(connect, Math.min(5000, 500 * attempts));
+      reconnectTimer = setTimeout(connect, Math.min(15000, 500 * attempts));
     };
 
     const connect = async () => {
       if (cancelled) return;
       setConnecting(true);
+      setLimitMsg(false);
       try {
         const resp = await fetch(src, { headers: { "X-Auth-Token": getToken() } });
+        if (!cancelled && resp.status === 429) {
+          // лимит облака (2 потока): не долбим, показываем подсказку
+          setLimitMsg(true);
+          setConnecting(false);
+          scheduleReconnect();
+          return;
+        }
         if (!cancelled && (!resp.ok || !resp.body)) throw new Error(`HTTP ${resp.status}`);
         const ct = resp.headers.get("content-type") || "";
         const bm = ct.match(/boundary=([^;]+)/);
@@ -147,6 +156,11 @@ function MjpegPlayer({ src, style }: { src: string; style?: React.CSSProperties 
       {connecting && (
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 12, color: "rgba(255,255,255,0.8)", fontSize: 13, background: frameUrl ? "rgba(0,0,0,0.45)" : "transparent" }}>
           Подключение… пробуждение камеры через облако может занять до 15 с
+        </div>
+      )}
+      {limitMsg && !connecting && (
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 12, color: "#ffd479", fontSize: 13, background: "rgba(0,0,0,0.55)" }}>
+          Лимит облака: не более 2 одновременных просмотров. Закройте другие окна камер и подождите ~15 с.
         </div>
       )}
     </div>
