@@ -163,7 +163,9 @@ router.get('/stream/:index', authMiddleware, async (req: AuthRequest, res) => {
     }
     if (!upstream.ok || !upstream.body) {
       const text = await upstream.text().catch(() => '');
-      return res.status(502).json({ error: text || `Сервис камер вернул HTTP ${upstream.status}` });
+      // не маскируем статус: 429 (лимит потоков) клиент должен отличать от 502
+      const status = upstream.status === 429 ? 429 : 502;
+      return res.status(status).json({ error: text || `Сервис камер вернул HTTP ${upstream.status}` });
     }
     res.setHeader('Content-Type', upstream.headers.get('content-type') || 'multipart/x-mixed-replace; boundary=hikframe');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
