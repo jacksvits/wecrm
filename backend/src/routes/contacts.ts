@@ -121,7 +121,18 @@ router.get('/:id', async (req, res) => {
     if (!contact) {
       return res.status(404).json({ error: 'Контакт не найден' });
     }
-    res.json(contact);
+    // Счётчик устройств: для организации — включая устройства сотрудников
+    let devicesTotal = contact._count.devices;
+    if (contact.kind === 'organization') {
+      const employees = await prisma.contact.findMany({
+        where: { organizationId: contact.id },
+        select: { id: true },
+      });
+      devicesTotal = await prisma.clientDevice.count({
+        where: { contactId: { in: [contact.id, ...employees.map((e) => e.id)] } },
+      });
+    }
+    res.json({ ...contact, devicesTotal });
   } catch (err: any) {
     console.error('[Contacts GET by ID] Error:', err.message);
     res.status(500).json({ error: err.message });
