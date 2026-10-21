@@ -57,3 +57,7 @@ vpn/sing-box/config.json
 # Установщик Python для WeAGENT (большой бинарник, не для git)
 agent/windows/python-*.exe
 agent/windows/__pycache__/
+
+# WeAGENT.exe — бинарный установщик (сборка кросс-компиляцией Go)
+agent/windows/WeAGENT.exe
+agent/windows/installer/files/

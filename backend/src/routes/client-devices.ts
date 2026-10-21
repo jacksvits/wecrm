@@ -108,7 +108,19 @@ router.get('/installer', async (req: AuthRequest, res) => {
       'call "%~dp0install.bat" "' + serverUrl + '" "' + key + '"',
       '',
     ].join('\r\n');
+    // Тот же запуск, но через единый exe-установщик (если есть в архиве)
+    const exeRunner = [
+      '@echo off',
+      'if exist "%~dp0WeAGENT.exe" (',
+      '  "%~dp0WeAGENT.exe" "' + serverUrl + '" "' + key + '"',
+      ') else (',
+      '  call "%~dp0install.bat" "' + serverUrl + '" "' + key + '"',
+      ')',
+      '',
+    ].join('\r\n');
     archive.append(runner, { name: `INSTALL-${key}.bat` });
+    archive.append(exeRunner, { name: `WeAGENT-${key}.bat` });
+    archive.append(exeRunner, { name: `WeAGENT-${key}.bat` });
 
     await archive.finalize();
   } catch (e: any) {
