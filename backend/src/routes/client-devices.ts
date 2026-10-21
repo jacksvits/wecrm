@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import path from 'path';
 import { createRequire } from 'module';
-// CJS-модуль: в EMB-сборке типизируем через createRequire
+// CJS-модуль: в ESM-сборке подключаем через createRequire.
+// archiver v8 — классовый API: new ZipArchive(...) вместо archiver('zip', ...)
 const require = createRequire(import.meta.url);
-const archiver = require('archiver');
+const { ZipArchive } = require('archiver');
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
@@ -64,7 +65,7 @@ router.get('/installer', async (req: AuthRequest, res) => {
     const serverUrl = `${proto}://${req.get('host')}`;
     const key: string = contact.clientKey;
 
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    const archive: any = new ZipArchive({ zlib: { level: 9 } });
     archive.on('warning', (e: any) => console.warn('[client-devices] installer zip warning:', e.message));
     archive.on('error', (e: any) => {
       console.error('[client-devices] installer zip error:', e.message);
