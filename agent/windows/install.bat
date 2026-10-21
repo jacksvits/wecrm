@@ -29,37 +29,51 @@ where python >nul 2>&1
 if errorlevel 1 goto no_python
 
 echo.
-echo [1/5] Installing pywin32...
+echo [1/6] Installing pywin32...
 python -m pip install --upgrade pywin32
 if errorlevel 1 goto fail
 
-echo [2/5] Writing config to registry...
+echo [2/6] pywin32 post-install (needed for services)...
+python -c "import sys, os, subprocess; s=os.path.join(os.path.dirname(sys.executable),'Scripts','pywin32_postinstall.py'); subprocess.call([sys.executable, s, '-install'])"
+
+echo [3/6] Writing config to registry...
 python -c "import winreg; k=winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE,r'SOFTWARE\WeCRM\Agent',0,winreg.KEY_SET_VALUE|winreg.KEY_WOW64_64KEY); winreg.SetValueEx(k,'ServerUrl',0,winreg.REG_SZ,r'%SERVER%'); winreg.SetValueEx(k,'ContactKey',0,winreg.REG_SZ,r'%CONTACT%')"
 if errorlevel 1 goto fail
 
-echo [3/5] Installing WecrmAgent service...
+echo [4/6] Installing WecrmAgent service...
 cd /d "%~dp0"
 python agent.py install
 if errorlevel 1 goto fail
 
-echo [4/5] Auto-restart on failure + autostart...
+echo [5/6] Auto-restart on failure + autostart...
 sc failure WecrmAgent reset= 0 actions= restart/5000/restart/10000/restart/30000
 sc config WecrmAgent start= auto
 sc description WecrmAgent "Reports computer and system information to WeCRM"
-
-echo [5/5] Starting service...
 python agent.py start
-if errorlevel 1 goto fail
+if errorlevel 1 goto svc_fail
+
+echo [6/6] Sending first test report...
+python agent.py debug
+if errorlevel 1 goto svc_fail
 
 echo.
 echo ==========================================
 echo  Done! Service WecrmAgent is running.
-echo  Computer will appear on contact %CONTACT%
-echo  in CRM: client card - Devices tab.
-echo  Test: python agent.py debug
+echo  Check the Devices tab on contact %CONTACT%
+echo  in CRM in about a minute.
 echo ==========================================
 pause
 exit /b 0
+
+:svc_fail
+echo.
+echo [ERROR] Service was installed but did not start or report.
+echo Diagnostics:
+echo   1) sc query WecrmAgent
+echo   2) python agent.py debug   (shows the exact error)
+echo   3) Event Viewer - Windows Logs - Application
+pause
+exit /b 1
 
 :bad_id
 echo [ERROR] Contact ID must look like 000-000-000
