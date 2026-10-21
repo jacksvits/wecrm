@@ -43,6 +43,18 @@ REPORT_INTERVAL_SEC = 5 * 60     # полный отчёт раз в 5 мину�
 HEARTBEAT_INTERVAL_SEC = 60      # heartbeat раз в минуту
 HTTP_TIMEOUT_SEC = 30
 
+# Журнал работы агента (для диагностики на самом ПК)
+LOG_FILE = os.path.join(os.environ.get("ProgramData", r"C:\ProgramData"), "WeCRM", "agent.log")
+
+
+def log(msg):
+    try:
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S") + " " + msg + "\n")
+    except Exception:
+        pass
+
 REG_PATH = r"SOFTWARE\WeCRM\Agent"
 
 
@@ -266,6 +278,8 @@ def send_report(cfg):
     if token and token != cfg["token"]:
         reg_write("Token", token)
         cfg["token"] = token
+        log("report: registered, token stored")
+    log("report: HTTP %s hostname=%s" % (status, payload["info"].get("hostname", "")))
     return status, body
 
 
@@ -290,6 +304,7 @@ class WecrmAgentService(win32serviceutil.ServiceFramework):
         self.stop_event = win32event.CreateEvent(None, 0, 0, None)
 
     def SvcStop(self):
+        log("service stopped by request")
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
         win32event.SetEvent(self.stop_event)
 
@@ -302,6 +317,7 @@ class WecrmAgentService(win32serviceutil.ServiceFramework):
         self.main()
 
     def main(self):
+        log("service started, agent %s" % AGENT_VERSION)
         cfg = load_config()
         if not cfg["deviceKey"]:
             try:
@@ -329,12 +345,14 @@ class WecrmAgentService(win32serviceutil.ServiceFramework):
             try:
                 if now >= next_report:
                     send_report(cfg)
+                    log("report sent ok")
                     next_report = time.time() + REPORT_INTERVAL_SEC
                     next_heartbeat = time.time() + HEARTBEAT_INTERVAL_SEC
                 elif cfg["token"] and now >= next_heartbeat:
                     send_heartbeat(cfg)
                     next_heartbeat = time.time() + HEARTBEAT_INTERVAL_SEC
             except urllib.error.HTTPError as e:
+                log("HTTP error %s: %s" % (e.code, e.reason))
                 # 4xx — не повторять до следующего цикла отчёта, ошибка в конфиге/токене
                 if e.code >= 500:
                     next_report = time.time() + 60
@@ -343,6 +361,7 @@ class WecrmAgentService(win32serviceutil.ServiceFramework):
                 time.sleep(30)
             except Exception:
                 traceback.print_exc()
+                log("ERROR: %s" % traceback.format_exc())
                 next_report = time.time() + 60
                 time.sleep(30)
 
