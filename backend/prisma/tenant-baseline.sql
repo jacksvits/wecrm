@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mfPRPH3ZTYYl7vy2K3g1zv0wFBcDwsgxqmFdw4Qc3WwqkDddUp4ZyzIATuOLAdf
+\restrict KrPG57faUU18cmFsZ2w8vCkgsKkJXtmw91fpsMTQAloEC59r4Tdu41vhKnrghqr
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -364,7 +364,7 @@ CREATE TABLE public.contacts (
     "updatedAt" timestamp(3) without time zone NOT NULL,
     emails text[] DEFAULT ARRAY[]::text[],
     phones text[] DEFAULT ARRAY[]::text[],
-    vk_user_id integer,
+    vk_user_id bigint,
     inn text,
     kind text DEFAULT 'contact'::text NOT NULL,
     legal_address text,
@@ -612,6 +612,21 @@ CREATE TABLE public.help_articles (
     blocks jsonb NOT NULL,
     "position" integer DEFAULT 0 NOT NULL,
     updated_at timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: hikvision_plugin_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.hikvision_plugin_settings (
+    id integer DEFAULT 1 NOT NULL,
+    login text DEFAULT ''::text NOT NULL,
+    password text DEFAULT ''::text NOT NULL,
+    api_base_url text DEFAULT 'https://api.hik-connect.com'::text NOT NULL,
+    is_active boolean DEFAULT false NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    validate_code text DEFAULT ''::text NOT NULL
 );
 
 
@@ -870,7 +885,8 @@ CREATE TABLE public.ozon_seller_settings (
     last_sync_at timestamp(3) without time zone,
     last_sync_result text,
     updated_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    default_type_id integer
+    default_type_id integer,
+    auto_sync boolean DEFAULT true NOT NULL
 );
 
 
@@ -1560,7 +1576,7 @@ CREATE TABLE public.tasks (
     "emailMessageId" text,
     "sourceEmail" text,
     parent_id text,
-    vk_peer_id integer,
+    vk_peer_id bigint,
     vk_group_id integer,
     vk_message_id integer,
     budget double precision DEFAULT 0,
@@ -2236,6 +2252,14 @@ ALTER TABLE ONLY public.handler_settings
 
 ALTER TABLE ONLY public.help_articles
     ADD CONSTRAINT help_articles_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: hikvision_plugin_settings hikvision_plugin_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hikvision_plugin_settings
+    ADD CONSTRAINT hikvision_plugin_settings_pkey PRIMARY KEY (id);
 
 
 --
@@ -4702,13 +4726,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mfPRPH3ZTYYl7vy2K3g1zv0wFBcDwsgxqmFdw4Qc3WwqkDddUp4ZyzIATuOLAdf
+\unrestrict KrPG57faUU18cmFsZ2w8vCkgsKkJXtmw91fpsMTQAloEC59r4Tdu41vhKnrghqr
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 6ZE7700uokzTrS3JkS9H8WLy8lcrIEBu6rIRnt3LEmqxj6hLKKrmVq1uUcJxRlD
+\restrict jRaMqokNrgsEprBr844hMIhYgALQybxjzpKbMRn5aKbJa7ChBBCfdlHi3ckwmyR
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -4745,25 +4769,6 @@ INSERT INTO public._prisma_migrations VALUES ('232959db-9a9b-49c8-abb6-8ef5de0c9
 INSERT INTO public._prisma_migrations VALUES ('c30402ee-7d54-4553-8995-6d4c0b0cba52', '6e693f46bc0ba2827aedfdbb1edeb15ee3c5d13bd8e9bcafecd15b180b35f905', '2026-08-28 03:47:24.528082+00', '20260827180000_add_statuses', NULL, NULL, '2026-08-28 03:47:24.514911+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('61515a33-4450-49ac-a7fa-ea86d14a5db2', '9c15195a44f3d00de61433a0078eddc115bcf5f03154c809e990afa39c5f61e6', '2026-08-28 03:47:24.455508+00', '20260825070000_add_hide_completed_tasks', NULL, NULL, '2026-08-28 03:47:24.452762+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('f3350ee7-cda8-4631-9ea1-c259504b086c', '279f8a2df02e31cd5c0610abd6e164e7d89682cdff221c752dd9f1788d477970', '2026-08-28 03:47:24.45833+00', '20260825080000_add_dark_theme', NULL, NULL, '2026-08-28 03:47:24.456066+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('cd2e0fa2-8af5-4070-947c-228ba4ecdd62', '587c9548ba5a5f2dbd9d257606a62afba85afe7a05ca0f49fa7ed1d484cb7397', NULL, '20250829132200_add_pskovline_settings', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
-
-Migration name: 20250829132200_add_pskovline_settings
-
-Database error code: 42P07
-
-Database error:
-ERROR: relation "pskovline_settings" already exists
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42P07), message: "relation \"pskovline_settings\" already exists", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("heap.c"), line: Some(1167), routine: Some("heap_create_with_catalog") }
-
-   0: sql_schema_connector::apply_migration::apply_script
-           with migration_name="20250829132200_add_pskovline_settings"
-             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
-   1: schema_core::commands::apply_migrations::Applying migration
-           with migration_name="20250829132200_add_pskovline_settings"
-             at schema-engine/core/src/commands/apply_migrations.rs:91
-   2: schema_core::state::ApplyMigrations
-             at schema-engine/core/src/state.rs:226', '2026-08-29 10:33:18.782121+00', '2026-08-29 10:30:34.535967+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('d8950265-a266-42a3-ab8c-cc453828ea20', '0d12901a907049f1bf75f876c20aabdc90b3f22c7418e3bd25c90de5583d75dc', '2026-08-28 03:47:24.487958+00', '20260826000000_add_telephony', NULL, NULL, '2026-08-28 03:47:24.458887+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('82ec6f54-d843-4bf0-b909-879feb68486f', '64ef5f52cb0deb10d3f9c1b85ce431de9cb5cb99b106f6bf5325839e1c8e7538', '2026-08-28 03:47:24.531687+00', '20260827190000_add_role_assignable', NULL, NULL, '2026-08-28 03:47:24.528679+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('c9955674-9e5f-4a39-921c-e76f9517668b', '45e791942061fc8119a79872a72c4adb4c1c9d1e690850a3423bb753a453d911', '2026-08-28 05:05:45.910956+00', '20260828080000_add_user_fields', NULL, NULL, '2026-08-28 05:05:45.897097+00', 1);
@@ -4773,49 +4778,11 @@ INSERT INTO public._prisma_migrations VALUES ('d959113c-0023-4aaa-9877-9c8c93e39
 INSERT INTO public._prisma_migrations VALUES ('fff5ab4f-32dc-49f9-bf40-72c15d952b25', '628aaf22d19a95e5369143245069fe06d0afc2d2451cfb4a0570c993a60c8f84', '2026-08-28 22:23:39.428887+00', '20260829062302_add_news_to_allowed_pages', NULL, NULL, '2026-08-28 22:23:39.414257+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('aa13bf6e-2df1-4e8f-bdf2-17bee3fd86b7', '587c9548ba5a5f2dbd9d257606a62afba85afe7a05ca0f49fa7ed1d484cb7397', '2026-08-29 10:33:18.785228+00', '20250829132200_add_pskovline_settings', '', NULL, '2026-08-29 10:33:18.785228+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('9ef9faa7-6579-4d1c-8dc4-767f6d69987f', '23fee488728b3e9bf81d5b08c3476b79713ac77bcb7587e60808798b623bbb2d', '2026-08-29 11:07:34.614522+00', '20250829140000_add_pskovline_account2', NULL, NULL, '2026-08-29 11:07:34.607966+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('0df34081-5ccf-41b9-8a4a-89279cd10d58', '840a6935c10bd35ce17288b58ec0cd3232d498a74cf590788ad686b1b06fa142', NULL, '20260830072100_add_camera_settings', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
-
-Migration name: 20260830072100_add_camera_settings
-
-Database error code: 42P07
-
-Database error:
-ERROR: relation "camera_settings" already exists
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42P07), message: "relation \"camera_settings\" already exists", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("heap.c"), line: Some(1167), routine: Some("heap_create_with_catalog") }
-
-   0: sql_schema_connector::apply_migration::apply_script
-           with migration_name="20260830072100_add_camera_settings"
-             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
-   1: schema_core::commands::apply_migrations::Applying migration
-           with migration_name="20260830072100_add_camera_settings"
-             at schema-engine/core/src/commands/apply_migrations.rs:91
-   2: schema_core::state::ApplyMigrations
-             at schema-engine/core/src/state.rs:226', '2026-08-30 08:01:48.390545+00', '2026-08-30 07:59:01.522542+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('4085aca9-40ac-4b8c-96f8-34620b67fef2', '840a6935c10bd35ce17288b58ec0cd3232d498a74cf590788ad686b1b06fa142', '2026-08-30 08:01:48.393527+00', '20260830072100_add_camera_settings', '', NULL, '2026-08-30 08:01:48.393527+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('448d69d9-efeb-4708-9c44-538066a10717', '', '2026-08-30 08:07:52.868363+00', '20260830110000_add_task_history', '', NULL, '2026-08-30 08:07:52.868363+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('e7d1b9e6-459d-4c8e-a34a-8d2a1199746a', 'a2a214676389d2e838aad867d990cad20a2134a4ae17d4f1e116f7e5c80a386b', '2026-08-30 20:23:59.343708+00', '20260830230500_add_can_be_curator', NULL, NULL, '2026-08-30 20:23:59.334066+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('d6cef722-daea-4a33-8305-57a963564245', 'fbd68687a10b48471e98f1e13c02ccd4677bbf0d6590102c3ac8dd51a3f0bc28', '2026-08-30 17:50:56.629957+00', '20260830143200_add_status_is_active', NULL, NULL, '2026-08-30 17:50:56.622205+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('5f8fc922-9c21-448a-ad6a-38543ab77b6a', '', '2026-08-30 18:55:56.141466+00', '20260830215000_fix_task_curator', '', NULL, '2026-08-30 18:55:56.141466+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('6a6f5a0c-0232-4dbf-8ea5-40d57e603fe6', 'af4c4b08f7cae5decc195f5f7b47aa80612257960595cdfbffff0e57b8b9b53a', NULL, '20260830210000_add_task_curator', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
-
-Migration name: 20260830210000_add_task_curator
-
-Database error code: 42710
-
-Database error:
-ERROR: constraint "tasks_curator_id_fkey" for relation "tasks" already exists
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42710), message: "constraint \"tasks_curator_id_fkey\" for relation \"tasks\" already exists", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("tablecmds.c"), line: Some(9026), routine: Some("ATExecAddConstraint") }
-
-   0: sql_schema_connector::apply_migration::apply_script
-           with migration_name="20260830210000_add_task_curator"
-             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
-   1: schema_core::commands::apply_migrations::Applying migration
-           with migration_name="20260830210000_add_task_curator"
-             at schema-engine/core/src/commands/apply_migrations.rs:91
-   2: schema_core::state::ApplyMigrations
-             at schema-engine/core/src/state.rs:226', '2026-08-30 20:23:57.7359+00', '2026-08-30 20:23:43.226384+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('ebcc6a22-98b9-46ea-8701-66c177f184f7', 'af4c4b08f7cae5decc195f5f7b47aa80612257960595cdfbffff0e57b8b9b53a', '2026-08-30 20:23:57.739049+00', '20260830210000_add_task_curator', '', NULL, '2026-08-30 20:23:57.739049+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('feb9060a-b1aa-4ad3-b8fb-d9cfeca756fa', 'fefc9a3714b69af4e190bfd60226456a2dc26f8eb0b81a7d8a99269e937f9fae', '2026-09-11 03:11:11.087941+00', '20260911_add_tochka_interval', NULL, NULL, '2026-09-11 03:11:11.077853+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('941463c0-7ab6-4dc4-b2ba-f334a728d324', '42f8fc283457bf8cc9fe9bce7d0a3ebda0f5325e3e7f1ca3a3e3aadd8dc95e80', '2026-09-01 13:46:17.647864+00', '20250831_add_task_finances', NULL, NULL, '2026-09-01 13:46:17.640883+00', 1);
@@ -4835,84 +4802,8 @@ INSERT INTO public._prisma_migrations VALUES ('aa5abc01-f2e3-4bde-8cb0-c75d87a75
 INSERT INTO public._prisma_migrations VALUES ('06dccbc7-dda7-401d-841a-13d2035c2d9a', '05c85e9ccf8d783e067d9f995d2b17a0362202bfd87cffadb14f2fb55a4c3103', '2026-09-15 08:37:15.787341+00', '20260915_add_email_parse_rules', NULL, NULL, '2026-09-15 08:37:15.783258+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('4ecc1f97-cc1a-47f4-866c-389f328b386f', '6a98411cb84c88769b193d227e29688ee28d2ce94f8a484c6fc4a2f65cc41dfd', '2026-09-15 10:26:34.053946+00', '20260915_add_email_filter_spam', NULL, NULL, '2026-09-15 10:26:34.048336+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('f8936903-5563-44c4-bcf1-dde9bc49c432', '06dcd2aee44aa782a41f392c0b5f797585ac4407a579e23bb82da667ace8a1d0', '2026-09-15 10:44:48.504611+00', '20260915_add_role_can_handle_spam', NULL, NULL, '2026-09-15 10:44:48.498874+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('a30e71ce-ff5f-4f61-a98e-ed36e9c93b94', '2ba435a5cc00ca5157e17def749712955490bedad1905b47f0338473e0be9a00', NULL, '20250831_add_vk_comment', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
-
-Migration name: 20250831_add_vk_comment
-
-Database error code: 42701
-
-Database error:
-ERROR: column "vk_message_id" of relation "comments" already exists
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42701), message: "column \"vk_message_id\" of relation \"comments\" already exists", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("tablecmds.c"), line: Some(7356), routine: Some("check_for_column_name_collision") }
-
-   0: sql_schema_connector::apply_migration::apply_script
-           with migration_name="20250831_add_vk_comment"
-             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
-   1: schema_core::commands::apply_migrations::Applying migration
-           with migration_name="20250831_add_vk_comment"
-             at schema-engine/core/src/commands/apply_migrations.rs:91
-   2: schema_core::state::ApplyMigrations
-             at schema-engine/core/src/state.rs:226', '2026-09-01 13:46:41.440465+00', '2026-09-01 13:46:17.648557+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('28179ae8-a374-4f61-847e-e5a8ed87cccb', '2ba435a5cc00ca5157e17def749712955490bedad1905b47f0338473e0be9a00', '2026-09-01 13:46:41.443975+00', '20250831_add_vk_comment', '', NULL, '2026-09-01 13:46:41.443975+00', 0);
-INSERT INTO public._prisma_migrations VALUES ('e141ca5b-4b27-4628-84f0-972976163b73', '0f5943e98192d6ce0d2781b1d5f8cb8ccfba9d996f0bf8b438a956f1b3959c80', NULL, '20250831_add_vk_group', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
-
-Migration name: 20250831_add_vk_group
-
-Database error code: 42701
-
-Database error:
-ERROR: column "vk_user_id" of relation "contacts" already exists
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42701), message: "column \"vk_user_id\" of relation \"contacts\" already exists", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("tablecmds.c"), line: Some(7356), routine: Some("check_for_column_name_collision") }
-
-   0: sql_schema_connector::apply_migration::apply_script
-           with migration_name="20250831_add_vk_group"
-             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
-   1: schema_core::commands::apply_migrations::Applying migration
-           with migration_name="20250831_add_vk_group"
-             at schema-engine/core/src/commands/apply_migrations.rs:91
-   2: schema_core::state::ApplyMigrations
-             at schema-engine/core/src/state.rs:226', '2026-09-01 13:47:10.934893+00', '2026-09-01 13:46:44.48795+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('44388ea6-a720-445f-9809-56f351f6b9b3', '0f5943e98192d6ce0d2781b1d5f8cb8ccfba9d996f0bf8b438a956f1b3959c80', '2026-09-01 13:47:10.938004+00', '20250831_add_vk_group', '', NULL, '2026-09-01 13:47:10.938004+00', 0);
-INSERT INTO public._prisma_migrations VALUES ('983cacbd-1bf4-4f10-a0f1-362ea3c098e8', 'b08a2c6d3f092f0668b1224c622f99c8a56b2716cc36c03e7b3287570d52c60b', NULL, '20260909180000_yandex_task_address', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
-
-Migration name: 20260909180000_yandex_task_address
-
-Database error code: 42P01
-
-Database error:
-ERROR: relation "Task" does not exist
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42P01), message: "relation \"Task\" does not exist", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("namespace.c"), line: Some(434), routine: Some("RangeVarGetRelidExtended") }
-
-   0: sql_schema_connector::apply_migration::apply_script
-           with migration_name="20260909180000_yandex_task_address"
-             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
-   1: schema_core::commands::apply_migrations::Applying migration
-           with migration_name="20260909180000_yandex_task_address"
-             at schema-engine/core/src/commands/apply_migrations.rs:91
-   2: schema_core::state::ApplyMigrations
-             at schema-engine/core/src/state.rs:226', '2026-09-09 14:47:49.635977+00', '2026-09-09 14:46:15.275741+00', 0);
-INSERT INTO public._prisma_migrations VALUES ('bf8b19b3-6ff4-4f44-8c3e-bb7ef591b81f', 'e5acb310cef2af41764115026ded46d889e0a1ef09d070682e14d512d5616dfd', NULL, '20260901_add_notification_settings', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
-
-Migration name: 20260901_add_notification_settings
-
-Database error code: 42701
-
-Database error:
-ERROR: column "push_enabled" of relation "users" already exists
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42701), message: "column \"push_enabled\" of relation \"users\" already exists", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("tablecmds.c"), line: Some(7356), routine: Some("check_for_column_name_collision") }
-
-   0: sql_schema_connector::apply_migration::apply_script
-           with migration_name="20260901_add_notification_settings"
-             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
-   1: schema_core::commands::apply_migrations::Applying migration
-           with migration_name="20260901_add_notification_settings"
-             at schema-engine/core/src/commands/apply_migrations.rs:91
-   2: schema_core::state::ApplyMigrations
-             at schema-engine/core/src/state.rs:226', '2026-09-01 13:47:46.232945+00', '2026-09-01 13:47:25.661085+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('3a17e09e-854d-4954-8606-e93f09857a5e', 'e5acb310cef2af41764115026ded46d889e0a1ef09d070682e14d512d5616dfd', '2026-09-01 13:47:46.238313+00', '20260901_add_notification_settings', '', NULL, '2026-09-01 13:47:46.238313+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('ba6045ea-8a43-43a2-9b71-54e5254cade2', 'e065ac1827d1d0ce745b0becb455c7e0f94f57f35aeb5e9138819f1cbfcfb303', '2026-09-01 13:47:49.33467+00', '20260901_add_ticket_number', NULL, NULL, '2026-09-01 13:47:49.284881+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('90cf4417-5931-411c-9959-342fbb815fd3', 'cbba941d9416672adf1fb1ab3ff32499455c7590e7da33fd5f74869f4849935a', '2026-09-01 17:34:32.882629+00', '20260901_add_is_internal', NULL, NULL, '2026-09-01 17:34:32.874212+00', 1);
@@ -4922,25 +4813,6 @@ INSERT INTO public._prisma_migrations VALUES ('c9b83224-85f5-4f06-b191-8a02b3de2
 INSERT INTO public._prisma_migrations VALUES ('bd222049-5c35-4244-8c9a-8a2f9bf589e0', '65e5c38afbe054d24b807b9678b9001a82a697f415eb9b0f1a4b4ee537bca04b', '2026-09-12 09:24:37.433202+00', '20260912130000_add_auto_reply', NULL, NULL, '2026-09-12 09:24:37.425631+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('4863cb7e-0052-40d1-8522-fa2e455cc8d1', '94cb9360da2a65ce18aa6cecf1edf9ad71719999e7b5ee71d56f319a3fe09d57', '2026-09-12 11:38:46.988062+00', '20260912140000_add_auto_replier', NULL, NULL, '2026-09-12 11:38:46.969506+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('e71cdbc3-501e-4ebe-a977-59bd0b1e85c0', 'b5ccaaeea097038dc5fc37d15aff941cff6fcc5ddb991cb6cfacadd0d8c340e4', '2026-09-12 14:12:39.443227+00', '20260912150000_add_vk_profile_url', NULL, NULL, '2026-09-12 14:12:39.438608+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('9197b2e8-6e17-43e8-9cfe-efef25e1ab94', 'd7547c33529ac7693008f1aac05aea38ef39655f0058be62d7443f3efcdcbf09', NULL, '20260902_121800_add_contact_max_fields', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
-
-Migration name: 20260902_121800_add_contact_max_fields
-
-Database error code: 42701
-
-Database error:
-ERROR: column "avatar_url" of relation "contacts" already exists
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42701), message: "column \"avatar_url\" of relation \"contacts\" already exists", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("tablecmds.c"), line: Some(7356), routine: Some("check_for_column_name_collision") }
-
-   0: sql_schema_connector::apply_migration::apply_script
-           with migration_name="20260902_121800_add_contact_max_fields"
-             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
-   1: schema_core::commands::apply_migrations::Applying migration
-           with migration_name="20260902_121800_add_contact_max_fields"
-             at schema-engine/core/src/commands/apply_migrations.rs:91
-   2: schema_core::state::ApplyMigrations
-             at schema-engine/core/src/state.rs:226', '2026-09-02 13:02:20.291091+00', '2026-09-02 13:01:37.198027+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('a01b7b3c-3f2e-4f97-b6ca-7b7bf99fe38d', 'd7547c33529ac7693008f1aac05aea38ef39655f0058be62d7443f3efcdcbf09', '2026-09-02 13:02:20.293504+00', '20260902_121800_add_contact_max_fields', '', NULL, '2026-09-02 13:02:20.293504+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('73577e5e-1faf-4abe-b5d5-00a443c7c53a', '6c4e2bcadd92144c1879c261c6cbace71b04da382c2c85a858ab021900cba75b', '2026-09-03 09:13:10.068033+00', '20260902_160000_add_role_notifications', NULL, NULL, '2026-09-03 09:13:10.061451+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('5161e80d-a792-4d12-a317-62a6227378b8', 'c28da3569520b01bf84e5fcb69b18a6a00c24ddbea04b058145c38ad0ce22b9f', '2026-09-08 18:32:38.596867+00', '20260907_add_path_to_file_tab_settings', NULL, NULL, '2026-09-08 18:32:38.59401+00', 1);
@@ -4951,25 +4823,6 @@ INSERT INTO public._prisma_migrations VALUES ('9ae3ec41-e4d1-4d64-a634-53c4777c5
 INSERT INTO public._prisma_migrations VALUES ('2b2f4792-7615-49d5-a1a1-323c432515ab', '8961fb3f58b2de2c6f88de5ac1e410662fe9a3181cfb7b7c5331b6f05ed10f7d', '2026-09-05 19:21:20.025955+00', '20250905_enable_push_default', NULL, NULL, '2026-09-05 19:21:20.023468+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('c509aea4-97de-4cc7-992e-43611b19882b', '933903f2ee0e6bc7c8f5581eff8e18a86e9569c7fcb1066fa338653e2da65b76', '2026-09-06 11:41:22.320673+00', '20260905_add_contact_project_relation', NULL, NULL, '2026-09-06 11:41:22.306959+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('bb2024ed-d973-4e7e-88e1-8e4d439b8a6c', '', '2026-09-06 11:46:11.826749+00', '20260906_add_file_tab_settings', '', NULL, '2026-09-06 11:46:11.826749+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('c9b2a5dd-db4e-4bc0-a28b-853d305ee9f1', 'b08a2c6d3f092f0668b1224c622f99c8a56b2716cc36c03e7b3287570d52c60b', NULL, '20260909180000_yandex_task_address', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
-
-Migration name: 20260909180000_yandex_task_address
-
-Database error code: 42P01
-
-Database error:
-ERROR: relation "Task" does not exist
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42P01), message: "relation \"Task\" does not exist", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("namespace.c"), line: Some(434), routine: Some("RangeVarGetRelidExtended") }
-
-   0: sql_schema_connector::apply_migration::apply_script
-           with migration_name="20260909180000_yandex_task_address"
-             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
-   1: schema_core::commands::apply_migrations::Applying migration
-           with migration_name="20260909180000_yandex_task_address"
-             at schema-engine/core/src/commands/apply_migrations.rs:91
-   2: schema_core::state::ApplyMigrations
-             at schema-engine/core/src/state.rs:226', '2026-09-09 14:50:02.603467+00', '2026-09-09 14:48:13.025381+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('550585df-226d-4fb6-aefe-aad24a5047cc', '5b9d38a5e642da78b3a9758339291b533cd09e254cb6ff1a35d73034c76e07ad', '2026-09-08 18:32:38.593521+00', '20250906_add_is_visible_to_contact_types', NULL, NULL, '2026-09-08 18:32:38.587738+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('cb442766-77f8-4c17-8a8b-4f71a6e0a9af', 'f648ead8414ec5eea5d150b697a9039591bcf69fb6e14a1cc6e656192bb739fc', '2026-09-09 06:37:07.221926+00', '20260909093000_shared_reminders', NULL, NULL, '2026-09-09 06:37:07.202849+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('466ee099-ae36-42b2-9a65-28ba3879fb41', 'ea10c20074a17ecfb20c5742e8985581875c653f62dc6cc386c2636dbfc8a74a', '2026-09-09 07:13:06.450476+00', '20260909101500_recipient_completed_at', NULL, NULL, '2026-09-09 07:13:06.446276+00', 1);
@@ -5054,62 +4907,6 @@ INSERT INTO public._prisma_migrations VALUES ('da941b60-5f9c-43fe-9d07-b2c62918e
 INSERT INTO public._prisma_migrations VALUES ('78c74d13-5624-4eb9-87d0-8bcc5e5158ff', '80af48117d48a4494e028d7966bb83e2a17c10e1a26bac28d2432321f2d498a7', '2026-10-13 20:38:22.169439+00', '20261013210000_tenant_ticket_attachments', NULL, NULL, '2026-10-13 20:38:22.150311+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('38f925aa-aff8-412c-b818-9711e608c25d', 'edb74c1bcca8961cfdab0b8fb34d48fdf10aabe6b3e55131a36a998e96401f2b', '2026-10-15 12:28:07.262017+00', '20261015130000_user_calendar_timeline_pos', NULL, NULL, '2026-10-15 12:28:07.247653+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('d130fd95-878f-47ef-bf53-e5d790e8c3c9', '2b9dc1848a66362fef25f661e6b6074d3cc999380df5d79305757578aab15ca5', '2026-10-15 13:07:01.139637+00', '20261015160000_user_calendar_timeline_size', NULL, NULL, '2026-10-15 13:07:01.13274+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('dd6ec94b-024a-4652-be41-41198f8473a5', '069a4f85cd4956520869bd5be22ceb760dd07e7a77c43d2f38e8539fb62b0e37', NULL, '20261015213000_status_auto_change', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
-
-Migration name: 20261015213000_status_auto_change
-
-Database error code: 42703
-
-Database error:
-ERROR: column "updatedAt" does not exist
-HINT: Perhaps you meant to reference the column "reminders.updated_at".
-
-Position:
-[1m 19[0m CREATE INDEX "deals_status_changed_at_idx" ON "deals"("status_changed_at");
-[1m 20[0m CREATE INDEX "reminders_status_changed_at_idx" ON "reminders"("status_changed_at");
-[1m 21[0m
-[1m 22[0m -- Бэкфилл: считаем, что сущности находятся в текущем статусе с момента последнего обновления
-[1m 23[0m UPDATE "tasks" SET "status_changed_at" = "updatedAt" WHERE "status_changed_at" IS NULL;
-[1m 24[1;31m UPDATE "projects" SET "status_changed_at" = "updatedAt" WHERE "status_changed_at" IS NULL;[0m
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42703), message: "column \"updatedAt\" does not exist", detail: None, hint: Some("Perhaps you meant to reference the column \"reminders.updated_at\"."), position: Some(Original(1666)), where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("parse_relation.c"), line: Some(3729), routine: Some("errorMissingColumn") }
-
-   0: sql_schema_connector::apply_migration::apply_script
-           with migration_name="20261015213000_status_auto_change"
-             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
-   1: schema_core::commands::apply_migrations::Applying migration
-           with migration_name="20261015213000_status_auto_change"
-             at schema-engine/core/src/commands/apply_migrations.rs:91
-   2: schema_core::state::ApplyMigrations
-             at schema-engine/core/src/state.rs:226', '2026-10-15 18:39:49.893284+00', '2026-10-15 18:32:12.768913+00', 0);
-INSERT INTO public._prisma_migrations VALUES ('4648f278-d9ff-43b4-95bb-612338d25046', '069a4f85cd4956520869bd5be22ceb760dd07e7a77c43d2f38e8539fb62b0e37', NULL, '20261015213000_status_auto_change', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
-
-Migration name: 20261015213000_status_auto_change
-
-Database error code: 42703
-
-Database error:
-ERROR: column "updatedAt" does not exist
-HINT: Perhaps you meant to reference the column "reminders.updated_at".
-
-Position:
-[1m 19[0m CREATE INDEX "deals_status_changed_at_idx" ON "deals"("status_changed_at");
-[1m 20[0m CREATE INDEX "reminders_status_changed_at_idx" ON "reminders"("status_changed_at");
-[1m 21[0m
-[1m 22[0m -- Бэкфилл: считаем, что сущности находятся в текущем статусе с момента последнего обновления
-[1m 23[0m UPDATE "tasks" SET "status_changed_at" = "updatedAt" WHERE "status_changed_at" IS NULL;
-[1m 24[1;31m UPDATE "projects" SET "status_changed_at" = "updatedAt" WHERE "status_changed_at" IS NULL;[0m
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42703), message: "column \"updatedAt\" does not exist", detail: None, hint: Some("Perhaps you meant to reference the column \"reminders.updated_at\"."), position: Some(Original(1666)), where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("parse_relation.c"), line: Some(3729), routine: Some("errorMissingColumn") }
-
-   0: sql_schema_connector::apply_migration::apply_script
-           with migration_name="20261015213000_status_auto_change"
-             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
-   1: schema_core::commands::apply_migrations::Applying migration
-           with migration_name="20261015213000_status_auto_change"
-             at schema-engine/core/src/commands/apply_migrations.rs:91
-   2: schema_core::state::ApplyMigrations
-             at schema-engine/core/src/state.rs:226', '2026-10-15 18:41:47.508723+00', '2026-10-15 18:40:24.389804+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('3a10861b-97d3-4d2a-92c0-2e6850bcbcbf', '95cf5a607326e34932a366477a4518507c960517b3b033a6db65071d3071ccef', '2026-10-15 18:41:49.556912+00', '20261015213000_status_auto_change', NULL, NULL, '2026-10-15 18:41:49.512264+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('a8292bc3-4f8f-4850-b2e0-ea9697b01ccf', '1bfcd143f97094ceb2bdc0549eb14f0aa3cd6c3349d85cd571ff7af04ae03651', '2026-10-15 19:00:19.694101+00', '20261015223000_status_auto_change_enabled_at', NULL, NULL, '2026-10-15 19:00:19.68778+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('92a6c4a8-1763-4d60-9bce-c748a92febcb', '57b2e1b922d573b0cc579b8dff719117cbeb789d78bcc924362b85469a10cf58', '2026-10-16 07:14:34.919643+00', '20261016095800_task_is_favorite', NULL, NULL, '2026-10-16 07:14:34.909631+00', 1);
@@ -5118,11 +4915,16 @@ INSERT INTO public._prisma_migrations VALUES ('b5a6fe00-10af-4c94-b15d-d9b2a278e
 INSERT INTO public._prisma_migrations VALUES ('67ed3296-b393-4c23-b7a1-ad08a4d5759e', '63c5e3f8b34804f17937dee9d0db63113e1898a820f3b6454799b4f1d7e9fbdc', '2026-10-16 22:12:31.337225+00', '20261017010500_role_is_system_handler', NULL, NULL, '2026-10-16 22:12:31.33041+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('86af7f6c-83c5-47e1-929c-9a0c231fffa7', '2903da31c71ec49195ad6c84f5f85e4530bc2b49bfce95690685f8e12438db45', '2026-10-18 13:57:30.35164+00', '20261018164500_role_contact_accesses', NULL, NULL, '2026-10-18 13:57:30.343023+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('1b55bd4d-d9c6-4a1c-b03c-7fc19e34c82b', '33309f2d26c9ef6e6f9d75b911028acb91c3cee679ed1dbba64d7c71cbcf518f', '2026-10-19 09:11:13.04667+00', '20261019120000_split_vk_group_plugin', NULL, NULL, '2026-10-19 09:11:13.013249+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('bf1ff2cc-8e7c-4c10-be0d-2ab0b0b79870', '089510b658e9f4be923a2fa47d7b8bc8d70d3c08a4bc97326e74c5664d6fcd48', '2026-10-19 12:51:26.487328+00', '20261019160000_ozon_seller_auto_sync', NULL, NULL, '2026-10-19 12:51:26.481517+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('12d42275-917f-494d-ac90-b9a20ae501a7', '0b54ea24c532142930abd0ca0c6ab08e68feec49842efb7abf65f60cbac62d97', '2026-10-20 16:48:58.867582+00', '20261020195000_vk_user_id_bigint', NULL, NULL, '2026-10-20 16:48:58.857494+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('15783a93-5e30-4f20-855f-77d7e2d3e430', '88c5c29c37e6b16a9527e2e09d26f552fe4a20f7716717cf326521b020fe7d07', '2026-10-20 17:00:37.046022+00', '20261020196000_vk_peer_id_bigint', NULL, NULL, '2026-10-20 17:00:37.040445+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('889e9906-ae83-46b9-9051-159c59dea9dc', '1b7241d7876616e1836afefe1188867c71e9e18a93b9df4d939d2b26221a8901', '2026-10-20 21:43:27.124818+00', '20261021001000_hikvision_plugin_settings', NULL, NULL, '2026-10-20 21:43:27.108178+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('f7090923-0c21-4441-879f-bf79a9d17b4a', '7ac0b996be0095be5f4a71d408c93eb78360ee2e2e20024e4489bd8cee5a0893', '2026-10-21 05:55:21.236165+00', '20261021083000_hikvision_validate_code', NULL, NULL, '2026-10-21 05:55:21.229662+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6ZE7700uokzTrS3JkS9H8WLy8lcrIEBu6rIRnt3LEmqxj6hLKKrmVq1uUcJxRlD
+\unrestrict jRaMqokNrgsEprBr844hMIhYgALQybxjzpKbMRn5aKbJa7ChBBCfdlHi3ckwmyR
 
