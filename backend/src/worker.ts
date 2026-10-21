@@ -83,6 +83,7 @@ async function syncTenant(t: TenantInfo): Promise<void> {
         secure: emailSettings.secure,
         rejectUnauthorized: emailSettings.rejectUnauthorized,
         requireTLS: emailSettings.requireTLS,
+        markAsRead: emailSettings.markAsRead,
       });
       await bag.email.start();
       console.log(`[Worker] Email worker started (${key})`);

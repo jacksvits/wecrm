@@ -16,6 +16,7 @@ export function EmailSettings() {
     secure: true,
     rejectUnauthorized: false,
     requireTLS: true,
+    markAsRead: true,
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -40,6 +41,7 @@ export function EmailSettings() {
           secure: data.secure,
           rejectUnauthorized: data.rejectUnauthorized,
           requireTLS: data.requireTLS,
+          markAsRead: data.markAsRead ?? true,
         });
       }
     } catch (err: any) {
@@ -111,6 +113,7 @@ export function EmailSettings() {
         secure: true,
         rejectUnauthorized: false,
         requireTLS: true,
+        markAsRead: true,
       });
       setMessage("Настройки удалены");
     } catch (err: any) {
@@ -292,6 +295,22 @@ export function EmailSettings() {
           />
           Требовать STARTTLS (для порта 143)
         </label>{" "}
+        <label style={checkboxStyle}>
+          <input
+            type="checkbox"
+            checked={form.markAsRead}
+            onChange={(e) => setForm({ ...form, markAsRead: e.target.checked })}
+          />
+          Помечать прочитанными
+        </label>{" "}
+        {!form.markAsRead && (
+          <p style={{ fontSize: 12, color: "#888", margin: 0 }}>
+            Обработанные письма останутся непрочитанными на почтовом сервере. Рекомендуется
+            указать папку для обработанных писем, иначе они будут заново находиться при каждой
+            проверке (дубликаты задач не создаются). Приоритетное значение может задавать
+            фильтр писем.
+          </p>
+        )}{" "}
         <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
           {" "}
           <button

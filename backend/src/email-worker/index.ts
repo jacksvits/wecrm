@@ -75,6 +75,8 @@ interface EmailWorkerConfig {
   secure?: boolean;
   rejectUnauthorized?: boolean;
   requireTLS?: boolean;
+  /** Глобальная настройка «Помечать прочитанными» из настроек плагина (по умолчанию true) */
+  markAsRead?: boolean;
 }
 
 /**
@@ -173,19 +175,23 @@ export class EmailWorker {
             hasAttachments: allAttachments.some((a: any) => a.filename && a.content && a.content.length > 0),
           });
 
+          // Прочитанность письма: значение из фильтра (если задано) имеет приоритет
+          // над глобальной настройкой плагина «Помечать прочитанными» (дефолт — помечать)
+          const markSeen = decision.markRead ?? this.config.markAsRead ?? true;
+
           const existing = await prisma.task.findUnique({
             where: { emailMessageId: messageId },
           });
           if (existing) {
             console.log(`[EmailWorker] Task already exists for message ${messageId}`);
-            await this.markProcessed(client, uid, { folder: decision.moveToFolder, markSeen: decision.markRead });
+            await this.markProcessed(client, uid, { folder: decision.moveToFolder, markSeen });
             continue;
           }
 
           // Фильтр с действием «не создавать задачу»: письмо обрабатывается только по флагам/папке
           if (decision.matched && !decision.createTask) {
             console.log(`[EmailWorker] Filter "${decision.filterName}" ignored email from ${senderEmail}`);
-            await this.markProcessed(client, uid, { folder: decision.moveToFolder, markSeen: decision.markRead });
+            await this.markProcessed(client, uid, { folder: decision.moveToFolder, markSeen });
             continue;
           }
 
@@ -214,7 +220,7 @@ export class EmailWorker {
 
           if (!creatorId) {
             console.warn(`[EmailWorker] No default creator configured, skipping email from ${senderEmail}`);
-            await this.markProcessed(client, uid, { folder: decision.moveToFolder, markSeen: decision.markRead });
+            await this.markProcessed(client, uid, { folder: decision.moveToFolder, markSeen });
             continue;
           }
 
@@ -485,7 +491,7 @@ export class EmailWorker {
           });
 
           console.log(`[EmailWorker] Created task ${task.id}: "${cleanTitle}" from ${senderEmail}`);
-          await this.markProcessed(client, uid, { folder: decision.moveToFolder, markSeen: decision.markRead });
+          await this.markProcessed(client, uid, { folder: decision.moveToFolder, markSeen });
         } catch (err) {
           // Письмо остаётся непрочитанным: повтор на следующем тике, остальные письма не блокируются
           console.error(`[EmailWorker] Failed to process UID ${uid}:`, err);

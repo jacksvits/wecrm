@@ -708,6 +708,9 @@ model EmailSettings {
   secure              Boolean  @default(true)
   rejectUnauthorized  Boolean  @default(false)
   requireTLS          Boolean  @default(true)
+  // Помечать ли обработанные входящие письма прочитанными (\Seen) на почтовом сервере.
+  // Фильтр писем со своим markRead переопределяет это значение.
+  markAsRead          Boolean  @default(true)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

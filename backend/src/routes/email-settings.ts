@@ -18,6 +18,7 @@ const settingsSchema = z.object({
   secure: z.boolean().default(true),
   rejectUnauthorized: z.boolean().default(false),
   requireTLS: z.boolean().default(true),
+  markAsRead: z.boolean().default(true),
 });
 
 router.get('/', async (_req: AuthRequest, res) => {
