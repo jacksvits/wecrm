@@ -233,9 +233,10 @@ export function HikvisionCameras() {
   const [camerasLoading, setCamerasLoading] = useState(false);
   const [camerasError, setCamerasError] = useState<string | null>(null);
   const [liveCamera, setLiveCamera] = useState<HikCamera | null>(null);
-  // 1 — основной поток (макс. качество), 2 — дополнительный (быстрее просыпается,
-  // меньше тратит трафик relay — рекомендуется для предпросмотра)
-  const [liveStreamType, setLiveStreamType] = useState<1 | 2>(2);
+  // 1 — основной поток. У некоторых регистраторов субпоток (2) отдаётся в облако
+  // битым (HEVC без VPS, слейсы недекодируемые — Smart Codec), поэтому по
+  // умолчанию основной; субпоток доступен в переключателе, если он исправен.
+  const [liveStreamType, setLiveStreamType] = useState<1 | 2>(1);
 
   useEffect(() => {
     apiFetch("/api/hikvision-plugin/settings")
@@ -353,8 +354,8 @@ export function HikvisionCameras() {
                 onChange={(e) => setLiveStreamType(Number(e.target.value) as 1 | 2)}
                 style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.3)", background: "#1c1c1e", color: "#fff", fontSize: 13 }}
               >
-                <option value={2}>Дополнительный (быстрее)</option>
                 <option value={1}>Основной (качество)</option>
+                <option value={2}>Дополнительный (экономия трафика)</option>
               </select>
             </label>
             <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 12 }}>
