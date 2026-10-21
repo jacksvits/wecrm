@@ -1,5 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import path from 'path';
+import { createRequire } from 'module';
+// CJS-модуль: в EMB-сборке типизируем через createRequire
+const require = createRequire(import.meta.url);
+const archiver = require('archiver');
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
@@ -36,6 +41,63 @@ router.get('/', async (req: AuthRequest, res) => {
 
 const updateSchema = z.object({
   comment: z.string().max(20000).optional(),
+});
+
+
+// Скачивание агента Windows с предзаполненными параметрами текущего
+// тенанта (Host запроса) и контакта (clientKey). Менеджер передаёт архив
+// клиенту — установщик спросит только права администратора.
+router.get('/installer', async (req: AuthRequest, res) => {
+  try {
+    if (!isManagerOrAdmin(req)) return res.status(403).json({ error: 'Недостаточно прав' });
+    const contactId = req.query.contactId as string | undefined;
+    if (!contactId) return res.status(400).json({ error: 'Необходим contactId' });
+    const contact = await (prisma as any).contact.findUnique({
+      where: { id: contactId },
+      select: { id: true, clientKey: true },
+    });
+    if (!contact || !contact.clientKey) {
+      return res.status(404).json({ error: 'У контакта нет ID для агента' });
+    }
+
+    const proto = String(req.get('x-forwarded-proto') || req.protocol || 'https').split(',')[0].trim();
+    const serverUrl = `${proto}://${req.get('host')}`;
+    const key: string = contact.clientKey;
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('warning', (e: any) => console.warn('[client-devices] installer zip warning:', e.message));
+    archive.on('error', (e: any) => {
+      console.error('[client-devices] installer zip error:', e.message);
+      if (!res.headersSent) res.status(500).json({ error: 'Ошибка формирования установщика' });
+      else res.end();
+    });
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="WeAGENT.zip"`);
+    archive.pipe(res);
+
+    // Файлы агента (копия agent/windows, зашитая в образ backend)
+    const agentDir = path.join(process.cwd(), 'agent-windows');
+    archive.directory(agentDir, false);
+
+    // Персонализированный установщик: подставляет URL тенанта и ID контакта
+    const runner = [
+      '@echo off',
+      'REM ==========================================================',
+      `REM  WeCRM Agent - personalized installer for contact ${key}`,
+      `REM  Server: ${serverUrl}`,
+      'REM  Run as Administrator!',
+      'REM ==========================================================',
+      'call "%~dp0install.bat" "' + serverUrl + '" "' + key + '"',
+      '',
+    ].join('\r\n');
+    archive.append(runner, { name: `INSTALL-${key}.bat` });
+
+    await archive.finalize();
+  } catch (e: any) {
+    console.error('[client-devices] installer error:', e.message);
+    if (!res.headersSent) res.status(500).json({ error: 'Ошибка формирования установщика' });
+  }
 });
 
 router.patch('/:id', async (req: AuthRequest, res) => {

@@ -120,6 +120,14 @@ export function ContactDetail() {
                   title="Скопировать ID"
                   style={{ padding: '3px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}
                 >📋 Копировать</button>
+                <button
+                  onClick={async () => {
+                    try { await api.clientDevices.installer(contact.id); }
+                    catch (e: any) { alert(e.message || 'Не удалось сформировать архив'); }
+                  }}
+                  title="Скачать WeAGENT с предзаполненными параметрами"
+                  style={{ padding: '3px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}
+                >⬇ Скачать агента</button>
               </span>
             </div>
           )}

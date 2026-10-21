@@ -8,6 +8,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     mergeNew: (targetId: string, data: any): Promise<Contact> => fetchApi('/api/contacts/merge-new', { method: 'POST', body: JSON.stringify({ targetId, data }) }),
     import: (format: 'vcf' | 'csv' | 'xlsx', data: string) => fetchApi('/api/contacts/import', { method: 'POST', body: JSON.stringify({ format, data }) }),
 }, clientDevices: {
+    installer: (contactId: string): Promise<void> => downloadBlob(`/api/client-devices/installer?contactId=${contactId}`, 'WeAGENT.zip'),
     list: (contactId: string): Promise<ClientDevice[]> => fetchApi(`/api/client-devices?contactId=${contactId}`),
     update: (id: string, data: Partial<ClientDevice>): Promise<ClientDevice> => fetchApi(`/api/client-devices/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string): Promise<{ ok: boolean }> => fetchApi(`/api/client-devices/${id}`, { method: 'DELETE' }),

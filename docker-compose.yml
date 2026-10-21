@@ -63,6 +63,8 @@ services:
       - ./backend/data:/app/data
       # Общий том с конфигом sing-box: бэкенд перезаписывает его из плагина «Прокси через VPN»
       - ./vpn/sing-box:/app/vpn-config
+      # WeAGENT: файлы Windows-агента (с установщиком Python) для выдачи в CRM
+      - /home/crm/wecrm/agent/windows:/app/agent-windows:ro
       # Docker-сокет: спавн контейнеров VNC-браузера (routes/browser-vnc.ts)
       - /var/run/docker.sock:/var/run/docker.sock
       # Собранный фронтенд (общий том с frontend) — шаблон index.html для /pwa-index

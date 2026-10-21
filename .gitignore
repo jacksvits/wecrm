@@ -53,3 +53,7 @@ vnc-data/
 # Локальные артефакты сервера (не для репозитория)
 backend/src/routes/*.bak-*
 vpn/sing-box/config.json
+
+# Установщик Python для WeAGENT (большой бинарник, не для git)
+agent/windows/python-*.exe
+agent/windows/__pycache__/

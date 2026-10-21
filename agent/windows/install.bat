@@ -1,6 +1,12 @@
 @echo off
+REM ===================================================================
+REM  WeCRM Agent (WeAGENT) - Windows service installer (Windows 10)
+REM  Run as Administrator!
+REM  Usage: install.bat [serverUrl] [contactId] - params skip prompts
+REM  Python 3.13 installs automatically from bundled installer if absent
+REM ===================================================================
 echo ==========================================
-echo  WeCRM Agent - installer (Windows 10)
+echo  WeAGENT - WeCRM Agent installer
 echo  Run as Administrator!
 echo ==========================================
 echo.
@@ -16,44 +22,63 @@ pause
 exit /b 1
 
 :setup
-set "SERVER="
-set /p "SERVER=WeCRM server URL [https://welans.cc]: "
+set "SERVER=%~1"
+set "CONTACT=%~2"
+set "PY=python"
+
+if "%SERVER%"=="" set /p "SERVER=WeCRM server URL [https://welans.cc]: "
 if "%SERVER%"=="" set "SERVER=https://welans.cc"
 
-set "CONTACT="
-set /p "CONTACT=Contact ID from client card, format 000-000-000: "
+if "%CONTACT%"=="" set /p "CONTACT=Contact ID from client card, format 000-000-000: "
 echo %CONTACT%|findstr /r "^[0-9][0-9][0-9]-[0-9][0-9][0-9]-[0-9][0-9][0-9]$" >nul
 if errorlevel 1 goto bad_id
 
 where python >nul 2>&1
-if errorlevel 1 goto no_python
+if errorlevel 1 goto install_python
+goto have_python
 
+:install_python
+if not exist "%~dp0python-3.13.17-amd64.exe" goto no_python
 echo.
+echo Python not found. Installing bundled Python 3.13...
+start "" /wait "%~dp0python-3.13.17-amd64.exe" /quiet InstallAllUsers=0 PrependPath=1 Include_test=0
+if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" set "PY=%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
+"%PY%" --version >nul 2>&1
+if errorlevel 1 goto no_python
+goto have_python
+
+:have_python
+echo.
+echo Server:   %SERVER%
+echo Contact:  %CONTACT%
+"%PY%" --version
+echo.
+
 echo [1/6] Installing pywin32...
-python -m pip install --upgrade pywin32
+"%PY%" -m pip install --upgrade pywin32
 if errorlevel 1 goto fail
 
 echo [2/6] pywin32 post-install (needed for services)...
-python -c "import sys, os, subprocess; s=os.path.join(os.path.dirname(sys.executable),'Scripts','pywin32_postinstall.py'); subprocess.call([sys.executable, s, '-install'])"
+"%PY%" -c "import sys, os, subprocess; s=os.path.join(os.path.dirname(sys.executable),'Scripts','pywin32_postinstall.py'); subprocess.call([sys.executable, s, '-install'])"
 
 echo [3/6] Writing config to registry...
-python -c "import winreg; k=winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE,r'SOFTWARE\WeCRM\Agent',0,winreg.KEY_SET_VALUE|winreg.KEY_WOW64_64KEY); winreg.SetValueEx(k,'ServerUrl',0,winreg.REG_SZ,r'%SERVER%'); winreg.SetValueEx(k,'ContactKey',0,winreg.REG_SZ,r'%CONTACT%')"
+"%PY%" -c "import winreg; k=winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE,r'SOFTWARE\WeCRM\Agent',0,winreg.KEY_SET_VALUE|winreg.KEY_WOW64_64KEY); winreg.SetValueEx(k,'ServerUrl',0,winreg.REG_SZ,r'%SERVER%'); winreg.SetValueEx(k,'ContactKey',0,winreg.REG_SZ,r'%CONTACT%')"
 if errorlevel 1 goto fail
 
 echo [4/6] Installing WecrmAgent service...
 cd /d "%~dp0"
-python agent.py install
+"%PY%" agent.py install
 if errorlevel 1 goto fail
 
 echo [5/6] Auto-restart on failure + autostart...
 sc failure WecrmAgent reset= 0 actions= restart/5000/restart/10000/restart/30000
 sc config WecrmAgent start= auto
 sc description WecrmAgent "Reports computer and system information to WeCRM"
-python agent.py start
+"%PY%" agent.py start
 if errorlevel 1 goto svc_fail
 
 echo [6/6] Sending first test report...
-python agent.py debug
+"%PY%" agent.py debug
 if errorlevel 1 goto svc_fail
 
 echo.
@@ -81,7 +106,7 @@ pause
 exit /b 1
 
 :no_python
-echo [ERROR] Python not found.
+echo [ERROR] Python not found and bundled installer is missing/broken.
 echo Install Python 3.9+ from https://python.org
 echo and check "Add python.exe to PATH" during setup.
 pause
