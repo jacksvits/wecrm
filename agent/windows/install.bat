@@ -61,9 +61,10 @@ if errorlevel 1 goto fail
 echo [2/6] pywin32 post-install (needed for services)...
 "%PY%" -c "import sys, os, subprocess; s=os.path.join(os.path.dirname(sys.executable),'Scripts','pywin32_postinstall.py'); subprocess.call([sys.executable, s, '-install'])"
 
-echo [3/6] Writing config to registry...
+echo [3/6] Writing config to registry and desktop shortcut...
 "%PY%" -c "import winreg; k=winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE,r'SOFTWARE\WeCRM\Agent',0,winreg.KEY_SET_VALUE|winreg.KEY_WOW64_64KEY); winreg.SetValueEx(k,'ServerUrl',0,winreg.REG_SZ,r'%SERVER%'); winreg.SetValueEx(k,'ContactKey',0,winreg.REG_SZ,r'%CONTACT%')"
 if errorlevel 1 goto fail
+"%PY%" -c "import os; from pathlib import Path; s=r'%SERVER%'.rstrip('/'); desk=Path(os.environ.get('PUBLIC', r'C:\Users\Public'))/'Desktop'; desk.mkdir(parents=True, exist_ok=True); (desk/'WeCRM.url').write_text('[InternetShortcut]\nURL='+s+'\nIconFile='+s+'/favicon.ico\nIconIndex=0\n', encoding='ascii')"
 
 echo [4/6] Installing WecrmAgent service...
 cd /d "%~dp0"
@@ -84,6 +85,7 @@ if errorlevel 1 goto svc_fail
 echo.
 echo ==========================================
 echo  Done! Service WecrmAgent is running.
+echo  Desktop shortcut WeCRM created.
 echo  Check the Devices tab on contact %CONTACT%
 echo  in CRM in about a minute.
 echo ==========================================
