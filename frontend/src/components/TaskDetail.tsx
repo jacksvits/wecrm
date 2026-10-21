@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { YandexMap } from "./YandexMap";
 import { DgisMap } from "./DgisMap";
 import { useRealtime } from "../hooks/useRealtime";
+import { formatDateTime, toDateTimeLocalValue, fromDateTimeLocalValue } from "../lib/formatDate";
 import {
   Task,
   Comment,
@@ -269,6 +270,7 @@ const fieldLabels: Record<string, string> = {
   status: "Статус",
   priority: "Приоритет",
   dueDate: "Срок",
+  startDate: "Начало срока",
   projectId: "Проект",
   contactId: "Контакт",
   dealId: "Сделка",
@@ -315,6 +317,7 @@ export function TaskDetail() {
     description: "",
     priority: "medium",
     dueDate: "",
+    startDate: "",
     assigneeIds: [] as string[],
     curatorIds: [] as string[],
     contactId: "",
@@ -704,7 +707,8 @@ export function TaskDetail() {
         title: data.title,
         description: data.description || "",
         priority: data.priority,
-        dueDate: data.dueDate ? data.dueDate.slice(0, 16) : "",
+        dueDate: toDateTimeLocalValue(data.dueDate, user?.timezone),
+        startDate: toDateTimeLocalValue(data.startDate, user?.timezone),
         assigneeIds: data.assignees?.map((a) => a.user.id) || [],
         curatorIds: data.curators?.map((c) => c.id) || [],
         contactId: data.contact?.id || "",
@@ -813,7 +817,8 @@ export function TaskDetail() {
         title: editForm.title,
         description: editForm.description,
         priority: editForm.priority,
-        dueDate: editForm.dueDate || undefined,
+        dueDate: editForm.dueDate ? fromDateTimeLocalValue(editForm.dueDate, user?.timezone) : undefined,
+        startDate: editForm.startDate ? fromDateTimeLocalValue(editForm.startDate, user?.timezone) : undefined,
         assigneeIds: editForm.assigneeIds.length
           ? editForm.assigneeIds
           : undefined,
@@ -900,7 +905,7 @@ export function TaskDetail() {
       await api.tasks.create({
         title: subtaskTitle,
         priority: subtaskPriority as any,
-        dueDate: subtaskDueDate || undefined,
+        dueDate: subtaskDueDate ? fromDateTimeLocalValue(subtaskDueDate, user?.timezone) : undefined,
         assigneeIds: subtaskAssigneeIds.length ? subtaskAssigneeIds : undefined,
         parentId: id!,
       });
@@ -1256,6 +1261,24 @@ export function TaskDetail() {
               </select>{" "}
               <input
                 type="datetime-local"
+                title="Начало срока"
+                value={editForm.startDate}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, startDate: e.target.value })
+                }
+                style={{
+                  padding: 10,
+                  borderRadius: 12,
+                  border: "1px solid var(--border-color)",
+                  fontSize: 14,
+                  flex: 1,
+                  background: "var(--bg-input)",
+                  color: "var(--text-primary)",
+                }}
+              />{" "}
+              <input
+                type="datetime-local"
+                title="Срок"
                 value={editForm.dueDate}
                 onChange={(e) =>
                   setEditForm({ ...editForm, dueDate: e.target.value })
@@ -1618,11 +1641,15 @@ export function TaskDetail() {
                   {" "}
                   <div>
                     <strong style={{ color: "var(--text-muted)" }}>
+                      Начало срока:
+                    </strong>{" "}
+                    {task.startDate ? formatDateTime(task.startDate, user?.timezone) : "Не указано"}
+                  </div>{" "}
+                  <div>
+                    <strong style={{ color: "var(--text-muted)" }}>
                       Срок:
                     </strong>{" "}
-                    {task.dueDate
-                      ? new Date(task.dueDate).toLocaleString("ru-RU", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
-                      : "Не указан"}
+                    {task.dueDate ? formatDateTime(task.dueDate, user?.timezone) : "Не указан"}
                   </div>{" "}
                   <div>
                     <strong style={{ color: "var(--text-muted)" }}>

@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { useRealtime } from "../hooks/useRealtime";
 import { Task, User, Project, Status } from "../types";
 import { userOptionLabel } from "../lib/userOptionLabel";
+import { formatDateTime, toDateTimeLocalValue, fromDateTimeLocalValue, nowDateTimeLocalValue } from "../lib/formatDate";
 import { TaskCalendar } from "./TaskCalendar";
 import { ContactPicker } from "./ContactPicker";
 import ReactQuill from "react-quill";
@@ -82,6 +83,7 @@ export function TaskList() {
     status: defaultStatus,
     priority: "medium",
     dueDate: "",
+    startDate: "",
     assigneeIds: [] as string[],
     curatorIds: [] as string[],
     projectId: "",
@@ -193,6 +195,7 @@ export function TaskList() {
       status: defaultStatus,
       priority: "medium",
       dueDate: "",
+      startDate: nowDateTimeLocalValue(),
       assigneeIds: defaultAssigneeIds(),
       curatorIds: defaultCuratorIds(),
       projectId: "",
@@ -210,7 +213,8 @@ export function TaskList() {
       description: task.description || "",
       status: task.status,
       priority: task.priority,
-      dueDate: task.dueDate ? task.dueDate.slice(0, 16) : "",
+      dueDate: toDateTimeLocalValue(task.dueDate, user?.timezone),
+      startDate: toDateTimeLocalValue(task.startDate, user?.timezone),
       assigneeIds: task.assignees?.map((a) => a.user.id) || [],
       curatorIds: task.curators?.map((c) => c.id) || [],
       projectId: task.projectId || "",
@@ -224,6 +228,8 @@ export function TaskList() {
     e.preventDefault();
     const data = {
       ...form,
+      dueDate: form.dueDate ? fromDateTimeLocalValue(form.dueDate, user?.timezone) : form.dueDate,
+      startDate: form.startDate ? fromDateTimeLocalValue(form.startDate, user?.timezone) : form.startDate,
       assigneeIds: form.assigneeIds.length ? form.assigneeIds : undefined,
       curatorIds: form.curatorIds.length ? form.curatorIds : undefined,
       contactId: form.contactId || undefined,
@@ -504,8 +510,9 @@ export function TaskList() {
             >
               {" "}
               <span>
+                {task.startDate ? `Начало: ${formatDateTime(task.startDate, user?.timezone)} · ` : ""}
                 {task.dueDate
-                  ? new Date(task.dueDate).toLocaleString("ru-RU", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                  ? formatDateTime(task.dueDate, user?.timezone)
                   : "Без срока"}
               </span>{" "}
               <span>
@@ -758,8 +765,9 @@ export function TaskList() {
               {priorityLabels[task.priority]}
             </span>{" "}
             <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
+              {task.startDate ? `${formatDateTime(task.startDate, user?.timezone)} → ` : ""}
               {task.dueDate
-                ? new Date(task.dueDate).toLocaleString("ru-RU", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                ? formatDateTime(task.dueDate, user?.timezone)
                 : "—"}
             </span>{" "}
             <span style={{ color: "var(--text-secondary)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -1202,8 +1210,9 @@ export function TaskList() {
                               </span>{" "}
                             </div>{" "}
                             <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                              {task.startDate ? `Начало: ${formatDateTime(task.startDate, user?.timezone)} · ` : ""}
                               {task.dueDate
-                                ? new Date(task.dueDate).toLocaleString("ru-RU", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                                ? formatDateTime(task.dueDate, user?.timezone)
                                 : "Без срока"}{" "}
                               ·{" "}
                               {task.assignees?.map((a) => a.user.name).join(", ") ||
@@ -1502,6 +1511,18 @@ export function TaskList() {
               </select>{" "}
               <input
                 type="datetime-local"
+                title="Начало срока"
+                value={form.startDate}
+                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border-color)",
+                }}
+              />{" "}
+              <input
+                type="datetime-local"
+                title="Срок"
                 value={form.dueDate}
                 onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
                 style={{

@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../hooks/useAuth';
+import { formatDateTime } from '../lib/formatDate';
 import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
 import { DashboardStats, DashboardMetricSetting, Task, Status } from '../types';
@@ -454,7 +455,7 @@ export function Dashboard() {
                     </span>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                       {task.dueDate
-                        ? new Date(task.dueDate).toLocaleString('ru-RU', { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                        ? formatDateTime(task.dueDate, user?.timezone)
                         : 'Без срока'}
                     </span>
                   </div>

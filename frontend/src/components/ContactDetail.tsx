@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { Contact, Task, Deal } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { displayPhone } from '../lib/phone';
+import { formatDateTime } from '../lib/formatDate';
 import { linkifyTaskTagsHtml, useTaskHashtagClick } from '../lib/taskHashtags';
 import { ContactAccesses } from './ContactAccesses';
 
@@ -236,7 +237,7 @@ export function ContactDetail() {
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <span>Статус: {task.status}</span>
                 <span>Приоритет: {task.priority}</span>
-                {task.dueDate && <span>Срок: {new Date(task.dueDate).toLocaleString('ru-RU', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                {task.dueDate && <span>Срок: {formatDateTime(task.dueDate, user?.timezone)}</span>}
               </div>
             </div>
           )) : <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Нет задач</div>}
