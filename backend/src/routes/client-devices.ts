@@ -50,7 +50,7 @@ const updateSchema = z.object({
 // клиенту — установщик спросит только права администратора.
 router.get('/installer', async (req: AuthRequest, res) => {
   try {
-    if (!isManagerOrAdmin(req)) return res.status(403).json({ error: 'Недостаточно прав' });
+    // Разрешено всем авторизованным пользователям CRM
     const contactId = req.query.contactId as string | undefined;
     if (!contactId) return res.status(400).json({ error: 'Необходим contactId' });
     const contact = await (prisma as any).contact.findUnique({
