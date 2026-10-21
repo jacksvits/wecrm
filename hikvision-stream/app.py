@@ -32,9 +32,37 @@ from hikcloudstream.stream.session import open_live_stream
 from hikcloudstream.stream.sinks.annex_b import iter_annex_b_chunks
 from hikcloudstream.stream.sinks.mjpeg import (
     av_frame_to_jpeg,
-    placeholder_jpeg,
     write_mjpeg_frame,
 )
+
+
+def placeholder_jpeg(text: str) -> bytes:
+    """Кадр-заглушка с поддержкой кириллицы (шрифт DejaVu из образа)."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    w, h = 960, 540
+    img = Image.new("RGB", (w, h), (12, 12, 14))
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 26)
+    except Exception:
+        font = ImageFont.load_default()
+    lines = text.split("\n")
+    heights = []
+    for line in lines:
+        box = draw.textbbox((0, 0), line, font=font)
+        heights.append(box[3] - box[1])
+    total_h = sum(heights) + (len(lines) - 1) * 14
+    y = (h - total_h) // 2
+    for line, lh in zip(lines, heights):
+        box = draw.textbbox((0, 0), line, font=font)
+        draw.text(((w - (box[2] - box[0])) // 2, y), line, fill=(200, 200, 205), font=font)
+        y += lh + 14
+    import io
+
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=80)
+    return buf.getvalue()
 
 app = Flask(__name__)
 
@@ -215,19 +243,28 @@ def stream_mjpeg_auto(
     max_width = 1920 if stream_type == 1 else 1408
     quality = max(50, min(jpeg_quality, 95))
 
+    n_chunks = 0
+    n_frames = 0
+    last_chunk_at = time.monotonic()
     try:
         chunk_iter = chunks_iter if chunks_iter is not None else iter_annex_b_chunks(stream)
         while True:
             if should_abort is not None and should_abort():
                 # клиент ушёл, а werkzeug об этом молчит, пока не попробует
                 # записать — закрываем сессию сами, иначе слот потока утекает
-                return
+                return {"chunks": n_chunks, "frames": n_frames, "reason": "client_gone"}
+            if time.monotonic() - last_chunk_at > 45.0:
+                # облако шлёт видеоданные только в одну сессию на камеру —
+                # эта сессия голодная (данные уходит «в другую»). Рвём её,
+                # чтобы клиент переподключился и попал в «правильную».
+                return {"chunks": n_chunks, "frames": n_frames, "reason": "starved"}
             try:
                 _transport, chunk = next(chunk_iter)
             except StopIteration:
-                return
+                return {"chunks": n_chunks, "frames": n_frames, "reason": "eof"}
             except OSError:
-                return
+                return {"chunks": n_chunks, "frames": n_frames, "reason": "oserror"}
+            n_chunks += 1
 
             for name in list(active):
                 codec = codecs[name]
@@ -259,6 +296,7 @@ def stream_mjpeg_auto(
                         write_mjpeg_frame(output, jpeg)
                         produced[name] = True
                         sent_placeholder = True
+                        n_frames += 1
 
             if any(produced.values()):
                 # реальные кадры пошли — отключаем проигрышный декодер
@@ -277,7 +315,8 @@ def stream_mjpeg_auto(
                 last_placeholder_at = time.monotonic()
                 sent_placeholder = True
     except (BrokenPipeError, ConnectionResetError):
-        return
+        return {"chunks": n_chunks, "frames": n_frames, "reason": "pipe"}
+    return {"chunks": n_chunks, "frames": n_frames, "reason": "done"}
 
 
 class _QueueWriter:
@@ -419,11 +458,13 @@ def decrypting_chunks(stream, key: str):
             yield out
 
 
-# Лимит одновременных VTM-сессий на аккаунт: облако Hik-Connect держит
-# ~2 потока; лишние запросы получают 429 и клиент переподключается позже,
-# а не встают в облачную очередь зависших сессий.
+# Лимиты VTM-сессий: облако Hik-Connect держит ~2 потока на аккаунт, а
+# ВИДЕОДАННЫЕ по конкретной камере шлёт только в ОДНУ сессию — параллельные
+# сессии на ту же камеру голодные (placeholder вечно). Поэтому: 1 поток на
+# камеру и 2 на аккаунт; лишние получают 429 и переподключаются позже.
 _ACCOUNT_STREAMS: dict[str, int] = {}
-MAX_STREAMS_PER_ACCOUNT = 2
+_MAX_PER_CAMERA = 1
+_MAX_PER_ACCOUNT = 2
 
 
 def _account_key(login: str, password: str, api_base: str) -> str:
@@ -443,17 +484,23 @@ def mjpeg(index: int):
     q: "queue.Queue[bytes | None]" = queue.Queue(maxsize=200)
 
     acc_key = _account_key(login, password, api_base)
-    if _ACCOUNT_STREAMS.get(acc_key, 0) >= MAX_STREAMS_PER_ACCOUNT:
-        return (
-            jsonify(error=f"stream limit ({MAX_STREAMS_PER_ACCOUNT}) for account, retry later"),
-            429,
-        )
+    cam_key = f"{acc_key}:{index}"
+    if _ACCOUNT_STREAMS.get(cam_key, 0) >= _MAX_PER_CAMERA or _ACCOUNT_STREAMS.get(acc_key, 0) >= _MAX_PER_ACCOUNT:
+        return (jsonify(error="stream limit: camera or account busy, retry later"), 429)
+
+    # ключ слота: +1 на аккаунт и +1 на камеру (освобождаются в finally produce)
+    slot_keys = [acc_key, cam_key]
+
+    def release_slots() -> None:
+        for k in slot_keys:
+            _ACCOUNT_STREAMS[k] = max(0, _ACCOUNT_STREAMS.get(k, 1) - 1)
 
     def produce() -> None:
         # слот берём ЗДЕСЬ, а не во view: если клиент отвалился до первого
         # чтения генератора, produce не стартует и finally его не ждёт —
         # инкремент во view протекал бы навсегда
-        _ACCOUNT_STREAMS[acc_key] = _ACCOUNT_STREAMS.get(acc_key, 0) + 1
+        for k in slot_keys:
+            _ACCOUNT_STREAMS[k] = _ACCOUNT_STREAMS.get(k, 0) + 1
         t0 = time.time()
         try:
             client = get_client(login, password, api_base)
@@ -482,7 +529,7 @@ def mjpeg(index: int):
                     enc_key = client.query_device_encrypt_key(cam.device_serial, validate_code)
                     chunks_iter = decrypting_chunks(session._client, enc_key)
                     app.logger.warning("mjpeg camera=%s: stream decryption enabled", index)
-                stream_mjpeg_auto(
+                stats = stream_mjpeg_auto(
                     session._client,
                     _QueueWriter(q),
                     frame_fps=PREVIEW_FPS,
@@ -490,6 +537,10 @@ def mjpeg(index: int):
                     jpeg_quality=JPEG_QUALITY,
                     chunks_iter=chunks_iter,
                     should_abort=_abandoned,
+                )
+                app.logger.warning(
+                    "mjpeg camera=%s closed: chunks=%s frames=%s reason=%s",
+                    index, stats.get("chunks"), stats.get("frames"), stats.get("reason"),
                 )
             finally:
                 try:
@@ -500,9 +551,8 @@ def mjpeg(index: int):
             app.logger.warning("mjpeg camera=%s ended: %s", index, exc)
             drop_client(login, password, api_base)
         finally:
-            # освобождаем слот потока аккаунта ВСЕГДА — иначе счётчик
-            # «протекал» и аккаунт вечно оставался на лимите
-            _ACCOUNT_STREAMS[acc_key] = max(0, _ACCOUNT_STREAMS.get(acc_key, 1) - 1)
+            # освобождаем слоты ВСЕГДА — иначе счётчик «протекал»
+            release_slots()
             try:
                 q.put_nowait(None)  # сигнал конца генератору
             except queue.Full:
