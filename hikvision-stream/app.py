@@ -189,6 +189,7 @@ def stream_mjpeg_auto(
     stream_type: int = 2,
     jpeg_quality: int = 75,
     chunks_iter=None,
+    should_abort=None,
 ):
     """MJPEG-поток с авто-детекцией кодека (H.264 / H.265-HEVC).
 
@@ -217,6 +218,10 @@ def stream_mjpeg_auto(
     try:
         chunk_iter = chunks_iter if chunks_iter is not None else iter_annex_b_chunks(stream)
         while True:
+            if should_abort is not None and should_abort():
+                # клиент ушёл, а werkzeug об этом молчит, пока не попробует
+                # записать — закрываем сессию сами, иначе слот потока утекает
+                return
             try:
                 _transport, chunk = next(chunk_iter)
             except StopIteration:
@@ -481,6 +486,7 @@ def mjpeg(index: int):
                     stream_type=session.stream_type,
                     jpeg_quality=JPEG_QUALITY,
                     chunks_iter=chunks_iter,
+                    should_abort=_abandoned,
                 )
             finally:
                 try:
@@ -499,13 +505,20 @@ def mjpeg(index: int):
             except queue.Full:
                 pass
 
+    last_read = [time.time()]
+
     def generate():
         threading.Thread(target=produce, daemon=True).start()
         while True:
             chunk = q.get()
             if chunk is None:
                 break
+            last_read[0] = time.time()
             yield chunk
+
+    def _abandoned() -> bool:
+        # клиент не читает поток 15 с — считаем его ушедшим и рвём сессию
+        return time.time() - last_read[0] > 15.0
 
     return Response(
         generate(),
