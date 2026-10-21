@@ -426,7 +426,7 @@ model Task {
   statusChangedAt DateTime? @map("status_changed_at") // время входа в текущий статус (для «Авто смены»)
   priority      String   @default("medium")
   dueDate       DateTime?
-  startDate     DateTime? // Начало срока задачи: автозаполняется датой/временем создания
+  startDate     DateTime? @default(now()) // Начало срока задачи: автозаполняется датой/временем создания
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
