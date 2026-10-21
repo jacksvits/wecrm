@@ -210,6 +210,7 @@ def stream_mjpeg_auto(
     next_emit = 0.0
     started_at = time.monotonic()
     sent_placeholder = False
+    last_placeholder_at = 0.0
     max_width = 1920 if stream_type == 1 else 1408
     quality = max(50, min(jpeg_quality, 95))
 
@@ -261,8 +262,14 @@ def stream_mjpeg_auto(
                     if loser != winner:
                         active.discard(loser)
 
-            if not sent_placeholder and time.monotonic() - started_at > 2.0:
-                write_mjpeg_frame(output, placeholder_jpeg("Waiting for video..."))
+            if time.monotonic() - started_at > 2.0 and time.monotonic() - last_placeholder_at > 10.0:
+                # повторяем placeholder: без него клиент при зашифрованном
+                # потоке видит один чёрный кадр и не понимает, что происходит
+                write_mjpeg_frame(
+                    output,
+                    placeholder_jpeg("Waiting for video...\nЕсли картинка не появляется: введите код верификации в настройках плагина"),
+                )
+                last_placeholder_at = time.monotonic()
                 sent_placeholder = True
     except (BrokenPipeError, ConnectionResetError):
         return
