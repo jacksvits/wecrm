@@ -246,7 +246,7 @@ model ClientDevice {
   cpuThreads   Int       @default(0) @map("cpu_threads")
   ramTotalMb   Int       @default(0) @map("ram_total_mb")
   disks        Json      @default("[]")              // [{model, sizeGb, freeGb, serial}]
-  pnpDevices   Json      @default("[]")              // устройства из «Диспетчера устройств»: [{class, name, manufacturer, status, deviceId}]
+  pnpDevices   Json      @default("[]") @map("pnp_devices") // устройства из «Диспетчера устройств»: [{class, name, manufacturer, status, deviceId}]
   ipAddress    String    @default("") @map("ip_address")
   macAddress   String    @default("") @map("mac_address")
   gpu          String    @default("")                // видеокарты через запятую
