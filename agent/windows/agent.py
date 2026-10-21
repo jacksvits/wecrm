@@ -91,6 +91,19 @@ def _get(wmi, query):
     except Exception:
         return []
 
+def _i(value, default=0):
+    """WMI возвращает uint64 (размеры дисков, память) строками — приводим к int."""
+    try:
+        if value is None:
+            return default
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
 
 def collect_device_key():
     """Стабильный идентификатор железа: MachineGuid + серийник системного диска."""
@@ -139,8 +152,8 @@ def collect_info():
     idx = 0
     for ld in _get(wmi, "SELECT DeviceID, Size, FreeSpace FROM Win32_LogicalDisk WHERE DriveType=3"):
         p = phys.get(idx, {})
-        size_gb = int((getattr(ld, "Size", 0) or 0) // (1024 ** 3))
-        free_gb = int((getattr(ld, "FreeSpace", 0) or 0) // (1024 ** 3))
+        size_gb = _i(getattr(ld, "Size", 0)) // (1024 ** 3)
+        free_gb = _i(getattr(ld, "FreeSpace", 0)) // (1024 ** 3)
         disks.append({
             "model": p.get("model", "") or (getattr(ld, "DeviceID", "") or ""),
             "sizeGb": size_gb,
@@ -183,10 +196,10 @@ def collect_info():
         return None
 
     ram_mb = 0
-    if cs is not None and getattr(cs, "TotalPhysicalMemory", 0):
-        ram_mb = int(cs.TotalPhysicalMemory // (1024 ** 2))
+    if cs is not None and _i(getattr(cs, "TotalPhysicalMemory", 0)):
+        ram_mb = _i(getattr(cs, "TotalPhysicalMemory", 0)) // (1024 ** 2)
     elif os_item is not None:
-        ram_mb = int((getattr(os_item, "TotalVisibleMemorySize", 0) or 0) // 1024)
+        ram_mb = _i(getattr(os_item, "TotalVisibleMemorySize", 0)) // 1024
 
     username = ""
     if cs is not None and getattr(cs, "UserName", ""):
@@ -205,8 +218,8 @@ def collect_info():
         "model": (getattr(cs, "Model", "") or "") if cs is not None else "",
         "serialNumber": (getattr(prod, "UUID", "") or "") if prod is not None else "",
         "cpu": (getattr(cpu, "Name", "") or "").strip() if cpu is not None else "",
-        "cpuCores": int(getattr(cpu, "NumberOfCores", 0) or 0) if cpu is not None else 0,
-        "cpuThreads": int(getattr(cpu, "NumberOfLogicalProcessors", 0) or 0) if cpu is not None else 0,
+        "cpuCores": _i(getattr(cpu, "NumberOfCores", 0)) if cpu is not None else 0,
+        "cpuThreads": _i(getattr(cpu, "NumberOfLogicalProcessors", 0)) if cpu is not None else 0,
         "ramTotalMb": ram_mb,
         "disks": disks,
         "pnpDevices": pnp_devices,
