@@ -448,9 +448,12 @@ def mjpeg(index: int):
             jsonify(error=f"stream limit ({MAX_STREAMS_PER_ACCOUNT}) for account, retry later"),
             429,
         )
-    _ACCOUNT_STREAMS[acc_key] = _ACCOUNT_STREAMS.get(acc_key, 0) + 1
 
     def produce() -> None:
+        # слот берём ЗДЕСЬ, а не во view: если клиент отвалился до первого
+        # чтения генератора, produce не стартует и finally его не ждёт —
+        # инкремент во view протекал бы навсегда
+        _ACCOUNT_STREAMS[acc_key] = _ACCOUNT_STREAMS.get(acc_key, 0) + 1
         t0 = time.time()
         try:
             client = get_client(login, password, api_base)

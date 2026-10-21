@@ -58,6 +58,7 @@ function MjpegPlayer({ src, style }: { src: string; style?: React.CSSProperties 
     let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
     let watchdog: ReturnType<typeof setInterval> | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let activeCtrl: AbortController | null = null;
     let attempts = 0;
 
     const scheduleReconnect = () => {
@@ -67,10 +68,14 @@ function MjpegPlayer({ src, style }: { src: string; style?: React.CSSProperties 
 
     const connect = async () => {
       if (cancelled) return;
+      // обрываем предыдущую попытку: иначе старый fetch держит облачный
+      // слот потока, и плеер блочит сам себя (лимит 2 на аккаунт)
+      if (activeCtrl) activeCtrl.abort();
+      activeCtrl = new AbortController();
       setConnecting(true);
       setLimitMsg(false);
       try {
-        const resp = await fetch(src, { headers: { "X-Auth-Token": getToken() } });
+        const resp = await fetch(src, { headers: { "X-Auth-Token": getToken() }, signal: activeCtrl.signal });
         if (!cancelled && resp.status === 429) {
           // лимит облака (2 потока): не долбим, показываем подсказку
           setLimitMsg(true);
@@ -140,6 +145,7 @@ function MjpegPlayer({ src, style }: { src: string; style?: React.CSSProperties 
       cancelled = true;
       if (watchdog) clearInterval(watchdog);
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      activeCtrl?.abort();
       try { reader?.cancel(); } catch { /* ignore */ }
       setFrameUrl((old) => {
         if (old) URL.revokeObjectURL(old);
