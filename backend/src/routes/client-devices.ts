@@ -29,9 +29,25 @@ router.get('/', async (req: AuthRequest, res) => {
   try {
     const contactId = req.query.contactId as string | undefined;
     if (!contactId) return res.status(400).json({ error: 'Необходим contactId' });
+
+    // Для организации показываем устройства всех её сотрудников
+    const contact = await (prisma as any).contact.findUnique({
+      where: { id: contactId },
+      select: { id: true, kind: true },
+    });
+    let contactIds = [contactId];
+    if (contact?.kind === 'organization') {
+      const employees = await (prisma as any).contact.findMany({
+        where: { organizationId: contactId },
+        select: { id: true },
+      });
+      contactIds = contactIds.concat(employees.map((e: any) => e.id));
+    }
+
     const devices = await (prisma as any).clientDevice.findMany({
-      where: { contactId },
+      where: { contactId: { in: contactIds } },
       orderBy: { hostname: 'asc' },
+      include: { contact: { select: { id: true, name: true } } },
     });
     res.json(devices.map(withOnline));
   } catch (e: any) {

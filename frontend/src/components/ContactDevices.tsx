@@ -76,7 +76,7 @@ export function ContactDevices({ contactId }: { contactId: string }) {
   if (devices.length === 0) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-        У контакта пока нет устройств. Установите Windows-агент и укажите ID контакта — компьютер появится здесь автоматически.
+        Устройств пока нет. Скачайте WeAGENT у контакта-сотрудника (поле «ID для агента» → «Скачать агента») — компьютер появится здесь автоматически.
       </div>
     );
   }
@@ -91,6 +91,11 @@ export function ContactDevices({ contactId }: { contactId: string }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             {onlineDot(d.isOnline)}
             <strong style={{ fontSize: 15 }}>{d.hostname}</strong>
+            {d.contact?.name && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }} title="Владелец устройства">
+                👤 {d.contact.name}
+              </span>
+            )}
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               {d.osCaption || 'Windows'} {d.osVersion && `(${d.osVersion})`}
             </span>

@@ -9,6 +9,7 @@ export interface ClientDevicePnp { class: string; name: string; manufacturer: st
 export interface ClientDevice {
   id: string;
   contactId: string;
+  contact?: { id: string; name: string };
   hostname: string;
   username?: string;
   workgroup?: string;
