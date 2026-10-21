@@ -25,6 +25,7 @@ import hashlib
 import os
 import sys
 import time
+import threading
 import traceback
 import urllib.request
 import urllib.error
@@ -54,6 +55,27 @@ def log(msg):
             f.write(time.strftime("%Y-%m-%d %H:%M:%S") + " " + msg + "\n")
     except Exception:
         pass
+
+
+def run_with_timeout(fn, timeout_sec=180):
+    """Защита от зависаний (WMI под SYSTEM может висеть бесконечно):
+    выполняет fn в потоке; при превышении таймаута бросает AgentError."""
+    result = {}
+
+    def worker():
+        try:
+            result["v"] = fn()
+        except Exception as e:  # noqa: BLE001
+            result["e"] = e
+
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
+    t.join(timeout_sec)
+    if t.is_alive():
+        raise AgentError("operation timed out after %ss" % timeout_sec)
+    if "e" in result:
+        raise result["e"]
+    return result.get("v")
 
 REG_PATH = r"SOFTWARE\WeCRM\Agent"
 
@@ -344,12 +366,12 @@ class WecrmAgentService(win32serviceutil.ServiceFramework):
 
             try:
                 if now >= next_report:
-                    send_report(cfg)
+                    run_with_timeout(lambda: send_report(cfg), timeout_sec=240)
                     log("report sent ok")
                     next_report = time.time() + REPORT_INTERVAL_SEC
                     next_heartbeat = time.time() + HEARTBEAT_INTERVAL_SEC
                 elif cfg["token"] and now >= next_heartbeat:
-                    send_heartbeat(cfg)
+                    run_with_timeout(lambda: send_heartbeat(cfg), timeout_sec=HTTP_TIMEOUT_SEC + 30)
                     next_heartbeat = time.time() + HEARTBEAT_INTERVAL_SEC
             except urllib.error.HTTPError as e:
                 log("HTTP error %s: %s" % (e.code, e.reason))
