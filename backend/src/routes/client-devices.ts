@@ -120,7 +120,6 @@ router.get('/installer', async (req: AuthRequest, res) => {
     ].join('\r\n');
     archive.append(runner, { name: `INSTALL-${key}.bat` });
     archive.append(exeRunner, { name: `WeAGENT-${key}.bat` });
-    archive.append(exeRunner, { name: `WeAGENT-${key}.bat` });
 
     await archive.finalize();
   } catch (e: any) {
