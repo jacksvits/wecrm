@@ -212,7 +212,55 @@ model Contact {
   subscriptions  ProductSubscription[]
   accesses       ContactAccess[]
   scheduleAppointments ScheduleAppointment[]
+  // Ключ привязки Windows-агента (формат 000-000-000, генерируется случайно).
+  // Агент передаёт его при регистрации устройства — у контакта может быть
+  // несколько устройств, все они привязываются к одному ключу.
+  clientKey    String?        @unique @map("client_key")
+  devices      ClientDevice[]
+}
 
+// === Агент «Устройства клиентов» (Windows): ПК/система сотрудника клиента ===
+// Запись создаётся агентом при первом подключении (по clientKey контакта +
+// стабильному deviceKey железа) и обновляется при каждом отчёте.
+// «Включено» устройство — если lastSeenAt свежее ONLINE_THRESHOLD_MS.
+model ClientDevice {
+  id           String    @id @default(cuid())
+  contactId    String    @map("contact_id")
+  contact      Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  deviceKey    String    @unique @map("device_key") // стабильный идентификатор железа (MachineGuid + серийник системного диска)
+  token        String    @unique                     // токен доступа агента (выдаётся при первой регистрации)
+
+  hostname     String
+  username     String    @default("")
+  workgroup    String    @default("")
+  osCaption    String    @default("") @map("os_caption")
+  osVersion    String    @default("") @map("os_version")
+  osBuild      String    @default("") @map("os_build")
+  osArch       String    @default("") @map("os_arch")
+  osInstallDate DateTime? @map("os_install_date")
+  manufacturer String    @default("")
+  model        String    @default("")
+  serialNumber String    @default("") @map("serial_number")
+  cpu          String    @default("")
+  cpuCores     Int       @default(0) @map("cpu_cores")
+  cpuThreads   Int       @default(0) @map("cpu_threads")
+  ramTotalMb   Int       @default(0) @map("ram_total_mb")
+  disks        Json      @default("[]")              // [{model, sizeGb, freeGb, serial}]
+  pnpDevices   Json      @default("[]")              // устройства из «Диспетчера устройств»: [{class, name, manufacturer, status, deviceId}]
+  ipAddress    String    @default("") @map("ip_address")
+  macAddress   String    @default("") @map("mac_address")
+  gpu          String    @default("")                // видеокарты через запятую
+  lastBootAt   DateTime? @map("last_boot_at")
+  agentVersion String    @default("") @map("agent_version")
+
+  comment      String    @default("")               // заметка менеджера (WYSIWYG-HTML)
+  firstSeenAt  DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt   DateTime  @default(now()) @map("last_seen_at")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([contactId])
+  @@map("client_devices")
 }
 
 model Project {

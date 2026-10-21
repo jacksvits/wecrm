@@ -7,6 +7,7 @@ import { displayPhone } from '../lib/phone';
 import { formatDateTime } from '../lib/formatDate';
 import { linkifyTaskTagsHtml, useTaskHashtagClick } from '../lib/taskHashtags';
 import { ContactAccesses } from './ContactAccesses';
+import { ContactDevices } from './ContactDevices';
 
 interface ContactType {
   id: string;
@@ -34,7 +35,7 @@ export function ContactDetail() {
   const onTagClick = useTaskHashtagClick();
   const { user } = useAuth();
   const [contact, setContact] = useState<Contact | null>(null);
-  const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'deals' | 'projects' | 'accesses'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'devices' | 'tasks' | 'deals' | 'projects' | 'accesses'>('info');
   const [loading, setLoading] = useState(true);
   const [contactTypes, setContactTypes] = useState<ContactType[]>([]);
 
@@ -93,7 +94,7 @@ export function ContactDetail() {
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border-color)' }}>
-        {[{ key: 'info' as const, label: 'Основная информация' }, { key: 'tasks' as const, label: `Задачи (${contact._count?.tasks || 0})` }, { key: 'deals' as const, label: `Сделки (${contact._count?.deals || 0})` }, { key: 'projects' as const, label: `Проекты (${contact.projects?.length || 0})` }, { key: 'accesses' as const, label: `Доступы (${contact._count?.accesses || 0})` }].filter(tab => tab.key !== 'accesses' || canReadAccesses).map((tab) => (
+        {[{ key: 'info' as const, label: 'Основная информация' }, { key: 'devices' as const, label: `Устройства (${contact._count?.devices ?? (contact as any).devices?.length ?? 0})` }, { key: 'tasks' as const, label: `Задачи (${contact._count?.tasks || 0})` }, { key: 'deals' as const, label: `Сделки (${contact._count?.deals || 0})` }, { key: 'projects' as const, label: `Проекты (${contact.projects?.length || 0})` }, { key: 'accesses' as const, label: `Доступы (${contact._count?.accesses || 0})` }].filter(tab => tab.key !== 'accesses' || canReadAccesses).map((tab) => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{ padding: '10px 20px', border: 'none', borderBottom: activeTab === tab.key ? '2px solid #1565c0' : '2px solid transparent', background: 'transparent', color: activeTab === tab.key ? '#1565c0' : 'var(--text-muted)', fontWeight: activeTab === tab.key ? 600 : 400, cursor: 'pointer', fontSize: 14, transition: 'all 0.15s' }}>{tab.label}</button>
         ))}
       </div>
@@ -108,6 +109,20 @@ export function ContactDetail() {
             <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Тип</span>
             <span style={{ padding: '2px 10px', borderRadius: 10, fontSize: 12, fontWeight: 500, background: tc.bg, color: tc.text, justifySelf: 'start' }}>{getTypeLabel(contact.type)}</span>
           </div>
+
+          {contact.clientKey && (
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>ID для агента</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+                <code style={{ background: '#f5f5f5', padding: '2px 8px', borderRadius: 6, fontSize: 13 }}>{contact.clientKey}</code>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(contact.clientKey!); }}
+                  title="Скопировать ID"
+                  style={{ padding: '3px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}
+                >📋 Копировать</button>
+              </span>
+            </div>
+          )}
 
           {contact.kind === 'organization' && (
             <>
@@ -227,6 +242,10 @@ export function ContactDetail() {
             </div>
           )}
       </div>
+      )}
+
+      {activeTab === 'devices' && (
+        <ContactDevices contactId={contact.id} />
       )}
 
       {activeTab === 'tasks' && (

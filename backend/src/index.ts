@@ -12,6 +12,8 @@ import authRoutes from './routes/auth.js';
 import taskRoutes from './routes/tasks.js';
 import contactRoutes from './routes/contacts.js';
 import contactAccessRoutes from './routes/contact-accesses.js';
+import agentRoutes from './routes/agent.js';
+import clientDeviceRoutes from './routes/client-devices.js';
 import dealRoutes from './routes/deals.js';
 import projectRoutes from './routes/projects.js';
 import dashboardRoutes from './routes/dashboard.js';
@@ -153,6 +155,9 @@ app.use('/api/accounting', accountingRoutes);
 app.use('/api/tasks', taskFinanceRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/contacts', contactRoutes);
+// Windows-агент «Устройства клиентов»: отчёты без user-auth (по contactKey+deviceKey+token)
+app.use('/api/agent', agentRoutes);
+app.use('/api/client-devices', clientDeviceRoutes);
 app.use('/api/contact-accesses', contactAccessRoutes);
 app.use('/api/deals', dealRoutes);
 app.use('/api/projects', projectRoutes);
