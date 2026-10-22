@@ -79,7 +79,7 @@ model User {
   mobileNav     String[] @default([]) @map("mobile_nav")
 
   // Часовой пояс для отображения дат/времени в интерфейсе (IANA, настраивается в профиле)
-  timezone String @default("UTC")
+  timezone String? // личный часовой пояс (IANA); null = системный пояс организации
 
   // Notification settings
   pushEnabled       Boolean @default(true) @map("push_enabled")
@@ -1534,6 +1534,8 @@ model Branding {
   splashEnabled Boolean  @default(true) @map("splash_enabled")
   splashPath    String?  @map("splash_path")
   defaultTheme  String?  @map("default_theme")
+  // Системный часовой пояс организации (IANA)
+  timezone      String   @default("UTC") @map("timezone")
   // Текст левой панели страницы авторизации (null — дефолтные тексты)
   loginTitle    String?  @map("login_title")     // первая строка заголовка
   loginAccent   String?  @map("login_accent")    // акцентная строка (градиент)

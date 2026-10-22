@@ -29,7 +29,7 @@ const updateSchema = z.object({
   notifyNews: z.boolean().optional(),
   soundEnabled: z.boolean().optional(),
   mobileNav: z.array(z.string()).optional(),
-  timezone: z.string().optional(),
+  timezone: z.string().nullable().optional(),
 });
 
 const passwordSchema = z.object({
@@ -53,7 +53,7 @@ router.get('/', async (req: any, res) => {
     role: user.role?.name || 'user',
     allowedPages: user.role?.allowedPages || [],
     mobileNav: user.mobileNav || [],
-    timezone: user.timezone || 'UTC',
+    timezone: user.timezone ?? null,
     hideCompletedTasks: user.hideCompletedTasks,
     darkTheme: user.darkTheme,
     calendarTimelinePos: user.calendarTimelinePos || 'bottom',
@@ -107,7 +107,7 @@ router.patch('/', async (req: any, res) => {
       role: user.role?.name || 'user',
       allowedPages: user.role?.allowedPages || [],
       mobileNav: user.mobileNav || [],
-    timezone: user.timezone || 'UTC',
+    timezone: user.timezone ?? null,
       hideCompletedTasks: user.hideCompletedTasks,
       darkTheme: user.darkTheme,
       calendarTimelinePos: user.calendarTimelinePos || 'bottom',

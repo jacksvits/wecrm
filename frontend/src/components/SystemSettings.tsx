@@ -4,6 +4,8 @@ import "react-quill/dist/quill.snow.css";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { loadBranding } from "../lib/branding";
+import { TIMEZONES } from "../lib/timezones";
+import { setSystemTimezone } from "../lib/formatDate";
 import { THEMES } from "../lib/themes";
 import { User, AutoReplyTrigger } from "../types";
 import PromoBlocks from "./PromoBlocks";
@@ -45,7 +47,7 @@ export function SystemSettings() {
   const [saving, setSaving] = useState<string | null>(null);
 
   // === Брендинг: иконка приложения, логотип компании, логотип тёмной темы, цвет акцента ===
-  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null; defaultTheme: string | null; newsCoverUrl: string | null; productDefaultImageUrl: string | null; productCardStyle: string | null; splashEnabled: boolean; splashUrl: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null, newsCoverUrl: null, productDefaultImageUrl: null, productCardStyle: null, defaultTheme: null, splashEnabled: true, splashUrl: null });
+  const [branding, setBranding] = useState<{ iconUrl: string | null; logoUrl: string | null; darkLogoUrl: string | null; accentColor: string | null; defaultTheme: string | null; timezone: string; newsCoverUrl: string | null; productDefaultImageUrl: string | null; productCardStyle: string | null; splashEnabled: boolean; splashUrl: string | null }>({ iconUrl: null, logoUrl: null, darkLogoUrl: null, accentColor: null, timezone: "UTC", newsCoverUrl: null, productDefaultImageUrl: null, productCardStyle: null, defaultTheme: null, splashEnabled: true, splashUrl: null });
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [newsCoverFile, setNewsCoverFile] = useState<File | null>(null);
   const [productDefaultImageFile, setProductDefaultImageFile] = useState<File | null>(null);
@@ -216,7 +218,7 @@ export function SystemSettings() {
       .then((r) => (r.ok ? r.json() : null))
       .then((b) => {
         if (!b) return;
-        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor, defaultTheme: b.defaultTheme || null, newsCoverUrl: b.newsCoverUrl, productDefaultImageUrl: b.productDefaultImageUrl || null, productCardStyle: b.productCardStyle || null, splashEnabled: b.splashEnabled ?? true, splashUrl: b.splashUrl || null });
+        setBranding({ iconUrl: b.iconUrl, logoUrl: b.logoUrl, darkLogoUrl: b.darkLogoUrl, accentColor: b.accentColor, defaultTheme: b.defaultTheme || null, timezone: b.timezone || "UTC", newsCoverUrl: b.newsCoverUrl, productDefaultImageUrl: b.productDefaultImageUrl || null, productCardStyle: b.productCardStyle || null, splashEnabled: b.splashEnabled ?? true, splashUrl: b.splashUrl || null });
         setAccentInput(b.accentColor || "");
       })
       .catch(() => {});
@@ -250,6 +252,23 @@ export function SystemSettings() {
       alert("Ошибка: " + e.message);
     } finally {
       setUploading(null);
+    }
+  };
+
+  // Системный часовой пояс организации (только админ) — действует у всех,
+  // у кого в профиле не выбран личный пояс
+  const saveTimezone = async (tz: string) => {
+    const res = await fetch("/api/branding/timezone", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(localStorage.getItem("token") ? { "X-Auth-Token": localStorage.getItem("token")! } : {}),
+      },
+      body: JSON.stringify({ timezone: tz }),
+    });
+    if (res.ok) {
+      setBranding((prev: any) => ({ ...prev, timezone: tz }));
+      setSystemTimezone(tz);
     }
   };
 
@@ -605,6 +624,21 @@ export function SystemSettings() {
   // === Под-вкладка «Дизайн»: брендинг (иконка приложения и логотип компании) ===
   const renderDesign = () => (
     <div>
+      {/* Системный часовой пояс организации: действует у всех без личного пояса в профиле */}
+      <div style={{ marginBottom: 20, padding: "10px 16px", borderRadius: 10, border: "1px solid var(--border-color)", background: "var(--bg-card)" }}>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Часовой пояс организации</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
+          Системный пояс для отображения дат и времени у всех пользователей, у которых в профиле не выбран личный пояс
+        </div>
+        <select
+          value={branding.timezone || "UTC"}
+          onChange={(e) => saveTimezone(e.target.value)}
+          style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid var(--border-color)", background: "var(--bg-card)", fontSize: 14 }}
+        >
+          {TIMEZONES.map((tz) => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+        </select>
+      </div>
+
       {/* Подсказка: настройки дизайна изолированы для каждой организации (tenant'а) */}
       <div
         style={{

@@ -61,6 +61,7 @@ router.get('/', async (_req, res) => {
         : null,
       // Стиль карточек товаров на витрине (null — глянец)
       productCardStyle: branding?.productCardStyle || 'gloss',
+      timezone: branding?.timezone ?? 'UTC', // системный часовой пояс организации (IANA)
       // Заставка при запуске: опция показа и кастомное видео (null — дефолт /splash.mp4)
       splashEnabled: branding?.splashEnabled ?? true,
       splashUrl: branding?.splashPath
@@ -368,6 +369,26 @@ const videoUpload = multer({
 });
 
 // POST /api/branding/splash — загрузка своего видео заставки (по умолчанию — /splash.mp4)
+router.post('/timezone', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!isAdmin(req)) return res.status(403).json({ error: 'Только администратор может менять системный часовой пояс' });
+    const { timezone } = req.body || {};
+    if (typeof timezone !== 'string' || timezone.length < 1 || timezone.length > 64
+        || !/^[A-Za-z0-9_+\/-]+$/.test(timezone)) {
+      return res.status(400).json({ error: 'Некорректный часовой пояс (формат IANA, напр. Europe/Moscow)' });
+    }
+    await prisma.branding.upsert({
+      where: { id: 1 },
+      update: { timezone },
+      create: { id: 1, timezone },
+    });
+    res.json({ ok: true, timezone });
+  } catch (e: any) {
+    console.error('Branding timezone error:', e);
+    res.status(500).json({ error: 'Ошибка сохранения часового пояса' });
+  }
+});
+
 router.post('/splash', authMiddleware, videoUpload.single('file'), async (req: AuthRequest, res) => {
   try {
     if (!isAdmin(req)) {

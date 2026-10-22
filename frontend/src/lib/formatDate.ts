@@ -1,6 +1,20 @@
 // Форматирование дат/времени в часовом поясе пользователя.
-// Часовой пояс задаётся в настройках профиля (поле timezone у User, IANA-имя зоны).
-// Пока пояс не выбран — используется UTC (прежнее поведение интерфейса).
+// Личный пояс задаётся в настройках профиля (поле timezone у User, IANA-имя зоны).
+// Когда личный пояс не выбран — используется СИСТЕМНЫЙ пояс организации
+// (задаётся в настройках системы, подставляется из /api/branding при старте),
+// если и он не задан — UTC.
+
+let systemTimezone: string | null = null;
+
+/** Системный часовой пояс организации (вызывается из AuthContext после /api/branding) */
+export function setSystemTimezone(tz: string | null): void {
+  systemTimezone = tz || null;
+}
+
+/** Эффективный пояс: личный → системный организации → UTC */
+export function getEffectiveTimezone(personal?: string | null): string {
+  return personal || systemTimezone || 'UTC';
+}
 
 const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
   day: 'numeric',
@@ -19,7 +33,7 @@ export function formatDateTime(
   const d = typeof value === 'string' ? new Date(value) : value;
   if (isNaN(d.getTime())) return '';
   try {
-    return d.toLocaleString('ru-RU', { ...DATE_TIME_OPTIONS, timeZone: timezone || 'UTC' });
+    return d.toLocaleString('ru-RU', { ...DATE_TIME_OPTIONS, timeZone: getEffectiveTimezone(timezone) });
   } catch {
     return d.toLocaleString('ru-RU', { ...DATE_TIME_OPTIONS, timeZone: 'UTC' });
   }
@@ -52,7 +66,7 @@ export function toDateTimeLocalValue(
   if (isNaN(d.getTime())) return '';
   try {
     const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone || 'UTC',
+      timeZone: getEffectiveTimezone(timezone),
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -76,7 +90,7 @@ export function fromDateTimeLocalValue(
   const m = value.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
   if (!m) return undefined;
   const asUTC = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]));
-  return new Date(asUTC.getTime() - tzOffsetMinutes(timezone || 'UTC', asUTC) * 60000).toISOString();
+  return new Date(asUTC.getTime() - tzOffsetMinutes(getEffectiveTimezone(timezone), asUTC) * 60000).toISOString();
 }
 
 // Текущие дата/время браузера в формате input[type=datetime-local]

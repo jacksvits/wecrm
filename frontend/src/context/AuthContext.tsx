@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { User } from '../types';
 import { api } from '../api/client';
+import { setSystemTimezone } from '../lib/formatDate';
 
 interface AuthContextType {
   user: User | null;
@@ -42,6 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(setUser)
       .catch(() => localStorage.removeItem('token'))
       .finally(() => setLoading(false));
+    // Системный часовой пояс организации — для форматирования дат/времени
+    fetch('/api/branding')
+      .then((r) => r.ok ? r.json() : null)
+      .then((b) => setSystemTimezone(b?.timezone || null))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
