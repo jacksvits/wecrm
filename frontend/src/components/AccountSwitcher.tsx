@@ -58,7 +58,7 @@ export function AccountSwitcher({ panelPosition = 'up' }: { panelPosition?: 'up'
     <div ref={panelRef} style={{ position: 'relative' }}>
       <button onClick={() => setOpen(o => !o)} title='Перейти под другого пользователя' style={buttonStyle}>⇄</button>
       {open && (
-        <div style={{
+        <div data-switcher-panel style={{
           position: 'absolute', ...(panelPosition === 'up' ? { bottom: 48 } : { top: 48 }), left: 0,
           width: 240, maxHeight: 320, overflowY: 'auto', background: 'var(--bg-sidebar)',
           border: '1px solid var(--border-color)', borderRadius: 12,
