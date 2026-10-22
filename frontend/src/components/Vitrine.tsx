@@ -85,12 +85,54 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
   const [favoriteNewGroupName, setFavoriteNewGroupName] = useState('');
   const [favoriteSaving, setFavoriteSaving] = useState(false);
   const [favoriteError, setFavoriteError] = useState('');
-  // Передача группы другому пользователю: модальное окно с выбором получателя
+  // Передача группы: модальное окно со ссылкой-приглашением (получатель открывает
+  // ссылку будучи авторизованным и принимает копию группы в своё избранное)
   const [shareTarget, setShareTarget] = useState<any | null>(null);
-  const [shareQuery, setShareQuery] = useState('');
-  const [shareSaving, setShareSaving] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [shareOk, setShareOk] = useState('');
-  const [usersList, setUsersList] = useState<any[]>([]);
+
+  // Открытие окна передачи: получаем (или создаём) ссылку-приглашение на группу
+  const openShare = (g: any) => {
+    setShareTarget(g);
+    setShareUrl('');
+    setShareCopied(false);
+    setShareOk('');
+    setShareLoading(true);
+    api.favorites.shareLink(g.id)
+      .then(r => setShareUrl(`${window.location.origin}${r.url}`))
+      .catch((e: any) => setShareOk(e.message || 'Ошибка создания ссылки'))
+      .finally(() => setShareLoading(false));
+  };
+
+  // Перевыпуск ссылки: старая перестаёт работать
+  const renewShareUrl = () => {
+    if (!shareTarget) return;
+    setShareLoading(true);
+    setShareCopied(false);
+    setShareOk('');
+    api.favorites.shareLink(shareTarget.id, true)
+      .then(r => setShareUrl(`${window.location.origin}${r.url}`))
+      .catch((e: any) => setShareOk(e.message || 'Ошибка обновления ссылки'))
+      .finally(() => setShareLoading(false));
+  };
+
+  // Копирование ссылки в буфер обмена
+  const copyShareUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 1500);
+    } catch {
+      const el = document.createElement('textarea');
+      el.value = shareUrl;
+      document.body.appendChild(el);
+      el.select();
+      try { document.execCommand('copy'); setShareCopied(true); setTimeout(() => setShareCopied(false), 1500); } catch { /* ignore */ }
+      document.body.removeChild(el);
+    }
+  };
   const [saleComment, setSaleComment] = useState('');
   // Способ оплаты: 'cash' — наличными, 'card' — банковской картой, 'invoice' — счёт на организацию (безнал)
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'invoice' | 'tochka' | 'postpone'>('tochka');
@@ -122,10 +164,9 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
     [favGroups],
   );
 
-  // Загрузка избранного и списка пользователей (для передачи групп)
+  // Загрузка избранного
   useEffect(() => {
     refreshFavorites();
-    api.users.list().then(setUsersList).catch(() => {});
   }, []);
 
   // Оповещаем шапку «Товаров» (счётчик кнопки «Избранное» берёт данные с сервера)
@@ -1332,8 +1373,8 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
                       <span title="Группа передана от другого пользователя" style={{ fontSize: 11, color: '#d97706', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 10, padding: '1px 8px', flexShrink: 0 }}>Передано от {g.sharedByName}</span>
                     )}
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexShrink: 0 }}>
-                      <button type="button" title="Передать группу другому пользователю"
-                        onClick={() => { setShareTarget(g); setShareQuery(''); setShareOk(''); }}
+                      <button type="button" title="Передать группу по ссылке другому пользователю"
+                        onClick={() => openShare(g)}
                         style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
@@ -1451,43 +1492,32 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
         </div>
       )}
 
-      {/* Модальное окно: передача группы другому пользователю (копия с отметкой «Передано от…») */}
+      {/* Модальное окно: передача группы по ссылке-приглашению */}
       {shareTarget && (
         <div className="vitrine-details-overlay reserve-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
           onClick={() => setShareTarget(null)}>
-          <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, width: '100%', maxWidth: 440, border: '1px solid var(--border-color)' }}
+          <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, width: '100%', maxWidth: 480, border: '1px solid var(--border-color)' }}
             onClick={(e) => e.stopPropagation()}>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Передать группу «{shareTarget.name}»</div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
-              У получателя появится копия группы со всеми товарами и отметкой «Передано от {user?.name || 'вас'}». Ваше избранное не изменится.
+              Отправьте ссылку любому пользователю CRM. Он сможет посмотреть группу и принять её копию с отметкой «Передано от {user?.name || 'вас'}» в своё избранное.
             </div>
-            <input value={shareQuery} onChange={e => setShareQuery(e.target.value)} placeholder="Поиск по имени или email…"
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 10 }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto', marginBottom: 12 }}>
-              {usersList
-                .filter((u: any) => u.id !== (user as any)?.id)
-                .filter((u: any) => !shareQuery.trim() || (u.name || '').toLowerCase().includes(shareQuery.trim().toLowerCase()) || (u.email || '').toLowerCase().includes(shareQuery.trim().toLowerCase()))
-                .map((u: any) => (
-                  <button key={u.id} type="button" disabled={shareSaving} onClick={async () => {
-                      setShareSaving(true);
-                      setShareOk('');
-                      try {
-                        const r = await api.favorites.shareGroup(shareTarget.id, u.id);
-                        setShareOk(`Группа передана пользователю «${r.sharedWith}»`);
-                        setTimeout(() => { setShareTarget(null); setShareOk(''); }, 1200);
-                      } catch (e: any) {
-                        setShareOk(e.message || 'Ошибка передачи');
-                      }
-                      setShareSaving(false);
-                    }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, textAlign: 'left', cursor: 'pointer', fontSize: 14,
-                      border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', opacity: shareSaving ? 0.6 : 1 }}>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</span>
-                  </button>
-                ))}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <input readOnly value={shareUrl} onFocus={(e) => e.target.select()} placeholder={shareLoading ? 'Создание ссылки...' : ''}
+                style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              <button type="button" className="btn-action-cart" disabled={shareLoading || !shareUrl} onClick={copyShareUrl}
+                style={{ padding: '8px 16px', fontWeight: 600, opacity: shareLoading || !shareUrl ? 0.6 : 1 }}>
+                {shareCopied ? 'Скопировано!' : 'Копировать'}
+              </button>
             </div>
-            {shareOk && <div style={{ color: shareOk.startsWith('Группа') ? '#16a34a' : '#ef4444', fontSize: 13, marginBottom: 10 }}>{shareOk}</div>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <button type="button" disabled={shareLoading} onClick={renewShareUrl}
+                style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', opacity: shareLoading ? 0.6 : 1 }}>
+                Обновить ссылку
+              </button>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>старая ссылка перестанет работать</span>
+            </div>
+            {shareOk && <div style={{ color: '#ef4444', fontSize: 13, marginBottom: 10 }}>{shareOk}</div>}
             <button type="button" onClick={() => setShareTarget(null)} className="btn-reserve"
               style={{ width: '100%', justifyContent: 'center', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
               Закрыть

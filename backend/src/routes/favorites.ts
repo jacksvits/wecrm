@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
@@ -16,6 +17,37 @@ const productInclude = {
   stocks: true,
 };
 
+// Флаги цен «на витрине» и «цена от» — raw-запросами (колонок for_vitrine и
+// price_from нет в схеме Prisma, добавляются напрямую в БД).
+async function loadPriceFlags() {
+  const [vitrineRows, priceFromRows] = await Promise.all([
+    prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vitrine = true`) as Promise<any[]>,
+    prisma.$queryRawUnsafe(`SELECT id, price_from FROM product_prices`) as Promise<any[]>,
+  ]);
+  return {
+    vitrineIds: new Set((vitrineRows as any[]).map((r) => r.id as string)),
+    priceFrom: new Map((priceFromRows as any[]).map((r) => [r.id as string, !!r.price_from])),
+  };
+}
+
+// Подставляем флаги ценам товаров группы (панель избранного и просмотр по ссылке)
+function annotateGroup(group: any, flags: { vitrineIds: Set<string>; priceFrom: Map<string, boolean> }) {
+  return {
+    ...group,
+    items: group.items.map((it: any) => ({
+      ...it,
+      product: it.product && {
+        ...it.product,
+        prices: it.product.prices.map((pr: any) => ({
+          ...pr,
+          priceFrom: flags.priceFrom.get(pr.id) ?? false,
+          priceType: { ...pr.priceType, forVitrine: flags.vitrineIds.has(pr.priceTypeId) },
+        })),
+      },
+    })),
+  };
+}
+
 // Мои группы избранного вместе с товарами
 async function groupsWithItems(ownerId: string) {
   const groups = await prisma.vitrineFavoriteGroup.findMany({
@@ -23,27 +55,8 @@ async function groupsWithItems(ownerId: string) {
     orderBy: { createdAt: 'asc' },
     include: { items: { orderBy: { createdAt: 'asc' }, include: { product: { include: productInclude } } } },
   });
-  // Флаги цен «на витрине» и «цена от» — raw-запросами (колонок нет в схеме Prisma)
-  const [vitrineRows, priceFromRows] = await Promise.all([
-    prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vitrine = true`) as Promise<any[]>,
-    prisma.$queryRawUnsafe(`SELECT id, price_from FROM product_prices`) as Promise<any[]>,
-  ]);
-  const vitrineIds = new Set((vitrineRows as any[]).map((r) => r.id as string));
-  const priceFrom = new Map((priceFromRows as any[]).map((r) => [r.id as string, !!r.price_from]));
-  return groups.map((g) => ({
-    ...g,
-    items: g.items.map((it) => ({
-      ...it,
-      product: it.product && {
-        ...it.product,
-        prices: it.product.prices.map((pr: any) => ({
-          ...pr,
-          priceFrom: priceFrom.get(pr.id) ?? false,
-          priceType: { ...pr.priceType, forVitrine: vitrineIds.has(pr.priceTypeId) },
-        })),
-      },
-    })),
-  }));
+  const flags = await loadPriceFlags();
+  return groups.map((g) => annotateGroup(g, flags));
 }
 
 /**
@@ -135,38 +148,80 @@ router.delete('/groups/:id/items/:productId', async (req: AuthRequest, res) => {
   }
 });
 
-const shareSchema = z.object({ userId: z.string().min(1) });
+// Ссылка-приглашение для просмотра группы и принятия её копии
+const sharedGroupInclude = {
+  include: {
+    owner: { select: { name: true } },
+    items: { orderBy: { createdAt: 'asc' as const }, include: { product: { include: productInclude } } },
+  },
+} as const;
 
 /**
  * POST /api/favorites/groups/:id/share
- * Передать группу другому пользователю: у получателя создаётся КОПИЯ группы
- * со всеми товарами и отметкой «Передано от <имя отправителя>».
- * Своё избранное и группа отправителя не меняются.
+ * Получить (или создать) ссылку-приглашение на группу. body: { renew?: boolean }
+ * renew=true — перевыпускает ссылку (старая перестаёт работать).
  */
 router.post('/groups/:id/share', async (req: AuthRequest, res) => {
-  const parsed = shareSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Не указан получатель' });
+  try {
+    const group = await prisma.vitrineFavoriteGroup.findFirst({ where: { id: req.params.id, ownerId: req.user!.id } });
+    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
+    const renew = !!(req.body as any)?.renew;
+    const shareToken = renew || !group.shareToken
+      ? crypto.randomBytes(24).toString('hex')
+      : group.shareToken;
+    if (shareToken !== group.shareToken) {
+      await prisma.vitrineFavoriteGroup.update({ where: { id: group.id }, data: { shareToken } });
+    }
+    res.json({ url: `/favorites/share/${shareToken}` });
+  } catch (err: any) {
+    console.error('[favorites:shareLink]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/favorites/shared/:token
+ * Просмотр группы по ссылке-приглашению (только для авторизованных).
+ */
+router.get('/shared/:token', async (req: AuthRequest, res) => {
   try {
     const group = await prisma.vitrineFavoriteGroup.findFirst({
-      where: { id: req.params.id, ownerId: req.user!.id },
-      include: { items: true },
+      where: { shareToken: req.params.token },
+      ...sharedGroupInclude,
     });
-    if (!group) return res.status(404).json({ error: 'Группа не найдена' });
-    const target = await prisma.user.findUnique({ where: { id: parsed.data.userId } });
-    if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
-    if (target.id === req.user!.id) return res.status(400).json({ error: 'Нельзя передать группу себе' });
-    const sender = await prisma.user.findUnique({ where: { id: req.user!.id } });
-    // Если у получателя уже есть копия этой группы от этого же отправителя с тем же
-    // названием — дополняем её товарами, иначе создаём новую копию
+    if (!group) return res.status(404).json({ error: 'Ссылка недействительна или устарела' });
+    const flags = await loadPriceFlags();
+    res.json({ ...annotateGroup(group, flags), sharedByName: group.owner.name });
+  } catch (err: any) {
+    console.error('[favorites:shared]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/favorites/shared/:token/accept
+ * Принять группу по ссылке: у текущего пользователя создаётся КОПИЯ группы
+ * со всеми товарами и отметкой «Передано от <имя владельца ссылки>».
+ * Повторное принятие той же ссылки дополняет его копию новыми товарами.
+ */
+router.post('/shared/:token/accept', async (req: AuthRequest, res) => {
+  try {
+    const group = await prisma.vitrineFavoriteGroup.findFirst({
+      where: { shareToken: req.params.token },
+      include: { items: true, owner: { select: { id: true, name: true } } },
+    });
+    if (!group) return res.status(404).json({ error: 'Ссылка недействительна или устарела' });
+    if (group.ownerId === req.user!.id) return res.status(400).json({ error: 'Это ваша собственная группа' });
+    // Если у получателя уже есть копия этой группы от этого же владельца —
+    // дополняем её товарами, иначе создаём новую копию
     const existing = await prisma.vitrineFavoriteGroup.findFirst({
-      where: { ownerId: target.id, name: group.name, sharedById: req.user!.id },
+      where: { ownerId: req.user!.id, name: group.name, sharedById: group.ownerId },
     });
     if (existing) {
-      const data = group.items.map(i => ({ groupId: existing.id, productId: i.productId }));
-      for (const d of data) {
+      for (const i of group.items) {
         await prisma.vitrineFavoriteItem.upsert({
-          where: { groupId_productId: { groupId: d.groupId, productId: d.productId } },
-          create: d,
+          where: { groupId_productId: { groupId: existing.id, productId: i.productId } },
+          create: { groupId: existing.id, productId: i.productId },
           update: {},
         });
       }
@@ -174,16 +229,16 @@ router.post('/groups/:id/share', async (req: AuthRequest, res) => {
       await prisma.vitrineFavoriteGroup.create({
         data: {
           name: group.name,
-          ownerId: target.id,
-          sharedById: req.user!.id,
-          sharedByName: sender?.name || 'пользователя',
+          ownerId: req.user!.id,
+          sharedById: group.ownerId,
+          sharedByName: group.owner.name || 'пользователя',
           items: { create: group.items.map(i => ({ productId: i.productId })) },
         },
       });
     }
-    res.json({ ok: true, sharedWith: target.name });
+    res.json({ ok: true, sharedByName: group.owner.name });
   } catch (err: any) {
-    console.error('[favorites:share]', err);
+    console.error('[favorites:accept]', err);
     res.status(500).json({ error: err.message });
   }
 });
