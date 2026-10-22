@@ -718,6 +718,8 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
         @media (max-width: 640px) {
           .vitrine-cart-overlay { align-items: flex-end !important; padding: 0 !important; }
           .vitrine-cart { width: 100% !important; height: auto !important; max-height: 92vh !important; border-radius: 16px 16px 0 0 !important; border-left: none !important; border-top: 1px solid var(--border-color); box-shadow: 0 -8px 24px rgba(0,0,0,.15) !important; }
+          /* Панель «Избранное» на мобильных — приподнята до 85% высоты экрана */
+          .vitrine-fav-panel { height: 85% !important; }
         }
         .vitrine-details-grid { display: grid; grid-template-columns: minmax(220px, 320px) 1fr; gap: 20px; }
         @media (max-width: 640px) {
@@ -1363,7 +1365,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
       {/* Список избранных товаров — выезжающая панель как у корзины/резерва, товары сгруппированы по группам */}
       {favoritesOpen && (
         <div className="vitrine-cart-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 210, display: 'flex', justifyContent: 'flex-end' }} onClick={() => setFavoritesOpen(false)}>
-          <div className="vitrine-cart" style={{ height: '100%', background: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 24px rgba(0,0,0,.15)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="vitrine-cart vitrine-fav-panel" style={{ height: '100%', background: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 24px rgba(0,0,0,.15)' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-color)' }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Избранное{favGroups.length > 0 && <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> ({favGroups.reduce((s: number, g: any) => s + g.items.length, 0)})</span>}</div>
               <button type="button" onClick={() => setFavoritesOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: 15, cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>✕</button>
