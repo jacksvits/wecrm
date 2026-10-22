@@ -6,20 +6,44 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 const router = Router();
 router.use(authMiddleware);
 
-// Продукт в составе избранного: только нужное для карточки в панели избранного
+// Продукт в составе избранного: только нужное для карточки в панели избранного.
+// Колонки for_vitrine (price_types) и price_from (product_prices) в схеме Prisma
+// отсутствуют — добавляются напрямую в БД, поэтому флаги подставляем raw-запросом
+// (та же техника, что и в роуте витрины /api/products/vitrine).
 const productInclude = {
   images: { orderBy: { sortOrder: 'asc' as const }, take: 1 },
-  prices: { include: { priceType: { select: { label: true, forVitrine: true } } } },
+  prices: { include: { priceType: { select: { label: true } } } },
   stocks: true,
 };
 
 // Мои группы избранного вместе с товарами
 async function groupsWithItems(ownerId: string) {
-  return prisma.vitrineFavoriteGroup.findMany({
+  const groups = await prisma.vitrineFavoriteGroup.findMany({
     where: { ownerId },
     orderBy: { createdAt: 'asc' },
     include: { items: { orderBy: { createdAt: 'asc' }, include: { product: { include: productInclude } } } },
   });
+  // Флаги цен «на витрине» и «цена от» — raw-запросами (колонок нет в схеме Prisma)
+  const [vitrineRows, priceFromRows] = await Promise.all([
+    prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vitrine = true`) as Promise<any[]>,
+    prisma.$queryRawUnsafe(`SELECT id, price_from FROM product_prices`) as Promise<any[]>,
+  ]);
+  const vitrineIds = new Set((vitrineRows as any[]).map((r) => r.id as string));
+  const priceFrom = new Map((priceFromRows as any[]).map((r) => [r.id as string, !!r.price_from]));
+  return groups.map((g) => ({
+    ...g,
+    items: g.items.map((it) => ({
+      ...it,
+      product: it.product && {
+        ...it.product,
+        prices: it.product.prices.map((pr: any) => ({
+          ...pr,
+          priceFrom: priceFrom.get(pr.id) ?? false,
+          priceType: { ...pr.priceType, forVitrine: vitrineIds.has(pr.priceTypeId) },
+        })),
+      },
+    })),
+  }));
 }
 
 /**
