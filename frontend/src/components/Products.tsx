@@ -235,11 +235,13 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
     setTimeout(() => window.dispatchEvent(new CustomEvent('wecrm:open-reserve')), 60);
   };
 
-  // Избранное витрины: счётчик из localStorage + события от Vitrine
+  // Избранное витрины: счётчик с сервера (личное у каждого пользователя) + события от Vitrine
   const [favoritesCount, setFavoritesCount] = useState(0);
   useEffect(() => {
     const read = () => {
-      try { setFavoritesCount((JSON.parse(localStorage.getItem('wecrm_vitrine_favorites') || '[]') as string[]).length); } catch { setFavoritesCount(0); }
+      api.favorites.list()
+        .then((gs: any[]) => setFavoritesCount(gs.reduce((s, g) => s + g.items.length, 0)))
+        .catch(() => {});
     };
     read();
     window.addEventListener('wecrm:favorites', read);

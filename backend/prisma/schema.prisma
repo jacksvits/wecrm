@@ -140,6 +140,7 @@ model User {
   scheduleShiftTemplates ScheduleShiftTemplate[]
   scheduleShifts       ScheduleShift[]
   scheduleAppointments ScheduleAppointment[]
+  vitrineFavoriteGroups VitrineFavoriteGroup[]
 }
 
 model ContactType {
@@ -586,6 +587,40 @@ model TaskFavorite {
   @@index([userId])
   @@index([taskId, userId])
   @@map("task_favorites")
+}
+
+// Группа избранных товаров витрины (личная у каждого пользователя)
+model VitrineFavoriteGroup {
+  id      String @id @default(cuid())
+  name    String
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  // Отметка о передаче: группа получена от другого пользователя («Передано от …»)
+  sharedById   String? @map("shared_by_id")
+  sharedByName String? @map("shared_by_name")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items VitrineFavoriteItem[]
+
+  @@index([ownerId])
+  @@map("vitrine_favorite_groups")
+}
+
+// Товар в группе избранного (дубликаты в одной группе запрещены)
+model VitrineFavoriteItem {
+  id        String @id @default(cuid())
+  groupId   String
+  group     VitrineFavoriteGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([groupId, productId])
+  @@index([productId])
+  @@map("vitrine_favorite_items")
 }
 
 model TaskHistory {
@@ -1335,6 +1370,7 @@ model Product {
   reservationItems ReservationItem[]
   saleItems        SaleItem[]
   subscriptions    ProductSubscription[]
+  vitrineFavoriteItems VitrineFavoriteItem[]
 
   crmAllowedPages Json?     @map("crm_allowed_pages")
 
