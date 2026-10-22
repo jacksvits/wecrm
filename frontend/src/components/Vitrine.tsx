@@ -768,7 +768,22 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
               </div>
               {g.items.map(({ product: p, price, inStock }) => (
                 <div key={p.id} className="vitrine-list-row" onClick={() => openDetails(p)} title={p.name}>
-                  <span className="vitrine-list-sku">{p.sku || '—'}</span>
+                  {/* Отметка «Избранное» первой в строке — звёздочка как у карточек задач, в одну линию с артикулом */}
+                  <span className="vitrine-list-sku" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <button type="button"
+                      onClick={(e) => { e.stopPropagation(); toggleFavorite(p.id); }}
+                      title={favorites.includes(p.id) ? 'Убрать из избранного' : 'В избранное'}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        width: 30, height: 30, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)',
+                        color: favorites.includes(p.id) ? '#f59e0b' : 'var(--text-muted)', cursor: 'pointer', padding: 0,
+                      }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill={favorites.includes(p.id) ? '#f59e0b' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                      </svg>
+                    </button>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.sku || '—'}</span>
+                  </span>
                   <span className="vitrine-list-name">{p.name}</span>
                   <span className="vitrine-list-price">
                     {price && Number(price.price) > 0 ? `${price.priceFrom ? 'от ' : ''}${fmtMoney(price.price)} ₽` : 'Договорная'}
@@ -789,19 +804,6 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
                       В корзину
                     </button>
                   )}
-                  {/* Отметка «Избранное» в строке списка — звёздочка как у карточек задач */}
-                  <button type="button"
-                    onClick={(e) => { e.stopPropagation(); toggleFavorite(p.id); }}
-                    title={favorites.includes(p.id) ? 'Убрать из избранного' : 'В избранное'}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)',
-                      color: favorites.includes(p.id) ? '#f59e0b' : 'var(--text-muted)', cursor: 'pointer',
-                    }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill={favorites.includes(p.id) ? '#f59e0b' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                  </button>
                 </div>
               ))}
               </Fragment>
