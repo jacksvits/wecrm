@@ -235,6 +235,21 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
     setTimeout(() => window.dispatchEvent(new CustomEvent('wecrm:open-reserve')), 60);
   };
 
+  // Избранное витрины: счётчик из localStorage + события от Vitrine
+  const [favoritesCount, setFavoritesCount] = useState(0);
+  useEffect(() => {
+    const read = () => {
+      try { setFavoritesCount((JSON.parse(localStorage.getItem('wecrm_vitrine_favorites') || '[]') as string[]).length); } catch { setFavoritesCount(0); }
+    };
+    read();
+    window.addEventListener('wecrm:favorites', read);
+    return () => window.removeEventListener('wecrm:favorites', read);
+  }, []);
+  const openFavorites = () => {
+    setTab('vitrine');
+    setTimeout(() => window.dispatchEvent(new CustomEvent('wecrm:open-favorites')), 60);
+  };
+
   // Фильтр по виду: все / товары / услуги
   const [kindFilter, setKindFilter] = useState<'all' | 'product' | 'service'>('all');
   // Фильтр «В наличии»: только позиции с суммарным остатком >= 1
@@ -568,6 +583,13 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
             <path fillRule="evenodd" clipRule="evenodd" d="M16.7248 8.63051C17.0763 8.98198 17.0763 9.55183 16.7248 9.9033L11.7627 14.8654C11.4113 15.2169 10.8414 15.2169 10.4899 14.8654L7.81839 12.1939C7.46692 11.8424 7.46691 11.2726 7.81839 10.9211C8.16986 10.5696 8.7397 10.5696 9.09118 10.9211L11.1263 12.9562L15.4521 8.63051C15.8035 8.27904 16.3734 8.27904 16.7248 8.63051Z" fill="currentColor"/>
           </svg>
           {reserveCount > 0 && <span style={{ position: 'absolute', top: -6, right: -6, background: '#fff', color: 'rgb(10,136,0)', border: '1px solid rgba(120,255,122,0.40)', borderRadius: 10, fontSize: 11, padding: '1px 6px', fontWeight: 700 }}>{reserveCount}</span>}
+        </button>
+        <button onClick={openFavorites} title="Избранное"
+          style={{ position: 'relative', marginLeft: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 12, border: '1px solid rgba(255,193,7,0.40)', background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #d97706 100%)', color: '#fff', cursor: 'pointer', boxShadow: 'rgba(245,158,11,0.35) 0 4px 20px, inset 0 1px 0 rgba(255,255,255,0.25)' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+          {favoritesCount > 0 && <span style={{ position: 'absolute', top: -6, right: -6, background: '#fff', color: '#d97706', border: '1px solid rgba(255,193,7,0.40)', borderRadius: 10, fontSize: 11, padding: '1px 6px', fontWeight: 700 }}>{favoritesCount}</span>}
         </button>
         {effectiveTab === 'nomenclature' && (
           <div style={{ display: 'flex', gap: 8 }}>

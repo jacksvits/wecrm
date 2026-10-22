@@ -75,6 +75,11 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
     try { return JSON.parse(localStorage.getItem('wecrm_vitrine_cart') || '[]'); } catch { return []; }
   });
   const [cartOpen, setCartOpen] = useState(false);
+  // Избранное (localStorage) — отметка «Избранное» на карточках товаров витрины
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('wecrm_vitrine_favorites') || '[]'); } catch { return []; }
+  });
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [saleComment, setSaleComment] = useState('');
   // Способ оплаты: 'cash' — наличными, 'card' — банковской картой, 'invoice' — счёт на организацию (безнал)
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'invoice' | 'tochka' | 'postpone'>('tochka');
@@ -99,6 +104,23 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
     try { localStorage.setItem('wecrm_vitrine_cart', JSON.stringify(cart)); } catch { /* ignore */ }
     try { window.dispatchEvent(new CustomEvent('wecrm:cart')); } catch { /* ignore */ }
   }, [cart]);
+
+  // Сохраняем избранное и оповещаем шапку «Товаров» (счётчик кнопки «Избранное»)
+  useEffect(() => {
+    try { localStorage.setItem('wecrm_vitrine_favorites', JSON.stringify(favorites)); } catch { /* ignore */ }
+    try { window.dispatchEvent(new CustomEvent('wecrm:favorites')); } catch { /* ignore */ }
+  }, [favorites]);
+
+  // Переключение отметки «Избранное» на карточке товара
+  const toggleFavorite = (productId: string) =>
+    setFavorites(prev => prev.includes(productId) ? prev.filter(x => x !== productId) : [...prev, productId]);
+
+  // Открытие списка избранного по событию из шапки страницы «Товары»
+  useEffect(() => {
+    const h = () => setFavoritesOpen(true);
+    window.addEventListener('wecrm:open-favorites', h);
+    return () => window.removeEventListener('wecrm:open-favorites', h);
+  }, []);
 
   // Запоминаем выбранный вид каталога (карточки/список) между визитами
   useEffect(() => {
@@ -181,6 +203,12 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
 
   const freeQty = (p: Product) =>
     (p.stocks || []).reduce((s, x) => s + Math.max(x.quantity - (x.reserved || 0), 0), 0);
+
+  // Карточки избранных товаров (по отметкам «Избранное» из localStorage)
+  const favoriteCards = useMemo<VitrineCard[]>(
+    () => cards.filter((c) => favorites.includes(c.product.id)),
+    [cards, favorites],
+  );
 
   // ===== Каталог: дерево категорий и фильтрация витрины =====
   const childrenOf = (parentId: string | null) =>
@@ -761,6 +789,19 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
                       В корзину
                     </button>
                   )}
+                  {/* Отметка «Избранное» в строке списка — звёздочка как у карточек задач */}
+                  <button type="button"
+                    onClick={(e) => { e.stopPropagation(); toggleFavorite(p.id); }}
+                    title={favorites.includes(p.id) ? 'Убрать из избранного' : 'В избранное'}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)',
+                      color: favorites.includes(p.id) ? '#f59e0b' : 'var(--text-muted)', cursor: 'pointer',
+                    }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill={favorites.includes(p.id) ? '#f59e0b' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                  </button>
                 </div>
               ))}
               </Fragment>
@@ -776,6 +817,21 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
               ) : (
                 <span style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, color: 'var(--text-muted)' }}>📦</span>
               )}
+              {/* Отметка «Избранное» — звёздочка как у карточек задач */}
+              <button type="button"
+                onClick={(e) => { e.stopPropagation(); toggleFavorite(p.id); }}
+                title={favorites.includes(p.id) ? 'Убрать из избранного' : 'В избранное'}
+                style={{
+                  position: 'absolute', top: 8, right: 8, zIndex: 2,
+                  width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)',
+                  color: favorites.includes(p.id) ? '#f59e0b' : 'var(--text-muted)', cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill={favorites.includes(p.id) ? '#f59e0b' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              </button>
             </div>
             <div className="vitrine-card-body" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
               <div className="vitrine-name" style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>{p.name}</div>
@@ -1186,6 +1242,64 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
                 {saving ? 'Сохранение...' : 'Создать резерв'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Список избранных товаров — выезжающая панель как у корзины/резерва */}
+      {favoritesOpen && (
+        <div className="vitrine-cart-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 210, display: 'flex', justifyContent: 'flex-end' }} onClick={() => setFavoritesOpen(false)}>
+          <div className="vitrine-cart" style={{ height: '100%', background: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 24px rgba(0,0,0,.15)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Избранное{favorites.length > 0 && <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> ({favorites.length})</span>}</div>
+              <button type="button" onClick={() => setFavoritesOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: 15, cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {!favoriteCards.length && <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>В избранном пока пусто. Отмечайте товары звёздочкой на карточке.</div>}
+              {favoriteCards.map(({ product: p, price, inStock, image }) => (
+                <div key={p.id} style={{ display: 'flex', gap: 10, alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: 12, padding: 8, cursor: 'pointer' }}
+                  onClick={() => { setFavoritesOpen(false); openDetails(p); }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: 'var(--bg-hover)', flexShrink: 0, position: 'relative' }}>
+                    {image ? <img src={`${origin}${image.url}`} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>📦</span>}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      {price && Number(price.price) > 0 ? `${price.priceFrom ? 'от ' : ''}${fmtMoney(price.price)} ₽` : 'Договорная'}
+                      {p.kind !== 'service' && (inStock > 0 ? ` · в наличии: ${fmtQty(inStock)} ${p.unit}` : ' · нет в наличии')}
+                    </div>
+                  </div>
+                  {p.kind !== 'service' && inStock > 0 && (
+                    <button type="button" className="btn-cart" title="В корзину" aria-label="В корзину"
+                      style={{ flexShrink: 0 }}
+                      onClick={(e) => { e.stopPropagation(); addToCart(p); }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                      </svg>
+                    </button>
+                  )}
+                  <button type="button" onClick={(e) => { e.stopPropagation(); toggleFavorite(p.id); }} title="Убрать из избранного"
+                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#f59e0b', fontSize: 14, padding: 4, flexShrink: 0 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+            {favoriteCards.length > 0 && (
+              <div style={{ borderTop: '1px solid var(--border-color)', padding: '12px 16px' }}>
+                <button type="button" className="btn-action-cart" onClick={() => { favoriteCards.forEach(({ product }) => addToCart(product)); }}
+                  style={{ width: '100%', justifyContent: 'center', padding: '10px 16px', fontWeight: 600 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                  </svg>
+                  Все в корзину ({favoriteCards.length})
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
