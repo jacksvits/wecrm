@@ -79,6 +79,13 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
   // Избранное витрины (сервер, личное у каждого пользователя): группы с товарами
   const [favGroups, setFavGroups] = useState<any[]>([]);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
+  // Свёрнутые группы избранного в панели (по id группы)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroupCollapsed = (id: string) => setCollapsedGroups(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   // Товар, для которого выбираем группу избранного (модальное окно)
   const [favoritePick, setFavoritePick] = useState<Product | null>(null);
   const [favoritePickGroupId, setFavoritePickGroupId] = useState('');
@@ -1365,13 +1372,20 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
               {!favGroups.length && <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>В избранном пока пусто. Отмечайте товары звёздочкой на карточке и выбирайте группу.</div>}
               {favGroups.map((g: any) => (
                 <div key={g.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {/* Заголовок группы: название, отметка «Передано от…», действия */}
+                  {/* Заголовок группы: сворачивание/разворачивание, название, отметка «Передано от…», действия */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</div>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>({g.items.length})</span>
-                    {g.sharedByName && (
-                      <span title="Группа передана от другого пользователя" style={{ fontSize: 11, color: '#d97706', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 10, padding: '1px 8px', flexShrink: 0 }}>Передано от {g.sharedByName}</span>
-                    )}
+                    <button type="button" onClick={() => toggleGroupCollapsed(g.id)} title={collapsedGroups.has(g.id) ? 'Развернуть группу' : 'Свернуть группу'}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px 4px 2px 0', minWidth: 0, flex: 1 }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                        style={{ flexShrink: 0, transform: collapsedGroups.has(g.id) ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s' }}>
+                        <polyline points="6 9 12 15 18 9"/>
+                      </svg>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>({g.items.length})</span>
+                      {g.sharedByName && (
+                        <span title="Группа передана от другого пользователя" style={{ fontSize: 11, color: '#d97706', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 10, padding: '1px 8px', flexShrink: 0 }}>Передано от {g.sharedByName}</span>
+                      )}
+                    </button>
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexShrink: 0 }}>
                       <button type="button" title="Передать группу по ссылке другому пользователю"
                         onClick={() => openShare(g)}
@@ -1385,8 +1399,8 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
                         style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}>✕</button>
                     </div>
                   </div>
-                  {!g.items.length && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>В группе нет товаров.</div>}
-                  {g.items.map((item: any) => {
+                  {!collapsedGroups.has(g.id) && !g.items.length && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>В группе нет товаров.</div>}
+                  {!collapsedGroups.has(g.id) && g.items.map((item: any) => {
                     const p = item.product;
                     if (!p) return null;
                     const price = favPrice(p);
@@ -1424,7 +1438,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
                       </div>
                     );
                   })}
-                  {g.items.length > 0 && (
+                  {!collapsedGroups.has(g.id) && g.items.length > 0 && (
                     <button type="button" className="btn-action-cart" onClick={() => { g.items.forEach((i: any) => i.product && addToCart(i.product)); }}
                       style={{ alignSelf: 'flex-start', padding: '6px 14px', fontWeight: 600, fontSize: 13 }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
