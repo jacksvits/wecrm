@@ -8,6 +8,16 @@ const buttonStyle: React.CSSProperties = {
   justifyContent: 'center', flexShrink: 0,
 } ;
 
+const rowButtonStyle: React.CSSProperties = {
+  width: 20, height: 20, padding: 0, border: 'none', background: 'transparent',
+  color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center',
+  justifyContent: 'center', flexShrink: 0,
+} ;
+
+// Иконка «войти в организацию» в стиле остального меню (stroke='currentColor', 20x20)
+const enterIcon = 'M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4 M10 17l5-5-5-5 M15 12H3' ;
+const svgProps = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const } ;
+
 const itemStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px',
   border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: 13,
@@ -33,7 +43,7 @@ interface TenantItem { id: string ; name: string ; slug: string ; status: string
 
 // Мультитенантность: быстрый вход главного администратора платформы в организацию (⇉)
 // под её главным администратором. Видна только на главном домене и только администратору.
-export function TenantSwitcher({ panelPosition = 'up' }: { panelPosition?: 'up' | 'down' }) {
+export function TenantSwitcher({ panelPosition = 'up', inRow = false }: { panelPosition?: 'up' | 'down', inRow?: boolean }) {
   const { user } = useAuth() ;
   const [open, setOpen] = useState(false) ;
   const [tenants, setTenants] = useState<TenantItem[]>([]) ;
@@ -74,9 +84,9 @@ export function TenantSwitcher({ panelPosition = 'up' }: { panelPosition?: 'up' 
 
   return (
     <div ref={panelRef} style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(o => !o)} title='Перейти в организацию (тенант)' style={buttonStyle}>⇉</button>
+      <button onClick={() => setOpen(o => !o)} title='Перейти в организацию (тенант)' style={inRow ? rowButtonStyle : buttonStyle}><svg {...svgProps}><path d={enterIcon} /></svg></button>
       {open && (
-        <div style={{
+        <div data-switcher-panel style={{
           position: 'absolute', ...(panelPosition === 'up' ? { bottom: 48 } : { top: 48 }), left: 0,
           width: 240, maxHeight: 320, overflowY: 'auto', background: 'var(--bg-sidebar)',
           border: '1px solid var(--border-color)', borderRadius: 12,

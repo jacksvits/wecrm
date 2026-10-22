@@ -5,7 +5,7 @@ import { useNotifications } from '../hooks/useNotifications';
 // Десктопный колокольчик уведомлений (выпадающая панель в боковом меню).
 // Вся логика (загрузка, SSE, звук, бейдж, действия) — в хуке useNotifications,
 // общем с мобильной версией (slide-up панель в Layout.tsx).
-export function Notifications() {
+export function Notifications({ inRow = false }: { inRow?: boolean }) {
   const { user } = useAuth();
   const { items, unreadCount, markRead, markAllRead, deleteAll } = useNotifications();
   const [open, setOpen] = useState(false);
@@ -118,7 +118,7 @@ export function Notifications() {
       <button
         ref={buttonRef}
         onClick={() => { if (!open) calculatePosition(); setOpen(!open); setConfirmDeleteAll(false); }}
-        style={{ position: 'relative', width: 40, height: 40, borderRadius: 12, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--text-muted)' }}
+        style={inRow ? { position: 'relative', width: 20, height: 20, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--text-muted)' } : { position: 'relative', width: 40, height: 40, borderRadius: 12, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--text-muted)' }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" stroke-linecap="round" strokeLinejoin="round">
           <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>

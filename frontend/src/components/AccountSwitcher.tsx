@@ -10,6 +10,17 @@ const buttonStyle: React.CSSProperties = {
   justifyContent: 'center', flexShrink: 0,
 } ;
 
+const rowButtonStyle: React.CSSProperties = {
+  width: 20, height: 20, padding: 0, border: 'none', background: 'transparent',
+  color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center',
+  justifyContent: 'center', flexShrink: 0,
+} ;
+
+// Иконки в стиле остального меню (stroke='currentColor', 20x20)
+const swapIcon = 'M7 8h10m0 0l-4-4m4 4l-4 4M17 16H7m0 0l4 4m-4-4l4-4' ;
+const backIcon = 'M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3' ;
+const svgProps = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const } ;
+
 const itemStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px',
   border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: 13,
@@ -17,7 +28,7 @@ const itemStyle: React.CSSProperties = {
 } ;
 
 // Мультиаккаунтность: быстрый переход администратора под другой аккаунт (⇄) и возврат (⟲)
-export function AccountSwitcher({ panelPosition = 'up' }: { panelPosition?: 'up' | 'down' }) {
+export function AccountSwitcher({ panelPosition = 'up', inRow = false }: { panelPosition?: 'up' | 'down', inRow?: boolean }) {
   const { user, switchUser, switchBack } = useAuth() ;
   const [open, setOpen] = useState(false) ;
   const [users, setUsers] = useState<User[]>([]) ;
@@ -46,8 +57,8 @@ export function AccountSwitcher({ panelPosition = 'up' }: { panelPosition?: 'up'
       <button
         onClick={() => switchBack().catch(() => {})}
         title={`Вы работаете как ${user.name} (вошёл: ${user.impersonatorName}). Нажмите, чтобы вернуться в свой аккаунт`}
-        style={{ ...buttonStyle, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.12)' }}
-      >⟲</button>
+        style={inRow ? { ...rowButtonStyle, color: '#f59e0b' } : { ...buttonStyle, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.12)' }}
+      ><svg {...svgProps}><path d={backIcon} /></svg></button>
     ) ;
   }
 
@@ -56,7 +67,7 @@ export function AccountSwitcher({ panelPosition = 'up' }: { panelPosition?: 'up'
 
   return (
     <div ref={panelRef} style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(o => !o)} title='Перейти под другого пользователя' style={buttonStyle}>⇄</button>
+      <button onClick={() => setOpen(o => !o)} title='Перейти под другого пользователя' style={inRow ? rowButtonStyle : buttonStyle}><svg {...svgProps}><path d={swapIcon} /></svg></button>
       {open && (
         <div data-switcher-panel style={{
           position: 'absolute', ...(panelPosition === 'up' ? { bottom: 48 } : { top: 48 }), left: 0,
