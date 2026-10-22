@@ -1363,7 +1363,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
       {/* Список избранных товаров — выезжающая панель как у корзины/резерва, товары сгруппированы по группам */}
       {favoritesOpen && (
         <div className="vitrine-cart-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 210, display: 'flex', justifyContent: 'flex-end' }} onClick={() => setFavoritesOpen(false)}>
-          <div className="vitrine-cart" style={{ height: '100%', background: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 24px rgba(0,0,0,.15)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="vitrine-cart vitrine-fav-panel" style={{ height: '100%', background: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 24px rgba(0,0,0,.15)' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-color)' }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Избранное{favGroups.length > 0 && <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> ({favGroups.reduce((s: number, g: any) => s + g.items.length, 0)})</span>}</div>
               <button type="button" onClick={() => setFavoritesOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: 15, cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>✕</button>

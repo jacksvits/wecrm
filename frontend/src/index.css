@@ -1031,6 +1031,12 @@ body {
   .login-split *, .login-split *::before, .login-split *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
+/* Панель «Избранное» витрины: на десктопе фиксированная ширина, на мобильных — 85% экрана */
+.vitrine-fav-panel { width: 420px; max-width: 90vw; }
+@media (max-width: 768px) {
+  .vitrine-fav-panel { width: 85%; }
+}
+
 /* === Анимация смены слайдов слайдера новостей на дашборде === */
 @keyframes newsSlideInL {
   from { opacity: 0; transform: translateX(30px); }
