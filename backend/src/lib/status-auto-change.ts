@@ -2,6 +2,7 @@ import { prisma } from './prisma.js';
 import { broadcast, CHANNELS } from './events.js';
 import { notifyTaskAssignees } from './notifications.js';
 import { sendPushToTaskAssignees } from './push.js';
+import { syncTaskStatusToTicket } from './support-ticket-tasks.js';
 
 /**
  * «Авто смена» статусов.
@@ -45,6 +46,8 @@ async function applyTaskRule(rule: AutoChangeRule, deadline: Date): Promise<void
   });
   for (const task of tasks.filter(t => { const start = effectiveStart(rule, t.statusChangedAt); return start !== null && start.getTime() <= deadline.getTime(); })) {
     await prisma.task.update({ where: { id: task.id }, data: { status: rule.autoChangeToStatus!.name } });
+    // Задача может быть привязана к запросу организации — синхронизируем статус тикета
+    try { await syncTaskStatusToTicket(task.id); } catch { /* не прерываем авто-смену */ }
     // Запись в историю задачи: userId не задан — изменение выполнено системой
     await prisma.taskHistory.create({ data: { taskId: task.id, field: 'status', oldValue: rule.name, newValue: rule.autoChangeToStatus!.name, userId: null } });
     await prisma.taskHistory.create({ data: { taskId: task.id, field: 'task', oldValue: null, newValue: `Авто смена статуса «${rule.label}» → «${rule.autoChangeToStatus!.label}»`, userId: null } });

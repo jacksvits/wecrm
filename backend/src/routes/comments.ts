@@ -3,6 +3,7 @@ import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';
 import { prisma } from '../lib/prisma.js';
+import { addTaskCommentToTicket } from '../lib/support-ticket-tasks.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { sendPushToUser } from '../lib/push.js';
@@ -220,6 +221,15 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
         where: { id: { in: attachmentIds } },
         data: { entityId: comment.id },
       });
+    }
+
+    // Задача привязана к запросу организации — дублируем комментарий в тикет (внешним клиентам)
+    if (!isInternal) {
+      try {
+        await addTaskCommentToTicket(taskId, req.user!.name || 'Поддержка WeCRM', content);
+      } catch (e: any) {
+        console.error('[comments] → ticket:', e.message);
+      }
     }
 
     // Send push notifications to assignees, curators, creator and admins

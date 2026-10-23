@@ -18,6 +18,11 @@ import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { currentTenant, platformPrisma } from '../lib/tenant.js';
+import {
+  createTaskForTicket,
+  addTicketMessageToTask,
+  syncTicketStatusToTask,
+} from '../lib/support-ticket-tasks.js';
 
 const router = Router();
 const db: any = platformPrisma;
@@ -195,6 +200,13 @@ router.post('/', authMiddleware, requireTenant, async (req: AuthRequest, res) =>
   });
   await linkAttachments(parsed.data.attachmentIds, ticket.id, message.id);
 
+  // Создаём задачу в платформе (welans.cc) — диалог ведём в обсуждении задачи
+  try {
+    await createTaskForTicket(ticket.id);
+  } catch (e: any) {
+    console.error('[tenant-support] create task:', e.message);
+  }
+
   // Уведомляем администраторов платформы
   try {
     const admins = await platformPrisma.user.findMany({ where: { role: { name: 'admin' } }, select: { id: true } });
@@ -256,6 +268,13 @@ router.post('/:id/reply', authMiddleware, requireTenant, async (req: AuthRequest
   });
   await linkAttachments(parsed.data.attachmentIds, ticket.id, message.id);
   await db.tenantTicket.update({ where: { id: ticket.id }, data: { status: 'open' } });
+  // Ответ организации → обсуждение связанной задачи (тикет переоткрыт → задача тоже)
+  try {
+    await addTicketMessageToTask(ticket.id, message);
+    await syncTicketStatusToTask(ticket.id);
+  } catch (e: any) {
+    console.error('[tenant-support] reply → task:', e.message);
+  }
   const full = await db.tenantTicket.findUnique({ where: { id: ticket.id }, include: { messages: messagesInclude } });
   res.json(ticketWithMessages(full));
 });
@@ -301,6 +320,13 @@ router.post('/admin/:id/reply', authMiddleware, requirePlatformAdmin, async (req
   });
   await linkAttachments(parsed.data.attachmentIds, ticket.id, message.id);
   await db.tenantTicket.update({ where: { id: ticket.id }, data: { status: 'answered' } });
+  // Ответ поддержки → обсуждение связанной задачи (статус answered → in_progress)
+  try {
+    await addTicketMessageToTask(ticket.id, message, user?.id);
+    await syncTicketStatusToTask(ticket.id);
+  } catch (e: any) {
+    console.error('[tenant-support] admin reply → task:', e.message);
+  }
   const full = await db.tenantTicket.findUnique({ where: { id: ticket.id }, include: { messages: messagesInclude } });
   res.json(ticketWithMessages(full));
 });
@@ -327,6 +353,12 @@ router.post('/admin/:id/status', authMiddleware, requirePlatformAdmin, async (re
   const ticket = await db.tenantTicket.findUnique({ where: { id: req.params.id } });
   if (!ticket) return res.status(404).json({ error: 'Запрос не найден' });
   const updated = await db.tenantTicket.update({ where: { id: ticket.id }, data: { status } });
+  // Статус тикета → статус связанной задачи
+  try {
+    await syncTicketStatusToTask(ticket.id);
+  } catch (e: any) {
+    console.error('[tenant-support] status → task:', e.message);
+  }
   res.json(updated);
 });
 

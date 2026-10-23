@@ -1964,11 +1964,16 @@ model TenantTicket {
   authorEmail String   @map("author_email")
   subject     String
   status      String   @default("open") // open | answered | closed
+  // Связанная задача в платформенной БД (welans.cc): диалог с организацией
+  // ведётся в обсуждении задачи. Без FK: задачи tenant'ов живут в их БД,
+  // здесь — только ссылка на задачу платформы.
+  taskId      String?  @map("task_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   messages    TenantTicketMessage[]
   attachments TenantTicketAttachment[]
 
+  @@index([taskId])
   @@map("tenant_tickets")
 }
 

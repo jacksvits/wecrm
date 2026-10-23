@@ -7,6 +7,7 @@ interface Msg { id: string; authorRole: string; authorName: string; body: string
 interface Ticket {
   id: string; subject: string; status: string; tenantSlug: string; tenantName: string
   authorName: string; authorEmail: string; createdAt: string; updatedAt: string
+  taskId?: string | null
   messages?: Msg[]
 }
 
@@ -86,6 +87,11 @@ export function TenantTicketsAdmin() {
           <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {selected.status !== 'closed' && <button style={{ ...btn('#991b1b') }} onClick={() => setStatus('closed')}>Закрыть запрос</button>}
             {selected.status === 'closed' && <button style={{ ...btn('#16a34a') }} onClick={() => setStatus('open')}>Открыть заново</button>}
+            {selected.taskId && (
+              <button style={{ ...btn('#007AFF') }} onClick={() => navigate(`/tasks/${selected.taskId}`)} title="Открыть задачу в CRM — диалог ведётся в обсуждении">
+                Открыть задачу
+              </button>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
@@ -165,6 +171,13 @@ export function TenantTicketsAdmin() {
                 <b style={{ fontSize: 15 }}>{t.subject}</b>
 
                 <span style={{ marginLeft: 'auto', fontSize: 12, padding: '3px 10px', borderRadius: 20, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>{st.text}</span>
+                {t.taskId && (
+                  <span
+                    role="button" title="Открыть задачу в CRM"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/tasks/${t.taskId}`) }}
+                    style={{ fontSize: 13, color: '#007AFF', cursor: 'pointer', whiteSpace: 'nowrap', lineHeight: 1, padding: '2px 6px' }}
+                  >↗</span>
+                )}
                 <span
                   role="button" title="Удалить запрос"
                   onClick={(e) => {
