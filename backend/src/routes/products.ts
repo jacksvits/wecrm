@@ -858,6 +858,35 @@ router.post('/bulk-flags', async (req, res) => {
 });
 
 /**
+ * POST /api/products/bulk-tags
+ * Массовое переключение тега { ids: string[], tag: string } —
+ * у каждого выбранного товара тег инвертируется (стоит → снимается, нет → добавляется).
+ * Теги хранятся в массиве products.tags.
+ */
+router.post('/bulk-tags', async (req, res) => {
+  try {
+    const { ids, tag } = req.body;
+    if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids обязателен' });
+    if (typeof tag !== 'string' || !tag.trim()) return res.status(400).json({ error: 'Тег обязателен' });
+    const value = tag.trim();
+    const existing = await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, tags: true } });
+    const toDetach = existing.filter((p: any) => (p.tags || []).includes(value)).map((p: any) => p.id);
+    const toAttach = existing.filter((p: any) => !(p.tags || []).includes(value)).map((p: any) => p.id);
+    // array_remove/array_append — атомарно и без дублей
+    if (toDetach.length) {
+      await prisma.$executeRawUnsafe(`UPDATE products SET tags = array_remove(tags, $1) WHERE id = ANY($2::text[])`, value, toDetach);
+    }
+    if (toAttach.length) {
+      await prisma.$executeRawUnsafe(`UPDATE products SET tags = array_append(COALESCE(tags, '{}'::text[]), $1) WHERE id = ANY($2::text[])`, value, toAttach);
+    }
+    res.json({ success: true, attached: toAttach.length, detached: toDetach.length, updated: existing.length });
+  } catch (err: any) {
+    console.error('[products:bulk-tags]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/products/bulk-category
  * Массовый перенос в категорию { ids: string[], categoryId: string | null }
  * (categoryId = null — снять категорию)

@@ -108,6 +108,8 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   const [bulkBusy, setBulkBusy] = useState(false);
   // Массовое переключение флага (витрина / ВК / OZON) у выбранных товаров
   const [bulkFlag, setBulkFlag] = useState('');
+  // Массовое переключение тега у выбранных товаров
+  const [bulkTag, setBulkTag] = useState('');
 
   const importFromVk = async () => {
     if (!confirm('Импортировать все товары маркета группы ВК в проект? Позиции с совпадающим названием будут привязаны, не продублированы.')) return;
@@ -432,6 +434,24 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
       setBulkFlag('');
       await load();
       alert(`Готово: установлено ${r.set}, снято ${r.cleared}`);
+    } catch (err: any) {
+      alert(err.message || 'Ошибка');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  // Массовое переключение тега: стоявший снимается, отсутствующий добавляется
+  const bulkToggleTag = async (tag: string) => {
+    if (!tag || selected.size === 0) return;
+    if (!confirm(`Переключить тег «${tag}» у ${selected.size} выбранных позиций?\nУ товаров, где тег стоит, он будет снят; где не стоит — добавлен.`)) { setBulkTag(''); return; }
+    setBulkBusy(true);
+    try {
+      const r: any = await api.products.bulkTags([...selected], tag);
+      setSelected(new Set());
+      setBulkTag('');
+      await load();
+      alert(`Готово: добавлено ${r.attached}, снято ${r.detached}`);
     } catch (err: any) {
       alert(err.message || 'Ошибка');
     } finally {
@@ -770,6 +790,17 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
                 <option value="vitrine">На витрине</option>
                 <option value="vk">Товары в ВК</option>
                 <option value="ozon">Ozon</option>
+              </select>
+              <select
+                value={bulkTag}
+                onChange={e => { setBulkTag(e.target.value); bulkToggleTag(e.target.value); }}
+                disabled={bulkBusy}
+                style={{ ...inputStyle, maxWidth: 170, opacity: bulkBusy ? 0.6 : 1, cursor: 'pointer' }}
+              >
+                <option value="">— Теги —</option>
+                {(allTags || []).map((t: string) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
               </select>
               <button onClick={bulkMove} disabled={bulkBusy} style={{ ...btnPrimary, opacity: bulkBusy ? 0.6 : 1 }}>Перенести</button>
               <button onClick={bulkDelete} disabled={bulkBusy} style={{ ...btnPrimary, background: '#dc2626', opacity: bulkBusy ? 0.6 : 1 }}>Удалить</button>
