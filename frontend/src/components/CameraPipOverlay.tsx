@@ -4,6 +4,7 @@ import { CameraStreamImage } from "./CameraStreamImage";
 
 const STORAGE_KEY = "camera_pip_ids";
 const STORAGE_WIDTH = "camera_pip_width";
+const STORAGE_POS = "camera_pip_position";
 const DESKTOP_MIN = 1024;
 const MIN_W = 160;
 const HEADER_H = 25; // заголовок окна
@@ -34,16 +35,39 @@ function clampW(w: number): number {
   return Math.max(MIN_W, Math.min(w, max));
 }
 
+// Расположение стека окон «картинка в картинке» по правому краю
+type PipPosition = "top" | "middle" | "bottom";
+
+const POSITIONS: { value: PipPosition; label: string }[] = [
+  { value: "top", label: "Справа вверху" },
+  { value: "middle", label: "Справа по центру" },
+  { value: "bottom", label: "Справа внизу" },
+];
+
+function loadPosition(): PipPosition {
+  try {
+    const p = localStorage.getItem(STORAGE_POS);
+    if (p === "top" || p === "middle" || p === "bottom") return p;
+  } catch {}
+  return "top";
+}
+
 // Глобальный overlay «картинка в картинке» (только десктоп): маленькие окна
-// камер в правом верхнем углу поверх всех страниц. Размер окна меняется
-// «ручкой» в левом нижнем углу — пропорционально картинке (пропорции
-// определяются по фактическому снимку камеры). Состояние в localStorage.
+// камер у правого края поверх всех страниц. Расположение стека окон
+// настраивается кнопкой ⚙ под окнами: справа вверху / по центру / внизу.
+// Размер окна меняется «ручкой» в левом нижнем углу — пропорционально
+// картинке (пропорции определяются по фактическому снимку камеры).
+// Состояние в localStorage.
 export function CameraPipOverlay() {
   const [pipIds, setPipIds] = useState<string[]>(loadPipIds);
   const [cameras, setCameras] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [width, setWidth] = useState<number>(loadWidth);
+  // Расположение стека окон: справа вверху / по центру / внизу
+  const [position, setPosition] = useState<PipPosition>(loadPosition);
+  const [posMenuOpen, setPosMenuOpen] = useState<boolean>(false);
+  const [viewportH, setViewportH] = useState<number>(() => window.innerHeight);
   // Фактические пропорции снимка каждой камеры (width/height)
   const [aspects, setAspects] = useState<Record<string, number>>({});
   const [isDesktop, setIsDesktop] = useState<boolean>(
@@ -64,6 +88,18 @@ export function CameraPipOverlay() {
   useEffect(() => {
     try { localStorage.setItem(STORAGE_WIDTH, String(width)); } catch {}
   }, [width]);
+
+  // Сохраняем расположение стека окон
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_POS, position); } catch {}
+  }, [position]);
+
+  // Отслеживаем высоту окна для позиционирования стека (центр/низ)
+  useEffect(() => {
+    const onResize = () => setViewportH(window.innerHeight);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +122,10 @@ export function CameraPipOverlay() {
   // Синхронизация состояния между вкладками и с виджетами
   useEffect(() => {
     const sync = () => setPipIds(loadPipIds());
-    const onStorage = (e: StorageEvent) => { if (e.key === STORAGE_KEY) sync(); };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY) sync();
+      if (e.key === STORAGE_POS) setPosition(loadPosition());
+    };
     const onToggle = (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
       if (!id) return;
@@ -136,14 +175,27 @@ export function CameraPipOverlay() {
   if (!isDesktop || pipCameras.length === 0) return null;
 
   // Вертикальный стек с учётом фактической высоты каждого окна
-  let topOffset = 16;
-  const wins = pipCameras.map((cam: any) => {
+  const stack = pipCameras.map((cam: any) => {
     const aspect = aspects[cam.id] || DEFAULT_ASPECT;
     const imgH = Math.max(56, Math.round((width - 2) / aspect));
+    return { cam, imgH };
+  });
+  const stackH = stack.reduce((sum, w) => sum + HEADER_H + w.imgH + GAP + 2, 0);
+  // Начальная вертикальная координата стека в зависимости от выбранного расположения
+  let topOffset = 16;
+  if (position === "middle") topOffset = Math.max(16, Math.round((viewportH - stackH) / 2));
+  if (position === "bottom") topOffset = Math.max(16, viewportH - stackH - 16);
+  const stackStart = topOffset;
+  const wins = stack.map(({ cam, imgH }) => {
     const top = topOffset;
     topOffset += HEADER_H + imgH + GAP + 2;
     return { cam, imgH, top };
   });
+  const stackEnd = topOffset; // низ стека (с учётом GAP последнего окна)
+  // Кнопка настроек: под стеком (вверху/центр) или над стеком (внизу), всегда в пределах экрана
+  const btnTop = position === "bottom"
+    ? Math.max(4, stackStart - 36)
+    : Math.min(stackEnd + 4, viewportH - 32);
 
   const expanded = expandedId ? cameras.find((c) => c.id === expandedId) : null;
 
@@ -223,6 +275,70 @@ export function CameraPipOverlay() {
           </div>
         </div>
       ))}
+
+      {/* Кнопка настроек расположения окон — под стеком */}
+      {!expanded && (
+        <div
+          style={{
+            position: "fixed",
+            top: `calc(${btnTop}px + env(safe-area-inset-top, 0px))`,
+            right: "calc(16px + env(safe-area-inset-right, 0px))",
+            zIndex: 3000,
+          }}
+        >
+          <button
+            onClick={() => setPosMenuOpen((v) => !v)}
+            title="Расположение окон камер"
+            style={{
+              width: 28, height: 28, borderRadius: "50%",
+              background: "var(--bg-card)", border: "1px solid var(--border-color)",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.25)", cursor: "pointer",
+              color: posMenuOpen ? "#007AFF" : "var(--text-muted)",
+              fontSize: 14, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 0,
+            }}
+          >
+            ⚙
+          </button>
+          {posMenuOpen && (
+            <>
+              {/* Прозрачный фон для закрытия меню по клику вне его */}
+              <div
+                style={{ position: "fixed", inset: 0, zIndex: 2999 }}
+                onClick={() => setPosMenuOpen(false)}
+              />
+              <div
+                style={{
+                  position: "absolute", top: 34, right: 0, zIndex: 3000,
+                  background: "var(--bg-card)", border: "1px solid var(--border-color)",
+                  borderRadius: 10, boxShadow: "var(--shadow)", padding: 6, minWidth: 172,
+                }}
+              >
+                <div style={{ fontSize: 11, color: "var(--text-muted)", padding: "2px 10px 6px" }}>
+                  Расположение окон
+                </div>
+                {POSITIONS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => { setPosition(value); setPosMenuOpen(false); }}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      gap: 8, width: "100%", padding: "7px 10px", border: "none", borderRadius: 8,
+                      background: position === value ? "var(--bg-hover)" : "none",
+                      color: "var(--text-primary)", fontSize: 13, cursor: "pointer", textAlign: "left",
+                    }}
+                  >
+                    <span>{label}</span>
+                    <span style={{ color: "#007AFF", fontSize: 12, opacity: position === value ? 1 : 0 }}>
+                      ✓
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Развёрнутый просмотр */}
       {expanded && (
