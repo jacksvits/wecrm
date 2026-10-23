@@ -21,6 +21,8 @@ router.get('/', authMiddleware, async (_req, res) => {
       isActive: s?.isActive ?? false,
       // опция «Авто синхронизация»: фоновая синхронизация по расписанию (worker)
       autoSync: s?.autoSync ?? true,
+      // источник остатков: 'warehouse' (по умолчанию) — из CRM в OZON; 'ozon' — из кабинета OZON в складской учёт CRM
+      stockSource: s?.stockSource ?? 'warehouse',
       clientId: s?.clientId ?? '',
       apiKeySet: !!s?.apiKey,
       updateIntervalMinutes: s?.updateIntervalMinutes ?? 60,
@@ -42,8 +44,11 @@ router.get('/', authMiddleware, async (_req, res) => {
 router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
-    const { clientId, apiKey, updateIntervalMinutes, defaultTypeId, autoSync } = req.body || {};
+    const { clientId, apiKey, updateIntervalMinutes, defaultTypeId, autoSync, stockSource } = req.body || {};
     if (clientId !== undefined && typeof clientId !== 'string') return res.status(400).json({ error: 'Некорректный Client-Id' });
+    if (stockSource !== undefined && stockSource !== 'warehouse' && stockSource !== 'ozon') {
+      return res.status(400).json({ error: 'Некорректный источник остатков' });
+    }
 
     const existing = await prisma.ozonSellerSettings.findUnique({ where: { id: 1 } });
     const data = {
@@ -59,6 +64,8 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
           : (existing?.defaultTypeId ?? null),
       // опция «Авто синхронизация»: не передана (старые клиенты) — сохраняем текущее значение
       autoSync: typeof autoSync === 'boolean' ? autoSync : (existing?.autoSync ?? true),
+      // источник остатков: не передан — сохраняем текущее значение (по умолчанию 'warehouse')
+      stockSource: stockSource !== undefined ? stockSource : (existing?.stockSource ?? 'warehouse'),
     };
 
     // Проверка подключения при сохранении

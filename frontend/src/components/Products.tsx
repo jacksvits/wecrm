@@ -1925,14 +1925,15 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
   const [color, setColor] = useState(isNew ? '#f0f0f0' : priceType.color);
   const [forVitrine, setForVitrine] = useState(isNew ? false : !!priceType.forVitrine);
   const [forVk, setForVk] = useState(isNew ? false : !!priceType.forVk);
+  const [forOzon, setForOzon] = useState(isNew ? false : !!priceType.forOzon);
   const [isRetail, setIsRetail] = useState(isNew ? false : !!priceType.isRetail);
   const [forCashless, setForCashless] = useState(isNew ? false : !!priceType.forCashless);
   const [error, setError] = useState('');
 
   const save = async () => {
     try {
-      if (isNew) await api.products.priceTypes.create({ name, label, color, forVitrine, forVk, isRetail, forCashless });
-      else await api.products.priceTypes.update(priceType.id, { label, color, forVitrine, forVk, isRetail, forCashless });
+      if (isNew) await api.products.priceTypes.create({ name, label, color, forVitrine, forVk, forOzon, isRetail, forCashless });
+      else await api.products.priceTypes.update(priceType.id, { label, color, forVitrine, forVk, forOzon, isRetail, forCashless });
       onSaved();
     } catch (e: any) { setError(e.message || 'Ошибка'); }
   };
@@ -1973,6 +1974,15 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
             <input type="checkbox" checked={forVk} onChange={e => setForVk(e.target.checked)} />
             Для ВК
           </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+            <input type="checkbox" checked={forOzon} onChange={e => setForOzon(e.target.checked)} />
+            Для OZON
+          </label>
+          {forOzon && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -6 }}>
+              Этот вид цен будет использоваться при синхронизации с OZON Seller вместо розничного. Отметить можно только один вид цен.
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={save} style={btnPrimary}>Сохранить</button>
             {!isNew && <button onClick={remove} style={{ ...btnPrimary, background: '#dc2626' }}>Удалить</button>}

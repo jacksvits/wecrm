@@ -1508,6 +1508,8 @@ model PriceType {
   isActive  Boolean  @default(true) @map("is_active")
   isRetail  Boolean  @default(false) @map("is_retail")
   forCashless Boolean @default(false) @map("for_cashless")
+  // опция «Ozon»: активный вид цен с этим флагом используется при синхронизации с OZON Seller
+  forOzon   Boolean  @default(false) @map("for_ozon")
   createdAt DateTime @default(now()) @map("created_at")
 
   prices       ProductPrice[]
@@ -1730,6 +1732,8 @@ model OzonSellerSettings {
   isActive              Boolean   @default(false) @map("is_active")
   autoSync              Boolean   @default(true) @map("auto_sync") // авто-синхронизация по расписанию (worker); ручная синхронизация доступна всегда
   updateIntervalMinutes Int       @default(60) @map("update_interval_minutes")
+  // Источник остатков: 'warehouse' — из складского учёта CRM в OZON (по умолчанию); 'ozon' — из кабинета OZON в складской учёт CRM
+  stockSource           String    @default("warehouse") @map("stock_source")
   // Категория OZON (type_id) по умолчанию для новых товаров — выбирается из дерева категорий OZON
   defaultTypeId         Int?      @map("default_type_id")
   lastSyncAt            DateTime? @map("last_sync_at")

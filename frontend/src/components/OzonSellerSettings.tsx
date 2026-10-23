@@ -33,7 +33,7 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
 
 export default function OzonSellerSettings() {
   const [settings, setSettings] = useState<any>(null);
-  const [form, setForm] = useState({ clientId: '', apiKey: '', updateIntervalMinutes: 60, defaultTypeId: null as number | null, autoSync: true });
+  const [form, setForm] = useState({ clientId: '', apiKey: '', updateIntervalMinutes: 60, defaultTypeId: null as number | null, autoSync: true, stockSource: 'warehouse' as 'warehouse' | 'ozon' });
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState('');
@@ -52,7 +52,7 @@ export default function OzonSellerSettings() {
     try {
       const s = await api.ozonPlugin.get();
       setSettings(s);
-      setForm({ clientId: s.clientId || '', apiKey: '', updateIntervalMinutes: s.updateIntervalMinutes || 60, defaultTypeId: s.defaultTypeId ?? null, autoSync: s.autoSync ?? true });
+      setForm({ clientId: s.clientId || '', apiKey: '', updateIntervalMinutes: s.updateIntervalMinutes || 60, defaultTypeId: s.defaultTypeId ?? null, autoSync: s.autoSync ?? true, stockSource: s.stockSource === 'ozon' ? 'ozon' : 'warehouse' });
     } catch (e: any) {
       flash(e.message || 'Ошибка загрузки настроек', true);
     }
@@ -115,6 +115,7 @@ export default function OzonSellerSettings() {
         updateIntervalMinutes: Number(form.updateIntervalMinutes) || 60,
         autoSync: form.autoSync,
         defaultTypeId: form.defaultTypeId,
+        stockSource: form.stockSource,
       });
       setSettings((prev: any) => ({ ...prev, ...res }));
       flash(res.isActive
@@ -244,6 +245,22 @@ export default function OzonSellerSettings() {
           disabled={!form.autoSync}
           style={{ ...inputStyle, maxWidth: 120, opacity: form.autoSync ? 1 : 0.5 }}
         />
+      </div>
+
+      <div>
+        <label style={labelStyle}>Остатки на складах</label>
+        <select
+          value={form.stockSource}
+          onChange={e => setForm({ ...form, stockSource: e.target.value === 'ozon' ? 'ozon' : 'warehouse' })}
+          style={inputStyle}
+        >
+          <option value="warehouse">Со склада — выгружать из CRM в OZON</option>
+          <option value="ozon">С OZON — забирать из кабинета в складской учёт CRM</option>
+        </select>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+          «Со склада» — при синхронизации остатки из складского учёта CRM выгружаются в кабинет OZON (по умолчанию).
+          «С OZON» — остатки из кабинета OZON записываются в складской учёт CRM, в OZON ничего не отправляется.
+        </div>
       </div>
 
       {msg && (

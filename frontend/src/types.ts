@@ -120,6 +120,7 @@ export interface Reminder {
 export interface Warehouse { id: string; name: string; location?: string | null; isActive: boolean; sortOrder: number; createdAt: string; }
 export interface PriceType { id: string; name: string; label: string; color: string; sortOrder: number; isActive: boolean; createdAt: string;   forVitrine?: boolean;
   forVk?: boolean;
+  forOzon?: boolean;
   isRetail?: boolean;
   forCashless?: boolean;
 }

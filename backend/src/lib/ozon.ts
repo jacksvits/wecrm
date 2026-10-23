@@ -246,6 +246,59 @@ export async function ozonUpdateStocks(items: { product_id: number; stock: numbe
   });
 }
 
+/**
+ * Остатки товаров из кабинета OZON: offer_id → суммарный остаток (present) по всем складам продавца.
+ * Используется, когда в настройках плагина источник остатков — «С OZON».
+ */
+export async function fetchOzonStocks(): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  let lastId = '';
+  for (let page = 0; page < 100; page++) {
+    const data = await ozonApi('POST', '/v3/product/info/stocks', {
+      filter: { visibility: 'ALL' },
+      limit: 100,
+      ...(lastId ? { last_id: lastId } : {}),
+    });
+    const items = data?.items || data?.result?.items || [];
+    if (!items.length) break;
+    for (const it of items) {
+      const offerId = String(it.offer_id ?? '');
+      if (!offerId) continue;
+      const stock = (it.stocks || []).reduce((sum: number, w: any) => sum + (Number(w.present) || 0), 0);
+      map.set(offerId, (map.get(offerId) || 0) + stock);
+    }
+    const next = String(items[items.length - 1]?.product_id ?? '');
+    if (!next || next === lastId) break;
+    lastId = next;
+  }
+  return map;
+}
+
+/**
+ * Записать остаток из кабинета OZON в складской учёт CRM (первый активный склад).
+ * Баланс обновляется как корректировка (абсолютное значение) с движением «Синхронизация OZON»;
+ * если остаток не изменился — записей не создаётся.
+ */
+async function applyOzonStockToWarehouse(productId: string, quantity: number): Promise<void> {
+  const warehouse = await prisma.warehouse.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } });
+  if (!warehouse) throw new Error('В CRM нет активного склада — создайте склад, чтобы сохранять остатки из OZON');
+  const qty = Math.max(0, Math.round(quantity));
+  const balance = await prisma.stockBalance.findUnique({
+    where: { productId_warehouseId: { productId, warehouseId: warehouse.id } },
+  });
+  if (balance && Math.round(balance.quantity) === qty) return;
+  await prisma.$transaction(async (tx) => {
+    await tx.stockMovement.create({
+      data: { productId, warehouseId: warehouse.id, type: 'adjust', quantity: qty, comment: 'Синхронизация OZON' },
+    });
+    await tx.stockBalance.upsert({
+      where: { productId_warehouseId: { productId, warehouseId: warehouse.id } },
+      create: { productId, warehouseId: warehouse.id, quantity: qty },
+      update: { quantity: qty },
+    });
+  });
+}
+
 let categoryTreeCache: { at: number; tree: any[] } | null = null;
 
 /** Дерево категорий OZON (кэш 24 ч) — для выбора категории по умолчанию в настройках плагина */
@@ -294,6 +347,21 @@ export async function resolveRetailType(): Promise<{ id: string } | null> {
   if (named) return { id: named.id };
   const any = await prisma.priceType.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } });
   return any ? { id: any.id } : null;
+}
+
+/**
+ * Вид цен для выгрузки в OZON: АКТИВНЫЙ вид цен с опцией «Ozon» (price_types.for_ozon) —
+ * задаётся в карточке вида цен (Склад → Виды цен). Если опция не включена ни для одного
+ * вида цен — обычная розничная логика (как для ВК и импорта).
+ */
+export async function resolveOzonPriceType(): Promise<{ id: string } | null> {
+  try {
+    const ozonType = await prisma.priceType.findFirst({ where: { forOzon: true, isActive: true } });
+    if (ozonType) return { id: ozonType.id };
+  } catch {
+    // колонка for_ozon ещё не применена (миграция) — работаем по прежней схеме
+  }
+  return resolveRetailType();
 }
 
 /** ID товаров из OZON (product_id + offer_id) через /v3/product/list */
@@ -692,11 +760,17 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
     : [];
   const pathById = new Map(attachments.map((a) => [a.id, a.path]));
 
-  // Розничный вид цен (как для ВК и для импорта)
-  const retailType = await resolveRetailType();
+  // Вид цен для OZON: активный вид с опцией «Ozon», иначе розничный (прежнее поведение)
+  const priceType = await resolveOzonPriceType();
+
+  // Источник остатков (настройка плагина): 'ozon' — из кабинета OZON в складской учёт CRM,
+  // 'warehouse' (по умолчанию) — из складского учёта CRM в кабинет OZON
+  const stockFromOzon = settings.stockSource === 'ozon';
+  const ozonStocks = stockFromOzon ? await fetchOzonStocks() : null;
 
   // Остатки в OZON обязательно привязаны к складу — берём первый склад продавца
-  const warehouseIds = await getOzonWarehouseIds();
+  // (нужен только когда остатки выгружаются из CRM в OZON)
+  const warehouseIds = stockFromOzon ? [] : await getOzonWarehouseIds();
   const warehouseId = warehouseIds[0] ?? null;
   const requireWarehouse = () => {
     if (!warehouseId) throw new Error('В кабинете OZON нет складов — создайте склад, чтобы выгружать остатки');
@@ -720,8 +794,8 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
   for (const product of products) {
     try {
       const offerId = product.article || product.sku || product.id;
-      const retail = retailType ? product.prices.find((p) => p.priceTypeId === retailType!.id) : null;
-      const price = retail?.price ?? null;
+      const priceRow = priceType ? product.prices.find((p) => p.priceTypeId === priceType!.id) : null;
+      const price = priceRow?.price ?? null;
       const quantity = product.stocks.reduce((sum, s) => sum + s.quantity, 0);
       // публичные URL всех картинок (до 10) — OZON забирает файлы сам при импорте
       const firstImageUrl = (() => {
@@ -762,7 +836,8 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
           // категория не определена — старое поведение: только цена
           await ozonUpdatePrices([{ product_id: Number(product.ozonProductId), price: Math.round(price) }]);
         }
-        await ozonUpdateStocks([{ product_id: Number(product.ozonProductId), stock: Math.max(0, Math.round(quantity)) }], requireWarehouse());
+        if (stockFromOzon) await applyOzonStockToWarehouse(product.id, ozonStocks!.get(offerId) ?? 0);
+        else await ozonUpdateStocks([{ product_id: Number(product.ozonProductId), stock: Math.max(0, Math.round(quantity)) }], requireWarehouse());
         await prisma.product.update({ where: { id: product.id }, data: { ozonSyncedAt: new Date() } });
         summary.updated++;
         continue;
@@ -773,7 +848,8 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
       if (existingId) {
         await prisma.product.update({ where: { id: product.id }, data: { ozonProductId: BigInt(existingId), ozonSyncedAt: new Date() } });
         if (price != null) await ozonUpdatePrices([{ product_id: existingId, price: Math.round(price) }]);
-        await ozonUpdateStocks([{ product_id: existingId, stock: Math.max(0, Math.round(quantity)) }], requireWarehouse());
+        if (stockFromOzon) await applyOzonStockToWarehouse(product.id, ozonStocks!.get(offerId) ?? 0);
+        else await ozonUpdateStocks([{ product_id: existingId, stock: Math.max(0, Math.round(quantity)) }], requireWarehouse());
         summary.updated++;
         continue;
       }
@@ -794,7 +870,9 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         descriptionCategoryId,
         barcode: product.barcode || undefined,
         price: price != null ? Math.round(price) : undefined,
-        quantity: Math.max(0, Math.round(quantity)),
+        // остаток в кабинете при создании задаём только в режиме «Со склада»;
+        // в режиме «С OZON» количество берём из кабинета после создания товара
+        quantity: stockFromOzon ? undefined : Math.max(0, Math.round(quantity)),
         // картинка из карточки CRM → OZON забирает её по публичному URL
         images: firstImageUrl,
         // характеристики из карточки CRM (вес, габариты, штрихкод, бренд)
@@ -819,6 +897,7 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         where: { id: product.id },
         data: { ozonProductId: newId != null ? BigInt(newId) : null, ozonSyncedAt: new Date() },
       });
+      if (stockFromOzon) await applyOzonStockToWarehouse(product.id, ozonStocks!.get(offerId) ?? 0);
       summary.created++;
     } catch (err: any) {
       summary.failed++;

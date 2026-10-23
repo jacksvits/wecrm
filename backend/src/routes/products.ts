@@ -264,7 +264,7 @@ router.get('/meta/price-types', async (_req, res) => {
  */
 router.post('/meta/price-types', async (req, res) => {
   try {
-    const { name, label, color, sortOrder, forVitrine, forVk, isRetail, forCashless } = req.body;
+    const { name, label, color, sortOrder, forVitrine, forVk, forOzon, isRetail, forCashless } = req.body;
     if (!name?.trim() || !label?.trim()) return res.status(400).json({ error: 'Название и метка обязательны' });
     const count = await prisma.priceType.count();
     const priceType = await prisma.priceType.create({
@@ -274,6 +274,8 @@ router.post('/meta/price-types', async (req, res) => {
     if (isRetail) await prisma.$executeRawUnsafe(`UPDATE price_types SET is_retail = true WHERE id = '${priceType.id}'`);
     if (forCashless) await prisma.$executeRawUnsafe(`UPDATE price_types SET for_cashless = true WHERE id = '${priceType.id}'`);
     if (forVk) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = true WHERE id = '${priceType.id}'`); }
+    // опция «Ozon»: эксклюзивный флаг — отмеченным может быть только один вид цен
+    if (forOzon) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_ozon = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_ozon = true WHERE id = '${priceType.id}'`); }
     res.status(201).json(priceType);
   } catch (err: any) {
     if (err.code === 'P2002') return res.status(400).json({ error: 'Такой вид цены уже есть' });
@@ -309,6 +311,11 @@ router.patch('/meta/price-types/:id', async (req, res) => {
     if (req.body.forVk !== undefined) {
       if (req.body.forVk) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = true WHERE id = '${req.params.id}'`); }
       else await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = false WHERE id = '${req.params.id}'`);
+    }
+    // опция «Ozon»: эксклюзивный флаг — при включении снимаем с остальных видов цен
+    if (req.body.forOzon !== undefined) {
+      if (req.body.forOzon) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_ozon = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_ozon = true WHERE id = '${req.params.id}'`); }
+      else await prisma.$executeRawUnsafe(`UPDATE price_types SET for_ozon = false WHERE id = '${req.params.id}'`);
     }
     const priceType = await prisma.priceType.update({ where: { id: req.params.id }, data });
     res.json(priceType);
