@@ -281,6 +281,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     delete: (id: string) => fetchApi(`/api/products/${id}`, { method: 'DELETE' }),
     bulkDelete: (ids: string[]) => fetchApi('/api/products/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
     bulkCategory: (ids: string[], categoryId: string | null) => fetchApi('/api/products/bulk-category', { method: 'POST', body: JSON.stringify({ ids, categoryId }) }),
+    bulkFlags: (ids: string[], flag: 'vitrine' | 'vk' | 'ozon') => fetchApi('/api/products/bulk-flags', { method: 'POST', body: JSON.stringify({ ids, flag }) }),
     createMovement: (id: string, data: Partial<StockMovement>) => fetchApi(`/api/products/${id}/movements`, { method: 'POST', body: JSON.stringify(data) }),
     setPrice: (id: string, priceTypeId: string, price: number, priceFrom?: boolean) => fetchApi(`/api/products/${id}/prices`, { method: 'PUT', body: JSON.stringify({ priceTypeId, price, ...(priceFrom !== undefined ? { priceFrom } : {}) }) }),
     priceHistory: (id: string): Promise<PriceHistory[]> => fetchApi(`/api/products/${id}/history`),

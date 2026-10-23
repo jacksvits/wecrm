@@ -106,6 +106,8 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkCat, setBulkCat] = useState('');
   const [bulkBusy, setBulkBusy] = useState(false);
+  // Массовое переключение флага (витрина / ВК / OZON) у выбранных товаров
+  const [bulkFlag, setBulkFlag] = useState('');
 
   const importFromVk = async () => {
     if (!confirm('Импортировать все товары маркета группы ВК в проект? Позиции с совпадающим названием будут привязаны, не продублированы.')) return;
@@ -417,6 +419,25 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
     walk(null, 0);
     return out;
   }, [catChildren]);
+
+  // Массовое переключение флага: стоявший снимается, отсутствующий устанавливается
+  const BULK_FLAG_LABELS: Record<string, string> = { vitrine: '«На витрине»', vk: '«Товары в ВК»', ozon: '«Ozon»' };
+  const bulkToggleFlag = async (flag: string) => {
+    if (!flag || selected.size === 0) return;
+    if (!confirm(`Переключить флаг ${BULK_FLAG_LABELS[flag]} у ${selected.size} выбранных позиций?\nУ товаров, где флаг стоит, он будет снят; где не стоит — установлен.`)) { setBulkFlag(''); return; }
+    setBulkBusy(true);
+    try {
+      const r: any = await api.products.bulkFlags([...selected], flag as 'vitrine' | 'vk' | 'ozon');
+      setSelected(new Set());
+      setBulkFlag('');
+      await load();
+      alert(`Готово: установлено ${r.set}, снято ${r.cleared}`);
+    } catch (err: any) {
+      alert(err.message || 'Ошибка');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   const bulkDelete = async () => {
     if (!confirm(`Удалить выбранные позиции (${selected.size})?`)) return;
@@ -738,6 +759,17 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
               <select value={bulkCat} onChange={e => setBulkCat(e.target.value)} style={{ ...inputStyle, maxWidth: 280 }}>
                 <option value="">— Без категории —</option>
                 {categoryOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+              <select
+                value={bulkFlag}
+                onChange={e => { setBulkFlag(e.target.value); bulkToggleFlag(e.target.value); }}
+                disabled={bulkBusy}
+                style={{ ...inputStyle, maxWidth: 170, opacity: bulkBusy ? 0.6 : 1, cursor: 'pointer' }}
+              >
+                <option value="">— Флаги —</option>
+                <option value="vitrine">На витрине</option>
+                <option value="vk">Товары в ВК</option>
+                <option value="ozon">Ozon</option>
               </select>
               <button onClick={bulkMove} disabled={bulkBusy} style={{ ...btnPrimary, opacity: bulkBusy ? 0.6 : 1 }}>Перенести</button>
               <button onClick={bulkDelete} disabled={bulkBusy} style={{ ...btnPrimary, background: '#dc2626', opacity: bulkBusy ? 0.6 : 1 }}>Удалить</button>

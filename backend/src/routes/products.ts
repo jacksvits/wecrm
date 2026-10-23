@@ -835,6 +835,29 @@ router.post('/bulk-delete', async (req, res) => {
 });
 
 /**
+ * POST /api/products/bulk-flags
+ * Массовое переключение флага { ids: string[], flag: 'vitrine' | 'vk' | 'ozon' } —
+ * у каждого выбранного товара флаг инвертируется (стоял → снимается, не стоял → ставится).
+ */
+router.post('/bulk-flags', async (req, res) => {
+  try {
+    const { ids, flag } = req.body;
+    if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids обязателен' });
+    const field = flag === 'vitrine' ? 'onVitrine' : flag === 'vk' ? 'syncToVk' : flag === 'ozon' ? 'syncToOzon' : null;
+    if (!field) return res.status(400).json({ error: 'Некорректный флаг' });
+    const existing = await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, [field]: true } });
+    const toSet = existing.filter((p: any) => !p[field]).map((p: any) => p.id);
+    const toClear = existing.filter((p: any) => p[field]).map((p: any) => p.id);
+    if (toSet.length) await prisma.product.updateMany({ where: { id: { in: toSet } }, data: { [field]: true } });
+    if (toClear.length) await prisma.product.updateMany({ where: { id: { in: toClear } }, data: { [field]: false } });
+    res.json({ success: true, set: toSet.length, cleared: toClear.length, updated: existing.length });
+  } catch (err: any) {
+    console.error('[products:bulk-flags]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/products/bulk-category
  * Массовый перенос в категорию { ids: string[], categoryId: string | null }
  * (categoryId = null — снять категорию)
