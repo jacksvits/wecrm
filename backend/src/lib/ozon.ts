@@ -248,16 +248,17 @@ export async function ozonUpdateStocks(items: { product_id: number; stock: numbe
 
 /**
  * Остатки товаров из кабинета OZON: offer_id → суммарный остаток (present) по всем складам продавца.
+ * Чтение через /v4/product/info/stocks (постранично по cursor).
  * Используется, когда в настройках плагина источник остатков — «С OZON».
  */
 export async function fetchOzonStocks(): Promise<Map<string, number>> {
   const map = new Map<string, number>();
-  let lastId = '';
-  for (let page = 0; page < 100; page++) {
-    const data = await ozonApi('POST', '/v3/product/info/stocks', {
+  let cursor = '';
+  for (let page = 0; page < 200; page++) {
+    const data = await ozonApi('POST', '/v4/product/info/stocks', {
       filter: { visibility: 'ALL' },
       limit: 100,
-      ...(lastId ? { last_id: lastId } : {}),
+      ...(cursor ? { cursor } : {}),
     });
     const items = data?.items || data?.result?.items || [];
     if (!items.length) break;
@@ -267,9 +268,9 @@ export async function fetchOzonStocks(): Promise<Map<string, number>> {
       const stock = (it.stocks || []).reduce((sum: number, w: any) => sum + (Number(w.present) || 0), 0);
       map.set(offerId, (map.get(offerId) || 0) + stock);
     }
-    const next = String(items[items.length - 1]?.product_id ?? '');
-    if (!next || next === lastId) break;
-    lastId = next;
+    const next = String(data?.cursor ?? '');
+    if (!next || next === cursor) break;
+    cursor = next;
   }
   return map;
 }
