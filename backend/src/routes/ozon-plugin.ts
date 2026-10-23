@@ -23,6 +23,8 @@ router.get('/', authMiddleware, async (_req, res) => {
       autoSync: s?.autoSync ?? true,
       // источник остатков: 'warehouse' (по умолчанию) — из CRM в OZON; 'ozon' — из кабинета OZON в складской учёт CRM
       stockSource: s?.stockSource ?? 'warehouse',
+      // целевой склад CRM для остатков из кабинета (NULL — первый активный склад)
+      stockWarehouseId: s?.stockWarehouseId ?? null,
       clientId: s?.clientId ?? '',
       apiKeySet: !!s?.apiKey,
       updateIntervalMinutes: s?.updateIntervalMinutes ?? 60,
@@ -44,8 +46,11 @@ router.get('/', authMiddleware, async (_req, res) => {
 router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
-    const { clientId, apiKey, updateIntervalMinutes, defaultTypeId, autoSync, stockSource } = req.body || {};
+    const { clientId, apiKey, updateIntervalMinutes, defaultTypeId, autoSync, stockSource, stockWarehouseId } = req.body || {};
     if (clientId !== undefined && typeof clientId !== 'string') return res.status(400).json({ error: 'Некорректный Client-Id' });
+    if (stockWarehouseId !== undefined && stockWarehouseId !== null && typeof stockWarehouseId !== 'string') {
+      return res.status(400).json({ error: 'Некорректный склад для остатков' });
+    }
     if (stockSource !== undefined && stockSource !== 'warehouse' && stockSource !== 'ozon') {
       return res.status(400).json({ error: 'Некорректный источник остатков' });
     }
@@ -66,6 +71,8 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
       autoSync: typeof autoSync === 'boolean' ? autoSync : (existing?.autoSync ?? true),
       // источник остатков: не передан — сохраняем текущее значение (по умолчанию 'warehouse')
       stockSource: stockSource !== undefined ? stockSource : (existing?.stockSource ?? 'warehouse'),
+      // целевой склад для остатков из кабинета: пустая строка — сброс (первый активный склад)
+      stockWarehouseId: stockWarehouseId !== undefined ? (stockWarehouseId || null) : (existing?.stockWarehouseId ?? null),
     };
 
     // Проверка подключения при сохранении

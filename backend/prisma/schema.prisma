@@ -1734,6 +1734,8 @@ model OzonSellerSettings {
   updateIntervalMinutes Int       @default(60) @map("update_interval_minutes")
   // Источник остатков: 'warehouse' — из складского учёта CRM в OZON (по умолчанию); 'ozon' — из кабинета OZON в складской учёт CRM
   stockSource           String    @default("warehouse") @map("stock_source")
+  // Целевой склад CRM для остатков из кабинета OZON (опция «С OZON»); NULL — первый активный склад
+  stockWarehouseId      String?   @map("stock_warehouse_id")
   // Категория OZON (type_id) по умолчанию для новых товаров — выбирается из дерева категорий OZON
   defaultTypeId         Int?      @map("default_type_id")
   lastSyncAt            DateTime? @map("last_sync_at")

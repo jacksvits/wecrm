@@ -33,7 +33,9 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
 
 export default function OzonSellerSettings() {
   const [settings, setSettings] = useState<any>(null);
-  const [form, setForm] = useState({ clientId: '', apiKey: '', updateIntervalMinutes: 60, defaultTypeId: null as number | null, autoSync: true, stockSource: 'warehouse' as 'warehouse' | 'ozon' });
+  const [form, setForm] = useState({ clientId: '', apiKey: '', updateIntervalMinutes: 60, defaultTypeId: null as number | null, autoSync: true, stockSource: 'warehouse' as 'warehouse' | 'ozon', stockWarehouseId: null as string | null });
+  // Склады CRM — для выбора целевого склада остатков из кабинета OZON
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState('');
@@ -52,13 +54,20 @@ export default function OzonSellerSettings() {
     try {
       const s = await api.ozonPlugin.get();
       setSettings(s);
-      setForm({ clientId: s.clientId || '', apiKey: '', updateIntervalMinutes: s.updateIntervalMinutes || 60, defaultTypeId: s.defaultTypeId ?? null, autoSync: s.autoSync ?? true, stockSource: s.stockSource === 'ozon' ? 'ozon' : 'warehouse' });
+      setForm({ clientId: s.clientId || '', apiKey: '', updateIntervalMinutes: s.updateIntervalMinutes || 60, defaultTypeId: s.defaultTypeId ?? null, autoSync: s.autoSync ?? true, stockSource: s.stockSource === 'ozon' ? 'ozon' : 'warehouse', stockWarehouseId: s.stockWarehouseId ?? null });
     } catch (e: any) {
       flash(e.message || 'Ошибка загрузки настроек', true);
     }
   };
 
   useEffect(() => { load(); }, []);
+
+  // Список складов CRM для селекта «Склад для остатков из OZON»
+  useEffect(() => {
+    api.products.warehouses.list()
+      .then((list: any[]) => setWarehouses((list || []).filter((w: any) => w.isActive)))
+      .catch(() => {});
+  }, []);
 
   // Дерево категорий OZON: грузим только когда плагин подключён (нужен API-ключ)
   useEffect(() => {
@@ -116,6 +125,7 @@ export default function OzonSellerSettings() {
         autoSync: form.autoSync,
         defaultTypeId: form.defaultTypeId,
         stockSource: form.stockSource,
+        stockWarehouseId: form.stockWarehouseId,
       });
       setSettings((prev: any) => ({ ...prev, ...res }));
       flash(res.isActive
@@ -261,6 +271,24 @@ export default function OzonSellerSettings() {
           «Со склада» — при синхронизации остатки из складского учёта CRM выгружаются в кабинет OZON (по умолчанию).
           «С OZON» — остатки из кабинета OZON записываются в складской учёт CRM, в OZON ничего не отправляется.
         </div>
+        {form.stockSource === 'ozon' && (
+          <>
+            <label style={{ ...labelStyle, marginTop: 10 }}>Склад для остатков из OZON</label>
+            <select
+              value={form.stockWarehouseId ?? ''}
+              onChange={e => setForm({ ...form, stockWarehouseId: e.target.value || null })}
+              style={inputStyle}
+            >
+              <option value="">Первый активный склад (по умолчанию)</option>
+              {warehouses.map((w: any) => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
+            </select>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+              Остатки из кабинета OZON будут записываться на выбранный склад складского учёта.
+            </div>
+          </>
+        )}
       </div>
 
       {msg && (
