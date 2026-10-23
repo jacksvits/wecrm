@@ -854,6 +854,209 @@ export function TaskList() {
   );
   const renderKanban = () => {
     // Пользователь без привязанных проектов не видит задачи ни в одном режиме
+    // Карточка канбана — переиспользуется в колонках статусов и в колонке «Избранные»
+    const renderKanbanCard = (task: Task) => (
+    <div
+      key={task.id}
+      style={{
+        padding: 14,
+        borderRadius: 14,
+        border: "1px solid var(--border-color)",
+        background: getTaskBackground(getStatusStyle(task.status).bg),
+        borderLeft: getTaskBorderLeft(getStatusStyle(task.status).bg),
+        cursor: "pointer",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+        position: "relative",
+      }}
+      onClick={() => navigate(`/tasks/${task.id}`)}
+    >
+      {" "}
+      <div
+        style={{
+          position: "absolute",
+          top: 8,
+          right: 8,
+          display: "flex",
+          gap: 4,
+        }}
+      >
+        {" "}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleToggleFavorite(task);
+          }}
+          title={task.isFavorite ? "Убрать из избранного" : "В избранное"}
+          style={{
+            width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+            borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
+            color: task.isFavorite ? "#f59e0b" : "var(--text-muted)", cursor: "pointer",
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill={task.isFavorite ? "#f59e0b" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+        </button>
+        {" "}
+        {canHandleSpam && task.sourceEmail && task.status !== "spam" && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleMarkSpam(task);
+            }}
+            title="СПАМ: добавить адрес в спам-фильтры (Junk), задача → «Спам»"
+            style={{
+              width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+              borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
+              fontSize: 15, cursor: "pointer", lineHeight: 1,
+            }}
+          >
+            ☠️
+          </button>
+        )}
+        {" "}
+        {canEditTask(task) && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openEdit(task);
+            }}
+            title="Изменить"
+            style={{
+              width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+              borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
+              color: "var(--text-color)", cursor: "pointer",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+            </svg>
+          </button>
+        )}{" "}
+        {isAdmin && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete(task.id);
+            }}
+            title="Удалить"
+            style={{
+              width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+              borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
+              color: "#dc2626", cursor: "pointer",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+          </button>
+        )}{" "}
+      </div>{" "}
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          alignItems: "baseline",
+          marginBottom: 6,
+          paddingRight: 132,
+        }}
+      >
+        {task.ticketNumber != null && (
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--text-muted)",
+              flexShrink: 0,
+            }}
+          >
+            #{task.ticketNumber}
+          </span>
+        )}
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 500,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: isMobile ? "normal" : "nowrap",
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical",
+            WebkitLineClamp: isMobile ? 2 : 1,
+          }}
+        >
+          {task.title}
+        </span>
+      </div>{" "}
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          flexWrap: "wrap",
+          marginBottom: 6,
+        }}
+      >
+        {" "}
+        <span
+          style={{
+            padding: "2px 6px",
+            borderRadius: 8,
+            fontSize: 10,
+            background:
+              task.priority === "urgent"
+                ? "#fee2e2"
+                : task.priority === "high"
+                  ? "#fef3c7"
+                  : "#f0f0f0",
+            color:
+              task.priority === "urgent"
+                ? "#dc2626"
+                : task.priority === "high"
+                  ? "#92400e"
+                  : "#666",
+          }}
+        >
+          {priorityLabels[task.priority]}
+        </span>{" "}
+      </div>{" "}
+      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+        {task.startDate ? `Начало: ${formatDateTime(task.startDate, user?.timezone)} · ` : ""}
+        {task.dueDate
+          ? formatDateTime(task.dueDate, user?.timezone)
+          : "Без срока"}{" "}
+        ·{" "}
+        {task.assignees?.map((a) => a.user.name).join(", ") ||
+          "Не назначено"}
+      </div>{" "}
+      {task.curators && task.curators.length > 0 && (
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+          Кураторы: {task.curators.map((c) => c.name).join(", ")}
+        </div>
+      )}{" "}
+      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+        Создал: {task.creator?.name || "—"}
+      </div>{" "}
+      {task.contact && (
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+          Контакт:{" "}
+          <span
+            style={{ color: "#1565c0", cursor: "pointer" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/contacts/${task.contact!.id}`);
+            }}
+          >
+            {task.contact.name}
+          </span>
+        </div>
+      )}
+    </div>
+    );
+
     if (!isAdmin && projects.length === 0) {
       return (
         <div style={{ textAlign: "center", padding: 40, color: "var(--text-muted)", fontSize: 14 }}>
@@ -956,6 +1159,69 @@ export function TaskList() {
         }}
       >
         {isMobile && renderMobileTabs()}
+        {/* Колонка «Избранные» — карточки задач, отмеченных текущим пользователем (десктоп, только при выключенном фильтре «Избранное») */}
+        {!isMobile &&
+          !favoriteOnly &&
+          (() => {
+            const favTasks = rootTasks.filter((t) => t.isFavorite);
+            const favEmpty = favTasks.length === 0;
+            return (
+              <div
+                style={{
+                  minWidth: favEmpty ? 48 : 280,
+                  flex: favEmpty ? "0 0 auto" : 1,
+                  flexShrink: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: favEmpty ? "center" : "space-between",
+                    alignItems: "center",
+                    padding: favEmpty ? "12px 4px" : "8px 0",
+                    background: favEmpty ? "#fef3c7" : "transparent",
+                    borderRadius: favEmpty ? 12 : 0,
+                    writingMode: favEmpty ? "vertical-rl" : "horizontal-tb",
+                    textOrientation: favEmpty ? "mixed" : "initial",
+                    minHeight: favEmpty ? 120 : "auto",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: favEmpty ? "#92400e" : "inherit",
+                      letterSpacing: favEmpty ? "0.05em" : "normal",
+                    }}
+                  >
+                    ⭐ Избранные
+                  </span>
+                  {!favEmpty && (
+                    <span
+                      style={{
+                        fontSize: 12,
+                        padding: "2px 8px",
+                        borderRadius: 10,
+                        background: "#f59e0b",
+                        color: "#fff",
+                      }}
+                    >
+                      {favTasks.length}
+                    </span>
+                  )}
+                </div>
+                {!favEmpty && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {favTasks.map((task) => renderKanbanCard(task))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         {taskStatuses.map((status) => {
           const statusTasks = rootTasks.filter((t) => t.status === status.name);
           const projectGroups = groupByProject(statusTasks);
@@ -1041,207 +1307,7 @@ export function TaskList() {
                         {group.name} ({group.tasks.length})
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {group.tasks.map((task) => (
-                          <div
-                            key={task.id}
-                            style={{
-                              padding: 14,
-                              borderRadius: 14,
-                              border: "1px solid var(--border-color)",
-                              background: getTaskBackground(getStatusStyle(task.status).bg),
-                              borderLeft: getTaskBorderLeft(getStatusStyle(task.status).bg),
-                              cursor: "pointer",
-                              boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
-                              position: "relative",
-                            }}
-                            onClick={() => navigate(`/tasks/${task.id}`)}
-                          >
-                            {" "}
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: 8,
-                                right: 8,
-                                display: "flex",
-                                gap: 4,
-                              }}
-                            >
-                              {" "}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleFavorite(task);
-                                }}
-                                title={task.isFavorite ? "Убрать из избранного" : "В избранное"}
-                                style={{
-                                  width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
-                                  borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
-                                  color: task.isFavorite ? "#f59e0b" : "var(--text-muted)", cursor: "pointer",
-                                }}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill={task.isFavorite ? "#f59e0b" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                                </svg>
-                              </button>
-                              {" "}
-                              {canHandleSpam && task.sourceEmail && task.status !== "spam" && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleMarkSpam(task);
-                                  }}
-                                  title="СПАМ: добавить адрес в спам-фильтры (Junk), задача → «Спам»"
-                                  style={{
-                                    width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
-                                    borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
-                                    fontSize: 15, cursor: "pointer", lineHeight: 1,
-                                  }}
-                                >
-                                  ☠️
-                                </button>
-                              )}
-                              {" "}
-                              {canEditTask(task) && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEdit(task);
-                                  }}
-                                  title="Изменить"
-                                  style={{
-                                    width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
-                                    borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
-                                    color: "var(--text-color)", cursor: "pointer",
-                                  }}
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                                  </svg>
-                                </button>
-                              )}{" "}
-                              {isAdmin && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDelete(task.id);
-                                  }}
-                                  title="Удалить"
-                                  style={{
-                                    width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
-                                    borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-card)",
-                                    color: "#dc2626", cursor: "pointer",
-                                  }}
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M3 6h18" />
-                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                                    <line x1="10" y1="11" x2="10" y2="17" />
-                                    <line x1="14" y1="11" x2="14" y2="17" />
-                                  </svg>
-                                </button>
-                              )}{" "}
-                            </div>{" "}
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: 6,
-                                alignItems: "baseline",
-                                marginBottom: 6,
-                                paddingRight: 132,
-                              }}
-                            >
-                              {task.ticketNumber != null && (
-                                <span
-                                  style={{
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    color: "var(--text-muted)",
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  #{task.ticketNumber}
-                                </span>
-                              )}
-                              <span
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: 500,
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: isMobile ? "normal" : "nowrap",
-                                  display: "-webkit-box",
-                                  WebkitBoxOrient: "vertical",
-                                  WebkitLineClamp: isMobile ? 2 : 1,
-                                }}
-                              >
-                                {task.title}
-                              </span>
-                            </div>{" "}
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: 6,
-                                flexWrap: "wrap",
-                                marginBottom: 6,
-                              }}
-                            >
-                              {" "}
-                              <span
-                                style={{
-                                  padding: "2px 6px",
-                                  borderRadius: 8,
-                                  fontSize: 10,
-                                  background:
-                                    task.priority === "urgent"
-                                      ? "#fee2e2"
-                                      : task.priority === "high"
-                                        ? "#fef3c7"
-                                        : "#f0f0f0",
-                                  color:
-                                    task.priority === "urgent"
-                                      ? "#dc2626"
-                                      : task.priority === "high"
-                                        ? "#92400e"
-                                        : "#666",
-                                }}
-                              >
-                                {priorityLabels[task.priority]}
-                              </span>{" "}
-                            </div>{" "}
-                            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                              {task.startDate ? `Начало: ${formatDateTime(task.startDate, user?.timezone)} · ` : ""}
-                              {task.dueDate
-                                ? formatDateTime(task.dueDate, user?.timezone)
-                                : "Без срока"}{" "}
-                              ·{" "}
-                              {task.assignees?.map((a) => a.user.name).join(", ") ||
-                                "Не назначено"}
-                            </div>{" "}
-                            {task.curators && task.curators.length > 0 && (
-                              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                                Кураторы: {task.curators.map((c) => c.name).join(", ")}
-                              </div>
-                            )}{" "}
-                            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                              Создал: {task.creator?.name || "—"}
-                            </div>{" "}
-                            {task.contact && (
-                              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                                Контакт:{" "}
-                                <span
-                                  style={{ color: "#1565c0", cursor: "pointer" }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigate(`/contacts/${task.contact!.id}`);
-                                  }}
-                                >
-                                  {task.contact.name}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                        {group.tasks.map((task) => renderKanbanCard(task))}
                       </div>
                     </div>
                   ))}
@@ -1259,6 +1325,7 @@ export function TaskList() {
     );
   };
   const au = assignableUsers(users);
+
   return (
     <div>
       {" "}
