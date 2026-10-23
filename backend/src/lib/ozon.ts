@@ -276,16 +276,44 @@ export async function fetchOzonStocks(): Promise<Map<string, number>> {
 }
 
 /**
+ * Цены товаров из кабинета OZON: offer_id → текущая цена продажи.
+ * Чтение через /v5/product/info/prices (постранично по cursor).
+ * Используется в режиме цен «С Озона».
+ */
+export async function fetchOzonPrices(): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  let cursor = '';
+  for (let page = 0; page < 200; page++) {
+    const data = await ozonApi('POST', '/v5/product/info/prices', {
+      filter: { visibility: 'ALL' },
+      limit: 100,
+      ...(cursor ? { cursor } : {}),
+    });
+    const items = data?.items || [];
+    if (!items.length) break;
+    for (const it of items) {
+      const offerId = String(it.offer_id ?? '');
+      const price = Number(it?.price?.price) || 0;
+      if (offerId && price > 0) map.set(offerId, price);
+    }
+    const next = String(data?.cursor ?? '');
+    if (!next || next === cursor) break;
+    cursor = next;
+  }
+  return map;
+}
+
+/**
  * Записать остаток из кабинета OZON в складской учёт CRM (склад задаётся вызовом).
  * Баланс обновляется как корректировка (абсолютное значение) с движением «Синхронизация OZON»;
  * если остаток не изменился — записей не создаётся.
  */
-async function applyOzonStockToWarehouse(productId: string, quantity: number, warehouseId: string): Promise<void> {
+async function applyOzonStockToWarehouse(productId: string, quantity: number, warehouseId: string): Promise<boolean> {
   const qty = Math.max(0, Math.round(quantity));
   const balance = await prisma.stockBalance.findUnique({
     where: { productId_warehouseId: { productId, warehouseId } },
   });
-  if (balance && Math.round(balance.quantity) === qty) return;
+  if (balance && Math.round(balance.quantity) === qty) return false;
   await prisma.$transaction(async (tx) => {
     await tx.stockMovement.create({
       data: { productId, warehouseId, type: 'adjust', quantity: qty, comment: 'Синхронизация OZON' },
@@ -296,6 +324,195 @@ async function applyOzonStockToWarehouse(productId: string, quantity: number, wa
       update: { quantity: qty },
     });
   });
+  return true;
+}
+
+/**
+ * Записать цену товара в вид цен с записью в историю (аналог ручного изменения цены).
+ * Возвращает true, если цена реально изменилась.
+ */
+async function writeProductPrice(productId: string, priceTypeId: string, price: number): Promise<boolean> {
+  const existing = await prisma.productPrice.findUnique({
+    where: { productId_priceTypeId: { productId, priceTypeId } },
+  });
+  if (existing && Math.abs(existing.price - price) < 0.005) return false;
+  await prisma.productPrice.upsert({
+    where: { productId_priceTypeId: { productId, priceTypeId } },
+    create: { productId, priceTypeId, price },
+    update: { price },
+  });
+  await prisma.priceHistory.create({
+    data: { productId, priceTypeId, oldPrice: existing?.price ?? 0, newPrice: price },
+  });
+  return true;
+}
+
+/** Итог одной синхронизационной задачи (цены/остатки) */
+export interface OzonJobSummary {
+  updated: number;
+  skipped: number;
+  failed: number;
+  errors: string[];
+}
+
+/** Сохранить результат задачи в настройках плагина (время и JSON-итог с типом задачи) */
+async function saveOzonJobResult(kind: 'products' | 'prices' | 'stocks', summary: unknown): Promise<void> {
+  await prisma.ozonSellerSettings.update({
+    where: { id: 1 },
+    data: { lastSyncAt: new Date(), lastSyncResult: JSON.stringify({ kind, ...(summary as object) }) },
+  }).catch(() => {});
+}
+
+/**
+ * Цены «В Озон»: выгрузить цены (вид «Ozon», иначе розничный) по товарам, привязанным к кабинету.
+ */
+export async function syncPricesToOzon(): Promise<OzonJobSummary> {
+  const settings = await getOzonSettings();
+  if (!settings) throw new Error('OZON Seller не подключён: укажите Client-Id и API-ключ в настройках интеграции');
+  const summary: OzonJobSummary = { updated: 0, skipped: 0, failed: 0, errors: [] };
+  const priceType = await resolveOzonPriceType();
+  if (!priceType) throw new Error('Не задан вид цен для OZON: отметьте опцию «Ozon» у вида цен либо создайте активный вид цен');
+  const products = await prisma.product.findMany({
+    where: { syncToOzon: true, isActive: true, kind: 'product', ozonProductId: { not: null } },
+    include: { prices: true },
+  });
+  const items: { product_id: number; price: number }[] = [];
+  for (const product of products) {
+    const row = product.prices.find((p) => p.priceTypeId === priceType.id);
+    if (row) items.push({ product_id: Number(product.ozonProductId), price: Math.round(row.price) });
+    else summary.skipped++;
+  }
+  for (let i = 0; i < items.length; i += 100) {
+    const chunk = items.slice(i, i + 100);
+    try {
+      await ozonUpdatePrices(chunk);
+      summary.updated += chunk.length;
+    } catch (err: any) {
+      summary.failed += chunk.length;
+      summary.errors.push(err.message);
+    }
+  }
+  await saveOzonJobResult('prices', summary);
+  return summary;
+}
+
+/**
+ * Цены «С Озона»: прочитать цены из кабинета и записать в CRM в вид цен «Ozon» (иначе розничный).
+ */
+export async function syncPricesFromOzon(): Promise<OzonJobSummary> {
+  const settings = await getOzonSettings();
+  if (!settings) throw new Error('OZON Seller не подключён: укажите Client-Id и API-ключ в настройках интеграции');
+  const summary: OzonJobSummary = { updated: 0, skipped: 0, failed: 0, errors: [] };
+  const priceType = await resolveOzonPriceType();
+  if (!priceType) throw new Error('Не задан вид цен для OZON: отметьте опцию «Ozon» у вида цен либо создайте активный вид цен');
+  const prices = await fetchOzonPrices();
+  const products = await prisma.product.findMany({
+    where: { syncToOzon: true, isActive: true, kind: 'product' },
+    include: { prices: true },
+  });
+  for (const product of products) {
+    const offerId = product.article || product.sku || product.id;
+    const price = prices.get(offerId);
+    if (!price) { summary.skipped++; continue; }
+    try {
+      if (await writeProductPrice(product.id, priceType.id, price)) summary.updated++;
+      else summary.skipped++;
+    } catch (err: any) {
+      summary.failed++;
+      summary.errors.push(`${offerId}: ${err.message}`);
+    }
+  }
+  await saveOzonJobResult('prices', summary);
+  return summary;
+}
+
+/**
+ * Остатки «В Озон»: выгрузить суммарные остатки складского учёта на первый склад продавца.
+ */
+export async function syncStocksToOzon(): Promise<OzonJobSummary> {
+  const settings = await getOzonSettings();
+  if (!settings) throw new Error('OZON Seller не подключён: укажите Client-Id и API-ключ в настройках интеграции');
+  const summary: OzonJobSummary = { updated: 0, skipped: 0, failed: 0, errors: [] };
+  const warehouseId = (await getOzonWarehouseIds())[0];
+  if (!warehouseId) throw new Error('В кабинете OZON нет складов — создайте склад, чтобы выгружать остатки');
+  const products = await prisma.product.findMany({
+    where: { syncToOzon: true, isActive: true, kind: 'product', ozonProductId: { not: null } },
+    include: { stocks: true },
+  });
+  const items: { product_id: number; stock: number }[] = [];
+  for (const product of products) {
+    const quantity = product.stocks.reduce((sum: number, s: any) => sum + (Number(s.quantity) || 0), 0);
+    items.push({ product_id: Number(product.ozonProductId), stock: Math.max(0, Math.round(quantity)) });
+  }
+  for (let i = 0; i < items.length; i += 100) {
+    const chunk = items.slice(i, i + 100);
+    try {
+      await ozonUpdateStocks(chunk, warehouseId);
+      summary.updated += chunk.length;
+    } catch (err: any) {
+      summary.failed += chunk.length;
+      summary.errors.push(err.message);
+    }
+  }
+  await saveOzonJobResult('stocks', summary);
+  return summary;
+}
+
+/**
+ * Остатки «С Озона»: прочитать остатки из кабинета и записать в складской учёт CRM
+ * (выбранный в настройках активный склад, иначе первый активный).
+ */
+export async function syncStocksFromOzon(): Promise<OzonJobSummary> {
+  const settings = await getOzonSettings();
+  if (!settings) throw new Error('OZON Seller не подключён: укажите Client-Id и API-ключ в настройках интеграции');
+  const summary: OzonJobSummary = { updated: 0, skipped: 0, failed: 0, errors: [] };
+  const ozonStocks = await fetchOzonStocks();
+  const warehouse = (await prisma.warehouse.findFirst({ where: { id: settings.stockWarehouseId || '', isActive: true } }))
+    ?? (await prisma.warehouse.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
+  if (!warehouse) throw new Error('В CRM нет активного склада — создайте склад, чтобы сохранять остатки из OZON');
+  const products = await prisma.product.findMany({
+    where: { syncToOzon: true, isActive: true, kind: 'product' },
+  });
+  for (const product of products) {
+    const offerId = product.article || product.sku || product.id;
+    try {
+      if (await applyOzonStockToWarehouse(product.id, ozonStocks.get(offerId) ?? 0, warehouse.id)) summary.updated++;
+      else summary.skipped++;
+    } catch (err: any) {
+      summary.failed++;
+      summary.errors.push(`${offerId}: ${err.message}`);
+    }
+  }
+  await saveOzonJobResult('stocks', summary);
+  return summary;
+}
+
+/**
+ * Полная синхронизация по настройкам режимов: товары, цены и остатки —
+ * каждый блок в своём направлении («В Озон» / «С Озона»). Используется ручной кнопкой.
+ */
+export async function runOzonFullSync(userId?: string): Promise<{
+  products?: unknown; prices?: unknown; stocks?: unknown;
+}> {
+  const settings = await getOzonSettings();
+  if (!settings) throw new Error('OZON Seller не подключён: укажите Client-Id и API-ключ в настройках интеграции');
+  const result: { products?: unknown; prices?: unknown; stocks?: unknown } = {};
+  try {
+    result.products = settings.productsMode === 'from_ozon' ? await importOzonProducts(userId) : await syncProductsToOzon();
+  } catch (err: any) {
+    result.products = { error: err.message };
+  }
+  try {
+    result.prices = settings.pricesMode === 'from_ozon' ? await syncPricesFromOzon() : await syncPricesToOzon();
+  } catch (err: any) {
+    result.prices = { error: err.message };
+  }
+  try {
+    result.stocks = settings.stocksMode === 'from_ozon' ? await syncStocksFromOzon() : await syncStocksToOzon();
+  } catch (err: any) {
+    result.stocks = { error: err.message };
+  }
+  return result;
 }
 
 let categoryTreeCache: { at: number; tree: any[] } | null = null;
@@ -761,25 +978,15 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
 
   // Вид цен для OZON: активный вид с опцией «Ozon», иначе розничный (прежнее поведение)
   const priceType = await resolveOzonPriceType();
-
-  // Источник остатков (настройка плагина): 'ozon' — из кабинета OZON в складской учёт CRM,
-  // 'warehouse' (по умолчанию) — из складского учёта CRM в кабинет OZON
-  const stockFromOzon = settings.stockSource === 'ozon';
-  const ozonStocks = stockFromOzon ? await fetchOzonStocks() : null;
-
-  // Целевой склад CRM для остатков из кабинета: выбранный в настройках плагина активный склад,
-  // иначе первый активный (прежнее поведение)
-  const ozonTargetWarehouse = stockFromOzon
-    ? (await prisma.warehouse.findFirst({ where: { id: settings.stockWarehouseId || '', isActive: true } }))
-      ?? (await prisma.warehouse.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }))
-    : null;
-  if (stockFromOzon && !ozonTargetWarehouse) {
-    throw new Error('В CRM нет активного склада — создайте склад, чтобы сохранять остатки из OZON');
-  }
+  // Цены в карточку передаём только в режиме цен «В Озон»; в режиме «С Озона» цены читает отдельная задача
+  const pricesToOzon = settings.pricesMode !== 'from_ozon';
+  // Остатки при создании/обновлении карточки передаём только в режиме остатков «В Озон»;
+  // в режиме «С Озона» остатки обновляет отдельная задача по своему расписанию
+  const stocksToOzon = settings.stocksMode !== 'from_ozon';
 
   // Остатки в OZON обязательно привязаны к складу — берём первый склад продавца
   // (нужен только когда остатки выгружаются из CRM в OZON)
-  const warehouseIds = stockFromOzon ? [] : await getOzonWarehouseIds();
+  const warehouseIds = stocksToOzon ? await getOzonWarehouseIds() : [];
   const warehouseId = warehouseIds[0] ?? null;
   const requireWarehouse = () => {
     if (!warehouseId) throw new Error('В кабинете OZON нет складов — создайте склад, чтобы выгружать остатки');
@@ -828,7 +1035,7 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
             typeId: typeIdUpd,
             descriptionCategoryId: descCatIdUpd,
             barcode: product.barcode || undefined,
-            price: price != null ? Math.round(price) : undefined,
+            price: price != null && pricesToOzon ? Math.round(price) : undefined,
             images: firstImageUrl,
             weight: product.weight,
             width: product.width,
@@ -841,12 +1048,11 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
             const t = await waitOzonImportTask(taskIdUpd, offerId);
             for (const w of t.errors) summary.errors.push(`⚠ ${w}`);
           }
-        } else if (price != null) {
+        } else if (price != null && pricesToOzon) {
           // категория не определена — старое поведение: только цена
           await ozonUpdatePrices([{ product_id: Number(product.ozonProductId), price: Math.round(price) }]);
         }
-        if (stockFromOzon) await applyOzonStockToWarehouse(product.id, ozonStocks!.get(offerId) ?? 0, ozonTargetWarehouse!.id);
-        else await ozonUpdateStocks([{ product_id: Number(product.ozonProductId), stock: Math.max(0, Math.round(quantity)) }], requireWarehouse());
+        if (stocksToOzon) await ozonUpdateStocks([{ product_id: Number(product.ozonProductId), stock: Math.max(0, Math.round(quantity)) }], requireWarehouse());
         await prisma.product.update({ where: { id: product.id }, data: { ozonSyncedAt: new Date() } });
         summary.updated++;
         continue;
@@ -856,9 +1062,8 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
       const existingId = await ozonFindProductId(offerId);
       if (existingId) {
         await prisma.product.update({ where: { id: product.id }, data: { ozonProductId: BigInt(existingId), ozonSyncedAt: new Date() } });
-        if (price != null) await ozonUpdatePrices([{ product_id: existingId, price: Math.round(price) }]);
-        if (stockFromOzon) await applyOzonStockToWarehouse(product.id, ozonStocks!.get(offerId) ?? 0, ozonTargetWarehouse!.id);
-        else await ozonUpdateStocks([{ product_id: existingId, stock: Math.max(0, Math.round(quantity)) }], requireWarehouse());
+        if (price != null && pricesToOzon) await ozonUpdatePrices([{ product_id: existingId, price: Math.round(price) }]);
+        if (stocksToOzon) await ozonUpdateStocks([{ product_id: existingId, stock: Math.max(0, Math.round(quantity)) }], requireWarehouse());
         summary.updated++;
         continue;
       }
@@ -878,10 +1083,10 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         typeId,
         descriptionCategoryId,
         barcode: product.barcode || undefined,
-        price: price != null ? Math.round(price) : undefined,
-        // остаток в кабинете при создании задаём только в режиме «Со склада»;
-        // в режиме «С OZON» количество берём из кабинета после создания товара
-        quantity: stockFromOzon ? undefined : Math.max(0, Math.round(quantity)),
+        price: price != null && pricesToOzon ? Math.round(price) : undefined,
+        // остаток в кабинете при создании задаём только в режиме остатков «В Озон»;
+        // в режиме «С Озона» количество обновляет отдельная задача по своему расписанию
+        quantity: stocksToOzon ? Math.max(0, Math.round(quantity)) : undefined,
         // картинка из карточки CRM → OZON забирает её по публичному URL
         images: firstImageUrl,
         // характеристики из карточки CRM (вес, габариты, штрихкод, бренд)
@@ -906,7 +1111,6 @@ export async function syncProductsToOzon(): Promise<OzonSyncSummary> {
         where: { id: product.id },
         data: { ozonProductId: newId != null ? BigInt(newId) : null, ozonSyncedAt: new Date() },
       });
-      if (stockFromOzon) await applyOzonStockToWarehouse(product.id, ozonStocks!.get(offerId) ?? 0, ozonTargetWarehouse!.id);
       summary.created++;
     } catch (err: any) {
       summary.failed++;

@@ -1731,10 +1731,15 @@ model OzonSellerSettings {
   apiKey                String    @default("") @map("api_key")
   isActive              Boolean   @default(false) @map("is_active")
   autoSync              Boolean   @default(true) @map("auto_sync") // авто-синхронизация по расписанию (worker); ручная синхронизация доступна всегда
-  updateIntervalMinutes Int       @default(60) @map("update_interval_minutes")
-  // Источник остатков: 'warehouse' — из складского учёта CRM в OZON (по умолчанию); 'ozon' — из кабинета OZON в складской учёт CRM
-  stockSource           String    @default("warehouse") @map("stock_source")
-  // Целевой склад CRM для остатков из кабинета OZON (опция «С OZON»); NULL — первый активный склад
+  // Режимы синхронизации (направление): 'to_ozon' — из CRM в кабинет (по умолчанию); 'from_ozon' — из кабинета в CRM
+  productsMode          String    @default("to_ozon") @map("products_mode")
+  pricesMode            String    @default("to_ozon") @map("prices_mode")
+  stocksMode            String    @default("to_ozon") @map("stocks_mode")
+  // Расписание: независимые интервалы авто-синхронизации товаров, цен и остатков (минуты)
+  productsIntervalMinutes Int     @default(60) @map("products_interval_minutes")
+  pricesIntervalMinutes Int       @default(60) @map("prices_interval_minutes")
+  stocksIntervalMinutes Int       @default(60) @map("stocks_interval_minutes")
+  // Целевой склад CRM для остатков из кабинета OZON (режим «С Озона»); NULL — первый активный склад
   stockWarehouseId      String?   @map("stock_warehouse_id")
   // Категория OZON (type_id) по умолчанию для новых товаров — выбирается из дерева категорий OZON
   defaultTypeId         Int?      @map("default_type_id")

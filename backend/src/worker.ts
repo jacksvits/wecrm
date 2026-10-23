@@ -8,7 +8,7 @@ import { AccountingWorker } from './accounting-worker/index.js';
 import { VkCommunityWorker } from './vk-community/index.js';
 import { prisma } from './lib/prisma.js';
 import { runOneCSync } from './lib/onec-sync.js';
-import { syncProductsToOzon } from './lib/ozon.js';
+import { syncProductsToOzon, syncPricesToOzon, syncPricesFromOzon, syncStocksToOzon, syncStocksFromOzon, importOzonProducts } from './lib/ozon.js';
 import { listWorkerTenants, withTenant, TenantInfo } from './lib/tenant.js';
 import { runStatusAutoChange } from './lib/status-auto-change.js';
 
@@ -24,7 +24,7 @@ import { runStatusAutoChange } from './lib/status-auto-change.js';
  * глобальный `prisma` обращается к БД нужной организации.
  */
 
-type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkCommunityWorker; onecTimer?: NodeJS.Timeout; ozonTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
+type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkCommunityWorker; onecTimer?: NodeJS.Timeout; ozonProductsTimer?: NodeJS.Timeout; ozonPricesTimer?: NodeJS.Timeout; ozonStocksTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
 
 /** Интервал проверки «Авто смены» статусов */
 const STATUS_AUTO_CHANGE_MS = 60_000;
@@ -41,7 +41,9 @@ function stopBag(key: string, bag: TimerBag) {
   try { bag.accounting?.stop(); } catch { /* ignore */ }
   try { bag.vk?.stop(); } catch { /* ignore */ }
   if (bag.onecTimer) clearInterval(bag.onecTimer);
-  if (bag.ozonTimer) clearInterval(bag.ozonTimer);
+  if (bag.ozonProductsTimer) clearInterval(bag.ozonProductsTimer);
+  if (bag.ozonPricesTimer) clearInterval(bag.ozonPricesTimer);
+  if (bag.ozonStocksTimer) clearInterval(bag.ozonStocksTimer);
   if (bag.statusAutoTimer) clearInterval(bag.statusAutoTimer);
   instances.delete(key);
   console.log(`[Worker] Воркеры остановлены для tenant ${key}`);
@@ -151,26 +153,45 @@ async function syncTenant(t: TenantInfo): Promise<void> {
     bag.onecTimer = undefined;
   }
 
-  // --- OZON Seller sync (выгрузка отмеченных товаров по расписанию) ---
+  // --- OZON Seller sync: три независимые задачи (товары, цены, остатки) по своим расписаниям ---
+  // Каждая задача работает в направлении из настроек режима («В Озон» / «С Озона»).
   // Авто-синхронизация запускается только при включённой опции «Авто синхронизация»;
   // ручная синхронизация из настроек плагина доступна независимо от неё
   const ozonSettings = await prisma.ozonSellerSettings.findFirst();
   if (ozonSettings?.isActive && ozonSettings.autoSync) {
-    if (!bag.ozonTimer) {
-      const runOzonSyncJob = async () => {
-        try {
-          const summary = await syncProductsToOzon();
-          console.log(`[Worker] OZON sync done (${key}): created=${summary.created} updated=${summary.updated} failed=${summary.failed}`);
-        } catch (e: any) {
-          console.error(`[Worker] OZON sync error (${key}):`, e.message);
-        }
-      };
-      bag.ozonTimer = setInterval(runOzonSyncJob, Math.max(5, ozonSettings.updateIntervalMinutes || 60) * 60 * 1000);
-      console.log(`[Worker] OZON sync scheduled every ${Math.max(5, ozonSettings.updateIntervalMinutes || 60)} min (${key})`);
+    const runOzonJob = (kind: 'products' | 'prices' | 'stocks', job: () => Promise<unknown>) => async () => {
+      try {
+        const summary = await job();
+        console.log(`[Worker] OZON ${kind} sync done (${key}):`, JSON.stringify(summary).slice(0, 250));
+      } catch (e: any) {
+        console.error(`[Worker] OZON ${kind} sync error (${key}):`, e.message);
+      }
+    };
+    const ozonJobFor = (kind: 'products' | 'prices' | 'stocks') =>
+      kind === 'products'
+        ? (ozonSettings.productsMode === 'from_ozon' ? () => importOzonProducts() : () => syncProductsToOzon())
+        : kind === 'prices'
+          ? (ozonSettings.pricesMode === 'from_ozon' ? () => syncPricesFromOzon() : () => syncPricesToOzon())
+          : (ozonSettings.stocksMode === 'from_ozon' ? () => syncStocksFromOzon() : () => syncStocksToOzon());
+    const ozonIntervalFor = (kind: 'products' | 'prices' | 'stocks') =>
+      Math.max(5, (kind === 'products' ? ozonSettings.productsIntervalMinutes : kind === 'prices' ? ozonSettings.pricesIntervalMinutes : ozonSettings.stocksIntervalMinutes) || 60) * 60 * 1000;
+
+    if (!bag.ozonProductsTimer) {
+      bag.ozonProductsTimer = setInterval(runOzonJob('products', ozonJobFor('products')), ozonIntervalFor('products'));
+      console.log(`[Worker] OZON products sync scheduled every ${ozonIntervalFor('products') / 60000} min, mode=${ozonSettings.productsMode} (${key})`);
     }
-  } else if (bag.ozonTimer) {
-    clearInterval(bag.ozonTimer);
-    bag.ozonTimer = undefined;
+    if (!bag.ozonPricesTimer) {
+      bag.ozonPricesTimer = setInterval(runOzonJob('prices', ozonJobFor('prices')), ozonIntervalFor('prices'));
+      console.log(`[Worker] OZON prices sync scheduled every ${ozonIntervalFor('prices') / 60000} min, mode=${ozonSettings.pricesMode} (${key})`);
+    }
+    if (!bag.ozonStocksTimer) {
+      bag.ozonStocksTimer = setInterval(runOzonJob('stocks', ozonJobFor('stocks')), ozonIntervalFor('stocks'));
+      console.log(`[Worker] OZON stocks sync scheduled every ${ozonIntervalFor('stocks') / 60000} min, mode=${ozonSettings.stocksMode} (${key})`);
+    }
+  } else {
+    if (bag.ozonProductsTimer) { clearInterval(bag.ozonProductsTimer); bag.ozonProductsTimer = undefined; }
+    if (bag.ozonPricesTimer) { clearInterval(bag.ozonPricesTimer); bag.ozonPricesTimer = undefined; }
+    if (bag.ozonStocksTimer) { clearInterval(bag.ozonStocksTimer); bag.ozonStocksTimer = undefined; }
   }
 
 }

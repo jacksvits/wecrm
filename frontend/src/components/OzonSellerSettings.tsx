@@ -33,7 +33,18 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
 
 export default function OzonSellerSettings() {
   const [settings, setSettings] = useState<any>(null);
-  const [form, setForm] = useState({ clientId: '', apiKey: '', updateIntervalMinutes: 60, defaultTypeId: null as number | null, autoSync: true, stockSource: 'warehouse' as 'warehouse' | 'ozon', stockWarehouseId: null as string | null });
+  const [form, setForm] = useState({
+    clientId: '', apiKey: '',
+    defaultTypeId: null as number | null, autoSync: true,
+    // Режимы синхронизации (направление) для товаров, цен и остатков
+    productsMode: 'to_ozon' as 'to_ozon' | 'from_ozon',
+    pricesMode: 'to_ozon' as 'to_ozon' | 'from_ozon',
+    stocksMode: 'to_ozon' as 'to_ozon' | 'from_ozon',
+    // Расписание: независимые интервалы товаров/цен/остатков (минуты)
+    productsIntervalMinutes: 60, pricesIntervalMinutes: 60, stocksIntervalMinutes: 60,
+    // Целевой склад CRM для остатков из кабинета (NULL — первый активный)
+    stockWarehouseId: null as string | null,
+  });
   // Склады CRM — для выбора целевого склада остатков из кабинета OZON
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
@@ -54,7 +65,17 @@ export default function OzonSellerSettings() {
     try {
       const s = await api.ozonPlugin.get();
       setSettings(s);
-      setForm({ clientId: s.clientId || '', apiKey: '', updateIntervalMinutes: s.updateIntervalMinutes || 60, defaultTypeId: s.defaultTypeId ?? null, autoSync: s.autoSync ?? true, stockSource: s.stockSource === 'ozon' ? 'ozon' : 'warehouse', stockWarehouseId: s.stockWarehouseId ?? null });
+      setForm({
+        clientId: s.clientId || '', apiKey: '',
+        defaultTypeId: s.defaultTypeId ?? null, autoSync: s.autoSync ?? true,
+        productsMode: s.productsMode === 'from_ozon' ? 'from_ozon' : 'to_ozon',
+        pricesMode: s.pricesMode === 'from_ozon' ? 'from_ozon' : 'to_ozon',
+        stocksMode: s.stocksMode === 'from_ozon' ? 'from_ozon' : 'to_ozon',
+        productsIntervalMinutes: s.productsIntervalMinutes || 60,
+        pricesIntervalMinutes: s.pricesIntervalMinutes || 60,
+        stocksIntervalMinutes: s.stocksIntervalMinutes || 60,
+        stockWarehouseId: s.stockWarehouseId ?? null,
+      });
     } catch (e: any) {
       flash(e.message || 'Ошибка загрузки настроек', true);
     }
@@ -121,10 +142,14 @@ export default function OzonSellerSettings() {
       const res: any = await api.ozonPlugin.save({
         clientId: form.clientId.trim(),
         apiKey: form.apiKey || undefined,
-        updateIntervalMinutes: Number(form.updateIntervalMinutes) || 60,
         autoSync: form.autoSync,
         defaultTypeId: form.defaultTypeId,
-        stockSource: form.stockSource,
+        productsMode: form.productsMode,
+        pricesMode: form.pricesMode,
+        stocksMode: form.stocksMode,
+        productsIntervalMinutes: form.productsIntervalMinutes,
+        pricesIntervalMinutes: form.pricesIntervalMinutes,
+        stocksIntervalMinutes: form.stocksIntervalMinutes,
         stockWarehouseId: form.stockWarehouseId,
       });
       setSettings((prev: any) => ({ ...prev, ...res }));
@@ -140,11 +165,26 @@ export default function OzonSellerSettings() {
   };
 
   const sync = async () => {
-    if (!confirm('Выгрузить все позиции с отметкой «OZON Seller» в маркетплейс OZON?')) return;
+    if (!confirm('Запустить полную синхронизацию с OZON Seller (товары, цены и остатки — по настроенным режимам)?')) return;
     setSyncing(true);
     try {
       const r: any = await api.ozonPlugin.sync();
-      flash(`Синхронизация завершена: создано ${r.created}, обновлено ${r.updated}, ошибок ${r.failed}${r.errors?.length ? '\n' + r.errors.slice(0, 5).join('\n') : ''}`, !!r.failed);
+      // Итог по блокам: товары / цены / остатки, каждый — в своём направлении (режимы из настроек)
+      const block = (name: string, s: any) => {
+        if (!s) return `${name}: —`;
+        if (s.error) return `${name}: ошибка — ${s.error}`;
+        const parts: string[] = [];
+        if (s.created != null) parts.push(`создано ${s.created}`);
+        if (s.linked != null) parts.push(`привязано ${s.linked}`);
+        if (s.updated != null) parts.push(`обновлено ${s.updated}`);
+        if (s.skipped != null) parts.push(`без изменений ${s.skipped}`);
+        if (s.failed != null) parts.push(`ошибок ${s.failed}`);
+        return `${name}: ${parts.join(', ') || 'ok'}`;
+      };
+      const lines = [block('Товары', r.products), block('Цены', r.prices), block('Остатки', r.stocks)];
+      const anyError = [r.products, r.prices, r.stocks].some((s: any) => s?.error || s?.failed > 0);
+      const firstErrors = [r.products, r.prices, r.stocks].flatMap((s: any) => s?.errors || []).slice(0, 5);
+      flash(lines.join('\n') + (firstErrors.length ? '\n' + firstErrors.join('\n') : ''), anyError);
       await load();
     } catch (e: any) {
       flash(e.message || 'Ошибка синхронизации', true);
@@ -242,36 +282,55 @@ export default function OzonSellerSettings() {
           Авто синхронизация
         </label>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -6 }}>
-          Когда включено, товары с отметкой «OZON Seller» выгружаются в маркетплейс автоматически по расписанию.
+          Когда включено, товары, цены и остатки синхронизируются автоматически по расписанию (каждый блок — по своему интервалу).
           Когда выключено — только вручную, кнопкой «Синхронизировать сейчас».
         </div>
-        <label style={labelStyle}>Интервал автообновления, мин</label>
-        <input
-          type="number"
-          min={5}
-          max={1440}
-          value={form.updateIntervalMinutes}
-          onChange={e => setForm({ ...form, updateIntervalMinutes: Number(e.target.value) })}
-          disabled={!form.autoSync}
-          style={{ ...inputStyle, maxWidth: 120, opacity: form.autoSync ? 1 : 0.5 }}
-        />
+        <label style={labelStyle}>Интервалы автообновления, мин</label>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {([
+            ['Товары', 'productsIntervalMinutes'],
+            ['Цены', 'pricesIntervalMinutes'],
+            ['Остатки', 'stocksIntervalMinutes'],
+          ] as const).map(([label, field]) => (
+            <label key={field} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+              {label}
+              <input
+                type="number"
+                min={5}
+                max={1440}
+                value={form[field]}
+                onChange={e => setForm({ ...form, [field]: Number(e.target.value) })}
+                disabled={!form.autoSync}
+                style={{ ...inputStyle, maxWidth: 90, opacity: form.autoSync ? 1 : 0.5 }}
+              />
+            </label>
+          ))}
+        </div>
       </div>
 
       <div>
-        <label style={labelStyle}>Остатки на складах</label>
-        <select
-          value={form.stockSource}
-          onChange={e => setForm({ ...form, stockSource: e.target.value === 'ozon' ? 'ozon' : 'warehouse' })}
-          style={inputStyle}
-        >
-          <option value="warehouse">Со склада — выгружать из CRM в OZON</option>
-          <option value="ozon">С OZON — забирать из кабинета в складской учёт CRM</option>
-        </select>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-          «Со склада» — при синхронизации остатки из складского учёта CRM выгружаются в кабинет OZON (по умолчанию).
-          «С OZON» — остатки из кабинета OZON записываются в складской учёт CRM, в OZON ничего не отправляется.
-        </div>
-        {form.stockSource === 'ozon' && (
+        <label style={labelStyle}>Режимы синхронизации</label>
+        {([
+          ['Товары', 'productsMode', '«В Озон» — создавать и обновлять карточки в кабинете.', '«С Озона» — импортировать карточки из кабинета в CRM.'],
+          ['Цены', 'pricesMode', '«В Озон» — выгружать цены из CRM (вид «Ozon», иначе розничный).', '«С Озона» — читать цены из кабинета и записывать в CRM в вид цен «Ozon» (иначе розничный).'],
+          ['Остатки', 'stocksMode', '«В Озон» — выгружать остатки складского учёта в кабинет.', '«С Озона» — читать остатки из кабинета и записывать в складской учёт CRM.'],
+        ] as const).map(([label, field, toHint, fromHint]) => (
+          <div key={field} style={{ marginTop: field === 'productsMode' ? 0 : 10 }}>
+            <label style={{ ...labelStyle, marginTop: 0 }}>{label}</label>
+            <select
+              value={form[field]}
+              onChange={e => setForm({ ...form, [field]: e.target.value === 'from_ozon' ? 'from_ozon' : 'to_ozon' })}
+              style={inputStyle}
+            >
+              <option value="to_ozon">В Озон</option>
+              <option value="from_ozon">С Озона</option>
+            </select>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+              {form[field] === 'to_ozon' ? toHint : fromHint}
+            </div>
+          </div>
+        ))}
+        {form.stocksMode === 'from_ozon' && (
           <>
             <label style={{ ...labelStyle, marginTop: 10 }}>Склад для остатков из OZON</label>
             <select
