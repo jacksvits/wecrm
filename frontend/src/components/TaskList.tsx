@@ -8,6 +8,7 @@ import { userOptionLabel } from "../lib/userOptionLabel";
 import { formatDateTime, toDateTimeLocalValue, fromDateTimeLocalValue, nowDateTimeLocalValue } from "../lib/formatDate";
 import { TaskCalendar } from "./TaskCalendar";
 import { ContactPicker } from "./ContactPicker";
+import { Avatar } from "./Avatar";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 const priorityLabels: Record<string, string> = {
@@ -1037,7 +1038,7 @@ export function TaskList() {
           Кураторы: {task.curators.map((c) => c.name).join(", ")}
         </div>
       )}{" "}
-      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, paddingRight: 32 }}>
         Создал: {task.creator?.name || "—"}
       </div>{" "}
       {task.contact && (
@@ -1052,6 +1053,16 @@ export function TaskList() {
           >
             {task.contact.name}
           </span>
+        </div>
+      )}
+      {/* Аватарка создателя задачи — правый нижний угол карточки */}
+      {task.creator && (
+        <div
+          title={`Создал: ${task.creator.name}`}
+          style={{ position: "absolute", bottom: 10, right: 12 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Avatar name={task.creator.name} avatar={task.creator.avatar} size={24} />
         </div>
       )}
     </div>
