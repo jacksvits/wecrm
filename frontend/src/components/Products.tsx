@@ -260,11 +260,17 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   const [kindFilter, setKindFilter] = useState<'all' | 'product' | 'service'>('all');
   // Фильтр «В наличии»: только позиции с суммарным остатком >= 1
   const [inStockOnly, setInStockOnly] = useState(false);
+  // Быстрый фильтр по бейджу маркетплейса/витрины
+  const [badgeFilter, setBadgeFilter] = useState<'all' | 'vk' | 'ozon' | 'wb' | 'vitrine'>('all');
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     let list = products;
-    if (kindFilter !== 'all') list = list.filter(p => (p.kind || 'product') === kindFilter);
+    if (kindFilter !== 'all') list = list.filter(p => (p.kind || 'product') === kindFilter)
+    if (badgeFilter === 'vk') list = list.filter(p => p.syncToVk);
+    if (badgeFilter === 'ozon') list = list.filter(p => p.syncToOzon);
+    if (badgeFilter === 'wb') list = list.filter((p: any) => p.syncToWb);
+    if (badgeFilter === 'vitrine') list = list.filter(p => p.onVitrine);;
     if (inStockOnly) list = list.filter(p => (p.stocks || []).reduce((sum, x) => sum + x.quantity, 0) >= 1);
     if (!s) return list;
     return list.filter(p =>
@@ -272,7 +278,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
       (p.sku || '').toLowerCase().includes(s) ||
       (p.category || '').toLowerCase().includes(s) ||
       (p.subcategory || '').toLowerCase().includes(s));
-  }, [products, q, kindFilter, inStockOnly]);
+  }, [products, q, kindFilter, inStockOnly, badgeFilter]);
 
   const searching = q.trim().length > 0;
 
@@ -770,6 +776,17 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
               <input type="checkbox" checked={inStockOnly} onChange={e => setInStockOnly(e.target.checked)} />
               В наличии
             </label>
+            <select
+              value={badgeFilter}
+              onChange={e => setBadgeFilter(e.target.value as any)}
+              style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border-color)', fontSize: 13, background: '#fff', cursor: 'pointer' }}
+            >
+              <option value="all">— Бейджи —</option>
+              <option value="ozon">OZON Seller</option>
+              <option value="wb">WB Seller</option>
+              <option value="vk">ВКонтакте</option>
+              <option value="vitrine">На витрине</option>
+            </select>
           </div>
 
           {/* Панель массовых действий */}
