@@ -367,13 +367,15 @@ export async function importWbProducts(userId?: string): Promise<{ created: numb
   if (!settings) throw new Error('WB Seller не подключён: укажите API-ключ в настройках интеграции');
   const priceType = await resolveWbPriceType();
   const cards = await fetchWbCardsList();
+  // цены — из прайс-листа WB (в карточках цена не всегда присутствует)
+  const prices = await fetchWbPrices();
   const result = { created: 0, linked: 0, skipped: 0, errors: [] as string[] };
   for (const card of cards) {
     const vendorCode = String(card.vendorCode ?? '');
     if (!vendorCode) { result.skipped++; continue; }
     try {
       const fields = cardFields(card);
-      const price = Number(card.sizes?.[0]?.price) || Number(card.price) || 0;
+      const price = prices.get(vendorCode) || 0;
       const photos: string[] = (card.photos || []).slice(0, 10).map((p: any) => p.big || p.hq).filter(Boolean);
       const existing = await prisma.product.findFirst({ where: { OR: [{ article: vendorCode }, { sku: vendorCode }] }, include: { prices: true } });
       if (existing) {

@@ -1284,6 +1284,18 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
             OZON
           </span>
         ))}
+        {p.syncToWb && ((p as any).wbProductId ? (
+          <a href={`https://www.wildberries.ru/catalog/${(p as any).wbProductId}/detail.aspx`} target="_blank" rel="noreferrer"
+            title={`Карточка товара на Wildberries (nmID: ${(p as any).wbProductId})`}
+            style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#CB11AB', color: '#fff', textDecoration: 'none' }}>
+            WB ↗
+          </a>
+        ) : (
+          <span title="Синхронизируется с WB Seller (Wildberries)"
+            style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#CB11AB', color: '#fff' }}>
+            WB
+          </span>
+        ))}
         {p.onVitrine && (
           <span title="Показывается на витрине магазина"
             style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#16a34a', color: '#fff' }}>
