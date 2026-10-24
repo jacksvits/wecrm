@@ -34,6 +34,7 @@ const STOCK_TABS = [
   { key: 'stock', label: 'Склад' },
   { key: 'prices', label: 'Цены' },
   { key: 'stats', label: 'Статистика' },
+  { key: 'ozon', label: 'OZON Заказы' },
 ];
 
 const KIND_LABELS: Record<string, string> = { product: 'Товар', service: 'Услуга' };
