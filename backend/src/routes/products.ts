@@ -653,7 +653,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, brand, tnved, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, brand, tnved, kind, syncToVk, syncToOzon, syncToWb, onVitrine, isSubscription, categoryId, tags } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
     const productKind = ['service', 'crm_subscription'].includes(kind) ? kind : 'product';
     // Категория из дерева 1С (группы/виды номенклатуры)
@@ -694,6 +694,8 @@ router.post('/', async (req, res) => {
         syncToVk: !!syncToVk,
         // «OZON Seller» актуально только для товаров, не для услуг
         syncToOzon: productKind === 'product' && !!syncToOzon,
+        // «WB Seller» актуально только для товаров, не для услуг
+        syncToWb: productKind === 'product' && !!syncToWb,
         onVitrine: !!onVitrine,
         // «Подписка» актуальна только для услуг
         isSubscription: productKind === 'service' && !!isSubscription,
@@ -752,7 +754,7 @@ router.get('/:id', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, brand, tnved, isActive, kind, syncToVk, syncToOzon, onVitrine, isSubscription, categoryId, tags } = req.body;
+    const { name, sku, description, category, subcategory, unit, barcode, weight, width, height, depth, brand, tnved, isActive, kind, syncToVk, syncToOzon, syncToWb, onVitrine, isSubscription, categoryId, tags } = req.body;
     const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Товар не найден' });
     const data: any = {};
@@ -775,6 +777,8 @@ router.patch('/:id', async (req, res) => {
     if (syncToVk !== undefined) data.syncToVk = !!syncToVk;
     // «OZON Seller» актуально только для товаров, не для услуг
     if (syncToOzon !== undefined) data.syncToOzon = (data.kind ?? existing.kind) === 'product' && !!syncToOzon;
+    // «WB Seller» актуально только для товаров, не для услуг
+    if (syncToWb !== undefined) data.syncToWb = (data.kind ?? existing.kind) === 'product' && !!syncToWb;
     if (brand !== undefined) data.brand = brand?.trim() || null;
     if (tnved !== undefined) data.tnved = tnved?.trim() || null;
     for (const f of ['weight', 'width', 'height', 'depth'] as const) {

@@ -1400,7 +1400,7 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages: string[]; payLink: string; crmRenewMonths: string; crmCameras: boolean; crmSubscriptions: boolean; crmAccounting: boolean; crmVideoNotes: boolean; crmCalls: boolean; crmIntegrations: string[]; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages: string[]; payLink: string; crmRenewMonths: string; crmCameras: boolean; crmSubscriptions: boolean; crmAccounting: boolean; crmVideoNotes: boolean; crmCalls: boolean; crmIntegrations: string[]; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; syncToWb: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : (product.kind as any) || 'product',
     crmAllowedPages: isNew ? [] : (Array.isArray((product as any).crmAllowedPages) ? (product as any).crmAllowedPages : []),
@@ -1419,6 +1419,7 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     depth: isNew ? '' : (product.depth != null ? String(product.depth) : ''),
     syncToVk: isNew ? false : product.syncToVk,
     syncToOzon: isNew ? false : product.syncToOzon,
+    syncToWb: isNew ? false : (product as any).syncToWb,
     onVitrine: isNew ? false : product.onVitrine,
     isSubscription: isNew ? false : product.isSubscription,
     description: isNew ? '' : product.description || '',
@@ -1767,6 +1768,19 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
                   title="Открыть карточку товара в кабинете OZON Seller"
                   style={{ marginLeft: 6, fontSize: 12, color: '#005BFF', textDecoration: 'none', fontWeight: 600 }}>
                   Открыть в OZON ↗
+                </a>
+              )}
+            </label>
+          )}
+          {form.kind === 'product' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!form.syncToWb} onChange={e => setForm({ ...form, syncToWb: e.target.checked })} style={{ width: 16, height: 16 }} />
+              WB Seller
+              {!isNew && (product as any).wbProductId && (
+                <a href={`https://www.wildberries.ru/catalog/${(product as any).wbProductId}/detail.aspx`} target="_blank" rel="noreferrer"
+                  title="Открыть карточку товара в кабинете WB Seller"
+                  style={{ marginLeft: 6, fontSize: 12, color: '#005BFF', textDecoration: 'none', fontWeight: 600 }}>
+                  Открыть в WB ↗
                 </a>
               )}
             </label>

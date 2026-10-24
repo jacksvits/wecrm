@@ -300,6 +300,63 @@ async function wbCreateCard(product: any, price: number | null): Promise<number>
   return nmId;
 }
 
+
+/** Скачать фото по URL и прикрепить к товару (реплика логики POST /api/products/:id/images/url) */
+async function attachPhotoByUrl(productId: string, url: string, authorId: string | undefined, sortOrder: number): Promise<boolean> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    if (!res.ok) return false;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const mime = String(res.headers.get('content-type') || '').split(';')[0].trim();
+    if (!mime.startsWith('image/')) return false;
+    if (buf.length > 10 * 1024 * 1024) return false;
+    const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+    const rel = `wb/${productId}-${sortOrder}-${Date.now()}.${ext}`;
+    const abs = path.join(UPLOAD_ROOT, rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, buf);
+    const user = authorId
+      ? { id: authorId }
+      : await prisma.user.findFirst({ select: { id: true } });
+    if (!user) return false;
+    const attachment = await prisma.fileAttachment.create({
+      data: {
+        filename: path.basename(rel),
+        originalName: (path.basename(url).split('?')[0] || `photo-${sortOrder}.${ext}`).slice(0, 250),
+        mimeType: mime,
+        size: buf.length,
+        path: `/${rel}`,
+        entityType: 'product',
+        entityId: productId,
+        authorId: user.id,
+      },
+    });
+    await prisma.productImage.create({
+      data: { productId, attachmentId: attachment.id, url: `/uploads/${rel}`, sortOrder },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Поля карточки WB → данные товара CRM (заполняются только пустые поля при привязке) */
+function cardFields(card: any): { description?: string; brand?: string; barcode?: string; weight?: number; width?: number; height?: number; depth?: number } {
+  const fields: any = {};
+  const desc = String(card.description ?? '').trim();
+  if (desc) fields.description = desc;
+  const brand = String(card.brand ?? '').trim();
+  if (brand) fields.brand = brand;
+  const barcode = String(card.sizes?.[0]?.skus?.[0] ?? '').trim();
+  if (barcode) fields.barcode = barcode;
+  const d = card.dimensions || {};
+  if (Number(d.weightBrutto) > 0) fields.weight = Number(d.weightBrutto); // кг
+  if (Number(d.width) > 0) fields.width = Number(d.width);     // см
+  if (Number(d.height) > 0) fields.height = Number(d.height);  // см
+  if (Number(d.length) > 0) fields.depth = Number(d.length);   // см (длина упаковки)
+  return fields;
+}
+
 /** Импорт карточек из кабинета WB в номенклатуру CRM (привязка по артикулу, создание новых) */
 export async function importWbProducts(userId?: string): Promise<{ created: number; linked: number; skipped: number; errors: string[] }> {
   const settings = await getWbSettings();
@@ -311,28 +368,49 @@ export async function importWbProducts(userId?: string): Promise<{ created: numb
     const vendorCode = String(card.vendorCode ?? '');
     if (!vendorCode) { result.skipped++; continue; }
     try {
-      const existing = await prisma.product.findFirst({ where: { OR: [{ article: vendorCode }, { sku: vendorCode }] }, include: { prices: true } });
+      const fields = cardFields(card);
       const price = Number(card.sizes?.[0]?.price) || Number(card.price) || 0;
+      const photos: string[] = (card.photos || []).slice(0, 10).map((p: any) => p.big || p.hq).filter(Boolean);
+      const existing = await prisma.product.findFirst({ where: { OR: [{ article: vendorCode }, { sku: vendorCode }] }, include: { prices: true } });
       if (existing) {
-        await prisma.product.update({
-          where: { id: existing.id },
-          data: { wbProductId: BigInt(Number(card.nmID)), syncToWb: true, ...(price > 0 && priceType ? {} : {}) },
-        });
+        // привязка: помечаем «WB Seller» и заполняем только пустые поля (не затираем данные CRM)
+        const patch: any = { wbProductId: BigInt(Number(card.nmID)), syncToWb: true };
+        if (!existing.description && fields.description) patch.description = fields.description;
+        if (!(existing as any).brand && fields.brand) patch.brand = fields.brand;
+        if (!(existing as any).barcode && fields.barcode) patch.barcode = fields.barcode;
+        for (const k of ['weight', 'width', 'height', 'depth'] as const) {
+          if ((existing as any)[k] == null && fields[k] != null) patch[k] = fields[k];
+        }
+        await prisma.product.update({ where: { id: existing.id }, data: patch });
         if (price > 0 && priceType) await writeProductPrice(existing.id, priceType.id, price);
+        // фото — только если у товара их нет
+        const imgCount = await prisma.productImage.count({ where: { productId: existing.id } });
+        if (imgCount === 0 && photos.length) {
+          for (let n = 0; n < photos.length; n++) await attachPhotoByUrl(existing.id, photos[n], userId, n);
+        }
         result.linked++;
       } else {
+        // создание новой позиции с опцией «WB Seller» и всеми данными карточки
         const created = await prisma.product.create({
           data: {
             name: card.title || vendorCode,
             article: vendorCode,
             wbProductId: BigInt(Number(card.nmID)),
             syncToWb: true,
+            description: fields.description,
+            brand: fields.brand,
+            barcode: fields.barcode,
+            weight: fields.weight,
+            width: fields.width,
+            height: fields.height,
+            depth: fields.depth,
             prices: price > 0 && priceType ? { create: { priceTypeId: priceType.id, price } } : undefined,
           },
         });
         if (price > 0 && priceType) {
           await prisma.priceHistory.create({ data: { productId: created.id, priceTypeId: priceType.id, oldPrice: 0, newPrice: price, userId } });
         }
+        for (let n = 0; n < photos.length; n++) await attachPhotoByUrl(created.id, photos[n], userId, n);
         result.created++;
       }
     } catch (err: any) {
