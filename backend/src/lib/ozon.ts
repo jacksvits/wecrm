@@ -347,6 +347,34 @@ export async function writeProductPrice(productId: string, priceTypeId: string, 
   return true;
 }
 
+/**
+ * Список отправлений (заказов) из кабинета OZON за последние `days` дней.
+ * Чтение через актуальный v4 API (v3 объявлен obsolete) — статусы и
+ * состав товаров приходят в одном ответе, пагинация по cursor.
+ */
+export async function fetchOzonPostings(days = 30): Promise<any[]> {
+  const settings = await getOzonSettings();
+  if (!settings) throw new Error('OZON Seller не подключён: укажите Client-Id и API-ключ в настройках интеграции');
+  const postings: any[] = [];
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const to = new Date().toISOString();
+  let cursor = '';
+  for (let page = 0; page < 50; page++) {
+    const data = await ozonApi('POST', '/v4/posting/fbs/list', {
+      dir: 'DESC',
+      filter: { since, to },
+      limit: 50,
+      ...(cursor ? { cursor } : {}),
+    });
+    const batch = data?.postings || [];
+    if (!batch.length) break;
+    postings.push(...batch);
+    if (!data?.has_next || !data?.cursor || data.cursor === cursor) break;
+    cursor = data.cursor;
+  }
+  return postings;
+}
+
 /** Итог одной синхронизационной задачи (цены/остатки) */
 export interface OzonJobSummary {
   updated: number;

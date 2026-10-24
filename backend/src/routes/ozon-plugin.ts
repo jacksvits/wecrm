@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { testOzonConnection, runOzonFullSync, fetchOzonCategoryTree, importOzonProducts } from '../lib/ozon.js';
+import { testOzonConnection, runOzonFullSync, fetchOzonCategoryTree, importOzonProducts, fetchOzonPostings } from '../lib/ozon.js';
 
 const router = Router();
 
@@ -145,6 +145,47 @@ router.post('/import', authMiddleware, async (req: AuthRequest, res) => {
     res.json(summary);
   } catch (err: any) {
     console.error('[ozon-plugin] import error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/ozon-plugin/postings — заказы из кабинета OZON за период + агрегированные резервы по новым заказам
+// (только просмотр: на складской учёт не влияет)
+router.get('/postings', authMiddleware, async (req, res) => {
+  try {
+    const days = Math.min(90, Math.max(1, Number(req.query.days) || 30));
+    const postings = await fetchOzonPostings(days);
+    // статусы «новых» заказов — резерв ещё не списан со склада OZON
+    const RESERVE_STATUSES = new Set(['awaiting_registration', 'awaiting_confirm', 'assembling', 'awaiting_packaging', 'awaiting_delivering']);
+    const result = postings.map((p: any) => ({
+      posting_number: p.posting_number,
+      order_number: p.order_number ?? null,
+      status: p.status,
+      substatus: p.substatus ?? null,
+      created_at: p.created_at ?? p.in_process_at ?? null,
+      shipment_date: p.shipment_date ?? null,
+      products: (p.products || []).map((it: any) => ({
+        offer_id: it.offer_id ?? '',
+        name: it.name ?? '',
+        quantity: Number(it.quantity) || 0,
+        price: Number(it.price) || 0,
+      })),
+    }));
+    // резервы: сумма по товарам из незавершённых заказов
+    const reserves = new Map<string, { offer_id: string; name: string; quantity: number; postings: string[] }>();
+    for (const p of result) {
+      if (!RESERVE_STATUSES.has(p.status)) continue;
+      for (const it of p.products) {
+        if (!it.offer_id) continue;
+        const row = reserves.get(it.offer_id) || { offer_id: it.offer_id, name: it.name, quantity: 0, postings: [] as string[] };
+        row.quantity += it.quantity;
+        if (!row.postings.includes(p.posting_number)) row.postings.push(p.posting_number);
+        reserves.set(it.offer_id, row);
+      }
+    }
+    res.json({ postings: result, reserves: [...reserves.values()].sort((a, b) => b.quantity - a.quantity) });
+  } catch (err: any) {
+    console.error('[ozon-plugin] postings error:', err.message);
     res.status(400).json({ error: err.message });
   }
 });

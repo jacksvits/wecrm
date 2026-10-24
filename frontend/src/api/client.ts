@@ -96,6 +96,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     sync: (): Promise<{ created: number; updated: number; failed: number; errors: string[] }> => fetchApi('/api/ozon-plugin/sync', { method: 'POST' }),
     import: (): Promise<{ created: number; linked: number; skipped: number; errors: string[] }> => fetchApi('/api/ozon-plugin/import', { method: 'POST' }),
     categories: (): Promise<{ items: any[] }> => fetchApi('/api/ozon-plugin/categories'),
+    postings: (days = 30): Promise<{ postings: any[]; reserves: any[] }> => fetchApi(`/api/ozon-plugin/postings?days=${days}`),
   },
   wbPlugin: {
     get: (): Promise<any> => fetchApi('/api/wb-plugin'),

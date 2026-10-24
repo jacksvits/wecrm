@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Vitrine } from './Vitrine';
 import { Product, ProductCategory, Warehouse, PriceType, StockMovement, PriceHistory } from '../types';
 import { useBrandProductDefaultImage } from '../lib/branding';
+import OzonOrdersPanel from './OzonOrdersPanel';
 
 const quillModules = {
   toolbar: [
@@ -1048,6 +1049,11 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
       )}
 
       {/* ===== Цены ===== */}
+      {/* ===== OZON Заказы ===== */}
+      {effectiveTab === 'ozon' && (
+        <OzonOrdersPanel />
+      )}
+
       {effectiveTab === 'prices' && (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           {categorySidebar}
