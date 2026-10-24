@@ -99,9 +99,6 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   // Строка дерева категорий под курсором (показываем кнопки ✎ / ✕)
   const [hoverCat, setHoverCat] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ productId: string; priceTypeId: string; value: string; priceFrom: boolean } | null>(null);
-  const [vkBusy, setVkBusy] = useState<'import' | 'sync' | null>(null);
-  const [ozonBusy, setOzonBusy] = useState(false);
-
   // Массовый выбор позиций (удаление / перенос в категорию)
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkCat, setBulkCat] = useState('');
@@ -111,54 +108,32 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   // Массовое переключение тега у выбранных товаров
   const [bulkTag, setBulkTag] = useState('');
 
-  const importFromVk = async () => {
-    if (!confirm('Импортировать все товары маркета группы ВК в проект? Позиции с совпадающим названием будут привязаны, не продублированы.')) return;
-    setVkBusy('import');
-    try {
-      const r = await api.products.vkImport();
-      alert(`Импорт завершён: создано ${r.created}, привязано ${r.linked}, пропущено ${r.skipped}${r.errors.length ? '\nОшибки:\n' + r.errors.slice(0, 10).join('\n') : ''}`);
-      await load();
-    } catch (e: any) {
-      alert(e.message || 'Ошибка импорта из ВК');
-    } finally { setVkBusy(null); }
-  };
+
 
   const syncToVk = async () => {
     if (!confirm('Выгрузить все позиции с отметкой «ВК» в маркет группы ВКонтакте?')) return;
-    setVkBusy('sync');
     try {
       const r = await api.products.vkSync();
       alert(`Синхронизация завершена: создано ${r.created}, обновлено ${r.updated}, ошибок ${r.failed}${r.errors.length ? '\n' + r.errors.slice(0, 10).join('\n') : ''}`);
       await load();
     } catch (e: any) {
       alert(e.message || 'Ошибка синхронизации с ВК');
-    } finally { setVkBusy(null); }
+    }
   };
 
   const syncToOzon = async () => {
     if (!confirm('Выгрузить все позиции с отметкой «OZON Seller» в маркетплейс OZON?')) return;
-    setOzonBusy(true);
     try {
       const r = await api.products.ozonSync();
       alert(`Синхронизация завершена: создано ${r.created}, обновлено ${r.updated}, ошибок ${r.failed}${r.errors.length ? '\n' + r.errors.slice(0, 10).join('\n') : ''}`);
       await load();
     } catch (e: any) {
       alert(e.message || 'Ошибка синхронизации с OZON');
-    } finally { setOzonBusy(false); }
+    }
   };
 
   // Импорт из OZON: привязка товаров CRM к карточкам OZON по артикулу
-  const importFromOzon = async () => {
-    if (!confirm('Импортировать каталог OZON и привязать товары CRM по артикулу?')) return;
-    setOzonBusy(true);
-    try {
-      const r = await api.ozonPlugin.import();
-      alert(`Импорт завершён: привязано ${r.linked}, пропущено ${r.skipped}, создано ${r.created}, ошибок ${r.errors.length}${r.errors.length ? '\n' + r.errors.slice(0, 10).join('\n') : ''}`);
-      await load();
-    } catch (e: any) {
-      alert(e.message || 'Ошибка импорта из OZON');
-    } finally { setOzonBusy(false); }
-  };
+
 
   // Переключение опции «Показывать на витрине» у вида цены
   const toggleVitrine = async (t: PriceType) => {
@@ -641,25 +616,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
           {favoritesCount > 0 && <span style={{ position: 'absolute', top: -6, right: -6, background: '#fff', color: '#d97706', border: '1px solid rgba(255,193,7,0.40)', borderRadius: 10, fontSize: 11, padding: '1px 6px', fontWeight: 700 }}>{favoritesCount}</span>}
         </button>
         {effectiveTab === 'nomenclature' && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={importFromVk} disabled={!!vkBusy} title="Загрузить все товары маркета группы ВК в проект"
-              style={{ ...btnGhost, borderColor: '#0077FF', color: '#0077FF' }}>
-              {vkBusy === 'import' ? 'Импорт...' : '↓ Импорт из ВК'}
-            </button>
-            <button onClick={syncToVk} disabled={!!vkBusy} title="Выгрузить позиции с отметкой «ВК» в маркет группы"
-              style={{ ...btnGhost, borderColor: '#0077FF', color: '#0077FF' }}>
-              {vkBusy === 'sync' ? 'Синхронизация...' : '↑ Синхронизация ВК'}
-            </button>
-            <button onClick={syncToOzon} disabled={ozonBusy} title="Выгрузить позиции с отметкой «OZON Seller» в маркетплейс OZON"
-              style={{ ...btnGhost, borderColor: '#005BFF', color: '#005BFF' }}>
-              {ozonBusy ? 'Синхронизация...' : '↑ Синхронизация OZON'}
-            </button>
-            <button onClick={importFromOzon} disabled={ozonBusy} title="Привязать товары CRM к карточкам OZON по артикулу"
-              style={{ ...btnGhost, borderColor: '#005BFF', color: '#005BFF' }}>
-              {ozonBusy ? 'Импорт...' : '↓ Импорт из OZON'}
-            </button>
-            <button onClick={() => setProductModal('new')} style={btnPrimary}>+ Позиция</button>
-          </div>
+          <button onClick={() => setProductModal('new')} style={btnPrimary}>+ Позиция</button>
         )}
         {effectiveTab === 'stock' && (
           <button onClick={() => setWhModal('new')} style={btnPrimary}>+ Склад</button>
