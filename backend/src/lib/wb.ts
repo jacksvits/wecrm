@@ -18,23 +18,33 @@ export async function getWbSettings() {
   return settings;
 }
 
-/** Базовый вызов WB API (авторизация: заголовок Authorization); base — хост API (контент или marketplace) */
+/** Базовый вызов WB API (авторизация: заголовок Authorization); base — хост API (контент или marketplace).
+ *  При 429 (лимит запросов) — до 4 повторных попыток с нарастающей паузой (20/40/60/80 с). */
 async function wbApi<T = any>(method: string, path: string, body?: any, base: string = WB_CONTENT_API): Promise<T> {
   const settings = await getWbSettings();
   if (!settings) throw new Error('WB Seller не подключён: укажите API-ключ в настройках интеграции');
-  const res = await fetch(`${base}${path}`, {
-    method,
-    headers: {
-      'Authorization': settings.apiKey.trim(),
-      'Content-Type': 'application/json',
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  let data: any = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
-  if (!res.ok) throw new Error(`WB: HTTP ${res.status}${data?.message ? ` — ${data.message}` : ''}`);
-  return data as T;
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await fetch(`${base}${path}`, {
+      method,
+      headers: {
+        'Authorization': settings.apiKey.trim(),
+        'Content-Type': 'application/json',
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    const text = await res.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
+    if (res.ok) return data as T;
+    lastError = new Error(`WB: HTTP ${res.status}${data?.message ? ` — ${data.message}` : ''}`);
+    if (res.status === 429 && attempt < 4) {
+      await new Promise((r) => setTimeout(r, 20000 * (attempt + 1)));
+      continue;
+    }
+    throw lastError;
+  }
+  throw lastError!;
 }
 
 /** Список складов продавца WB (marketplace API) */
@@ -88,6 +98,7 @@ export async function fetchWbPrices(): Promise<Map<string, number>> {
   const map = new Map<string, number>();
   let page = 1;
   for (let i = 0; i < 200; i++) {
+    if (page > 1) await new Promise((r) => setTimeout(r, 1000)); // бережём лимит запросов WB
     const data = await wbApi('GET', `/api/v2/list/goods/filter?page=${page}&limit=100`, undefined, WB_PRICES_API);
     const goods = data?.data?.listGoods || [];
     if (!goods.length) break;
