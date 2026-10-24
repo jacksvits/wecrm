@@ -1653,6 +1653,10 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
         <input type="checkbox" checked={form.crmIntegrations.includes('ozon')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('ozon') ? form.crmIntegrations.filter(x => x !== 'ozon') : [...form.crmIntegrations, 'ozon'] })} style={{ width: 15, height: 15 }} />
         OZON Seller
       </label>
+      <label key='wb' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+        <input type="checkbox" checked={form.crmIntegrations.includes('wb')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('wb') ? form.crmIntegrations.filter(x => x !== 'wb') : [...form.crmIntegrations, 'wb'] })} style={{ width: 15, height: 15 }} />
+        WB Seller
+      </label>
       <label key='vpn' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
         <input type="checkbox" checked={form.crmIntegrations.includes('vpn')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('vpn') ? form.crmIntegrations.filter(x => x !== 'vpn') : [...form.crmIntegrations, 'vpn'] })} style={{ width: 15, height: 15 }} />
         Прокси через VPN
