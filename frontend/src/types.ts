@@ -121,6 +121,7 @@ export interface Warehouse { id: string; name: string; location?: string | null;
 export interface PriceType { id: string; name: string; label: string; color: string; sortOrder: number; isActive: boolean; createdAt: string;   forVitrine?: boolean;
   forVk?: boolean;
   forOzon?: boolean;
+  forWb?: boolean;
   isRetail?: boolean;
   forCashless?: boolean;
 }

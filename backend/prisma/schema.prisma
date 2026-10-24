@@ -1344,6 +1344,11 @@ model Product {
   // product_id товара в OZON Seller (BigInt: значения больше 2^31)
   ozonProductId BigInt?   @unique @map("ozon_product_id")
   ozonSyncedAt  DateTime? @map("ozon_synced_at")
+  // «WB Seller» (Wildberries): синхронизировать позицию с маркетплейсом
+  syncToWb      Boolean   @default(false) @map("sync_to_wb")
+  // nmID карточки товара в WB
+  wbProductId   BigInt?   @map("wb_product_id")
+  wbSyncedAt    DateTime? @map("wb_synced_at")
   onecId      String?  @unique @map("onec_id")
   onecSyncedAt DateTime? @map("onec_synced_at")
   isActive    Boolean  @default(true) @map("is_active")
@@ -1510,6 +1515,8 @@ model PriceType {
   forCashless Boolean @default(false) @map("for_cashless")
   // опция «Ozon»: активный вид цен с этим флагом используется при синхронизации с OZON Seller
   forOzon   Boolean  @default(false) @map("for_ozon")
+  // опция «WB»: активный вид цен с этим флагом используется при синхронизации с WB Seller
+  forWb     Boolean  @default(false) @map("for_wb")
   createdAt DateTime @default(now()) @map("created_at")
 
   prices       ProductPrice[]
@@ -1725,6 +1732,31 @@ model OneCPluginSettings {
 
 // Настройки плагина «Контур.Диадок» (ЭДО): подключение по API-ключу разработчика + логин/пароль
 // === Плагин «OZON Seller»: подключение и синхронизация каталога товаров с OZON ===
+/// Настройки плагина WB Seller (Wildberries) — структура зеркально OzonSellerSettings.
+/// По умолчанию всё «С WB»: карточки, цены и остатки вытягиваются из кабинета в складской учёт CRM.
+model WbSellerSettings {
+  id                    Int       @id @default(1)
+  isActive              Boolean   @default(false) @map("is_active")
+  autoSync              Boolean   @default(true) @map("auto_sync") // авто-синхронизация по расписанию (worker); ручная синхронизация доступна всегда
+  apiKey                String    @default("") @map("api_key") // API-ключ WB (заголовок Authorization)
+  // Предмет WB (категория) по умолчанию — для создания карточек «В WB»; NULL — создание недоступно
+  defaultSubjectId      Int?      @map("default_subject_id")
+  // Режимы синхронизации (направление): 'from_wb' — из кабинета в CRM (по умолчанию); 'to_wb' — из CRM в кабинет
+  productsMode          String    @default("from_wb") @map("products_mode")
+  pricesMode            String    @default("from_wb") @map("prices_mode")
+  stocksMode            String    @default("from_wb") @map("stocks_mode")
+  // Расписание: независимые интервалы авто-синхронизации товаров, цен и остатков (минуты)
+  productsIntervalMinutes Int     @default(60) @map("products_interval_minutes")
+  pricesIntervalMinutes Int       @default(60) @map("prices_interval_minutes")
+  stocksIntervalMinutes Int       @default(60) @map("stocks_interval_minutes")
+  // Целевой склад CRM для остатков из кабинета (режим «С WB»); NULL — первый активный склад
+  stockWarehouseId      String?   @map("stock_warehouse_id")
+  lastSyncAt            DateTime? @map("last_sync_at")
+  lastSyncResult        String?   @map("last_sync_result")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+}
+
 model OzonSellerSettings {
   id                    Int       @id @default(1)
   clientId              String    @default("") @map("client_id")

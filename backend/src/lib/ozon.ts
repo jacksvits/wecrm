@@ -331,7 +331,7 @@ async function applyOzonStockToWarehouse(productId: string, quantity: number, wa
  * Записать цену товара в вид цен с записью в историю (аналог ручного изменения цены).
  * Возвращает true, если цена реально изменилась.
  */
-async function writeProductPrice(productId: string, priceTypeId: string, price: number): Promise<boolean> {
+export async function writeProductPrice(productId: string, priceTypeId: string, price: number): Promise<boolean> {
   const existing = await prisma.productPrice.findUnique({
     where: { productId_priceTypeId: { productId, priceTypeId } },
   });

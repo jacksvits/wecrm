@@ -27,12 +27,13 @@ import TochkaAcquiringSettings from "./TochkaAcquiringSettings";
 import OneCSettings from "./OneCSettings";
 import DiadocSettings from "./DiadocSettings";
 import OzonSellerSettings from "./OzonSellerSettings";
+import WbSellerSettings from "./WbSellerSettings";
 import { HikvisionSettings } from "./HikvisionSettings";
 import { SystemSettings } from "./SystemSettings";
 import { ScheduleSettings } from "./ScheduleSettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "schedule" | "integrations" | "system";
-type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "vpn" | "hikvision";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "wb" | "vpn" | "hikvision";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
 const PLUGINS: { key: PluginKey; label: string; group: string; description: string; helpSlug: string }[] = [
@@ -53,6 +54,7 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "onec", helpSlug: "int-1c", label: "1С УТ 8.3", group: "Учётные системы", description: "Двусторонняя синхронизация номенклатуры и контрагентов" },
   { key: "diadoc", helpSlug: "int-diadoc", label: "Контур.Диадок", group: "Учётные системы", description: "ЭДО: получение, отправка и подписание документов" },
   { key: "ozon", helpSlug: "int-ozon", label: "OZON Seller", group: "Маркетплейсы", description: "Двусторонняя синхронизация каталога товаров с маркетплейсом OZON" },
+  { key: "wb", helpSlug: "int-wb", label: "WB Seller", group: "Маркетплейсы", description: "Двусторонняя синхронизация каталога товаров с маркетплейсом Wildberries" },
   { key: "vpn", helpSlug: "int-vpn", label: "Прокси через VPN", group: "Сервисы", description: "Локальный VPN-прокси для Telegram API (sing-box)" },
   { key: "hikvision", helpSlug: "int-hikvision", label: "Камеры Hik-Connect", group: "Видеонаблюдение", description: "Онлайн-просмотр облачных камер Hik-Connect по логину/паролю аккаунта" },
 ];
@@ -76,6 +78,7 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
     onec: "M9.42 11.55L9.42 12.43L9.64 12.45L9.87 13.55L10.07 13.55L10.76 14.45L11.42 14.45L11.44 14.67L21.98 14.67L21.98 13.57L11.66 13.57L11.64 13.35L11.21 13.35L11.19 13.12L10.74 12.88L10.74 11.33L10.97 11.3L11.44 10.63L12.54 10.4L12.56 10.63L13.46 10.88L13.46 11.3L13.69 11.33L13.91 11.98L15.01 11.98L14.56 10.43L14.36 10.43L13.89 9.75L13.46 9.75L13.44 9.53L12.56 9.53L12.54 9.3L12.11 9.3L12.09 9.53L10.99 9.53L10.74 9.98L10.31 9.98L10.09 10.63L9.64 10.88L9.64 11.53ZM2 9.3L2 10.4L3.35 10.43L3.35 16.7L4.67 16.7L4.67 9.3ZM7.39 11.1L7.62 13.78L8.07 14.67L10.31 16.47L21.98 16.7L21.98 15.6L11.44 15.6L9.62 14.67L9.62 14.25L8.72 13.33L8.49 11.78L9.17 9.98L10.99 8.61L13.44 8.61L14.34 9.06L15.26 9.98L15.93 11.98L17.03 11.98L16.58 9.75L15.46 8.4L15.03 8.4L14.34 7.73L12.76 7.28L10.09 7.73L8.52 8.85ZM3.57 7.28L3.57 7.48L3.35 7.51L3.35 8.38L3.55 8.38L3.57 8.61L5.37 8.63L5.37 16.7L6.47 16.7L6.47 7.28Z",
     diadoc: "M18 6v12a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6h6a6 6 0 0 1 6 6zM7.59 5.32C7.83 4.53 8.56 4 9.38 4H17.13C18.16 4 19 4.84 19 5.88V18.13C19 19.16 18.16 20 17.13 20H5.55C4.29 20 3.38 18.77 3.76 17.57L7.59 5.32ZM11 7.5H15.13C15.33 7.5 15.5 7.67 15.5 7.88V15M8.59 17.38L8.08 15.74a.26.26 0 0 1 .25-.24H16.74a.26.26 0 0 1 .25.24l-.51 1.63M9 12.5H13M9.5 10.5H13",
     ozon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 8v6M9 11h6",
+    wb: "M4 7h16M4 12h16M4 17h16M6 7v10M18 7v10",
     vpn: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
     hikvision: "M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z",
   };
@@ -126,6 +129,8 @@ function renderPluginSettings(pluginKey: PluginKey) {
       return <DiadocSettings />;
     case "ozon":
       return <OzonSellerSettings />;
+    case "wb":
+      return <WbSellerSettings />;
     case "vpn":
       return <VpnSettings />;
     case "hikvision":
@@ -167,6 +172,7 @@ export function Settings() {
     hikvision: false,
     diadoc: false,
     ozon: false,
+    wb: false,
     vpn: false,
   });
   useEffect(() => {

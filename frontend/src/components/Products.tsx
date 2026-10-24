@@ -423,7 +423,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   }, [catChildren]);
 
   // Массовое переключение флага: стоявший снимается, отсутствующий устанавливается
-  const BULK_FLAG_LABELS: Record<string, string> = { vitrine: '«На витрине»', vk: '«Товары в ВК»', ozon: '«Ozon»' };
+  const BULK_FLAG_LABELS: Record<string, string> = { vitrine: '«На витрине»', vk: '«Товары в ВК»', ozon: '«Ozon»', wb: '«WB»' };
   const bulkToggleFlag = async (flag: string) => {
     if (!flag || selected.size === 0) return;
     if (!confirm(`Переключить флаг ${BULK_FLAG_LABELS[flag]} у ${selected.size} выбранных позиций?\nУ товаров, где флаг стоит, он будет снят; где не стоит — установлен.`)) { setBulkFlag(''); return; }
@@ -790,6 +790,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
                 <option value="vitrine">На витрине</option>
                 <option value="vk">Товары в ВК</option>
                 <option value="ozon">Ozon</option>
+                <option value="wb">WB</option>
               </select>
               <select
                 value={bulkTag}
@@ -1989,14 +1990,15 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
   const [forVitrine, setForVitrine] = useState(isNew ? false : !!priceType.forVitrine);
   const [forVk, setForVk] = useState(isNew ? false : !!priceType.forVk);
   const [forOzon, setForOzon] = useState(isNew ? false : !!priceType.forOzon);
+  const [forWb, setForWb] = useState(isNew ? false : !!priceType.forWb);
   const [isRetail, setIsRetail] = useState(isNew ? false : !!priceType.isRetail);
   const [forCashless, setForCashless] = useState(isNew ? false : !!priceType.forCashless);
   const [error, setError] = useState('');
 
   const save = async () => {
     try {
-      if (isNew) await api.products.priceTypes.create({ name, label, color, forVitrine, forVk, forOzon, isRetail, forCashless });
-      else await api.products.priceTypes.update(priceType.id, { label, color, forVitrine, forVk, forOzon, isRetail, forCashless });
+      if (isNew) await api.products.priceTypes.create({ name, label, color, forVitrine, forVk, forOzon, forWb, isRetail, forCashless });
+      else await api.products.priceTypes.update(priceType.id, { label, color, forVitrine, forVk, forOzon, forWb, isRetail, forCashless });
       onSaved();
     } catch (e: any) { setError(e.message || 'Ошибка'); }
   };
@@ -2040,6 +2042,10 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
             <input type="checkbox" checked={forOzon} onChange={e => setForOzon(e.target.checked)} />
             Для OZON
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+            <input type="checkbox" checked={forWb} onChange={e => setForWb(e.target.checked)} />
+            Для WB
           </label>
           {forOzon && (
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -6 }}>

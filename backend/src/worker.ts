@@ -9,6 +9,7 @@ import { VkCommunityWorker } from './vk-community/index.js';
 import { prisma } from './lib/prisma.js';
 import { runOneCSync } from './lib/onec-sync.js';
 import { syncProductsToOzon, syncPricesToOzon, syncPricesFromOzon, syncStocksToOzon, syncStocksFromOzon, importOzonProducts } from './lib/ozon.js';
+import { syncProductsToWb, syncPricesToWb, syncPricesFromWb, syncStocksToWb, syncStocksFromWb, importWbProducts } from './lib/wb.js';
 import { listWorkerTenants, withTenant, TenantInfo } from './lib/tenant.js';
 import { runStatusAutoChange } from './lib/status-auto-change.js';
 
@@ -24,7 +25,7 @@ import { runStatusAutoChange } from './lib/status-auto-change.js';
  * глобальный `prisma` обращается к БД нужной организации.
  */
 
-type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkCommunityWorker; onecTimer?: NodeJS.Timeout; ozonProductsTimer?: NodeJS.Timeout; ozonPricesTimer?: NodeJS.Timeout; ozonStocksTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
+type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkCommunityWorker; onecTimer?: NodeJS.Timeout; ozonProductsTimer?: NodeJS.Timeout; ozonPricesTimer?: NodeJS.Timeout; ozonStocksTimer?: NodeJS.Timeout; wbProductsTimer?: NodeJS.Timeout; wbPricesTimer?: NodeJS.Timeout; wbStocksTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
 
 /** Интервал проверки «Авто смены» статусов */
 const STATUS_AUTO_CHANGE_MS = 60_000;
@@ -44,6 +45,9 @@ function stopBag(key: string, bag: TimerBag) {
   if (bag.ozonProductsTimer) clearInterval(bag.ozonProductsTimer);
   if (bag.ozonPricesTimer) clearInterval(bag.ozonPricesTimer);
   if (bag.ozonStocksTimer) clearInterval(bag.ozonStocksTimer);
+  if (bag.wbProductsTimer) clearInterval(bag.wbProductsTimer);
+  if (bag.wbPricesTimer) clearInterval(bag.wbPricesTimer);
+  if (bag.wbStocksTimer) clearInterval(bag.wbStocksTimer);
   if (bag.statusAutoTimer) clearInterval(bag.statusAutoTimer);
   instances.delete(key);
   console.log(`[Worker] Воркеры остановлены для tenant ${key}`);
@@ -192,6 +196,46 @@ async function syncTenant(t: TenantInfo): Promise<void> {
     if (bag.ozonProductsTimer) { clearInterval(bag.ozonProductsTimer); bag.ozonProductsTimer = undefined; }
     if (bag.ozonPricesTimer) { clearInterval(bag.ozonPricesTimer); bag.ozonPricesTimer = undefined; }
     if (bag.ozonStocksTimer) { clearInterval(bag.ozonStocksTimer); bag.ozonStocksTimer = undefined; }
+  }
+
+  // --- WB Seller sync: три независимые задачи (товары, цены, остатки) по своим расписаниям ---
+  // Каждая задача работает в направлении из настроек режима («В WB» / «С WB»).
+  // По умолчанию всё «С WB»: карточки, цены и остатки вытягиваются из кабинета в складской учёт CRM.
+  const wbSettings = await prisma.wbSellerSettings.findFirst();
+  if (wbSettings?.isActive && wbSettings.autoSync) {
+    const runWbJob = (kind: 'products' | 'prices' | 'stocks', job: () => Promise<unknown>) => async () => {
+      try {
+        const summary = await job();
+        console.log(`[Worker] WB ${kind} sync done (${key}):`, JSON.stringify(summary).slice(0, 250));
+      } catch (e: any) {
+        console.error(`[Worker] WB ${kind} sync error (${key}):`, e.message);
+      }
+    };
+    const wbJobFor = (kind: 'products' | 'prices' | 'stocks') =>
+      kind === 'products'
+        ? (wbSettings.productsMode === 'from_wb' ? () => importWbProducts() : () => syncProductsToWb())
+        : kind === 'prices'
+          ? (wbSettings.pricesMode === 'from_wb' ? () => syncPricesFromWb() : () => syncPricesToWb())
+          : (wbSettings.stocksMode === 'from_wb' ? () => syncStocksFromWb() : () => syncStocksToWb());
+    const wbIntervalFor = (kind: 'products' | 'prices' | 'stocks') =>
+      Math.max(5, (kind === 'products' ? wbSettings.productsIntervalMinutes : kind === 'prices' ? wbSettings.pricesIntervalMinutes : wbSettings.stocksIntervalMinutes) || 60) * 60 * 1000;
+
+    if (!bag.wbProductsTimer) {
+      bag.wbProductsTimer = setInterval(runWbJob('products', wbJobFor('products')), wbIntervalFor('products'));
+      console.log(`[Worker] WB products sync scheduled every ${wbIntervalFor('products') / 60000} min, mode=${wbSettings.productsMode} (${key})`);
+    }
+    if (!bag.wbPricesTimer) {
+      bag.wbPricesTimer = setInterval(runWbJob('prices', wbJobFor('prices')), wbIntervalFor('prices'));
+      console.log(`[Worker] WB prices sync scheduled every ${wbIntervalFor('prices') / 60000} min, mode=${wbSettings.pricesMode} (${key})`);
+    }
+    if (!bag.wbStocksTimer) {
+      bag.wbStocksTimer = setInterval(runWbJob('stocks', wbJobFor('stocks')), wbIntervalFor('stocks'));
+      console.log(`[Worker] WB stocks sync scheduled every ${wbIntervalFor('stocks') / 60000} min, mode=${wbSettings.stocksMode} (${key})`);
+    }
+  } else {
+    if (bag.wbProductsTimer) { clearInterval(bag.wbProductsTimer); bag.wbProductsTimer = undefined; }
+    if (bag.wbPricesTimer) { clearInterval(bag.wbPricesTimer); bag.wbPricesTimer = undefined; }
+    if (bag.wbStocksTimer) { clearInterval(bag.wbStocksTimer); bag.wbStocksTimer = undefined; }
   }
 
 }
