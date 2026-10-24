@@ -78,6 +78,7 @@ import seoSettingsRoutes from './routes/seo-settings.js';
 import pwaRoutes from './routes/pwa.js';
 import autoReplySettingsRoutes from './routes/auto-reply-settings.js';
 import legalRoutes from './routes/legal.js';
+import publicFeedbackRoutes from './routes/public-feedback.js';
 import browserRoutes from './routes/browser.js';
 import vncRoutes, { handleVncUpgrade, isVncUpgradePath } from './routes/browser-vnc.js';
 import platformRoutes from './routes/platform.js';
@@ -226,6 +227,7 @@ app.use(['/pwa-index', '/manifest.json'], tenantMiddleware);
 app.use(pwaRoutes);
 app.use('/api/auto-reply-settings', autoReplySettingsRoutes);
 app.use('/api/legal', legalRoutes);
+app.use('/api/public/feedback', publicFeedbackRoutes); // Публичная форма лендинга: заявка с сайта -> новая задача
 app.use('/api/browser/vnc', vncRoutes);
 app.use('/api/browser', browserRoutes);
 app.use('/api/yandex', yandexRoutes);
