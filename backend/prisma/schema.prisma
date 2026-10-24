@@ -1755,6 +1755,8 @@ model WbSellerSettings {
   lastSyncResult        String?   @map("last_sync_result")
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("wb_seller_settings")
 }
 
 model OzonSellerSettings {
