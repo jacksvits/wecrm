@@ -350,10 +350,14 @@ function cardFields(card: any): { description?: string; brand?: string; barcode?
   const barcode = String(card.sizes?.[0]?.skus?.[0] ?? '').trim();
   if (barcode) fields.barcode = barcode;
   const d = card.dimensions || {};
-  if (Number(d.weightBrutto) > 0) fields.weight = Number(d.weightBrutto); // кг
-  if (Number(d.width) > 0) fields.width = Number(d.width);     // см
-  if (Number(d.height) > 0) fields.height = Number(d.height);  // см
-  if (Number(d.length) > 0) fields.depth = Number(d.length);   // см (длина упаковки)
+  // WB возвращает единицы как введены продавцом (г/мм или кг/см) — нормализуем к г/мм (как в форме CRM):
+  // вес < 50 считаем кг → г; габарит ≤ 100 считаем см → мм
+  const w = Number(d.weightBrutto);
+  if (w > 0) fields.weight = w < 50 ? Math.round(w * 1000) : Math.round(w);
+  for (const [key, field] of [['width', 'width'], ['height', 'height'], ['length', 'depth']] as const) {
+    const v = Number(d[key]);
+    if (v > 0) fields[field] = v <= 100 ? Math.round(v * 10) : Math.round(v);
+  }
   return fields;
 }
 
