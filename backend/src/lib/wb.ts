@@ -4,8 +4,10 @@ import path from 'path';
 import { resolveRetailType, writeProductPrice } from './ozon.js';
 
 // Актуальные хосты WB API (suppliers-api.wildberries.ru снят с эксплуатации — NXDOMAIN):
-// контент (карточки, медиа, характеристики) и цены — common-api; склады и остатки — marketplace-api
-const WB_CONTENT_API = 'https://common-api.wildberries.ru';
+// контент (карточки, медиа, характеристики) — content-api;
+// цены — discounts-prices-api; склады и остатки — marketplace-api
+const WB_CONTENT_API = 'https://content-api.wildberries.ru';
+const WB_PRICES_API = 'https://discounts-prices-api.wildberries.ru';
 const WB_MARKETPLACE_API = 'https://marketplace-api.wildberries.ru';
 const UPLOAD_ROOT = process.env.UPLOAD_ROOT || '/app/uploads';
 
@@ -81,39 +83,67 @@ export async function fetchWbCardsList(textSearch?: string): Promise<any[]> {
   return cards;
 }
 
-/** Цены из кабинета: артикул продавца (vendorCode) → базовая цена карточки */
+/** Цены из кабинета: артикул продавца (vendorCode) → цена (discounts-prices API) */
 export async function fetchWbPrices(): Promise<Map<string, number>> {
   const map = new Map<string, number>();
-  for (const card of await fetchWbCardsList()) {
-    const vendorCode = String(card.vendorCode ?? '');
-    const price = Number(card.price) || 0;
-    if (vendorCode && price > 0) map.set(vendorCode, price);
+  let page = 1;
+  for (let i = 0; i < 200; i++) {
+    const data = await wbApi('GET', `/api/v2/list/goods/filter?page=${page}&limit=100`, undefined, WB_PRICES_API);
+    const goods = data?.data?.listGoods || [];
+    if (!goods.length) break;
+    for (const g of goods) {
+      const vendorCode = String(g.vendorCode ?? '');
+      const price = Number(g.sizes?.[0]?.price) || 0;
+      if (vendorCode && price > 0) map.set(vendorCode, price);
+    }
+    const total = Number(data?.data?.total ?? 0);
+    if (goods.length < 100 || map.size >= total) break;
+    page++;
   }
   return map;
 }
 
 /**
- * Остатки из кабинета: sku (артикул продавца) → количество.
- * Эндпоинт чтения остатков зависит от кабинета: пробуем основной API,
- * при 404 — marketplace API. Проверено будет на живом ключе.
+ * Остатки из кабинета: артикул продавца (vendorCode) → суммарное количество.
+ * Чтение — POST /api/v3/stocks/{warehouseId} с фильтром {"skus": [barcode]}:
+ * sku в WB API — это баркод, поэтому строим индекс артикул → баркоды по карточкам.
  */
 export async function fetchWbStocks(): Promise<Map<string, number>> {
+  const settings = await getWbSettings();
   const warehouses = await getWbWarehouses();
   const warehouseId = warehouses?.[0]?.id;
   if (warehouseId == null) throw new Error('В кабинете WB нет складов');
-  // чтение остатков — marketplace API
-  const res = await fetch(`${WB_MARKETPLACE_API}/api/v3/stocks/${warehouseId}`, {
-    headers: { 'Authorization': (await getWbSettings())!.apiKey.trim() },
-  });
-  if (!res.ok) throw new Error(`WB: HTTP ${res.status} при чтении остатков`);
-  const data: any = await res.json().catch(() => null);
-  const map = new Map<string, number>();
-  for (const row of data?.stocks || []) {
-    const sku = String(row.sku ?? row.vendorCode ?? '');
-    const amount = Number(row.amount ?? row.stock ?? row.present ?? 0) || 0;
-    if (sku) map.set(sku, amount);
+  // индекс: артикул → баркоды (из карточек)
+  const byVendor = new Map<string, string[]>();
+  const allBarcodes: string[] = [];
+  for (const card of await fetchWbCardsList()) {
+    const vendorCode = String(card.vendorCode ?? '');
+    const barcodes = (card.sizes || []).flatMap((s: any) => s.skus || []).map(String).filter(Boolean);
+    if (vendorCode && barcodes.length) {
+      byVendor.set(vendorCode, barcodes);
+      allBarcodes.push(...barcodes);
+    }
   }
-  return map;
+  // остатки по баркодам пакетами
+  const byBarcode = new Map<string, number>();
+  for (let i = 0; i < allBarcodes.length; i += 500) {
+    const chunk = allBarcodes.slice(i, i + 500);
+    const res = await fetch(`${WB_MARKETPLACE_API}/api/v3/stocks/${warehouseId}`, {
+      method: 'POST',
+      headers: { 'Authorization': settings!.apiKey.trim(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ skus: chunk }),
+    });
+    if (!res.ok) throw new Error(`WB: HTTP ${res.status} при чтении остатков`);
+    const data: any = await res.json().catch(() => null);
+    for (const row of data?.stocks || []) {
+      byBarcode.set(String(row.sku), Number(row.amount) || 0);
+    }
+  }
+  const result = new Map<string, number>();
+  for (const [vendorCode, barcodes] of byVendor) {
+    result.set(vendorCode, barcodes.reduce((sum, b) => sum + (byBarcode.get(b) ?? 0), 0));
+  }
+  return result;
 }
 
 /**
@@ -245,14 +275,22 @@ async function wbCreateCard(product: any, price: number | null): Promise<number>
   if (missingRequired.length) {
     throw new Error(`Не заполнены обязательные характеристики WB: ${missingRequired.join(', ')}`);
   }
-  const result = await wbApi('POST', '/content/v2/cards/upload', {
-    cards: [{
+  // актуальный формат карточки (2025): предмет + варианты (variants), баркоды — skus (пустые — WB сгенерирует)
+  const result = await wbApi('POST', '/content/v2/cards/upload', [{
+    subjectID: settings.defaultSubjectId,
+    variants: [{
       vendorCode: offerId,
-      subjectID: settings.defaultSubjectId,
+      title: product.name,
+      brand: 'Не указан',
       characteristics,
-      sizes: [{ price: price != null ? Math.round(price) : undefined, skus: [offerId] }],
+      sizes: [{
+        techSize: '0',
+        wbSize: '0',
+        price: price != null ? Math.round(price) : undefined,
+        skus: product.barcode ? [String(product.barcode)] : [],
+      }],
     }],
-  });
+  }]);
   const err = result?.error || result?.errors?.[0]?.error || result?.errors?.[0];
   if (err) throw new Error(`WB не принял карточку: ${typeof err === 'string' ? err : JSON.stringify(err)}`);
   // фото — неблокирующе, привяжутся к карточке по артикулу
@@ -274,7 +312,7 @@ export async function importWbProducts(userId?: string): Promise<{ created: numb
     if (!vendorCode) { result.skipped++; continue; }
     try {
       const existing = await prisma.product.findFirst({ where: { OR: [{ article: vendorCode }, { sku: vendorCode }] }, include: { prices: true } });
-      const price = Number(card.price) || 0;
+      const price = Number(card.sizes?.[0]?.price) || Number(card.price) || 0;
       if (existing) {
         await prisma.product.update({
           where: { id: existing.id },
@@ -313,7 +351,7 @@ export async function importWbProducts(userId?: string): Promise<{ created: numb
 export async function syncProductsToWb(): Promise<{ created: number; updated: number; failed: number; errors: string[] }> {
   const settings = await getWbSettings();
   if (!settings) throw new Error('WB Seller не подключён: укажите API-ключ в настройках интеграции');
-  const summary = { created: 0, updated: 0, failed: 0, errors: [] as string[] };
+  const summary = { created: 0, updated: 0, skipped: 0, failed: 0, errors: [] as string[] };
   const priceType = await resolveWbPriceType();
   const pricesToWb = settings.pricesMode !== 'from_wb';
   const stocksToWb = settings.stocksMode !== 'from_wb';
@@ -322,10 +360,11 @@ export async function syncProductsToWb(): Promise<{ created: number; updated: nu
     include: { prices: true, stocks: true, images: { orderBy: { sortOrder: 'asc' }, take: 10 } },
   });
   // Индекс карточек по артикулу — один запрос на всю синхронизацию
-  const cardIndex = new Map<string, number>();
+  const cardIndex = new Map<string, { nmId: number; barcodes: string[] }>();
   for (const card of await fetchWbCardsList()) {
     const vendorCode = String(card.vendorCode ?? '');
-    if (vendorCode && card.nmID) cardIndex.set(vendorCode, Number(card.nmID));
+    const barcodes = (card.sizes || []).flatMap((s: any) => s.skus || []).map(String).filter(Boolean);
+    if (vendorCode && card.nmID) cardIndex.set(vendorCode, { nmId: Number(card.nmID), barcodes });
   }
   const warehouseId = stocksToWb ? (await getWbWarehouses())[0]?.id : null;
   if (stocksToWb && warehouseId == null) {
@@ -340,7 +379,7 @@ export async function syncProductsToWb(): Promise<{ created: number; updated: nu
     const price = priceRow?.price ?? null;
     const quantity = product.stocks.reduce((sum: number, s: any) => sum + (Number(s.quantity) || 0), 0);
     try {
-      let nmId = product.wbProductId != null ? Number(product.wbProductId) : (cardIndex.get(offerId) ?? null);
+      let nmId = product.wbProductId != null ? Number(product.wbProductId) : (cardIndex.get(offerId)?.nmId ?? null);
       if (nmId == null) {
         // карточки нет — создаём (нужен предмет по умолчанию в настройках)
         nmId = await wbCreateCard(product, price);
@@ -352,7 +391,11 @@ export async function syncProductsToWb(): Promise<{ created: number; updated: nu
         await prisma.product.update({ where: { id: product.id }, data: { wbProductId: BigInt(nmId), wbSyncedAt: new Date() } });
       }
       if (pricesToWb && price != null) priceItems.push({ nmID: nmId, price: Math.round(price) });
-      if (stocksToWb) stockItems.push({ sku: offerId, amount: Math.max(0, Math.round(quantity)) });
+      if (stocksToWb) {
+        const barcode = product.barcode || cardIndex.get(offerId)?.barcodes[0];
+        if (!barcode) { summary.skipped++; continue; }
+        stockItems.push({ sku: String(barcode), amount: Math.max(0, Math.round(quantity)) });
+      }
       await prisma.product.update({ where: { id: product.id }, data: { wbSyncedAt: new Date() } });
       summary.updated++;
     } catch (err: any) {
@@ -361,10 +404,10 @@ export async function syncProductsToWb(): Promise<{ created: number; updated: nu
     }
   }
 
-  // Выгрузка цен пачками (до 1000 за запрос)
+  // Выгрузка цен пачками (до 1000 за запрос) — актуальный эндпоинт цен
   for (let i = 0; i < priceItems.length; i += 1000) {
     const chunk = priceItems.slice(i, i + 1000);
-    try { await wbApi('POST', '/api/v2/upload/prices', chunk); }
+    try { await wbApi('POST', '/api/v2/upload/task', chunk.map((it) => ({ nmID: it.nmID, price: it.price, discount: 0 })), WB_PRICES_API); }
     catch (err: any) { summary.failed += chunk.length; summary.errors.push(`prices: ${err.message}`); }
   }
   // Выгрузка остатков на первый склад WB пачками (до 1000 за запрос)
@@ -396,8 +439,11 @@ export async function syncPricesToWb(): Promise<WbJobSummary> {
   }
   for (let i = 0; i < items.length; i += 1000) {
     const chunk = items.slice(i, i + 1000);
-    try { await wbApi('POST', '/api/v2/upload/prices', chunk); summary.updated += chunk.length; }
-    catch (err: any) { summary.failed += chunk.length; summary.errors.push(err.message); }
+    try {
+      // формат актуального API: nmID + цена + скидка (0 — без скидки)
+      await wbApi('POST', '/api/v2/upload/task', chunk.map((it) => ({ nmID: it.nmID, price: it.price, discount: 0 })), WB_PRICES_API);
+      summary.updated += chunk.length;
+    } catch (err: any) { summary.failed += chunk.length; summary.errors.push(err.message); }
   }
   await saveWbJobResult('prices', summary);
   return summary;
@@ -428,7 +474,7 @@ export async function syncPricesFromWb(): Promise<WbJobSummary> {
   return summary;
 }
 
-/** Остатки «В WB»: выгрузить суммарные остатки складского учёта на первый склад WB */
+/** Остатки «В WB»: выгрузить суммарные остатки складского учёта на первый склад WB (sku — баркод карточки) */
 export async function syncStocksToWb(): Promise<WbJobSummary> {
   const settings = await getWbSettings();
   if (!settings) throw new Error('WB Seller не подключён: укажите API-ключ в настройках интеграции');
@@ -440,11 +486,20 @@ export async function syncStocksToWb(): Promise<WbJobSummary> {
     where: { syncToWb: true, isActive: true, kind: 'product' },
     include: { stocks: true },
   });
+  // индекс карточек: артикул → баркоды
+  const barcodeByVendor = new Map<string, string[]>();
+  for (const card of await fetchWbCardsList()) {
+    const vendorCode = String(card.vendorCode ?? '');
+    const barcodes = (card.sizes || []).flatMap((s: any) => s.skus || []).map(String).filter(Boolean);
+    if (vendorCode && barcodes.length) barcodeByVendor.set(vendorCode, barcodes);
+  }
   const items: { sku: string; amount: number }[] = [];
   for (const product of products) {
     const offerId = product.article || product.sku || product.id;
     const quantity = product.stocks.reduce((sum: number, s: any) => sum + (Number(s.quantity) || 0), 0);
-    items.push({ sku: offerId, amount: Math.max(0, Math.round(quantity)) });
+    const barcode = product.barcode || barcodeByVendor.get(offerId)?.[0];
+    if (!barcode) { summary.skipped++; continue; }
+    items.push({ sku: String(barcode), amount: Math.max(0, Math.round(quantity)) });
   }
   for (let i = 0; i < items.length; i += 1000) {
     const chunk = items.slice(i, i + 1000);
