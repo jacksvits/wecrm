@@ -183,6 +183,8 @@ router.get('/postings', authMiddleware, async (req, res) => {
         reserves.set(it.offer_id, row);
       }
     }
+    // свежие заказы сверху (по дате создания/обработки, у части отправлений created_at пустой)
+    result.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
     res.json({ postings: result, reserves: [...reserves.values()].sort((a, b) => b.quantity - a.quantity) });
   } catch (err: any) {
     console.error('[ozon-plugin] postings error:', err.message);
