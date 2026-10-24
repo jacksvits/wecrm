@@ -3,8 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import { resolveRetailType, writeProductPrice } from './ozon.js';
 
-const WB_API = 'https://suppliers-api.wildberries.ru';
-// Marketplace API — резервный хост для чтения остатков (зависит от типа кабинета)
+// Актуальные хосты WB API (suppliers-api.wildberries.ru снят с эксплуатации — NXDOMAIN):
+// контент (карточки, медиа, характеристики) и цены — common-api; склады и остатки — marketplace-api
+const WB_CONTENT_API = 'https://common-api.wildberries.ru';
 const WB_MARKETPLACE_API = 'https://marketplace-api.wildberries.ru';
 const UPLOAD_ROOT = process.env.UPLOAD_ROOT || '/app/uploads';
 
@@ -15,11 +16,11 @@ export async function getWbSettings() {
   return settings;
 }
 
-/** Базовый вызов WB API (авторизация: заголовок Authorization) */
-async function wbApi<T = any>(method: string, path: string, body?: any): Promise<T> {
+/** Базовый вызов WB API (авторизация: заголовок Authorization); base — хост API (контент или marketplace) */
+async function wbApi<T = any>(method: string, path: string, body?: any, base: string = WB_CONTENT_API): Promise<T> {
   const settings = await getWbSettings();
   if (!settings) throw new Error('WB Seller не подключён: укажите API-ключ в настройках интеграции');
-  const res = await fetch(`${WB_API}${path}`, {
+  const res = await fetch(`${base}${path}`, {
     method,
     headers: {
       'Authorization': settings.apiKey.trim(),
@@ -34,9 +35,9 @@ async function wbApi<T = any>(method: string, path: string, body?: any): Promise
   return data as T;
 }
 
-/** Список складов продавца WB */
+/** Список складов продавца WB (marketplace API) */
 export async function getWbWarehouses(): Promise<any[]> {
-  const data = await wbApi('GET', '/api/v3/warehouses');
+  const data = await wbApi('GET', '/api/v3/warehouses', undefined, WB_MARKETPLACE_API);
   return Array.isArray(data) ? data : (data?.warehouses || []);
 }
 
@@ -97,21 +98,15 @@ export async function fetchWbPrices(): Promise<Map<string, number>> {
  * при 404 — marketplace API. Проверено будет на живом ключе.
  */
 export async function fetchWbStocks(): Promise<Map<string, number>> {
-  const settings = await getWbSettings();
   const warehouses = await getWbWarehouses();
   const warehouseId = warehouses?.[0]?.id;
   if (warehouseId == null) throw new Error('В кабинете WB нет складов');
-  const tryRead = async (base: string): Promise<any | null> => {
-    const res = await fetch(`${base}/api/v3/stocks/${warehouseId}`, {
-      headers: { 'Authorization': settings!.apiKey.trim() },
-    });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`WB: HTTP ${res.status}`);
-    return res.json().catch(() => null);
-  };
-  let data = await tryRead(WB_API).catch(() => null);
-  if (!data) data = await tryRead(WB_MARKETPLACE_API).catch(() => null);
-  if (!data) throw new Error('WB: не найден рабочий эндпоинт чтения остатков — проверьте доступность API в кабинете WB');
+  // чтение остатков — marketplace API
+  const res = await fetch(`${WB_MARKETPLACE_API}/api/v3/stocks/${warehouseId}`, {
+    headers: { 'Authorization': (await getWbSettings())!.apiKey.trim() },
+  });
+  if (!res.ok) throw new Error(`WB: HTTP ${res.status} при чтении остатков`);
+  const data: any = await res.json().catch(() => null);
   const map = new Map<string, number>();
   for (const row of data?.stocks || []) {
     const sku = String(row.sku ?? row.vendorCode ?? '');
@@ -192,7 +187,7 @@ async function wbBindMedia(offerId: string, product: any): Promise<void> {
     try {
       const form = new FormData();
       form.append('uploadfile', new Blob([fs.readFileSync(file)]), path.basename(file));
-      const res = await fetch(`${WB_API}/content/v2/media/upload`, {
+      const res = await fetch(`${WB_CONTENT_API}/content/v2/media/upload`, {
         method: 'POST',
         headers: { 'Authorization': settings.apiKey.trim() },
         body: form,
