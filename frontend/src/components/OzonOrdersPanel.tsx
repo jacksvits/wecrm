@@ -30,7 +30,7 @@ const tdStyle: React.CSSProperties = { padding: '8px 10px', borderBottom: '1px s
 
 /** Вкладка «OZON Заказы»: заказы из кабинета + резервы по новым заказам (только просмотр) */
 export default function OzonOrdersPanel() {
-  const [days, setDays] = useState(30);
+  const [days, setDays] = useState(7);
   const [data, setData] = useState<{ postings: any[]; reserves: any[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
