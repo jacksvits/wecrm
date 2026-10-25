@@ -58,6 +58,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
   }, []);
   // Открытие резерв-листа — та же логика, что по событию wecrm:open-reserve
   const openReserveListInternal = () => {
+    if (!user) { window.location.href = '/'; return; }
     setSaveError("");
     setSaveOk("");
     setPaymentMethod("postpone");
@@ -171,9 +172,9 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
     [favGroups],
   );
 
-  // Загрузка избранного
+  // Загрузка избранного — только для авторизованных (на публичной витрине /vitrine запрос вернул бы 401)
   useEffect(() => {
-    refreshFavorites();
+    if (user) refreshFavorites();
   }, []);
 
   // Оповещаем шапку «Товаров» (счётчик кнопки «Избранное» берёт данные с сервера)
@@ -188,6 +189,8 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
   // Клик по звёздочке: товар уже в избранном — убираем из своей группы,
   // иначе открываем окно выбора группы (куда добавить товар)
   const toggleFavorite = (p: Product) => {
+    // Аноним на публичной витрине — предлагаем войти (избранное доступно только пользователям CRM)
+    if (!user) { window.location.href = '/'; return; }
     if (favoriteIds.has(p.id)) {
       const grp = favGroups.find((g: any) => g.items.some((i: any) => i.productId === p.id));
       if (grp) api.favorites.removeItem(grp.id, p.id).then(setFavGroups).catch(() => {});
@@ -285,8 +288,11 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
       .then(setProducts)
       .catch((e: any) => setError(e.message || 'Ошибка загрузки витрины'))
       .finally(() => setLoading(false));
-    api.contacts.list('kind=contact').then(setContacts).catch(() => {});
-    api.tochkaAcquiring.get().then((s: any) => setTochkaActive(!!s.isActive)).catch(() => {});
+    // Контакты и эквайринг — только для авторизованных (публичная витрина /vitrine работает без них)
+    if (user) {
+      api.contacts.list('kind=contact').then(setContacts).catch(() => {});
+      api.tochkaAcquiring.get().then((s: any) => setTochkaActive(!!s.isActive)).catch(() => {});
+    }
     api.products.vitrineCategories()
       .then((cats) => {
         setCategories(cats);
@@ -467,6 +473,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
   );
 
   const addToReserve = (p: Product) => {
+    if (!user) { window.location.href = '/'; return; }
     // Нулевая цена не участвует: берём самую минимальную ненулевую цену
     const visiblePrices = (p.prices || []).filter((x: any) => Number(x.price) > 0)
       .sort((a: any, b: any) => Number(a.price) - Number(b.price));
@@ -486,6 +493,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
   };
 
   const addToCart = (p: Product) => {
+    if (!user) { window.location.href = '/'; return; }
     // Нулевая цена не участвует: берём самую минимальную ненулевую цену
     const visiblePrices = (p.prices || []).filter((x: any) => Number(x.price) > 0)
       .sort((a: any, b: any) => Number(a.price) - Number(b.price));
