@@ -31,6 +31,11 @@ export const navItems: { path: string; label: string; icon: string; tenantOnly?:
     icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
   },
   {
+    path: "/logistics",
+    label: "Логистика",
+    icon: "M3 7h11v10H3zM14 10h4l3 3v4h-7zM7 21a2 2 0 100-4 2 2 0 000 4zM18 21a2 2 0 100-4 2 2 0 000 4zM1 17h2M14 17h-1",
+  },
+  {
     path: "/projects",
     label: "Проекты",
     icon: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z",

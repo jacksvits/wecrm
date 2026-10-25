@@ -198,6 +198,7 @@ model Contact {
   employees      Contact[] @relation("ContactOrganization")
 
   deals       Deal[]
+  cdekShipments CdekShipment[]
   tasks       Task[]
   calls       Call[]
   smsMessages SmsMessage[]
@@ -662,6 +663,7 @@ model Deal {
   financeDocuments FinanceDocument[]
 
   @@map("deals")
+  cdekShipments CdekShipment[]
 }
 
 model Comment {
@@ -2174,4 +2176,80 @@ model ScheduleSettings {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("schedule_settings")
+}
+
+// === Плагин «CDEK (СДЭК)»: доставка заказов из CRM (полный цикл) ===
+// Документация API: https://apidoc.cdek.ru (API v2)
+model CdekSettings {
+  id             Int       @id @default(1)
+  isActive       Boolean   @default(false) @map("is_active")
+  // Среда API: 'test' — api.edu.cdek.ru (тестовый контур), 'prod' — api.cdek.ru (боевой)
+  environment    String    @default("test") @map("environment")
+  account        String    @default("")     @map("account")
+  securePassword String    @default("")     @map("secure_password")
+  // Кэш OAuth-токена СДЭК
+  accessToken    String    @default("")     @map("access_token")
+  tokenExpiresAt DateTime? @map("token_expires_at")
+  // Секрет публичного URL вебхука: /api/cdek/webhook/<webhookToken>
+  webhookToken   String    @default("")     @map("webhook_token")
+  // Отправитель по умолчанию (заполняется в настройках интеграции)
+  senderCityCode Int?      @map("sender_city_code")
+  senderCompany  String    @default("") @map("sender_company")
+  senderName     String    @default("") @map("sender_name")
+  senderPhone    String    @default("") @map("sender_phone")
+  senderAddress  String    @default("") @map("sender_address")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("cdek_settings")
+}
+
+// Отправление СДЭК — заказ на доставку, созданный из CRM
+model CdekShipment {
+  id         String  @id @default(cuid())
+  // Идентификаторы в СДЭК
+  uuid       String? @map("uuid")
+  cdekNumber String? @map("cdek_number")
+  // Связь со сделкой/контактом CRM (необязательная, при удалении — SetNull)
+  dealId     String? @map("deal_id")
+  deal       Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  contactId  String? @map("contact_id")
+  contact    Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  // Номер заказа интернет-магазина (в СДЭК уникален в рамках договора ИМ)
+  imNumber          String  @map("im_number")
+  tariffCode        Int     @map("tariff_code")
+  deliveryMode      String  @default("door") @map("delivery_mode") // 'door' | 'warehouse'
+  deliverySum       Float?  @map("delivery_sum")
+  currency          String  @default("RUB")
+  fromCity          String  @default("") @map("from_city")
+  toCity            String  @map("to_city")
+  toAddress         String  @default("") @map("to_address")
+  deliveryPointCode String? @map("delivery_point_code")
+  recipientName     String  @map("recipient_name")
+  recipientPhone    String  @map("recipient_phone")
+  recipientEmail    String  @default("") @map("recipient_email")
+  // Груз: вес в граммах, габариты в сантиметрах
+  weightGrams   Int    @map("weight_grams")
+  lengthCm      Int?   @map("length_cm")
+  widthCm       Int?   @map("width_cm")
+  heightCm      Int?   @map("height_cm")
+  // Наложенный платёж за товар (₽, 0 — без постоплаты), объявленная стоимость (₽)
+  codAmount     Int    @default(0) @map("cod_amount")
+  declaredValue Int    @default(0) @map("declared_value")
+  itemName      String @default("") @map("item_name")
+  comment       String @default("")
+  // Актуальный статус в СДЭК
+  statusCode    String?   @map("status_code")
+  statusName    String?   @map("status_name")
+  statusAt      DateTime? @map("status_at")
+  // История статусов JSON: [{code,name,dateTime,city}]
+  statusHistory String?   @map("status_history") @db.Text
+  // Состояние асинхронной регистрации: ACCEPTED | SUCCESSFUL | INVALID
+  requestState  String?   @map("request_state")
+  lastError     String?   @map("last_error")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([dealId])
+  @@index([contactId])
+  @@map("cdek_shipments")
 }

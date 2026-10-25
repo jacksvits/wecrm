@@ -28,12 +28,13 @@ import OneCSettings from "./OneCSettings";
 import DiadocSettings from "./DiadocSettings";
 import OzonSellerSettings from "./OzonSellerSettings";
 import WbSellerSettings from "./WbSellerSettings";
+import CdekSettings from "./CdekSettings";
 import { HikvisionSettings } from "./HikvisionSettings";
 import { SystemSettings } from "./SystemSettings";
 import { ScheduleSettings } from "./ScheduleSettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "schedule" | "integrations" | "system";
-type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "wb" | "vpn" | "hikvision";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "wb" | "vpn" | "hikvision" | "cdek";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
 const PLUGINS: { key: PluginKey; label: string; group: string; description: string; helpSlug: string }[] = [
@@ -57,6 +58,7 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "wb", helpSlug: "int-wb", label: "WB Seller", group: "Маркетплейсы", description: "Двусторонняя синхронизация каталога товаров с маркетплейсом Wildberries" },
   { key: "vpn", helpSlug: "int-vpn", label: "Прокси через VPN", group: "Сервисы", description: "Локальный VPN-прокси для Telegram API (sing-box)" },
   { key: "hikvision", helpSlug: "int-hikvision", label: "Камеры Hik-Connect", group: "Видеонаблюдение", description: "Онлайн-просмотр облачных камер Hik-Connect по логину/паролю аккаунта" },
+  { key: "cdek", helpSlug: "int-cdek", label: "CDEK", group: "Логистика", description: "Доставка заказов СДЭК: калькулятор стоимости, накладные, трекинг, квитанции" },
 ];
 
 function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
@@ -81,6 +83,7 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
     wb: "M4 7h16M4 12h16M4 17h16M6 7v10M18 7v10",
     vpn: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
     hikvision: "M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z",
+    cdek: "M3 7h11v10H3zM14 10h4l3 3v4h-7zM7 21a2 2 0 100-4 2 2 0 000 4zM18 21a2 2 0 100-4 2 2 0 000 4zM1 17h2M14 17h-1",
   };
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -135,6 +138,8 @@ function renderPluginSettings(pluginKey: PluginKey) {
       return <VpnSettings />;
     case "hikvision":
       return <HikvisionSettings />;
+    case "cdek":
+      return <CdekSettings />;
     default:
       return null;
   }
@@ -174,6 +179,7 @@ export function Settings() {
     ozon: false,
     wb: false,
     vpn: false,
+    cdek: false,
   });
   useEffect(() => {
     if (!helpSlug) return;
@@ -188,6 +194,17 @@ export function Settings() {
   useEffect(() => {
     if (window.location.search.includes("tochka=connected")) {
       setActiveTab("integrations");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  // Прямая ссылка на интеграцию: /settings?tab=integrations&plugin=<key>
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") === "integrations") {
+      setActiveTab("integrations");
+      const plugin = params.get("plugin") as PluginKey | null;
+      if (plugin && PLUGINS.some((p) => p.key === plugin)) setSelectedPlugin(plugin);
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);

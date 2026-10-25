@@ -98,6 +98,26 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     categories: (): Promise<{ items: any[] }> => fetchApi('/api/ozon-plugin/categories'),
     postings: (days = 30): Promise<{ postings: any[]; reserves: any[] }> => fetchApi(`/api/ozon-plugin/postings?days=${days}`),
   },
+  cdekPlugin: {
+    get: (): Promise<any> => fetchApi('/api/cdek-plugin'),
+    save: (data: any) => fetchApi('/api/cdek-plugin', { method: 'POST', body: JSON.stringify(data) }),
+    test: (data?: any) => fetchApi('/api/cdek-plugin/test', { method: 'POST', body: JSON.stringify(data ?? {}) }),
+  },
+  cdek: {
+    shipments: (params?: { dealId?: string; contactId?: string }): Promise<any[]> =>
+      fetchApi(`/api/cdek/shipments?${params?.dealId ? `dealId=${params.dealId}&` : ''}${params?.contactId ? `contactId=${params.contactId}` : ''}`),
+    shipment: (id: string): Promise<any> => fetchApi(`/api/cdek/shipments/${id}`),
+    createShipment: (data: any) => fetchApi('/api/cdek/shipments', { method: 'POST', body: JSON.stringify(data) }),
+    refreshShipment: (id: string) => fetchApi(`/api/cdek/shipments/${id}/refresh`, { method: 'POST' }),
+    deleteShipment: (id: string) => fetchApi(`/api/cdek/shipments/${id}`, { method: 'DELETE' }),
+    label: (id: string, filename: string) => downloadBlob(`/api/cdek/shipments/${id}/label`, filename),
+    calcTariffList: (data: any) => fetchApi('/api/cdek/calculator/tariffList', { method: 'POST', body: JSON.stringify(data) }),
+    cities: (name: string): Promise<any[]> => fetchApi(`/api/cdek/cities?name=${encodeURIComponent(name)}`),
+    deliveryPoints: (cityCode: number): Promise<any[]> => fetchApi(`/api/cdek/deliverypoints?cityCode=${cityCode}`),
+    webhooks: (): Promise<any> => fetchApi('/api/cdek/webhooks'),
+    subscribeWebhook: (host?: string) => fetchApi('/api/cdek/webhooks/subscribe', { method: 'POST', body: JSON.stringify(host ? { host } : {}) }),
+    unsubscribeWebhook: (uuid: string) => fetchApi(`/api/cdek/webhooks/${uuid}`, { method: 'DELETE' }),
+  },
   wbPlugin: {
     get: (): Promise<any> => fetchApi('/api/wb-plugin'),
     save: (data: any) => fetchApi('/api/wb-plugin', { method: 'POST', body: JSON.stringify(data) }),

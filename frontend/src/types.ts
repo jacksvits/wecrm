@@ -351,3 +351,41 @@ export interface UserDeletePreview {
   remove: UserDeletePreviewLink[];
   candidates: UserDeletePreviewCandidate[];
 }
+
+// Плагин «CDEK»: отправление (заказ на доставку)
+export interface CdekShipment {
+  id: string;
+  uuid?: string | null;
+  cdekNumber?: string | null;
+  dealId?: string | null;
+  contactId?: string | null;
+  deal?: { id: string; name: string } | null;
+  contact?: { id: string; name: string; phone?: string } | null;
+  imNumber: string;
+  tariffCode: number;
+  deliveryMode: 'door' | 'warehouse';
+  deliverySum?: number | null;
+  currency: string;
+  fromCity: string;
+  toCity: string;
+  toAddress: string;
+  deliveryPointCode?: string | null;
+  recipientName: string;
+  recipientPhone: string;
+  recipientEmail?: string;
+  weightGrams: number;
+  lengthCm?: number | null;
+  widthCm?: number | null;
+  heightCm?: number | null;
+  codAmount: number;
+  declaredValue: number;
+  itemName?: string;
+  comment?: string;
+  statusCode?: string | null;
+  statusName?: string | null;
+  statusAt?: string | null;
+  requestState?: string | null;
+  lastError?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
