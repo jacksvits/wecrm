@@ -119,10 +119,9 @@ router.post('/test', authMiddleware, async (req, res) => {
     // введённые «на пробу» данные в БД не трогаем.
     if (!useProvided) await resetCdekToken();
     const token = await getCdekToken(settings);
-    // Лёгкий проверочный запрос: список доступных тарифов
-    const tariffs = await cdekApi('GET', '/v2/tariffs', undefined, settings).catch(() => null);
+    // Лёгкий проверочный запрос: подбор населённых пунктов (эндпоинт доступен в API v2)
     const cities = await cdekApi('GET', '/v2/location/cities?size=1', undefined, settings).catch(() => null);
-    if (!cities && !tariffs) throw new Error('API недоступно: нет ответа на проверочные запросы');
+    if (!cities) throw new Error('API недоступно: нет ответа на проверочный запрос');
     res.json({ ok: true, environment: settings.environment, baseUrl: cdekBaseUrl(settings.environment) });
   } catch (e: any) {
     res.status(400).json({ ok: false, error: e.message });

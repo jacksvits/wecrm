@@ -111,7 +111,11 @@ export async function cdekApi<T = any>(method: string, path: string, body?: any,
     if (res.ok) return data as T;
     const details = Array.isArray(data?.errors) && data.errors.length
       ? ` (${data.errors.map((e: any) => e.message).join('; ')})`
-      : '';
+      : data?.message
+        ? ''
+        : typeof data?.raw === 'string' && data.raw
+          ? ` — ${data.raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)}`
+          : '';
     lastError = new Error(`CDEK: HTTP ${res.status}${data?.message ? ` — ${data.message}` : ''}${details}`);
     if (res.status === 401 && attempt === 0) {
       await resetCdekToken();

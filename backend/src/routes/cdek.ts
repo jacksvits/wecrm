@@ -311,10 +311,17 @@ router.get('/deliverypoints', authMiddleware, async (req, res) => {
 
 router.get('/webhooks', authMiddleware, async (req, res) => {
   try {
-    const settings = await getCdekSettings();
+    let settings = await getCdekSettings();
     if (!settings?.isActive) return res.json({ items: [], webhookUrl: '' });
+    // Токен публикуемого URL генерируем при первом обращении
+    if (!settings.webhookToken) {
+      const token = newWebhookToken();
+      await prisma.cdekSettings.upsert({ where: { id: 1 }, update: { webhookToken: token }, create: { id: 1, webhookToken: token } });
+      settings = { ...settings, webhookToken: token };
+    }
     const items = await cdekListWebhooks();
-    const host = `${req.protocol}://${req.get('host')}`;
+    const proto = req.get('x-forwarded-proto') ?? req.protocol;
+    const host = `${proto}://${req.get('host')}`;
     res.json({
       items,
       webhookUrl: `${host}/api/cdek/webhook/${settings.webhookToken}`,
@@ -331,9 +338,10 @@ router.post('/webhooks/subscribe', authMiddleware, async (req, res) => {
     let token = settings.webhookToken;
     if (!token) {
       token = newWebhookToken();
-      await prisma.cdekSettings.update({ where: { id: 1 }, data: { webhookToken: token } });
+      await prisma.cdekSettings.upsert({ where: { id: 1 }, update: { webhookToken: token }, create: { id: 1, webhookToken: token } });
     }
-    const host = String(req.body?.host ?? `${req.protocol}://${req.get('host')}`);
+    const proto = req.get('x-forwarded-proto') ?? req.protocol;
+    const host = String(req.body?.host ?? `${proto}://${req.get('host')}`);
     const url = `${host}/api/cdek/webhook/${token}`;
     const result = await cdekSubscribeWebhook(url);
     res.json({ ok: true, url, result });
