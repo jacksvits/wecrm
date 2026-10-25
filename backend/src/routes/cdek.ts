@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
 import {
-  CDEK_STATUS_NAMES, cdekApi, cdekCalcTariffList, cdekCreateOrder, cdekDeleteOrder,
-  cdekDeliveryPoints, cdekGetOrder, cdekListWebhooks, cdekPrintOrderPdf,
-  cdekSubscribeWebhook, cdekSuggestCities, cdekUnsubscribeWebhook,
+  CDEK_FALLBACK_TARIFFS, CDEK_STATUS_NAMES, cdekApi, cdekCalcTariff, cdekCalcTariffList,
+  cdekCreateOrder, cdekDeleteOrder, cdekDeliveryPoints, cdekGetOrder, cdekListWebhooks,
+  cdekPrintOrderPdf, cdekSubscribeWebhook, cdekSuggestCities, cdekUnsubscribeWebhook,
   getCdekSettings, newWebhookToken,
 } from '../lib/cdek.js';
 
@@ -127,17 +127,15 @@ router.post('/shipments', authMiddleware, async (req, res) => {
     if (d.lengthCm) pkg.length = d.lengthCm;
     if (d.widthCm) pkg.width = d.widthCm;
     if (d.heightCm) pkg.height = d.heightCm;
-    // Вложения: постоплата (наложенный платёж) и/или объявленная стоимость
-    if (d.codAmount > 0 || d.declaredValue > 0) {
-      pkg.items = [{
-        name: d.itemName || 'Товар',
-        ware_key: `wecrm-${d.imNumber}`.slice(0, 20),
-        payment: { value: d.codAmount },
-        cost: d.declaredValue || d.codAmount,
-        weight: d.weightGrams,
-        amount: 1,
-      }];
-    }
+    // Вложения обязательны в API СДЭК (даже без постоплаты)
+    pkg.items = [{
+      name: d.itemName || 'Товар',
+      ware_key: `wecrm-${d.imNumber}`.slice(0, 20),
+      payment: { value: d.codAmount },
+      cost: d.declaredValue || d.codAmount || 1,
+      weight: d.weightGrams,
+      amount: 1,
+    }];
 
     const order: Record<string, any> = {
       type: 1, // договор «интернет-магазин»
@@ -251,28 +249,47 @@ router.delete('/shipments/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Квитанция (этикетка) в PDF
+// Квитанция (этикетка) в PDF: печать возможна по номеру накладной СДЭК
 router.get('/shipments/:id/label', authMiddleware, async (req, res) => {
   try {
-    const s = await prisma.cdekShipment.findUnique({ where: { id: req.params.id } });
+    let s = await prisma.cdekShipment.findUnique({ where: { id: req.params.id } });
     if (!s) return res.status(404).json({ error: 'Отправление не найдено' });
-    if (!s.uuid) return res.status(400).json({ error: 'У отправления нет UUID в СДЭК' });
-    const pdf = await cdekPrintOrderPdf(s.uuid);
+    // Номер накладной мог появиться после регистрации — дозапрашиваем при необходимости
+    if (!s.cdekNumber && s.uuid) {
+      try {
+        const data = await cdekGetOrder(s.uuid);
+        const upd = applyOrderEntity(s, data?.entity ?? {});
+        if (upd.cdekNumber) s = await prisma.cdekShipment.update({ where: { id: s.id }, data: upd });
+      } catch { /* оставляем как есть */ }
+    }
+    if (!s.cdekNumber) return res.status(400).json({ error: 'У отправления ещё нет номера накладной СДЭК — обновите статус позже' });
+    const pdf = await cdekPrintOrderPdf(s.cdekNumber);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="cdek-label-${s.cdekNumber ?? s.imNumber}.pdf"`);
+    res.setHeader('Content-Disposition', `inline; filename="cdek-label-${s.cdekNumber}.pdf"`);
     res.send(pdf);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// Калькулятор: расчёт по доступным тарифам
+// Калькулятор: расчёт по доступным тарифам.
+// Сначала /v2/calculator/tariffList; если недоступен (нет на тестовом стенде) —
+// фолбэк: попарный расчёт популярных тарифов через /v2/calculator/tariff.
 router.post('/calculator/tariffList', authMiddleware, async (req, res) => {
   try {
     const data = await cdekCalcTariffList(req.body ?? {});
     res.json(data);
   } catch (e: any) {
-    res.status(400).json({ error: e.message });
+    const body = req.body ?? {};
+    const results: any[] = [];
+    for (const code of CDEK_FALLBACK_TARIFFS) {
+      try {
+        const r = await cdekCalcTariff({ ...body, tariff_code: code });
+        if (r?.result) results.push({ tariff_code: code, status: true, result: r.result });
+      } catch { /* тариф недоступен по направлению */ }
+    }
+    if (!results.length) return res.status(400).json({ error: e.message });
+    res.json({ tariff_codes: results });
   }
 });
 

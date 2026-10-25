@@ -109,13 +109,20 @@ export async function cdekApi<T = any>(method: string, path: string, body?: any,
     let data: any = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
     if (res.ok) return data as T;
+    const reqErrors: string[] = Array.isArray(data?.requests?.[0]?.errors)
+      ? data.requests[0].errors.map((e: any) => e.message).filter(Boolean)
+      : [];
     const details = Array.isArray(data?.errors) && data.errors.length
       ? ` (${data.errors.map((e: any) => e.message).join('; ')})`
-      : data?.message
-        ? ''
-        : typeof data?.raw === 'string' && data.raw
-          ? ` — ${data.raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)}`
-          : '';
+      : reqErrors.length
+        ? ` (${reqErrors.join('; ')})`
+        : data?.message
+          ? ''
+          : data?.error_description
+            ? ` — ${data.error_description}`
+            : typeof data?.raw === 'string' && data.raw
+              ? ` — ${data.raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)}`
+              : '';
     lastError = new Error(`CDEK: HTTP ${res.status}${data?.message ? ` — ${data.message}` : ''}${details}`);
     if (res.status === 401 && attempt === 0) {
       await resetCdekToken();
@@ -163,17 +170,41 @@ export async function cdekDeleteOrder(uuid: string): Promise<any> {
   return cdekApi('DELETE', `/v2/orders/${encodeURIComponent(uuid)}`);
 }
 
-/** Форма квитанции (этикетка) в PDF: возвращает бинарные данные */
-export async function cdekPrintOrderPdf(orderUuid: string): Promise<Buffer> {
+/** Популярные тарифы для фолбэка расчёта, когда /v2/calculator/tariffList недоступен */
+export const CDEK_FALLBACK_TARIFFS = [136, 137, 138, 139, 233, 234, 235, 236, 480, 481, 482];
+
+/** Расчёт по одному тарифу */
+export async function cdekCalcTariff(payload: any): Promise<any> {
+  return cdekApi('POST', '/v2/calculator/tariff', payload);
+}
+
+/**
+ * Форма квитанции (этикетка) в PDF.
+ * Схема API: POST /v2/print/orders {"orders":[{"cdek_number":"…"}],"format":"A6"} →
+ * задание печати (uuid) → GET /v2/print/orders/{uuid} → url → скачивание PDF.
+ */
+export async function cdekPrintOrderPdf(cdekNumber: string): Promise<Buffer> {
   const settings = await getCdekSettings();
   if (!settings) throw new Error('CDEK не подключён');
+  const token = await getCdekToken(settings);
   const print = await cdekApi('POST', '/v2/print/orders', {
-    entity: { uuids: [orderUuid] },
+    orders: [{ cdek_number: cdekNumber }],
     format: 'A6',
   });
-  const url = print?.entity?.url;
+  const taskUuid = print?.entity?.uuid;
+  if (!taskUuid) throw new Error('CDEK: не создано задание печати квитанции');
+  // Задание асинхронное: ждём ссылки на PDF
+  let url: string | null = null;
+  for (let i = 0; i < 6; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const info = await cdekApi('GET', `/v2/print/orders/${encodeURIComponent(taskUuid)}`);
+    const state = info?.requests?.[0]?.state;
+    const err = info?.requests?.[0]?.errors?.map((e: any) => e.message).join('; ');
+    if (err) throw new Error(`CDEK: ошибка печати квитанции — ${err}`);
+    url = info?.entity?.url ?? null;
+    if (url || state === 'INVALID') break;
+  }
   if (!url) throw new Error('CDEK: не получена ссылка на квитанцию');
-  const token = await getCdekToken(settings);
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(30_000),
@@ -188,9 +219,9 @@ export async function cdekListWebhooks(): Promise<any[]> {
   return Array.isArray(data) ? data : [];
 }
 
-/** Подписка на вебхук изменения статуса заказа */
+/** Подписка на вебхук изменения статуса заказа (тело — плоское, без обёртки entity) */
 export async function cdekSubscribeWebhook(url: string): Promise<any> {
-  return cdekApi('POST', '/v2/webhooks', { entity: { url, type: 'ORDER_STATUS' } });
+  return cdekApi('POST', '/v2/webhooks', { url, type: 'ORDER_STATUS' });
 }
 
 /** Отмена подписки на вебхук */
