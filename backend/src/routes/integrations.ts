@@ -10,7 +10,7 @@ router.use(authMiddleware);
 // GET /api/integrations/status — статус активности интеграций («плагинов»)
 router.get('/status', async (_req, res) => {
   try {
-    const [email, telephony, max, telegram, vkAuth, vkMarket, vkCommunity, yandex, dgis, beget, pskovline, onec, tochka, vpn, diadoc, tochkaAcquiring, ozon, hikvision, cdek] = await Promise.all([
+    const [email, telephony, max, telegram, vkAuth, vkMarket, vkCommunity, yandex, dgis, beget, pskovline, onec, tochka, vpn, diadoc, tochkaAcquiring, ozon, wb, hikvision, cdek] = await Promise.all([
       prisma.emailSettings.findFirst({ select: { isActive: true } }),
       prisma.telephonySettings.findFirst({ select: { isActive: true } }),
       prisma.maxSettings.findFirst({ select: { isActive: true } }),
@@ -28,6 +28,7 @@ router.get('/status', async (_req, res) => {
       prisma.diadocPluginSettings.findFirst({ select: { isActive: true } }),
       prisma.tochkaAcquiringSettings.findFirst({ select: { isActive: true } }),
       prisma.ozonSellerSettings.findFirst({ select: { isActive: true } }),
+      prisma.wbSellerSettings.findFirst({ select: { isActive: true } }),
       prisma.hikvisionPluginSettings.findFirst({ select: { isActive: true } }),
       prisma.cdekSettings.findFirst({ select: { isActive: true } }),
     ]);
@@ -51,6 +52,7 @@ router.get('/status', async (_req, res) => {
       diadoc: diadoc?.isActive ?? false,
       tochkaAcquiring: tochkaAcquiring?.isActive ?? false,
       ozon: ozon?.isActive ?? false,
+      wb: wb?.isActive ?? false,
       hikvision: hikvision?.isActive ?? false,
       cdek: cdek?.isActive ?? false,
     });
