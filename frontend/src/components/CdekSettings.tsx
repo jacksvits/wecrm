@@ -54,6 +54,12 @@ export default function CdekSettings() {
     load();
   }, []);
 
+  // Любое изменение формы сбрасывает устаревший результат проверки/ошибку
+  useEffect(() => {
+    setTestResult(null);
+    setError('');
+  }, [form]);
+
   async function load() {
     try {
       const data = await api.cdekPlugin.get();
