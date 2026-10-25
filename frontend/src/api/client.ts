@@ -108,6 +108,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
       fetchApi(`/api/cdek/shipments?${params?.dealId ? `dealId=${params.dealId}&` : ''}${params?.contactId ? `contactId=${params.contactId}` : ''}`),
     shipment: (id: string): Promise<any> => fetchApi(`/api/cdek/shipments/${id}`),
     createShipment: (data: any) => fetchApi('/api/cdek/shipments', { method: 'POST', body: JSON.stringify(data) }),
+    importShipment: (cdekNumber: string) => fetchApi('/api/cdek/shipments/import', { method: 'POST', body: JSON.stringify({ cdekNumber }) }),
     refreshShipment: (id: string) => fetchApi(`/api/cdek/shipments/${id}/refresh`, { method: 'POST' }),
     deleteShipment: (id: string) => fetchApi(`/api/cdek/shipments/${id}`, { method: 'DELETE' }),
     label: (id: string, filename: string) => downloadBlob(`/api/cdek/shipments/${id}/label`, filename),

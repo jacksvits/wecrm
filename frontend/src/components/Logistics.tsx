@@ -382,6 +382,26 @@ export function Logistics() {
     }
   }
 
+  const [importNum, setImportNum] = useState('');
+  const [importing, setImporting] = useState(false);
+
+  // Импорт существующего заказа СДЭК по трек-номеру
+  async function importByNumber() {
+    const num = importNum.trim();
+    if (!num) return;
+    setImporting(true);
+    try {
+      const s = await api.cdek.importShipment(num);
+      setShipments(list => [s, ...list.filter(x => x.id !== s.id)]);
+      setImportNum('');
+      setError('');
+    } catch (e: any) {
+      setError(e.data?.error ?? e.message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function openDetails(id: string) {
     try {
       const d = await api.cdek.shipment(id);
@@ -400,9 +420,17 @@ export function Logistics() {
           <h1 style={{ margin: 0, fontSize: 24 }}>Логистика</h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary, #666666)' }}>Отправления СДЭК: регистрация накладных, трекинг, квитанции</p>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <button onClick={load} style={btnSecondary}>Обновить</button>
           <button onClick={() => setShowForm(true)} style={btnPrimary} disabled={pluginActive === false}>Новая отправка</button>
+          <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+            <input value={importNum} onChange={e => setImportNum(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && importByNumber()}
+              placeholder="Трек-номер СДЭК" style={{ ...inputStyle, width: 180, padding: '9px 12px' }} />
+            <button onClick={importByNumber} disabled={importing || !importNum.trim()} style={btnSecondary}>
+              {importing ? 'Импорт…' : 'Добавить по трек-номеру'}
+            </button>
+          </span>
         </div>
       </div>
 
@@ -419,7 +447,7 @@ export function Logistics() {
           <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-secondary, #666666)' }}>Загрузка…</div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-secondary, #666666)' }}>
-            {shipments.length === 0 ? 'Отправлений пока нет. Создайте первое накладную кнопкой «Новая отправка».' : 'Ничего не найдено по фильтру.'}
+            {shipments.length === 0 ? 'Отправлений пока нет. Создайте накладную кнопкой «Новая отправка» или добавьте существующий заказ по трек-номеру.' : 'Ничего не найдено по фильтру.'}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>

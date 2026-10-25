@@ -215,6 +215,48 @@ router.post('/shipments', authMiddleware, async (req, res) => {
   }
 });
 
+// Импорт существующего заказа СДЭК по трек-номеру (накладной)
+router.post('/shipments/import', authMiddleware, async (req, res) => {
+  try {
+    const cdekNumber = String(req.body?.cdekNumber ?? '').trim();
+    if (!cdekNumber) return res.status(400).json({ error: 'Укажите трек-номер накладной СДЭК' });
+    const data = await cdekApi('GET', `/v2/orders?cdek_number=${encodeURIComponent(cdekNumber)}`);
+    const entity = data?.entity;
+    if (!entity?.uuid) return res.status(404).json({ error: `Заказ ${cdekNumber} не найден в СДЭК` });
+
+    const toLoc = entity.to_location ?? {};
+    const recipient = entity.recipient ?? {};
+    const pkg = Array.isArray(entity.packages) ? entity.packages[0] ?? {} : {};
+    const existing = await prisma.cdekShipment.findFirst({
+      where: { OR: [{ uuid: String(entity.uuid) }, { cdekNumber: String(entity.cdek_number ?? cdekNumber) }] },
+    });
+    const fields: Record<string, any> = {
+      uuid: String(entity.uuid),
+      cdekNumber: String(entity.cdek_number ?? cdekNumber),
+      imNumber: entity.number ? String(entity.number) : `CDEK-${cdekNumber}`,
+      tariffCode: entity.tariff_code ?? 0,
+      deliverySum: entity.delivery_sum ?? null,
+      toCity: toLoc.city ?? '',
+      toAddress: toLoc.address ?? '',
+      deliveryPointCode: entity.delivery_point?.code ? String(entity.delivery_point.code) : null,
+      recipientName: recipient.name ?? '',
+      recipientPhone: Array.isArray(recipient.phones) && recipient.phones[0]?.number ? String(recipient.phones[0].number) : '',
+      weightGrams: pkg.weight ?? 0,
+      lengthCm: pkg.length ?? null,
+      widthCm: pkg.width ?? null,
+      heightCm: pkg.height ?? null,
+      requestState: data?.requests?.[0]?.state ?? null,
+      ...applyOrderEntity({}, entity),
+    };
+    const shipment = existing
+      ? await prisma.cdekShipment.update({ where: { id: existing.id }, data: fields })
+      : await prisma.cdekShipment.create({ data: fields });
+    res.json(shipment);
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 // Обновить статус отправления из СДЭК (ручное обновление по кнопке)
 router.post('/shipments/:id/refresh', authMiddleware, async (req, res) => {
   try {
