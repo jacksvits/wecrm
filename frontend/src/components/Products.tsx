@@ -1655,6 +1655,14 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
         <input type="checkbox" checked={form.crmIntegrations.includes('vpn')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('vpn') ? form.crmIntegrations.filter(x => x !== 'vpn') : [...form.crmIntegrations, 'vpn'] })} style={{ width: 15, height: 15 }} />
         Прокси через VPN
       </label>
+      <label key='hikvision' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+        <input type='checkbox' checked={form.crmIntegrations.includes('hikvision')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('hikvision') ? form.crmIntegrations.filter(x => x !== 'hikvision') : [...form.crmIntegrations, 'hikvision'] })} style={{ width: 15, height: 15 }} />
+        Камеры Hik-Connect
+      </label>
+      <label key='cdek' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+        <input type='checkbox' checked={form.crmIntegrations.includes('cdek')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('cdek') ? form.crmIntegrations.filter(x => x !== 'cdek') : [...form.crmIntegrations, 'cdek'] })} style={{ width: 15, height: 15 }} />
+        CDEK
+      </label>
     </div>
   </div>
 )}
