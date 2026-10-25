@@ -72,6 +72,21 @@ export function TaskList() {
     null,
   );
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  // Свернутые группы проектов на канбан-доске: ключ "<статус>|<проект>"
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("kanbanCollapsedGroups") || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem("kanbanCollapsedGroups", JSON.stringify(next));
+      return next;
+    });
+  };
   // Mobile kanban states
   const [isMobile, setIsMobile] = useState(false);
   const [mobileColumnIndex, setMobileColumnIndex] = useState(0);
@@ -1312,16 +1327,26 @@ export function TaskList() {
               )}
               {!isEmpty && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {projectGroups.map((group) => (
+                  {projectGroups.map((group) => {
+                    const gKey = status.name + "|" + group.id;
+                    const collapsed = !!collapsedGroups[gKey];
+                    return (
                     <div key={group.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", padding: "4px 8px", background: "var(--bg-input)", borderRadius: 8 }}>
-                        {group.name} ({group.tasks.length})
+                      <div
+                        onClick={() => toggleGroup(gKey)}
+                        style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", padding: "4px 8px", background: "var(--bg-input)", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}
+                      >
+                        <span>{group.name} ({group.tasks.length})</span>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)", width: 12 }}>{collapsed ? "▸" : "▾"}</span>
                       </div>
+                      {!collapsed && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {group.tasks.map((task) => renderKanbanCard(task))}
                       </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                   {projectGroups.length === 0 && (
                     <div style={{ textAlign: "center", padding: 20, color: "var(--text-muted)", fontSize: 12 }}>
                       Нет задач
