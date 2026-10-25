@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { CdekShipment } from '../types';
 
-const card: React.CSSProperties = { background: 'var(--bg-card)', borderRadius: 16, padding: 20, border: '1px solid var(--border-color)' };
-const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14, background: 'var(--bg-input)', color: 'var(--text-primary)', boxSizing: 'border-box' };
+const card: React.CSSProperties = { background: 'var(--bg-card, #fff)', borderRadius: 16, padding: 20, border: '1px solid var(--border-color, #e5e5e5)' };
+const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 12, border: '1px solid var(--border-color, #e5e5e5)', fontSize: 14, background: 'var(--bg-input, #f9f9f9)', color: 'var(--text-primary, #1a1a1a)', boxSizing: 'border-box' };
 const labelStyle: React.CSSProperties = { fontSize: 13, fontWeight: 600, marginBottom: 6, marginTop: 14, display: 'block' };
-const btnPrimary: React.CSSProperties = { padding: '10px 18px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' };
-const btnSecondary: React.CSSProperties = { ...btnPrimary, background: 'var(--bg-secondary)', color: 'var(--text-primary)' };
+const btnPrimary: React.CSSProperties = { padding: '10px 18px', borderRadius: 12, border: 'none', background: 'var(--accent-color, #111827)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' };
+const btnSecondary: React.CSSProperties = { ...btnPrimary, background: 'var(--bg-card, #fff)', color: 'var(--accent-color, #111827)', border: '1px solid var(--border-color, #e5e5e5)' };
 const btnDanger: React.CSSProperties = { ...btnPrimary, background: '#dc2626' };
 
 const STATUS_NAMES: Record<string, string> = {
@@ -204,7 +204,7 @@ function ShipmentForm({ onClose, onCreated, initialContactId, initialDealId }: {
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
       <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 720, maxHeight: '92vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 18 }}>Новая отправление СДЭК</h3>
-        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)' }}>Номер заказа ИМ: {form.imNumber}</p>
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary, #666666)' }}>Номер заказа ИМ: {form.imNumber}</p>
 
         <h4 style={{ margin: '18px 0 0', fontSize: 14 }}>Получатель</h4>
         <label style={labelStyle}>ФИО *</label>
@@ -219,11 +219,11 @@ function ShipmentForm({ onClose, onCreated, initialContactId, initialDealId }: {
         <div style={{ position: 'relative' }}>
           <input value={form.toCity} onChange={e => setForm({ ...form, toCity: e.target.value, toCityCode: null, deliveryPointCode: '' })} style={inputStyle} placeholder="Начните вводить: Москва, Санкт-Петербург…" onBlur={() => setTimeout(() => setShowCities(false), 200)} onFocus={() => cityOptions.length && setShowCities(true)} />
           {showCities && cityOptions.length > 0 && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, marginTop: 4, maxHeight: 220, overflow: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color, #e5e5e5)', borderRadius: 12, marginTop: 4, maxHeight: 220, overflow: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
               {cityOptions.map(c => (
                 <div key={c.code} onMouseDown={() => { setForm(f => ({ ...f, toCity: c.city, toCityCode: c.code, deliveryPointCode: '' })); setShowCities(false); }}
                   style={{ padding: '10px 12px', cursor: 'pointer', fontSize: 14 }}>
-                  {c.city}{c.region ? <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}> — {c.region}</span> : null} <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>код {c.code}</span>
+                  {c.city}{c.region ? <span style={{ color: 'var(--text-secondary, #666666)', fontSize: 12 }}> — {c.region}</span> : null} <span style={{ color: 'var(--text-secondary, #666666)', fontSize: 11 }}>код {c.code}</span>
                 </div>
               ))}
             </div>
@@ -232,7 +232,7 @@ function ShipmentForm({ onClose, onCreated, initialContactId, initialDealId }: {
         <label style={labelStyle}>Способ доставки</label>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {([['warehouse', 'До пункта выдачи (ПВЗ)'], ['door', 'Курьером до двери']] as const).map(([v, t]) => (
-            <button key={v} type="button" onClick={() => setForm({ ...form, deliveryMode: v })} style={{ ...btnSecondary, background: form.deliveryMode === v ? 'var(--accent)' : 'var(--bg-secondary)', color: form.deliveryMode === v ? '#fff' : 'var(--text-primary)' }}>{t}</button>
+            <button key={v} type="button" onClick={() => setForm({ ...form, deliveryMode: v })} style={{ ...btnSecondary, background: form.deliveryMode === v ? 'var(--accent-color, #111827)' : 'var(--bg-secondary)', color: form.deliveryMode === v ? '#fff' : 'var(--text-primary)' }}>{t}</button>
           ))}
         </div>
         {form.deliveryMode === 'warehouse' ? (
@@ -273,11 +273,11 @@ function ShipmentForm({ onClose, onCreated, initialContactId, initialDealId }: {
         {tariffs.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
             {tariffs.slice(0, 8).map(t => (
-              <label key={t.tariff_code} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, border: `2px solid ${tariffCode === t.tariff_code ? 'var(--accent)' : 'var(--border-color)'}`, cursor: 'pointer' }}>
+              <label key={t.tariff_code} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, border: `2px solid ${tariffCode === t.tariff_code ? 'var(--accent-color, #111827)' : 'var(--border-color)'}`, cursor: 'pointer' }}>
                 <input type="radio" name="tariff" checked={tariffCode === t.tariff_code} onChange={() => setTariffCode(t.tariff_code)} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>Тариф {t.tariff_code}{t.tariff_name ? ` — ${t.tariff_name}` : ''}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary, #666666)' }}>
                     Срок: {t.result?.period_min ?? '?'}{t.result?.period_max != null && t.result?.period_max !== t.result?.period_min ? `–${t.result.period_max}` : ''} дн.
                   </div>
                 </div>
@@ -293,25 +293,25 @@ function ShipmentForm({ onClose, onCreated, initialContactId, initialDealId }: {
             <label style={labelStyle}>Контакт</label>
             <input value={contactQuery} onChange={e => { setContactQuery(e.target.value); setForm(f => ({ ...f, contactId: '' })); }} style={inputStyle} placeholder="Поиск контакта…" />
             {contactQuery && !form.contactId && filteredContacts.length > 0 && (
-              <div style={{ border: '1px solid var(--border-color)', borderRadius: 10, marginTop: 4, maxHeight: 160, overflow: 'auto' }}>
+              <div style={{ border: '1px solid var(--border-color, #e5e5e5)', borderRadius: 10, marginTop: 4, maxHeight: 160, overflow: 'auto' }}>
                 {filteredContacts.map(c => (
                   <div key={c.id} onClick={() => { setForm(f => ({ ...f, contactId: c.id })); setContactQuery(c.name); }} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13 }}>{c.name}</div>
                 ))}
               </div>
             )}
-            {form.contactId && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>Выбран: {contacts.find(c => c.id === form.contactId)?.name ?? form.contactId} <span style={{ cursor: 'pointer', color: '#dc2626' }} onClick={() => { setForm(f => ({ ...f, contactId: '' })); setContactQuery(''); }}>✕</span></div>}
+            {form.contactId && <div style={{ fontSize: 12, color: 'var(--text-secondary, #666666)', marginTop: 4 }}>Выбран: {contacts.find(c => c.id === form.contactId)?.name ?? form.contactId} <span style={{ cursor: 'pointer', color: '#dc2626' }} onClick={() => { setForm(f => ({ ...f, contactId: '' })); setContactQuery(''); }}>✕</span></div>}
           </div>
           <div>
             <label style={labelStyle}>Сделка</label>
             <input value={dealQuery} onChange={e => { setDealQuery(e.target.value); setForm(f => ({ ...f, dealId: '' })); }} style={inputStyle} placeholder="Поиск сделки…" />
             {dealQuery && !form.dealId && filteredDeals.length > 0 && (
-              <div style={{ border: '1px solid var(--border-color)', borderRadius: 10, marginTop: 4, maxHeight: 160, overflow: 'auto' }}>
+              <div style={{ border: '1px solid var(--border-color, #e5e5e5)', borderRadius: 10, marginTop: 4, maxHeight: 160, overflow: 'auto' }}>
                 {filteredDeals.map(d => (
                   <div key={d.id} onClick={() => { setForm(f => ({ ...f, dealId: d.id })); setDealQuery(d.name); }} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13 }}>{d.name}</div>
                 ))}
               </div>
             )}
-            {form.dealId && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>Выбрана: {deals.find(d => d.id === form.dealId)?.name ?? form.dealId} <span style={{ cursor: 'pointer', color: '#dc2626' }} onClick={() => { setForm(f => ({ ...f, dealId: '' })); setDealQuery(''); }}>✕</span></div>}
+            {form.dealId && <div style={{ fontSize: 12, color: 'var(--text-secondary, #666666)', marginTop: 4 }}>Выбрана: {deals.find(d => d.id === form.dealId)?.name ?? form.dealId} <span style={{ cursor: 'pointer', color: '#dc2626' }} onClick={() => { setForm(f => ({ ...f, dealId: '' })); setDealQuery(''); }}>✕</span></div>}
           </div>
         </div>
 
@@ -398,7 +398,7 @@ export function Logistics() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 24 }}>Логистика</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>Отправления СДЭК: регистрация накладных, трекинг, квитанции</p>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary, #666666)' }}>Отправления СДЭК: регистрация накладных, трекинг, квитанции</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button onClick={load} style={btnSecondary}>Обновить</button>
@@ -416,16 +416,16 @@ export function Logistics() {
       <div style={card}>
         <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Поиск: номер, получатель, город, статус…" style={{ ...inputStyle, marginBottom: 14, maxWidth: 420 }} />
         {loading ? (
-          <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-secondary)' }}>Загрузка…</div>
+          <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-secondary, #666666)' }}>Загрузка…</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-secondary, #666666)' }}>
             {shipments.length === 0 ? 'Отправлений пока нет. Создайте первое накладную кнопкой «Новая отправка».' : 'Ничего не найдено по фильтру.'}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--text-secondary)', fontSize: 12 }}>
+                <tr style={{ textAlign: 'left', color: 'var(--text-secondary, #666666)', fontSize: 12 }}>
                   <th style={{ padding: '8px 10px' }}>Номер</th>
                   <th style={{ padding: '8px 10px' }}>Получатель</th>
                   <th style={{ padding: '8px 10px' }}>Маршрут</th>
@@ -442,15 +442,15 @@ export function Logistics() {
                       onClick={() => { setExpanded(expanded === s.id ? null : s.id); openDetails(s.id); }}>
                       <td style={{ padding: '10px' }}>
                         <div style={{ fontWeight: 600 }}>{s.cdekNumber ?? '—'}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>ИМ: {s.imNumber}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary, #666666)' }}>ИМ: {s.imNumber}</div>
                       </td>
                       <td style={{ padding: '10px' }}>
                         <div>{s.recipientName}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{s.recipientPhone}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary, #666666)' }}>{s.recipientPhone}</div>
                       </td>
                       <td style={{ padding: '10px' }}>
                         <div>{s.fromCity ? `${s.fromCity} → ` : ''}{s.toCity}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{s.deliveryMode === 'warehouse' ? `ПВЗ ${s.deliveryPointCode ?? ''}` : s.toAddress}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary, #666666)' }}>{s.deliveryMode === 'warehouse' ? `ПВЗ ${s.deliveryPointCode ?? ''}` : s.toAddress}</div>
                       </td>
                       <td style={{ padding: '10px' }}>{s.tariffCode}</td>
                       <td style={{ padding: '10px' }}>{fmtMoney(s.deliverySum)}</td>
@@ -466,7 +466,7 @@ export function Logistics() {
                     </tr>
                     {expanded === s.id && (
                       <tr>
-                        <td colSpan={7} style={{ padding: '14px 10px', background: 'var(--bg-secondary)', fontSize: 13 }}>
+                        <td colSpan={7} style={{ padding: '14px 10px', background: 'var(--bg-card, #fff)', fontSize: 13 }}>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
                             <div>
                               <div style={{ fontWeight: 600, marginBottom: 6 }}>Отправление</div>
@@ -475,21 +475,21 @@ export function Logistics() {
                               {s.codAmount > 0 && <div>Наложенный платёж: {fmtMoney(s.codAmount)}</div>}
                               {s.declaredValue > 0 && <div>Объявленная стоимость: {fmtMoney(s.declaredValue)}</div>}
                               {s.comment && <div>Комментарий: {s.comment}</div>}
-                              {s.deal && <div>Сделка: <Link to={`/deals/${s.deal.id}`} style={{ color: 'var(--accent)' }}>{s.deal.name}</Link></div>}
-                              {s.contact && <div>Контакт: <Link to={`/contacts/${s.contact.id}`} style={{ color: 'var(--accent)' }}>{s.contact.name}</Link></div>}
-                              {s.cdekNumber && <div><a href={`https://www.cdek.ru/ru/tracking/?order_id=${s.cdekNumber}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Отследить на cdek.ru ↗</a></div>}
+                              {s.deal && <div>Сделка: <Link to={`/deals/${s.deal.id}`} style={{ color: 'var(--accent-color, #111827)' }}>{s.deal.name}</Link></div>}
+                              {s.contact && <div>Контакт: <Link to={`/contacts/${s.contact.id}`} style={{ color: 'var(--accent-color, #111827)' }}>{s.contact.name}</Link></div>}
+                              {s.cdekNumber && <div><a href={`https://www.cdek.ru/ru/tracking/?order_id=${s.cdekNumber}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-color, #111827)' }}>Отследить на cdek.ru ↗</a></div>}
                             </div>
                             <div>
                               <div style={{ fontWeight: 600, marginBottom: 6 }}>История статусов</div>
                               {(details[s.id]?.statusHistory ?? []).length === 0
-                                ? <div style={{ color: 'var(--text-secondary)' }}>Нет данных — нажмите «Обновить статус».</div>
+                                ? <div style={{ color: 'var(--text-secondary, #666666)' }}>Нет данных — нажмите «Обновить статус».</div>
                                 : (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                     {[...(details[s.id]?.statusHistory ?? [])].reverse().map((h: any, i: number) => (
                                       <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-                                        <span style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{h.dateTime ? fmtDate(h.dateTime) : ''}</span>
+                                        <span style={{ color: 'var(--text-secondary, #666666)', whiteSpace: 'nowrap' }}>{h.dateTime ? fmtDate(h.dateTime) : ''}</span>
                                         <span style={statusStyle(h.code)}>{h.name || (STATUS_NAMES[h.code] ?? h.code)}</span>
-                                        {h.city && <span style={{ color: 'var(--text-secondary)' }}>{h.city}</span>}
+                                        {h.city && <span style={{ color: 'var(--text-secondary, #666666)' }}>{h.city}</span>}
                                       </div>
                                     ))}
                                   </div>

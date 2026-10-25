@@ -16,9 +16,9 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
 }
 
 const labelStyle: React.CSSProperties = { fontSize: 13, fontWeight: 600, marginBottom: 6, marginTop: 16, display: 'block' };
-const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14, background: 'var(--bg-input)', color: 'var(--text-primary)', boxSizing: 'border-box' };
-const btnPrimary: React.CSSProperties = { padding: '10px 18px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' };
-const btnSecondary: React.CSSProperties = { ...btnPrimary, background: 'var(--bg-secondary)', color: 'var(--text-primary)' };
+const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 12, border: '1px solid var(--border-color, #e5e5e5)', fontSize: 14, background: 'var(--bg-input, #f9f9f9)', color: 'var(--text-primary, #1a1a1a)', boxSizing: 'border-box' };
+const btnPrimary: React.CSSProperties = { padding: '10px 18px', borderRadius: 12, border: 'none', background: 'var(--accent-color, #111827)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' };
+const btnSecondary: React.CSSProperties = { ...btnPrimary, background: 'var(--bg-card, #fff)', color: 'var(--accent-color, #111827)', border: '1px solid var(--border-color, #e5e5e5)' };
 
 interface WebhookSub {
   uuid: string;
@@ -159,9 +159,9 @@ export default function CdekSettings() {
         <h2 style={{ margin: 0, fontSize: 20 }}>CDEK (СДЭК)</h2>
         <StatusBadge isActive={form.isActive} />
       </div>
-      <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--text-secondary)' }}>
+      <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--text-secondary, #666666)' }}>
         Доставка заказов через СДЭК: калькулятор стоимости, регистрация накладных, трекинг и квитанции — в разделе «Логистика».
-        Документация API: <a href="https://apidoc.cdek.ru" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>apidoc.cdek.ru</a>
+        Документация API: <a href="https://apidoc.cdek.ru" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-color, #111827)' }}>apidoc.cdek.ru</a>
       </p>
 
       <label style={labelStyle}>Контур API</label>
@@ -171,7 +171,7 @@ export default function CdekSettings() {
       </select>
 
       <label style={labelStyle}>Account (идентификатор клиента)</label>
-      <input value={form.account} onChange={e => setForm({ ...form, account: e.target.value })} style={inputStyle} placeholder="Например: EMC003 (тестовый стенд) или ваш Account из личного кабинета" />
+      <input value={form.account} onChange={e => setForm({ ...form, account: e.target.value })} style={inputStyle} placeholder="Тестовый стенд (общие ключи): wqGwiQx0gg8mLtiEKsUinjVSICCjtTEP. Боевой — ваш Account из личного кабинета СДЭК (lk.cdek.ru → Интеграция)" />
 
       <label style={labelStyle}>Secure password (секретный ключ)</label>
       <input type="password" value={form.securePassword} onChange={e => setForm({ ...form, securePassword: e.target.value })} style={inputStyle} placeholder="Оставьте пустым, чтобы не менять сохранённый ключ" />
@@ -216,11 +216,11 @@ export default function CdekSettings() {
       {form.isActive && (
         <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border-color)' }}>
           <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>Вебхуки (автообновление статусов)</h3>
-          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-secondary)' }}>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-secondary, #666666)' }}>
             Подписка на уведомления СДЭК об изменении статуса заказа. URL уведомлений:
           </p>
           {webhookUrl && (
-            <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--bg-secondary)', fontSize: 12, wordBreak: 'break-all', marginBottom: 12 }}>
+            <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--bg-card, #fff)', fontSize: 12, wordBreak: 'break-all', marginBottom: 12 }}>
               {webhookUrl}
             </div>
           )}
@@ -232,10 +232,10 @@ export default function CdekSettings() {
           {webhooks.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {webhooks.map((w) => (
-                <div key={w.uuid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border-color)', fontSize: 13, flexWrap: 'wrap' }}>
+                <div key={w.uuid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border-color, #e5e5e5)', fontSize: 13, flexWrap: 'wrap' }}>
                   <div style={{ wordBreak: 'break-all' }}>
                     <span style={{ fontWeight: 600 }}>{w.type ?? 'ORDER_STATUS'}</span>
-                    <span style={{ color: 'var(--text-secondary)' }}> — {w.url}</span>
+                    <span style={{ color: 'var(--text-secondary, #666666)' }}> — {w.url}</span>
                   </div>
                   <button onClick={() => handleUnsubscribe(w.uuid)} disabled={webhooksLoading} style={{ ...btnSecondary, padding: '6px 12px', fontSize: 12 }}>Отписать</button>
                 </div>

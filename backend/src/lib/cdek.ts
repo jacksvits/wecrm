@@ -11,6 +11,13 @@ const CDEK_API_URLS: Record<string, string> = {
   prod: 'https://api.cdek.ru',
 };
 
+// Публичные учётные данные тестового стенда из документации СДЭК (apidoc.cdek.ru).
+// Позволяют проверить интеграцию без своего договора.
+export const CDEK_TEST_CREDENTIALS = {
+  account: 'wqGwiQx0gg8mLtiEKsUinjVSICCjtTEP',
+  securePassword: 'RmAmgvSgSl1yirlz9QupbzOJVqhCxcP5',
+} as const;
+
 export function cdekBaseUrl(environment?: string | null): string {
   return CDEK_API_URLS[environment === 'prod' ? 'prod' : 'test'];
 }
@@ -61,13 +68,12 @@ export async function getCdekToken(settings?: CdekSettingsData | null): Promise<
   if (!res.ok || !data.access_token) {
     throw new Error(`CDEK: ошибка авторизации (HTTP ${res.status})${data?.error_description ? ` — ${data.error_description}` : ''}`);
   }
-  await prisma.cdekSettings.update({
-    where: { id: 1 },
-    data: {
-      accessToken: String(data.access_token),
-      tokenExpiresAt: new Date(now + (Number(data.expires_in) || 3600) * 1000),
-    },
-  });
+  // upsert: в tenant-БД записи настроек может ещё не быть (плагин ещё не сохраняли)
+  const tokenData = {
+    accessToken: String(data.access_token),
+    tokenExpiresAt: new Date(now + (Number(data.expires_in) || 3600) * 1000),
+  };
+  await prisma.cdekSettings.upsert({ where: { id: 1 }, update: tokenData, create: { id: 1, ...tokenData } });
   s.accessToken = String(data.access_token);
   s.tokenExpiresAt = new Date(now + (Number(data.expires_in) || 3600) * 1000);
   return s.accessToken;
@@ -75,7 +81,11 @@ export async function getCdekToken(settings?: CdekSettingsData | null): Promise<
 
 /** Сбросить кэш токена (после смены учётных данных/среды или 401 от API) */
 export async function resetCdekToken(): Promise<void> {
-  await prisma.cdekSettings.update({ where: { id: 1 }, data: { accessToken: '', tokenExpiresAt: null } });
+  try {
+    await prisma.cdekSettings.update({ where: { id: 1 }, data: { accessToken: '', tokenExpiresAt: null } });
+  } catch {
+    /* записи настроек ещё нет — сбрасывать нечего */
+  }
 }
 
 /** Базовый вызов CDEK API v2. При 401 — сброс кэша токена и один повтор. */

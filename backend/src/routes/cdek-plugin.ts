@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { cdekApi, cdekBaseUrl, getCdekSettings, getCdekToken, resetCdekToken } from '../lib/cdek.js';
+import { cdekApi, cdekBaseUrl, CDEK_TEST_CREDENTIALS, getCdekSettings, getCdekToken, resetCdekToken } from '../lib/cdek.js';
 
 const router = Router();
 
@@ -70,8 +70,9 @@ router.post('/', authMiddleware, async (req, res) => {
         id: 1,
         isActive: d.isActive ?? false,
         environment: d.environment ?? 'test',
-        account: (d.account ?? '').trim(),
-        securePassword: (d.securePassword ?? '').trim(),
+        // На тестовом контуре сразу подставляем публичные ключи стенда
+        account: (d.account ?? '').trim() || ((d.environment ?? 'test') === 'test' ? CDEK_TEST_CREDENTIALS.account : ''),
+        securePassword: (d.securePassword ?? '').trim() || ((d.environment ?? 'test') === 'test' ? CDEK_TEST_CREDENTIALS.securePassword : ''),
         senderCityCode: d.senderCityCode ?? null,
         senderCompany: d.senderCompany ?? '',
         senderName: d.senderName ?? '',
@@ -103,10 +104,20 @@ router.post('/test', authMiddleware, async (req, res) => {
         account, securePassword, environment, accessToken: '', tokenExpiresAt: null,
       } as any;
     }
+    if ((!settings || !settings.account || !settings.securePassword) && environment === 'test') {
+      settings = {
+        ...(settings ?? { id: 1, isActive: false, webhookToken: '', senderCityCode: null, senderCompany: '', senderName: '', senderPhone: '', senderAddress: '' }),
+        account: CDEK_TEST_CREDENTIALS.account,
+        securePassword: CDEK_TEST_CREDENTIALS.securePassword,
+        environment, accessToken: '', tokenExpiresAt: null,
+      } as any;
+    }
     if (!settings || !settings.account || !settings.securePassword) {
       return res.status(400).json({ ok: false, error: 'Укажите Account и Secure password' });
     }
-    await resetCdekToken();
+    // Сбрасываем кэш только при проверке сохранённых учётных данных;
+    // введённые «на пробу» данные в БД не трогаем.
+    if (!useProvided) await resetCdekToken();
     const token = await getCdekToken(settings);
     // Лёгкий проверочный запрос: список доступных тарифов
     const tariffs = await cdekApi('GET', '/v2/tariffs', undefined, settings).catch(() => null);
