@@ -17,7 +17,8 @@ router.use(adminOnly);
 
 const settingsSchema = z.object({
   groupId: z.number().int().min(1),
-  accessToken: z.string().min(1),
+  // Пустая строка = «токен не меняем» (UI очищает поле после загрузки)
+  accessToken: z.string().default(''),
   defaultCreatorId: z.string().optional().nullable(),
   defaultProjectId: z.string().optional().nullable(),
   assigneeIds: z.array(z.string()).default([]),
@@ -39,6 +40,10 @@ router.post('/', async (req: AuthRequest, res) => {
   try {
     const data = settingsSchema.parse(req.body);
     const existing = await prisma.vkCommunitySettings.findFirst();
+    // При первом сохранении токен обязателен
+    if (!existing && !data.accessToken) {
+      return res.status(400).json({ error: 'Токен сообщества обязателен' });
+    }
     let s;
     if (existing) {
       const payload: any = { ...data };
