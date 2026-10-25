@@ -286,6 +286,7 @@ model Project {
   contacts    ContactProject[]
   users       ProjectUser[]
   emailFilters EmailFilter[]
+  vkCommunitySettings VkCommunitySettings[]
 
   @@map("projects")
 }
@@ -1260,6 +1261,8 @@ model VkCommunitySettings {
   accessToken       String   @map("access_token")
   defaultCreatorId  String?  @map("default_creator_id")
   defaultCreator    User?    @relation(fields: [defaultCreatorId], references: [id])
+  defaultProjectId  String?  @map("default_project_id")
+  defaultProject    Project? @relation(fields: [defaultProjectId], references: [id], onDelete: SetNull)
   assigneeIds       String[] @default([]) @map("assignee_ids")
   autoCreateContact Boolean  @default(true) @map("auto_create_contact")
   autoReply         Boolean  @default(false) @map("auto_reply")

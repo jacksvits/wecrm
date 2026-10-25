@@ -19,6 +19,7 @@ const settingsSchema = z.object({
   groupId: z.number().int().min(1),
   accessToken: z.string().min(1),
   defaultCreatorId: z.string().optional().nullable(),
+  defaultProjectId: z.string().optional().nullable(),
   assigneeIds: z.array(z.string()).default([]),
   autoCreateContact: z.boolean().default(true),
   autoReply: z.boolean().default(false),

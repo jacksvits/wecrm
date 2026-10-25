@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import { User } from "../types";
+import { Project, User } from "../types";
 
 interface VkCommunitySettingsData {
   id?: string;
@@ -8,6 +8,7 @@ interface VkCommunitySettingsData {
   groupId: string;
   accessToken: string;
   defaultCreatorId: string | null;
+  defaultProjectId: string | null;
   assigneeIds: string[];
   autoCreateContact: boolean;
   autoReply: boolean;
@@ -22,6 +23,7 @@ export function VkCommunitySettings() {
     groupId: "",
     accessToken: "",
     defaultCreatorId: null,
+    defaultProjectId: null,
     assigneeIds: [],
     autoCreateContact: true,
     autoReply: false,
@@ -29,6 +31,7 @@ export function VkCommunitySettings() {
     confirmationString: "",
   });
   const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -40,6 +43,7 @@ export function VkCommunitySettings() {
           groupId: s.groupId?.toString() || "",
           accessToken: "",
           defaultCreatorId: s.defaultCreatorId || null,
+          defaultProjectId: s.defaultProjectId || null,
           assigneeIds: s.assigneeIds || [],
           autoCreateContact: s.autoCreateContact ?? true,
           autoReply: s.autoReply ?? false,
@@ -50,6 +54,7 @@ export function VkCommunitySettings() {
       }
     }).catch(() => {});
     api.users.list().then(setUsers).catch(() => {});
+    api.projects.list().then(setProjects).catch(() => {});
   }, []);
 
   const save = async () => {
@@ -130,6 +135,17 @@ export function VkCommunitySettings() {
         <option value="">—</option>
         {users.map((u) => (
           <option key={u.id} value={u.id}>{u.name}</option>
+        ))}
+      </select>
+      <label style={labelStyle}>Проект для новых задач</label>
+      <select
+        style={inputStyle}
+        value={form.defaultProjectId || ""}
+        onChange={(e) => setForm({ ...form, defaultProjectId: e.target.value || null })}
+      >
+        <option value="">—</option>
+        {projects.map((p) => (
+          <option key={p.id} value={p.id}>{p.name}</option>
         ))}
       </select>
       <label style={labelStyle}>Исполнители</label>

@@ -1865,6 +1865,7 @@ CREATE TABLE public.vk_community_settings (
     group_id integer NOT NULL,
     access_token text NOT NULL,
     default_creator_id text,
+    default_project_id text,
     assignee_ids text[] DEFAULT ARRAY[]::text[] NOT NULL,
     auto_create_contact boolean DEFAULT true NOT NULL,
     auto_reply boolean DEFAULT false NOT NULL,
@@ -4704,6 +4705,13 @@ ALTER TABLE ONLY public.users
 
 ALTER TABLE ONLY public.vk_community_settings
     ADD CONSTRAINT vk_community_settings_default_creator_id_fkey FOREIGN KEY (default_creator_id) REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE SET NULL;
+
+--
+-- Name: vk_community_settings vk_community_settings_default_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vk_community_settings
+    ADD CONSTRAINT vk_community_settings_default_project_id_fkey FOREIGN KEY (default_project_id) REFERENCES public.projects(id) ON UPDATE CASCADE ON DELETE SET NULL;
 
 
 --

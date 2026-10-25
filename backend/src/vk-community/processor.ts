@@ -336,6 +336,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
           status: 'open',
           priority: 'medium',
           creatorId,
+          projectId: settings.defaultProjectId || undefined,
           contactId,
           vkPeerId: BigInt(fromId),
           vkGroupId: settings.groupId,
