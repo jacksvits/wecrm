@@ -150,6 +150,8 @@ export function MailClient() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
+  // Свёрнутые ветви дерева папок (path → скрыть детей)
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
 
   const account: MailAccount | undefined = accounts.find(a => a.id === selectedAccountId);
 
@@ -432,29 +434,50 @@ export function MailClient() {
   };
 
 
-  // Рекурсивный рендер дерева папок (отступ по глубине вложенности)
+  // Рекурсивный рендер дерева папок: отступ по глубине + стрелки сворачивания
   function renderFolderTree(nodes: MailFolder[], depth: number): React.ReactNode {
-    return nodes.map(f => (
-      <div key={f.path}>
-        <button
-          onClick={() => { setSelectedFolder(f.path); setOpenMessage(null); }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: `8px 10px 8px ${10 + depth * 18}`,
-            width: '100%', borderRadius: 10,
-            border: 'none', cursor: 'pointer', fontSize: 14, textAlign: 'left',
-            background: selectedFolder === f.path ? 'var(--bg-hover)' : 'transparent',
-            color: 'var(--text-primary)', fontWeight: f.unseen > 0 ? 600 : 400,
-          }}
-        >
-          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folderLabel(f)}</span>
-          {f.unseen > 0 && (
-            <span style={{ fontSize: 12, background: '#007AFF', color: '#fff', borderRadius: 10, padding: '1px 7px', flexShrink: 0 }}>{f.unseen}</span>
-          )}
-        </button>
-        {f.children && f.children.length > 0 && renderFolderTree(f.children, depth + 1)}
-      </div>
-    ));
+    return nodes.map(f => {
+      const hasKids = f.children && f.children.length > 0;
+      const isCollapsed = collapsedFolders.has(f.path);
+      return (
+        <div key={f.path}>
+          <button
+            onClick={() => { setSelectedFolder(f.path); setOpenMessage(null); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: `8px 10px 8px ${8 + depth * 22}`,
+              width: '100%', borderRadius: 10, boxSizing: 'border-box',
+              border: 'none', cursor: 'pointer', fontSize: 14, textAlign: 'left',
+              background: selectedFolder === f.path ? 'var(--bg-hover)' : 'transparent',
+              color: 'var(--text-primary)', fontWeight: f.unseen > 0 ? 600 : 400,
+            }}
+          >
+            {hasKids ? (
+              <span
+                onClick={e => {
+                  e.stopPropagation();
+                  setCollapsedFolders(prev => {
+                    const next = new Set(prev);
+                    if (next.has(f.path)) next.delete(f.path); else next.add(f.path);
+                    return next;
+                  });
+                }}
+                style={{ width: 16, flexShrink: 0, fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer', textAlign: 'center' }}
+              >
+                {isCollapsed ? '▸' : '▾'}
+              </span>
+            ) : (
+              <span style={{ width: 16, flexShrink: 0 }} />
+            )}
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folderLabel(f)}</span>
+            {f.unseen > 0 && (
+              <span style={{ fontSize: 12, background: '#007AFF', color: '#fff', borderRadius: 10, padding: '1px 7px', flexShrink: 0 }}>{f.unseen}</span>
+            )}
+          </button>
+          {hasKids && !isCollapsed && renderFolderTree(f.children, depth + 1)}
+        </div>
+      );
+    });
   }
 
   function renderMessageList() {
@@ -650,22 +673,12 @@ export function MailClient() {
               display: isMobile ? 'contents' : 'flex', flexDirection: 'column', padding: 8, gap: 2,
             }}>
               {isMobile && (
-                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '8px 12px', borderBottom: `1px solid ${borderColor}` }}>
-                  {folders.map(f => (
-                    <button
-                      key={f.path}
-                      onClick={() => { setSelectedFolder(f.path); setOpenMessage(null); }}
-                      style={{
-                        flexShrink: 0, padding: '6px 12px', borderRadius: 16, fontSize: 13, cursor: 'pointer',
-                        border: `1px solid ${borderColor}`,
-                        background: selectedFolder === f.path ? 'var(--bg-hover)' : 'transparent',
-                        color: 'var(--text-primary)',
-                        fontWeight: f.unseen > 0 ? 600 : 400,
-                      }}
-                    >
-                      {folderLabel(f)}{f.unseen > 0 ? ` (${f.unseen})` : ''}
-                    </button>
-                  ))}
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: 2,
+                  padding: '4px 6px 8px', borderBottom: `1px solid ${borderColor}`,
+                  maxHeight: '38vh', overflowY: 'auto',
+                }}>
+                  {renderFolderTree(folders, 0)}
                 </div>
               )}
               {!isMobile && renderFolderTree(folders, 0)}
