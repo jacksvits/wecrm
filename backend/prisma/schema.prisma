@@ -141,6 +141,7 @@ model User {
   scheduleShifts       ScheduleShift[]
   scheduleAppointments ScheduleAppointment[]
   vitrineFavoriteGroups VitrineFavoriteGroup[]
+  mailAccounts    MailAccount[]
 }
 
 model ContactType {
@@ -804,6 +805,34 @@ model EmailSettings {
   updatedAt           DateTime @updatedAt
 
   @@map("email_settings")
+}
+
+// Аккаунты почтового клиента (страница «Почтовый клиент», доступ только у админов).
+// У каждого пользователя свои аккаунты, аккаунтов может быть несколько.
+model MailAccount {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Произвольная метка аккаунта (например «Рабочая», «Личная»)
+  label       String   @default("")
+  email       String
+  imapHost    String   @map("imap_host")
+  imapPort    Int      @default(993) @map("imap_port")
+  imapUser    String   @map("imap_user")
+  imapPass    String   @map("imap_pass")
+  smtpHost    String   @map("smtp_host")
+  smtpPort    Int      @default(465) @map("smtp_port")
+  smtpUser    String   @map("smtp_user")
+  smtpPass    String   @map("smtp_pass")
+  secure      Boolean  @default(true)
+  rejectUnauthorized Boolean @default(false) @map("reject_unauthorized")
+  // Аккаунт по умолчанию выбирается в клиенте автоматически
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("mail_accounts")
 }
 
 model TelephonySettings {

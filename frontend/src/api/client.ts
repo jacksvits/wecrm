@@ -474,4 +474,24 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     save: (slug: 'offer' | 'privacy', content: string) => fetchApi(`/api/legal/${slug}`, { method: 'PUT', body: JSON.stringify({ content }) }),
   },
 
+  // Почтовый клиент (страница /mail, только для админов)
+  mail: {
+    accounts: (): Promise<any[]> => fetchApi('/api/mail/accounts'),
+    createAccount: (data: any) => fetchApi('/api/mail/accounts', { method: 'POST', body: JSON.stringify(data) }),
+    updateAccount: (id: string, data: any) => fetchApi(`/api/mail/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    deleteAccount: (id: string) => fetchApi(`/api/mail/accounts/${id}`, { method: 'DELETE' }),
+    testAccount: (id: string): Promise<{ imap: string; smtp: string }> => fetchApi(`/api/mail/accounts/${id}/test`, { method: 'POST' }),
+    folders: (accountId: string): Promise<any[]> => fetchApi(`/api/mail/folders?accountId=${accountId}`),
+    messages: (accountId: string, folder: string, page: number): Promise<{ total: number; messages: any[] }> => fetchApi(`/api/mail/messages?accountId=${accountId}&folder=${encodeURIComponent(folder)}&page=${page}`),
+    message: (accountId: string, folder: string, uid: number): Promise<any> => fetchApi(`/api/mail/message?accountId=${accountId}&folder=${encodeURIComponent(folder)}&uid=${uid}`),
+    markRead: (accountId: string, folder: string, uid: number) => fetchApi('/api/mail/message/read', { method: 'POST', body: JSON.stringify({ accountId, folder, uid }) }),
+    markUnread: (accountId: string, folder: string, uid: number) => fetchApi('/api/mail/message/unread', { method: 'POST', body: JSON.stringify({ accountId, folder, uid }) }),
+    deleteMessage: (accountId: string, folder: string, uid: number) => fetchApi('/api/mail/message', { method: 'DELETE', body: JSON.stringify({ accountId, folder, uid }) }),
+    send: async (formData: FormData): Promise<any> => {
+      const res = await fetch('/api/mail/send', { method: 'POST', headers: { 'X-Auth-Token': getToken()! }, body: formData });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    },
+  },
 };

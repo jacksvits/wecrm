@@ -36,7 +36,8 @@
     "web-push": "^3.6.7",
     "ws": "^8.18.0",
     "xlsx": "^0.18.5",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "nodemailer": "^6.9.16"
   },
   "devDependencies": {
     "@types/archiver": "^8.0.0",
@@ -55,7 +56,8 @@
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.5.10",
     "prisma": "^5.15.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@types/nodemailer": "^6.4.17"
   },
   "prisma": {
     "seed": "tsx seed.ts"
