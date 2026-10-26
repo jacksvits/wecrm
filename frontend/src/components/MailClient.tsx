@@ -114,6 +114,13 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Запрос с таймаутом: интерфейс не висит в «Загрузка…», если сервер недоступен
+function withTimeout<T>(make: (signal: AbortSignal) => Promise<T>, ms = 45000): Promise<T> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  return make(ctrl.signal).finally(() => clearTimeout(t));
+}
+
 const iconBtnStyle: React.CSSProperties = {
   width: 36, height: 36, borderRadius: 10, border: 'none', cursor: 'pointer',
   background: 'var(--bg-hover)', color: 'var(--text-primary)',
@@ -122,7 +129,7 @@ const iconBtnStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 10px', borderRadius: 10, fontSize: 14,
-  border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-primary)',
+  border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)',
   boxSizing: 'border-box', outline: 'none',
 };
 
@@ -177,10 +184,10 @@ export function MailClient() {
   const loadFolders = async () => {
     if (!selectedAccountId) return;
     try {
-      const data = await api.mail.folders(selectedAccountId);
+      const data = await withTimeout(signal => api.mail.folders(selectedAccountId, signal));
       setFolders(data || []);
     } catch (e: any) {
-      setError(e.message || 'Не удалось загрузить папки');
+      setError(e.name === 'AbortError' ? 'Сервер не отвечает (превышено время ожидания)' : (e.message || 'Не удалось загрузить папки'));
     }
   };
 
@@ -189,12 +196,12 @@ export function MailClient() {
     setLoading(true);
     setError('');
     try {
-      const data = await api.mail.messages(selectedAccountId, selectedFolder, p);
+      const data = await withTimeout(signal => api.mail.messages(selectedAccountId, selectedFolder, p, signal));
       setMessages(data.messages || []);
       setTotalMessages(data.total || 0);
       setPage(p);
     } catch (e: any) {
-      setError(e.message || 'Не удалось загрузить письма');
+      setError(e.name === 'AbortError' ? 'Сервер не отвечает (превышено время ожидания)' : (e.message || 'Не удалось загрузить письма'));
       setMessages([]);
     } finally {
       setLoading(false);
@@ -218,13 +225,13 @@ export function MailClient() {
     setLoadingMessage(true);
     setError('');
     try {
-      const full = await api.mail.message(selectedAccountId, selectedFolder, uid);
+      const full = await withTimeout(signal => api.mail.message(selectedAccountId, selectedFolder, uid, signal));
       setOpenMessage(full);
       // Обновляем флаг \Seen в списке и счётчик папки
       setMessages(prev => prev.map(m => (m.uid === uid ? { ...m, seen: true } : m)));
       setFolders(prev => prev.map(f => (f.path === selectedFolder ? { ...f, unseen: Math.max(0, f.unseen - 1) } : f)));
     } catch (e: any) {
-      setError(e.message || 'Не удалось открыть письмо');
+      setError(e.name === 'AbortError' ? 'Сервер не отвечает (превышено время ожидания)' : (e.message || 'Не удалось открыть письмо'));
     } finally {
       setLoadingMessage(false);
     }
@@ -408,10 +415,10 @@ export function MailClient() {
     setTestingAccount(true);
     setTestResult(null);
     try {
-      const result = await api.mail.testAccount(a.id);
+      const result = await withTimeout(signal => api.mail.testAccount(a.id, signal), 60000);
       setTestResult(result);
     } catch (e: any) {
-      setTestResult({ imap: e.message || 'Ошибка', smtp: '' });
+      setTestResult({ imap: e.name === 'AbortError' ? 'Превышено время ожидания (сервер не отвечает)' : (e.message || 'Ошибка'), smtp: '' });
     } finally {
       setTestingAccount(false);
     }
@@ -672,7 +679,7 @@ export function MailClient() {
       >
         <div style={{
           width: '100%', maxWidth: 720, maxHeight: '92vh', display: 'flex', flexDirection: 'column',
-          background: 'var(--bg-color)', borderRadius: 14, overflow: 'hidden',
+          background: 'var(--bg-card)', borderRadius: 14, overflow: 'hidden',
           border: `1px solid ${borderColor}`, boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${borderColor}` }}>
@@ -705,7 +712,7 @@ export function MailClient() {
                 placeholder='Текст письма'
                 modules={quillModules}
                 formats={quillFormats}
-                style={{ borderRadius: 10, border: `1px solid ${borderColor}`, background: 'var(--bg-color)' }}
+                style={{ borderRadius: 10, border: `1px solid ${borderColor}`, background: 'var(--bg-input)' }}
               />
             </div>
             <div>
@@ -768,7 +775,7 @@ export function MailClient() {
       >
         <div style={{
           width: '100%', maxWidth: 560, maxHeight: '92vh', display: 'flex', flexDirection: 'column',
-          background: 'var(--bg-color)', borderRadius: 14, overflow: 'hidden',
+          background: 'var(--bg-card)', borderRadius: 14, overflow: 'hidden',
           border: `1px solid ${borderColor}`, boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${borderColor}` }}>
@@ -801,6 +808,7 @@ export function MailClient() {
                     <button onClick={() => testConnection(a)} disabled={testingAccount} style={{ ...iconBtnStyle, width: 32, height: 32 }} title='Проверить подключение'>
                       <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'><path d='M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3' /></svg>
                     </button>
+                    {testingAccount && <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>Проверка…</span>}
                     <button onClick={() => removeAccount(a)} style={{ ...iconBtnStyle, width: 32, height: 32, color: '#d93025' }} title='Удалить'>
                       <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'><path d='M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6' /></svg>
                     </button>

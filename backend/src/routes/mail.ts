@@ -85,9 +85,12 @@ async function withImap<T>(account: MailAccountRow, fn: (client: ImapFlow) => Pr
     host: account.imapHost,
     port: account.imapPort,
     secure: account.secure,
+    // при secure=false imapflow сам делает STARTTLS-апгрейд (порт 143), если сервер поддерживает
     auth: { user: account.imapUser, pass: account.imapPass },
     logger: false,
     tls: { rejectUnauthorized: account.rejectUnauthorized },
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
     socketTimeout: 30000,
   });
   await client.connect();
