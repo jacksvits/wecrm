@@ -258,7 +258,9 @@ router.get('/messages', async (req: AuthRequest, res) => {
     const result = await withImap(account, async client => {
       const lock = await client.getMailboxLock(folder);
       try {
-        const uids = (await client.search({ all: true })) || [];
+        // search() без опции вернул бы порядковые номера (seq), а не UID —
+        // в ящиках с удалёнными письмами диапазоны UID FETCH тогда «промахиваются»
+        const uids = (await client.search({ all: true }, { uid: true })) || [];
         const total = uids.length;
         const slice = uids.slice(Math.max(0, total - page * limit), total - (page - 1) * limit).reverse();
         if (!slice.length) return { total, messages: [] };
