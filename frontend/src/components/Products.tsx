@@ -1000,8 +1000,68 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
       {/* ===== Статистика ===== */}
       {effectiveTab === 'stats' && (
         <div className='mobile-grid-1' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(520px, 1fr))', gap: 16, alignItems: 'start' }}>
-          {/* Виджет журнала: фильтры (склад + период) и порционная загрузка «Показать ещё» */}
+          {/* Виджет «Самые активные»: позиции с самым частым изменением остатка */}
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px 8px', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Самые активные</h3>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>самое частое изменение остатка за всё время</div>
+              </div>
+              <select value={activeLimit} onChange={e => setActiveLimit(Number(e.target.value))} title='Размер топа' style={topSelectStyle}>
+                {[5, 10, 25, 50].map(n => <option key={n} value={n}>ТОП {n}</option>)}
+              </select>
+            </div>
+            <div style={{ padding: '4px 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {shownActive.map((t, i) => (
+                <div key={t.name} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
+                    <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i + 1}. {t.name}</span>
+                    <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{t.ops} движ. · {fmtMoney(t.volume)} {t.unit}</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-hover)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.round((t.ops / topMaxOps) * 100)}%`, borderRadius: 4, background: i === 0 ? '#d97706' : '#8b5cf6' }} />
+                  </div>
+                </div>
+              ))}
+              {shownActive.length === 0 && (
+                <div style={{ fontSize: 14, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
+                  Движений пока нет
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Виджет «Самые продаваемые»: расход склада + заказы OZON, выбор размера ТОПа */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px 8px', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Самые продаваемые</h3>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>по расходу склада и заказам OZON (90 дней)</div>
+              </div>
+              <select value={topLimit} onChange={e => setTopLimit(Number(e.target.value))} title='Размер топа' style={topSelectStyle}>
+                {[5, 10, 25, 50].map(n => <option key={n} value={n}>ТОП {n}</option>)}
+              </select>
+            </div>
+            <div style={{ padding: '4px 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {shownSellers.map((t, i) => (
+                <div key={t.name} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
+                    <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.sources.includes('stock') && t.sources.includes('ozon') ? 'Склад + OZON' : t.sources.includes('ozon') ? 'OZON' : 'Склад'}>{i + 1}. {t.name}</span>
+                    <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtMoney(t.qty)} {t.unit} · {t.ops} оп.</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-hover)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.round((t.qty / topMaxQty) * 100)}%`, borderRadius: 4, background: i === 0 ? '#059669' : '#3b82f6' }} />
+                  </div>
+                </div>
+              ))}
+              {shownSellers.length === 0 && (
+                <div style={{ fontSize: 14, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
+                  Расходных движений и заказов пока нет
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Виджет журнала: фильтры (склад + период) и порционная загрузка «Показать ещё» */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', gridColumn: '1 / -1' }}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '12px 12px 8px' }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, marginRight: 8 }}>История движений</h3>
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>период:</span>
@@ -1093,66 +1153,6 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
                 </button>
               </div>
             )}
-          </div>
-          {/* Виджет «Самые продаваемые»: расход склада + заказы OZON, выбор размера ТОПа */}
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px 8px', flexWrap: 'wrap' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Самые продаваемые</h3>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>по расходу склада и заказам OZON (90 дней)</div>
-              </div>
-              <select value={topLimit} onChange={e => setTopLimit(Number(e.target.value))} title='Размер топа' style={topSelectStyle}>
-                {[5, 10, 25, 50].map(n => <option key={n} value={n}>ТОП {n}</option>)}
-              </select>
-            </div>
-            <div style={{ padding: '4px 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {shownSellers.map((t, i) => (
-                <div key={t.name} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
-                    <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.sources.includes('stock') && t.sources.includes('ozon') ? 'Склад + OZON' : t.sources.includes('ozon') ? 'OZON' : 'Склад'}>{i + 1}. {t.name}</span>
-                    <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtMoney(t.qty)} {t.unit} · {t.ops} оп.</span>
-                  </div>
-                  <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-hover)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${Math.round((t.qty / topMaxQty) * 100)}%`, borderRadius: 4, background: i === 0 ? '#059669' : '#3b82f6' }} />
-                  </div>
-                </div>
-              ))}
-              {shownSellers.length === 0 && (
-                <div style={{ fontSize: 14, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
-                  Расходных движений и заказов пока нет
-                </div>
-              )}
-            </div>
-          </div>
-          {/* Виджет «Самые активные»: позиции с самым частым изменением остатка */}
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px 8px', flexWrap: 'wrap' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Самые активные</h3>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>самое частое изменение остатка за всё время</div>
-              </div>
-              <select value={activeLimit} onChange={e => setActiveLimit(Number(e.target.value))} title='Размер топа' style={topSelectStyle}>
-                {[5, 10, 25, 50].map(n => <option key={n} value={n}>ТОП {n}</option>)}
-              </select>
-            </div>
-            <div style={{ padding: '4px 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {shownActive.map((t, i) => (
-                <div key={t.name} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
-                    <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i + 1}. {t.name}</span>
-                    <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{t.ops} движ. · {fmtMoney(t.volume)} {t.unit}</span>
-                  </div>
-                  <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-hover)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${Math.round((t.ops / topMaxOps) * 100)}%`, borderRadius: 4, background: i === 0 ? '#d97706' : '#8b5cf6' }} />
-                  </div>
-                </div>
-              ))}
-              {shownActive.length === 0 && (
-                <div style={{ fontSize: 14, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
-                  Движений пока нет
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}
