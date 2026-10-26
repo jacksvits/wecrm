@@ -82,43 +82,9 @@ async function downloadVkAvatar(url: string): Promise<string | null> {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// Дозапрашивает прямую ссылку на вложение через VK API, если она отсутствует
-// в payload сообщения или скачивание по ней не удалось (временные ссылки ВК,
-// транзиентные ошибки CDN). Используем access_key самого вложения.
-async function resolveVkAttachmentUrl(attachment: any, accessToken: string): Promise<string | null> {
-  try {
-    const ownerId = attachment[attachment.type]?.owner_id;
-    const id = attachment[attachment.type]?.id;
-    const accessKey = attachment[attachment.type]?.access_key;
-    if (!ownerId || !id) return null;
-    const fullId = accessKey ? `${ownerId}_${id}_${accessKey}` : `${ownerId}_${id}`;
-
-    if (attachment.type === 'photo') {
-      const res = await api('photos.getById', { photos: fullId, photo_sizes: 1 }, accessToken);
-      const photo = res?.[0];
-      const sizes = photo?.sizes || [];
-      const largest = sizes[sizes.length - 1];
-      return largest?.url || photo?.max_size?.url || null;
-    }
-    if (attachment.type === 'doc') {
-      const res = await api('docs.getById', { docs: fullId }, accessToken);
-      return res?.[0]?.url || null;
-    }
-    if (attachment.type === 'audio') {
-      const res = await api('audio.getById', { audios: fullId }, accessToken);
-      return res?.[0]?.url || null;
-    }
-    return null;
-  } catch (err) {
-    console.error('[VK Processor] resolveVkAttachmentUrl error:', err);
-    return null;
-  }
-}
-
 async function downloadVkAttachment(
   attachment: any,
-  taskDir: string,
-  accessToken: string
+  taskDir: string
 ): Promise<{ filename: string; originalName: string; mimeType: string; size: number; path: string } | null> {
   try {
     let url: string | null = null;
@@ -150,24 +116,22 @@ async function downloadVkAttachment(
       return null;
     }
 
-    // Скачиваем с повторами: ссылки ВК/CDN периодически отдают транзиентные
-    // ошибки — файл должен доехать, а не потеряться
+    if (!url) {
+      console.log('[VK Processor] No URL for attachment type:', attachment.type);
+      return null;
+    }
+
+    // Скачиваем с повторами: CDN ВК периодически отдаёт транзиентные ошибки
+    // (5xx/таймауты) — файл должен доехать, а не потеряться. Дозапрос ссылки
+    // через VK API не помогает: photos.getById/docs.getById недоступны с
+    // токеном сообщества (ошибка 27)
     const attempts = 3;
     let buffer: ArrayBuffer | null = null;
     for (let attempt = 1; attempt <= attempts; attempt++) {
-      if (!url) {
-        console.log(`[VK Processor] No URL for ${attachment.type}, resolving via VK API (attempt ${attempt}/${attempts})`);
-        url = await resolveVkAttachmentUrl(attachment, accessToken);
-        if (!url) {
-          console.error('[VK Processor] Could not resolve URL via VK API for attachment type:', attachment.type);
-          return null;
-        }
-      }
       try {
         const res = await fetch(url);
         if (!res.ok) {
           console.error(`[VK Processor] Download failed (attempt ${attempt}/${attempts}): HTTP ${res.status}, type ${attachment.type}`);
-          url = null; // следующая попытка — со свежей ссылкой из VK API
           if (attempt < attempts) await sleep(1500);
           continue;
         }
@@ -178,7 +142,6 @@ async function downloadVkAttachment(
         break;
       } catch (fetchErr) {
         console.error(`[VK Processor] Download error (attempt ${attempt}/${attempts}), type ${attachment.type}:`, fetchErr);
-        url = null;
         if (attempt < attempts) await sleep(1500);
       }
     }
@@ -315,7 +278,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
         fs.mkdirSync(taskDir, { recursive: true });
       }
       for (const att of msg.attachments) {
-        const fileInfo = await downloadVkAttachment(att, taskDir, settings.accessToken);
+        const fileInfo = await downloadVkAttachment(att, taskDir);
         if (fileInfo) {
           const attachment = await prisma.fileAttachment.create({
             data: {
@@ -455,7 +418,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
       if (msg.attachments && msg.attachments.length > 0) {
         const attachmentIds: string[] = [];
         for (const att of msg.attachments) {
-          const fileInfo = await downloadVkAttachment(att, taskDir, settings.accessToken);
+          const fileInfo = await downloadVkAttachment(att, taskDir);
           if (fileInfo) {
             const attachment = await prisma.fileAttachment.create({
               data: {
