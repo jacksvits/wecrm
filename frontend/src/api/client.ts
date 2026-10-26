@@ -482,7 +482,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     deleteAccount: (id: string) => fetchApi(`/api/mail/accounts/${id}`, { method: 'DELETE' }),
     testAccount: (id: string, signal?: AbortSignal): Promise<{ imap: string; smtp: string }> => fetchApi(`/api/mail/accounts/${id}/test`, { method: 'POST', signal }),
     folders: (accountId: string, signal?: AbortSignal): Promise<any[]> => fetchApi(`/api/mail/folders?accountId=${accountId}`, { signal }),
-    messages: (accountId: string, folder: string, page: number, signal?: AbortSignal): Promise<{ total: number; messages: any[] }> => fetchApi(`/api/mail/messages?accountId=${accountId}&folder=${encodeURIComponent(folder)}&page=${page}`, { signal }),
+    messages: (accountId: string, folder: string, page: number, signal?: AbortSignal, q?: string): Promise<{ total: number; messages: any[] }> => fetchApi(`/api/mail/messages?accountId=${accountId}&folder=${encodeURIComponent(folder)}&page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}`, { signal }),
     message: (accountId: string, folder: string, uid: number, signal?: AbortSignal): Promise<any> => fetchApi(`/api/mail/message?accountId=${accountId}&folder=${encodeURIComponent(folder)}&uid=${uid}`, { signal }),
     markRead: (accountId: string, folder: string, uid: number) => fetchApi('/api/mail/message/read', { method: 'POST', body: JSON.stringify({ accountId, folder, uid }) }),
     markUnread: (accountId: string, folder: string, uid: number) => fetchApi('/api/mail/message/unread', { method: 'POST', body: JSON.stringify({ accountId, folder, uid }) }),

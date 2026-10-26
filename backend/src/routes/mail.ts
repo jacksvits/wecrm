@@ -254,13 +254,16 @@ router.get('/messages', async (req: AuthRequest, res) => {
     const folder = String(req.query.folder || 'INBOX');
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
     const limit = Math.min(50, Math.max(5, parseInt(String(req.query.limit || '25'), 10) || 25));
+    const q = String(req.query.q || '').trim();
 
     const result = await withImap(account, async client => {
       const lock = await client.getMailboxLock(folder);
       try {
         // search() без опции вернул бы порядковые номера (seq), а не UID —
         // в ящиках с удалёнными письмами диапазоны UID FETCH тогда «промахиваются»
-        const uids = (await client.search({ all: true }, { uid: true })) || [];
+        const uids = q
+          ? (await client.search({ or: [{ subject: q }, { from: q }, { to: q }] }, { uid: true })) || []
+          : (await client.search({ all: true }, { uid: true })) || [];
         const total = uids.length;
         const slice = uids.slice(Math.max(0, total - page * limit), total - (page - 1) * limit).reverse();
         if (!slice.length) return { total, messages: [] };
@@ -455,7 +458,7 @@ router.post('/messages/move', async (req: AuthRequest, res) => {
     if (!account) return;
     const folder = String(req.body.folder || 'INBOX');
     const destination = String(req.body.destination || '');
-    const uids = (Array.isArray(req.body.uids) ? req.body.uids : []).map(Number).filter(n => n > 0);
+    const uids = (Array.isArray(req.body.uids) ? req.body.uids : []).map(Number).filter((n: number) => n > 0);
     if (!uids.length || !destination) {
       return res.status(400).json({ error: 'uids и destination обязательны' });
     }
@@ -481,7 +484,7 @@ router.delete('/messages', async (req: AuthRequest, res) => {
     const account = await getAccount(req, res);
     if (!account) return;
     const folder = String(req.body.folder || 'INBOX');
-    const uids = (Array.isArray(req.body.uids) ? req.body.uids : []).map(Number).filter(n => n > 0);
+    const uids = (Array.isArray(req.body.uids) ? req.body.uids : []).map(Number).filter((n: number) => n > 0);
     if (!uids.length) return res.status(400).json({ error: 'uids обязательны' });
     await withImap(account, async client => {
       const lock = await client.getMailboxLock(folder);
