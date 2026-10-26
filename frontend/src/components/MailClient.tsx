@@ -247,6 +247,41 @@ export function MailClient() {
   };
   const clearSelection = () => setSelected(new Set());
 
+  // Обновление счётчика непрочитанных в дереве папок (в т.ч. вложенных)
+  const updateFolderUnseen = (nodes: MailFolder[], path: string, delta: number): MailFolder[] =>
+    nodes.map(n => (n.path === path
+      ? { ...n, unseen: Math.max(0, n.unseen + delta) }
+      : { ...n, children: updateFolderUnseen(n.children || [], path, delta) }));
+
+  // Прочитано/непрочитано для одного письма из списка
+  const toggleReadOne = async (m: MailMessageItem) => {
+    if (!selectedAccountId) return;
+    try {
+      if (m.seen) await api.mail.markUnread(selectedAccountId, selectedFolder, m.uid);
+      else await api.mail.markRead(selectedAccountId, selectedFolder, m.uid);
+      setMessages(prev => prev.map(x => (x.uid === m.uid ? { ...x, seen: !m.seen } : x)));
+      setFolders(prev => updateFolderUnseen(prev, selectedFolder, m.seen ? 1 : -1));
+    } catch (e: any) {
+      setError(e.message || 'Не удалось изменить статус');
+    }
+  };
+
+  // Удаление одного письма из списка (в Корзину / безвозвратно из Корзины)
+  const deleteOne = async (uid: number) => {
+    if (!selectedAccountId) return;
+    if (!confirm(currentFolderIsTrash ? 'Удалить письмо безвозвратно?' : 'Удалить письмо?')) return;
+    try {
+      if (currentFolderIsTrash) await api.mail.deleteMessages(selectedAccountId, selectedFolder, [uid]);
+      else await api.mail.moveMessages(selectedAccountId, selectedFolder, [uid], trashPath || 'Trash');
+      setSelected(prev => { const next = new Set(prev); next.delete(uid); return next; });
+      if (openMessage?.uid === uid) setOpenMessage(null);
+      loadMessages(page);
+      loadFolders();
+    } catch (e: any) {
+      setError(e.message || 'Не удалось удалить письмо');
+    }
+  };
+
   // Плоский список всех папок (с учётом вложенности) — для выбора назначения перемещения
   const flatFolders = useMemo(() => {
     const out: { path: string; label: string }[] = [];
@@ -317,7 +352,7 @@ export function MailClient() {
       setOpenMessage(full);
       // Обновляем флаг \Seen в списке и счётчик папки
       setMessages(prev => prev.map(m => (m.uid === uid ? { ...m, seen: true } : m)));
-      setFolders(prev => prev.map(f => (f.path === selectedFolder ? { ...f, unseen: Math.max(0, f.unseen - 1) } : f)));
+      setFolders(prev => updateFolderUnseen(prev, selectedFolder, -1));
     } catch (e: any) {
       setError(e.name === 'AbortError' ? 'Сервер не отвечает (превышено время ожидания)' : (e.message || 'Не удалось открыть письмо'));
     } finally {
@@ -349,7 +384,7 @@ export function MailClient() {
       } else {
         await api.mail.markUnread(selectedAccountId, selectedFolder, openMessage.uid);
         setMessages(prev => prev.map(m => (m.uid === openMessage.uid ? { ...m, seen: false } : m)));
-        setFolders(prev => prev.map(f => (f.path === selectedFolder ? { ...f, unseen: f.unseen + 1 } : f)));
+        setFolders(prev => updateFolderUnseen(prev, selectedFolder, 1));
       }
     } catch (e: any) {
       setError(e.message || 'Не удалось изменить статус');
@@ -614,21 +649,44 @@ export function MailClient() {
               display: 'flex', flexDirection: 'column', gap: 3,
             }}
           >
-            <input
-              type='checkbox'
-              checked={selected.has(m.uid)}
-              onClick={e => e.stopPropagation()}
-              onChange={() => toggleSelect(m.uid)}
-              style={{ alignSelf: 'flex-start' }}
-            />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Строка 1: чекбокс + отправитель + действия выбранного + дата */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type='checkbox'
+                checked={selected.has(m.uid)}
+                onClick={e => e.stopPropagation()}
+                onChange={() => toggleSelect(m.uid)}
+                style={{ flexShrink: 0, margin: 0 }}
+              />
               {!m.seen && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#007AFF', flexShrink: 0 }} />}
               <span style={{ flex: 1, fontSize: 14, fontWeight: m.seen ? 400 : 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {m.fromName || m.from || '(без отправителя)'}
               </span>
+              {selected.has(m.uid) && (
+                <>
+                  <button
+                    onClick={e => { e.stopPropagation(); toggleReadOne(m); }}
+                    title={m.seen ? 'Отметить непрочитанным' : 'Отметить прочитанным'}
+                    style={{ ...iconBtnStyle, width: 28, height: 28, background: 'transparent' }}
+                  >
+                    <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
+                      <path d='M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' />
+                      {!m.seen && <circle cx='17.5' cy='7.5' r='3.2' fill='#007AFF' stroke='none' />}
+                    </svg>
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteOne(m.uid); }}
+                    title={currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину'}
+                    style={{ ...iconBtnStyle, width: 28, height: 28, background: 'transparent', color: '#d93025' }}
+                  >
+                    <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'><path d='M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6' /></svg>
+                  </button>
+                </>
+              )}
               <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{formatMailDate(m.date)}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Строка 2: тема (с отступом под чекбокс) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 24 }}>
               <span style={{ flex: 1, fontSize: 13, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.subject}</span>
               {m.hasAttachments && <span title='Вложения' style={{ fontSize: 12, flexShrink: 0 }}>📎</span>}
             </div>
