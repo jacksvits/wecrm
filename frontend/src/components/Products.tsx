@@ -529,7 +529,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   };
 
   // ===== Виджеты вкладки «Статистика» =====
-  // Журнал движений: серверная фильтрация (склад + период) и постраничная пагинация (по 25 записей)
+  // Журнал движений: серверная фильтрация (склад + период) и постраничная пагинация (по 10 записей)
   const [statsMovements, setStatsMovements] = useState<StockMovement[]>([]);
   const [statsTotal, setStatsTotal] = useState(0);
   const [statsPage, setStatsPage] = useState(0);
@@ -541,7 +541,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   const [mostActive, setMostActive] = useState<MostActiveItem[]>([]);
   const [topLimit, setTopLimit] = useState(10);
   const [activeLimit, setActiveLimit] = useState(10);
-  const STATS_PAGE = 25;
+  const STATS_PAGE = 10;
   const statsTotalPages = Math.max(1, Math.ceil(statsTotal / STATS_PAGE));
   // окно номеров страниц: первая, последняя и ±2 вокруг текущей (остальное — многоточие)
   const statsPages: (number | '…')[] = [];
@@ -1074,7 +1074,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
               )}
             </div>
           </div>
-          {/* Виджет журнала: фильтры (склад + период) и постраничная пагинация (по 25 записей) */}
+          {/* Виджет журнала: фильтры (склад + период) и постраничная пагинация (по 10 записей) */}
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', gridColumn: '1 / -1' }}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '12px 12px 8px' }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, marginRight: 8 }}>История движений</h3>
