@@ -487,6 +487,8 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     markRead: (accountId: string, folder: string, uid: number) => fetchApi('/api/mail/message/read', { method: 'POST', body: JSON.stringify({ accountId, folder, uid }) }),
     markUnread: (accountId: string, folder: string, uid: number) => fetchApi('/api/mail/message/unread', { method: 'POST', body: JSON.stringify({ accountId, folder, uid }) }),
     deleteMessage: (accountId: string, folder: string, uid: number) => fetchApi('/api/mail/message', { method: 'DELETE', body: JSON.stringify({ accountId, folder, uid }) }),
+    moveMessages: (accountId: string, folder: string, uids: number[], destination: string) => fetchApi('/api/mail/messages/move', { method: 'POST', body: JSON.stringify({ accountId, folder, uids, destination }) }),
+    deleteMessages: (accountId: string, folder: string, uids: number[]) => fetchApi('/api/mail/messages', { method: 'DELETE', body: JSON.stringify({ accountId, folder, uids }) }),
     send: async (formData: FormData): Promise<any> => {
       const res = await fetch('/api/mail/send', { method: 'POST', headers: { 'X-Auth-Token': getToken()! }, body: formData });
       const data = await res.json().catch(() => ({}));

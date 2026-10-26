@@ -152,8 +152,18 @@ export function MailClient() {
   const [showCompose, setShowCompose] = useState(false);
   // Свёрнутые ветви дерева папок (path → скрыть детей)
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  // Множественный выбор писем (uid → выбрано)
+  const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const account: MailAccount | undefined = accounts.find(a => a.id === selectedAccountId);
+
+  // Локализованное название системных папок (используется в дереве, списках и выборе назначения)
+  const folderLabel = (f: MailFolder) =>
+    f.specialUse === '\\Sent' ? 'Отправленные' :
+    f.specialUse === '\\Trash' ? 'Корзина' :
+    f.specialUse === '\\Drafts' ? 'Черновики' :
+    f.specialUse === '\\Junk' ? 'Спам' :
+    /^INBOX$/i.test(f.path) ? 'Входящие' : f.name;
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -219,9 +229,78 @@ export function MailClient() {
     setMessages([]);
     setTotalMessages(0);
     setPage(1);
+    setSelected(new Set());
     loadFolders();
     loadMessages(1);
   }, [selectedAccountId, selectedFolder]);
+
+  // ---- Множественный выбор ----
+  const toggleSelect = (uid: number) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(uid)) next.delete(uid); else next.add(uid);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    setSelected(prev => (prev.size === messages.length && messages.length > 0 ? new Set() : new Set(messages.map(m => m.uid))));
+  };
+  const clearSelection = () => setSelected(new Set());
+
+  // Плоский список всех папок (с учётом вложенности) — для выбора назначения перемещения
+  const flatFolders = useMemo(() => {
+    const out: { path: string; label: string }[] = [];
+    const walk = (nodes: MailFolder[], depth: number) =>
+      nodes.forEach(n => {
+        out.push({ path: n.path, label: `${'— '.repeat(depth)}${folderLabel(n)}` });
+        walk(n.children || [], depth + 1);
+      });
+    walk(folders, 0);
+    return out;
+  }, [folders]);
+
+  const trashPath = useMemo(() => {
+    const find = (nodes: MailFolder[]): string | null => {
+      for (const n of nodes) {
+        if (n.specialUse === '\\Trash') return n.path;
+        const nested = find(n.children || []);
+        if (nested) return nested;
+      }
+      return null;
+    };
+    return find(folders);
+  }, [folders]);
+
+  const currentFolderIsTrash = trashPath !== null && selectedFolder === trashPath;
+
+  const moveSelected = async (destination: string) => {
+    if (!selectedAccountId || !destination || selected.size === 0) return;
+    try {
+      await api.mail.moveMessages(selectedAccountId, selectedFolder, Array.from(selected), destination);
+      clearSelection();
+      loadMessages(page);
+      loadFolders();
+    } catch (e: any) {
+      setError(e.message || 'Не удалось переместить письма');
+    }
+  };
+
+  const deleteSelected = async () => {
+    if (!selectedAccountId || selected.size === 0) return;
+    if (!confirm(currentFolderIsTrash ? `Удалить безвозвратно ${selected.size} писем?` : `Переместить ${selected.size} писем в Корзину?`)) return;
+    try {
+      if (currentFolderIsTrash) {
+        await api.mail.deleteMessages(selectedAccountId, selectedFolder, Array.from(selected));
+      } else {
+        await api.mail.moveMessages(selectedAccountId, selectedFolder, Array.from(selected), trashPath || 'Trash');
+      }
+      clearSelection();
+      loadMessages(page);
+      loadFolders();
+    } catch (e: any) {
+      setError(e.message || 'Не удалось удалить письма');
+    }
+  };
 
   const refresh = () => {
     loadFolders();
@@ -488,6 +567,38 @@ export function MailClient() {
         borderTop: isMobile ? 'none' : undefined,
         display: 'flex', flexDirection: 'column',
       }}>
+        {/* Панель выбора и массовых действий */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${borderColor}`, flexWrap: 'wrap' }}>
+          <input
+            type='checkbox'
+            title='Выбрать все на странице'
+            checked={messages.length > 0 && selected.size === messages.length}
+            onChange={toggleSelectAll}
+            disabled={!messages.length}
+          />
+          {selected.size > 0 && (
+            <>
+              <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Выбрано: {selected.size}</span>
+              <select
+                value=''
+                onChange={e => { const v = e.target.value; e.target.value = ''; if (v) moveSelected(v); }}
+                style={{ ...inputStyle, width: 'auto', fontSize: 13, padding: '5px 8px' }}
+              >
+                <option value=''>Переместить…</option>
+                {flatFolders.filter(f => f.path !== selectedFolder).map(f => (
+                  <option key={f.path} value={f.path}>{f.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={deleteSelected}
+                style={{ ...iconBtnStyle, width: 'auto', padding: '5px 12px', fontSize: 13, color: '#d93025' }}
+              >
+                {currentFolderIsTrash ? 'Удалить навсегда' : 'В Корзину'}
+              </button>
+              <button onClick={clearSelection} style={{ ...iconBtnStyle, width: 'auto', padding: '5px 10px', fontSize: 13 }} title='Снять выбор'>✕</button>
+            </>
+          )}
+        </div>
         {loading && <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>Загрузка…</div>}
         {!loading && messages.length === 0 && (
           <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>Папка пуста</div>
@@ -497,12 +608,19 @@ export function MailClient() {
             key={m.uid}
             onClick={() => openUid(m.uid)}
             style={{
-              padding: '10px 14px', cursor: 'pointer',
+              padding: '10px 14px 10px 12px', cursor: 'pointer',
               borderBottom: `1px solid ${borderColor}`,
               background: openMessage?.uid === m.uid ? 'var(--bg-hover)' : 'transparent',
               display: 'flex', flexDirection: 'column', gap: 3,
             }}
           >
+            <input
+              type='checkbox'
+              checked={selected.has(m.uid)}
+              onClick={e => e.stopPropagation()}
+              onChange={() => toggleSelect(m.uid)}
+              style={{ alignSelf: 'flex-start' }}
+            />
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {!m.seen && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#007AFF', flexShrink: 0 }} />}
               <span style={{ flex: 1, fontSize: 14, fontWeight: m.seen ? 400 : 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -605,13 +723,6 @@ export function MailClient() {
 
   // ---- Разметка ----
   const borderColor = 'var(--border-color)';
-
-  const folderLabel = (f: MailFolder) =>
-    f.specialUse === '\\Sent' ? 'Отправленные' :
-    f.specialUse === '\\Trash' ? 'Корзина' :
-    f.specialUse === '\\Drafts' ? 'Черновики' :
-    f.specialUse === '\\Junk' ? 'Спам' :
-    /^INBOX$/i.test(f.path) ? 'Входящие' : f.name;
 
   const settingsBtn = (
     <button onClick={() => setShowSettings(true)} title='Настройки почтовых аккаунтов' style={iconBtnStyle}>

@@ -446,6 +446,59 @@ router.delete('/message', async (req: AuthRequest, res) => {
   }
 });
 
+// ---- Массовые операции ----
+
+// Перемещение нескольких писем в другую папку
+router.post('/messages/move', async (req: AuthRequest, res) => {
+  try {
+    const account = await getAccount(req, res);
+    if (!account) return;
+    const folder = String(req.body.folder || 'INBOX');
+    const destination = String(req.body.destination || '');
+    const uids = (Array.isArray(req.body.uids) ? req.body.uids : []).map(Number).filter(n => n > 0);
+    if (!uids.length || !destination) {
+      return res.status(400).json({ error: 'uids и destination обязательны' });
+    }
+    await withImap(account, async client => {
+      const lock = await client.getMailboxLock(folder);
+      try {
+        for (const uid of uids) {
+          await client.messageMove(uid, destination, { uid: true });
+        }
+      } finally {
+        lock.release();
+      }
+    });
+    res.json({ success: true, moved: uids.length });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Безвозвратное удаление нескольких писем (из Корзины): \Deleted + expunge
+router.delete('/messages', async (req: AuthRequest, res) => {
+  try {
+    const account = await getAccount(req, res);
+    if (!account) return;
+    const folder = String(req.body.folder || 'INBOX');
+    const uids = (Array.isArray(req.body.uids) ? req.body.uids : []).map(Number).filter(n => n > 0);
+    if (!uids.length) return res.status(400).json({ error: 'uids обязательны' });
+    await withImap(account, async client => {
+      const lock = await client.getMailboxLock(folder);
+      try {
+        for (const uid of uids) {
+          await client.messageDelete(uid, { uid: true });
+        }
+      } finally {
+        lock.release();
+      }
+    });
+    res.json({ success: true, deleted: uids.length });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ---- Отправка ----
 
 const upload = multer({
