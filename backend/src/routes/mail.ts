@@ -194,29 +194,37 @@ router.get('/folders', async (req: AuthRequest, res) => {
   try {
     const account = await getAccount(req, res);
     if (!account) return;
-    const folders = await withImap(account, async client => {
-      const list = await client.list();
-      // Только папки верхнего уровня и вложенные INBOX — плоский список как в почтовых клиентах
-      return list
-        .filter(f => f.path.split(f.delimiter || '/').length <= 2 || /^INBOX/i.test(f.path))
-        .map(f => ({
-          path: f.path,
-          name: f.name,
-          specialUse: (f as any).specialUse || null,
-        }));
-    });
-    // Счётчики непрочитанных/всего — лучшим образом, ошибки по папке игнорируем
-    const withStatus = await Promise.all(
-      folders.map(async f => {
+    // Дерево папок (listTree) + счётчики — всё в одном IMAP-подключении
+    const tree = await withImap(account, async client => {
+      const listed = await client.listTree();
+      const build = async (node: any): Promise<any> => {
+        const out: any = {
+          path: node.path,
+          name: node.name,
+          specialUse: node.specialUse || null,
+          unseen: 0,
+          total: 0,
+          children: [],
+        };
         try {
-          const s = await withImap(account, c => c.status(f.path, { unseen: true, messages: true }));
-          return { ...f, unseen: s.unseen ?? 0, total: s.messages ?? 0 };
+          const s = await client.status(node.path, { unseen: true, messages: true });
+          out.unseen = s.unseen ?? 0;
+          out.total = s.messages ?? 0;
         } catch {
-          return { ...f, unseen: 0, total: 0 };
+          // отдельные папки (например, недоступные по ACL) не должны ломать весь список
         }
-      })
-    );
-    res.json(withStatus);
+        for (const sub of node.folders || []) {
+          out.children.push(await build(sub));
+        }
+        return out;
+      };
+      const roots: any[] = [];
+      for (const node of (listed as any)?.folders || []) {
+        roots.push(await build(node));
+      }
+      return roots;
+    });
+    res.json(tree);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }

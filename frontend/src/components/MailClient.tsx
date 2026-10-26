@@ -32,6 +32,7 @@ interface MailFolder {
   specialUse: string | null;
   unseen: number;
   total: number;
+  children: MailFolder[];
 }
 
 interface MailMessageItem {
@@ -191,12 +192,15 @@ export function MailClient() {
     }
   };
 
+  const loadSeq = useRef(0);
   const loadMessages = async (p: number) => {
     if (!selectedAccountId) return;
+    const seq = ++loadSeq.current;
     setLoading(true);
     setError('');
     try {
       const data = await withTimeout(signal => api.mail.messages(selectedAccountId, selectedFolder, p, signal));
+      if (seq !== loadSeq.current) return; // ответ устарел — пользователь уже переключил папку
       setMessages(data.messages || []);
       setTotalMessages(data.total || 0);
       setPage(p);
@@ -210,6 +214,9 @@ export function MailClient() {
 
   useEffect(() => {
     setOpenMessage(null);
+    setMessages([]);
+    setTotalMessages(0);
+    setPage(1);
     loadFolders();
     loadMessages(1);
   }, [selectedAccountId, selectedFolder]);
@@ -425,6 +432,31 @@ export function MailClient() {
   };
 
 
+  // Рекурсивный рендер дерева папок (отступ по глубине вложенности)
+  function renderFolderTree(nodes: MailFolder[], depth: number): React.ReactNode {
+    return nodes.map(f => (
+      <div key={f.path}>
+        <button
+          onClick={() => { setSelectedFolder(f.path); setOpenMessage(null); }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: `8px 10px 8px ${10 + depth * 18}`,
+            width: '100%', borderRadius: 10,
+            border: 'none', cursor: 'pointer', fontSize: 14, textAlign: 'left',
+            background: selectedFolder === f.path ? 'var(--bg-hover)' : 'transparent',
+            color: 'var(--text-primary)', fontWeight: f.unseen > 0 ? 600 : 400,
+          }}
+        >
+          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folderLabel(f)}</span>
+          {f.unseen > 0 && (
+            <span style={{ fontSize: 12, background: '#007AFF', color: '#fff', borderRadius: 10, padding: '1px 7px', flexShrink: 0 }}>{f.unseen}</span>
+          )}
+        </button>
+        {f.children && f.children.length > 0 && renderFolderTree(f.children, depth + 1)}
+      </div>
+    ));
+  }
+
   function renderMessageList() {
     return (
       <div style={{
@@ -636,23 +668,7 @@ export function MailClient() {
                   ))}
                 </div>
               )}
-              {!isMobile && folders.map(f => (
-                <button
-                  key={f.path}
-                  onClick={() => { setSelectedFolder(f.path); setOpenMessage(null); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10,
-                    border: 'none', cursor: 'pointer', fontSize: 14, textAlign: 'left',
-                    background: selectedFolder === f.path ? 'var(--bg-hover)' : 'transparent',
-                    color: 'var(--text-primary)', fontWeight: f.unseen > 0 ? 600 : 400,
-                  }}
-                >
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folderLabel(f)}</span>
-                  {f.unseen > 0 && (
-                    <span style={{ fontSize: 12, background: '#007AFF', color: '#fff', borderRadius: 10, padding: '1px 7px', flexShrink: 0 }}>{f.unseen}</span>
-                  )}
-                </button>
-              ))}
+              {!isMobile && renderFolderTree(folders, 0)}
               {/* Список писем (мобайл: под чипами папок) */}
               {isMobile && renderMessageList()}
             </div>
