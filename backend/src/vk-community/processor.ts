@@ -171,20 +171,65 @@ async function downloadVkAttachment(
   }
 }
 
+// Возвращает исходный текст сообщения без служебных пометок, которые мы
+// добавляем при сохранении: префиксы «Мы (ВК): » / «[Имя](url):», счётчик
+// «[N влож.]», заглушки для сообщений без текста
+function stripVkDecorations(content: string): string {
+  let t = content;
+  if (t.startsWith('Мы (ВК): ')) {
+    t = t.slice('Мы (ВК): '.length);
+  } else {
+    const sep = t.indexOf(':\n'); // формат «[Имя](ссылка):\nтекст»
+    if (sep !== -1) t = t.slice(sep + 2);
+  }
+  if (t === '📎 Вложение из ВК' || t === '📎 Вложение из ВК (исходящее)') t = '';
+  return t.replace(/\s*\[\d+ влож\.\]\s*$/, '').trim();
+}
+
+// Синхронизация правки сообщения ВК: текст изменился — обновляем комментарий
+// и добавляем запись в обсуждение, чтобы был виден факт правки
+async function syncVkMessageEdit(comment: any, msg: VkMessage) {
+  const freshText = (msg.text || '').trim();
+  const storedText = stripVkDecorations(comment.content);
+  if (storedText === freshText || !freshText) return;
+
+  const suffix = msg.attachments?.length ? ` [${msg.attachments.length} влож.]` : '';
+  let newContent: string;
+  if (comment.content.startsWith('Мы (ВК): ')) {
+    newContent = `Мы (ВК): ${freshText}${suffix}`;
+  } else {
+    const sep = comment.content.indexOf(':\n');
+    const prefix = sep !== -1 ? comment.content.slice(0, sep + 2) : '';
+    newContent = prefix + freshText + suffix;
+  }
+
+  await prisma.comment.update({ where: { id: comment.id }, data: { content: newContent } });
+  await prisma.comment.create({
+    data: {
+      content: '✏️ Сообщение отредактировано',
+      authorId: comment.authorId,
+      taskId: comment.taskId,
+    },
+  });
+  console.log(`[VK Processor] Msg ${msg.id} edited, comment ${comment.id} updated`);
+}
+
 export async function processVkMessage(msg: VkMessage, settings: any) {
   console.log('[VK Processor] Processing msg ' + msg.id + ' from peer ' + msg.peer_id);
 
-  // Check if already processed as a task
+  // Check if already processed as a task (первый комментарий такой задачи
+  // тоже имеет этот vk_message_id — при правке синхронизируем его)
   const existingTask = await prisma.task.findUnique({ where: { vkMessageId: msg.id } });
   if (existingTask) {
-    console.log(`[VK Processor] Msg ${msg.id} already exists as task ${existingTask.id}`);
+    const firstComment = await prisma.comment.findUnique({ where: { vkMessageId: msg.id } });
+    if (firstComment) await syncVkMessageEdit(firstComment, msg);
     return;
   }
 
   // Check if already processed as a comment
   const existingComment = await prisma.comment.findUnique({ where: { vkMessageId: msg.id } });
   if (existingComment) {
-    console.log(`[VK Processor] Msg ${msg.id} already exists as comment ${existingComment.id}`);
+    await syncVkMessageEdit(existingComment, msg);
     return;
   }
 
