@@ -415,14 +415,29 @@ router.delete('/message', async (req: AuthRequest, res) => {
     const uid = parseInt(String(req.body.uid || ''), 10);
     if (!uid) return res.status(400).json({ error: 'uid обязателен' });
     await withImap(account, async client => {
-      // Перемещаем в Корзину, если она есть; иначе помечаем \Deleted и чистим
-      const folders = await client.list();
-      const trash = folders.find(f => (f as any).specialUse === '\\Trash');
-      if (trash && trash.path !== folder) {
-        await client.messageMove(uid, trash.path, { uid: true });
-      } else {
-        // messageDelete = пометка \Deleted + expunge одним вызовом
-        await client.messageDelete(uid, { uid: true });
+      // Корзину ищем через listTree — только там есть specialUse (list() его не возвращает)
+      let trashPath: string | null = null;
+      const findTrash = (nodes: any[]): string | null => {
+        for (const n of nodes) {
+          if (n.specialUse === '\\Trash') return n.path;
+          const nested = findTrash(n.folders || []);
+          if (nested) return nested;
+        }
+        return null;
+      };
+      const tree = await client.listTree();
+      trashPath = findTrash((tree as any)?.folders || []);
+      // UID MOVE/STORE работают только внутри выбранного ящика — берём mailbox lock
+      const lock = await client.getMailboxLock(folder);
+      try {
+        if (trashPath && trashPath !== folder) {
+          await client.messageMove(uid, trashPath, { uid: true });
+        } else {
+          // messageDelete = пометка \Deleted + expunge одним вызовом
+          await client.messageDelete(uid, { uid: true });
+        }
+      } finally {
+        lock.release();
       }
     });
     res.json({ success: true });
