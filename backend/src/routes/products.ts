@@ -4,11 +4,15 @@ import path from 'path';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { importMarketItems, syncProductsToVk, getVkSettings } from '../lib/vk-market.js';
-import { syncProductsToOzon } from '../lib/ozon.js';
+import { syncProductsToOzon, fetchOzonPostings } from '../lib/ozon.js';
 import { generateUniqueArticle } from '../lib/article.js';
 
 const router = Router();
 import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
+
+// Кэш отправлений OZON для виджета «Самые продаваемые» — выборка из кабинета идёт до 50 запросов, кэшируем на 10 минут
+let ozonPostingsCache: { at: number; items: any[] } | null = null;
+const OZON_POSTINGS_CACHE_TTL = 10 * 60 * 1000;
 
 // Нормализация тегов карточки: обрезка пробелов, без дубликатов и пустых значений
 function normalizeTags(input: unknown): string[] {
@@ -349,28 +353,161 @@ router.delete('/meta/price-types/:id', async (req, res) => {
 });
 
 /**
- * GET /api/products/meta/movements?productId=&warehouseId=
- * История складских движений
+ * GET /api/products/meta/movements?productId=&warehouseId=&dateFrom=&dateTo=&limit=&offset=
+ * История складских движений с фильтром по дате и пагинацией («Показать ещё»).
+ * Возвращает { items, total } — total нужен виджету для кнопки «Показать ещё».
  */
 router.get('/meta/movements', async (req, res) => {
   try {
-    const { productId, warehouseId } = req.query;
+    const { productId, warehouseId, dateFrom, dateTo } = req.query;
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
     const where: any = {};
     if (productId) where.productId = productId as string;
     if (warehouseId) where.warehouseId = warehouseId as string;
-    const movements = await prisma.stockMovement.findMany({
-      where,
-      include: {
-        product: { select: { name: true, sku: true, unit: true } },
-        warehouse: { select: { name: true } },
-        user: { select: { name: true } },
-      },
-      orderBy: { date: 'desc' },
-      take: 200,
-    });
-    res.json(movements);
+    // даты приходят как YYYY-MM-DD: от — начало дня, до — конец дня (локальное время сервера)
+    if (dateFrom || dateTo) {
+      where.date = {};
+      if (dateFrom) where.date.gte = new Date(`${dateFrom}T00:00:00.000`);
+      if (dateTo) where.date.lte = new Date(`${dateTo}T23:59:59.999`);
+    }
+    const [movements, total] = await prisma.$transaction([
+      prisma.stockMovement.findMany({
+        where,
+        include: {
+          product: { select: { name: true, sku: true, unit: true } },
+          warehouse: { select: { name: true } },
+          user: { select: { name: true } },
+        },
+        orderBy: { date: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.stockMovement.count({ where }),
+    ]);
+    res.json({ items: movements, total });
   } catch (err: any) {
     console.error('[products:movements]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/products/meta/stats/top?limit=5|10|25|50
+ * Виджеты «Самые продаваемые» и «Самые активные».
+ * Продаваемые = расходные движения склада + заказы OZON (последние 90 дней, кэш 10 минут),
+ * сопоставление заказов с товарами — по артикулу / внутреннему артикулу (как в импорте OZON).
+ * Активные = позиции с самым частым изменением остатка (число движений, все типы).
+ */
+router.get('/meta/stats/top', async (req, res) => {
+  try {
+    const allowed = [5, 10, 25, 50];
+    const limit = allowed.includes(Number(req.query.limit)) ? Number(req.query.limit) : 10;
+
+    // расходные движения склада по товарам
+    const outcomeRows = await prisma.$queryRawUnsafe(
+      `SELECT product_id AS "productId", COUNT(*)::int AS ops, COALESCE(SUM(quantity), 0)::float AS qty
+       FROM stock_movements WHERE type = 'outcome' GROUP BY product_id`
+    ) as any[];
+
+    // заказы OZON из кабинета (не подключён/ошибка → статистика только по складу)
+    if (!ozonPostingsCache || Date.now() - ozonPostingsCache.at > OZON_POSTINGS_CACHE_TTL) {
+      try {
+        ozonPostingsCache = { at: Date.now(), items: await fetchOzonPostings(90) };
+      } catch {
+        ozonPostingsCache = null;
+      }
+    }
+    const ozonPostings = ozonPostingsCache?.items || [];
+
+    // агрегация заказов по артикулу (offer_id)
+    const ozonAgg = new Map<string, { name: string; qty: number; ops: number }>();
+    for (const p of ozonPostings) {
+      for (const it of (p.products || [])) {
+        const offerId = String(it.offer_id ?? '').trim();
+        if (!offerId) continue;
+        const row = ozonAgg.get(offerId) || { name: String(it.name ?? offerId), qty: 0, ops: 0 };
+        row.qty += Number(it.quantity) || 0;
+        row.ops += 1;
+        ozonAgg.set(offerId, row);
+      }
+    }
+
+    // сопоставление артикулов OZON с товарами CRM (по артикулу / внутреннему артикулу — как в импорте)
+    const offerIds = [...ozonAgg.keys()];
+    const offerToProduct = new Map<string, { id: string; name: string; unit: string }>();
+    const productIds = new Set<string>(outcomeRows.map((r: any) => r.productId));
+    if (offerIds.length) {
+      const matched = await prisma.product.findMany({
+        where: { OR: [{ article: { in: offerIds } }, { sku: { in: offerIds } }] },
+        select: { id: true, article: true, sku: true, name: true, unit: true },
+      });
+      for (const p of matched) {
+        for (const oid of [p.article, p.sku]) {
+          const key = String(oid ?? '').trim();
+          if (key && ozonAgg.has(key) && !offerToProduct.has(key)) offerToProduct.set(key, { id: p.id, name: p.name, unit: p.unit || '' });
+        }
+      }
+      for (const p of offerToProduct.values()) productIds.add(p.id);
+    }
+
+    // названия и единицы товаров
+    const productsInfo = await prisma.product.findMany({
+      where: { id: { in: [...productIds] } },
+      select: { id: true, name: true, unit: true },
+    });
+    const infoById = new Map(productsInfo.map(p => [p.id, p]));
+
+    // объединяем складской расход и заказы OZON в общий топ
+    const sellers = new Map<string, { name: string; unit: string; qty: number; ops: number; sources: Set<string> }>();
+    for (const r of outcomeRows) {
+      const info = infoById.get(r.productId);
+      sellers.set(r.productId, {
+        name: info?.name || 'Товар удалён',
+        unit: info?.unit || '',
+        qty: Number(r.qty),
+        ops: Number(r.ops),
+        sources: new Set(['stock']),
+      });
+    }
+    for (const [offerId, agg] of ozonAgg) {
+      const linked = offerToProduct.get(offerId);
+      const existing = linked ? sellers.get(linked.id) : undefined;
+      if (existing) {
+        existing.qty += agg.qty;
+        existing.ops += agg.ops;
+        existing.sources.add('ozon');
+      } else if (linked) {
+        sellers.set(linked.id, { name: linked.name, unit: linked.unit, qty: agg.qty, ops: agg.ops, sources: new Set(['ozon']) });
+      } else {
+        sellers.set(`ozon:${offerId}`, { name: `${agg.name} (OZON)`, unit: '', qty: agg.qty, ops: agg.ops, sources: new Set(['ozon']) });
+      }
+    }
+    const topSellers = [...sellers.values()]
+      .map(v => ({ name: v.name, unit: v.unit, qty: Math.round(v.qty * 100) / 100, ops: v.ops, sources: [...v.sources] }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, limit);
+
+    // «Самые активные»: частота изменения остатка по числу движений (все типы операций)
+    const activeRows = await prisma.$queryRawUnsafe(
+      `SELECT product_id AS "productId", COUNT(*)::int AS ops, COALESCE(SUM(ABS(quantity)), 0)::float AS volume
+       FROM stock_movements GROUP BY product_id ORDER BY ops DESC LIMIT ${limit}`
+    ) as any[];
+    const activeInfo = await prisma.product.findMany({
+      where: { id: { in: (activeRows as any[]).map(r => r.productId) } },
+      select: { id: true, name: true, unit: true },
+    });
+    const activeInfoById = new Map(activeInfo.map(p => [p.id, p]));
+    const mostActive = (activeRows as any[]).map(r => ({
+      name: activeInfoById.get(r.productId)?.name || 'Товар удалён',
+      unit: activeInfoById.get(r.productId)?.unit || '',
+      ops: Number(r.ops),
+      volume: Math.round(Number(r.volume) * 100) / 100,
+    }));
+
+    res.json({ topSellers, mostActive });
+  } catch (err: any) {
+    console.error('[products:stats-top]', err);
     res.status(500).json({ error: err.message });
   }
 });

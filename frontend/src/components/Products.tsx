@@ -6,7 +6,7 @@ import { api } from '../api/client';
 import { navItems } from '../lib/navItems';
 import { useAuth } from '../hooks/useAuth';
 import { Vitrine } from './Vitrine';
-import { Product, ProductCategory, Warehouse, PriceType, StockMovement, PriceHistory } from '../types';
+import { Product, ProductCategory, Warehouse, PriceType, StockMovement, TopSellerItem, MostActiveItem, PriceHistory } from '../types';
 import { useBrandProductDefaultImage } from '../lib/branding';
 import OzonOrdersPanel from './OzonOrdersPanel';
 
@@ -74,7 +74,6 @@ export function Products() {
   const [allTags, setAllTags] = useState<string[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);
-  const [movements, setMovements] = useState<StockMovement[]>([]);
   const [q, setQ] = useState('');
   const [whFilter, setWhFilter] = useState('all');
   // Сортировка таблицы «Склад»: текст — А→Я/Я→А, числа — по убыванию/возрастанию
@@ -155,18 +154,16 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
 
   const load = async () => {
     try {
-      const [p, w, t, m, c, tg] = await Promise.all([
+      const [p, w, t, c, tg] = await Promise.all([
         api.products.list(),
         api.products.warehouses.list(),
         api.products.priceTypes.list(),
-        api.products.movements(),
         api.products.categories.list(),
         api.products.tags(),
       ]);
       setProducts(p);
       setWarehouses(w);
       setPriceTypes(t);
-      setMovements(m);
       setCategories(c);
       setAllTags(tg);
     } catch (e: any) {
@@ -531,23 +528,67 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
     setEditingCell(null);
   };
 
-  const visibleMovements = useMemo(() =>
-    movements.filter(m => statsWhFilter === 'all' || m.warehouseId === statsWhFilter).slice(0, 50),
-    [movements, statsWhFilter]);
+  // ===== Виджеты вкладки «Статистика» =====
+  // Журнал движений: серверная фильтрация (склад + период) и порционная загрузка «Показать ещё»
+  const [statsMovements, setStatsMovements] = useState<StockMovement[]>([]);
+  const [statsTotal, setStatsTotal] = useState(0);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsDateFrom, setStatsDateFrom] = useState('');
+  const [statsDateTo, setStatsDateTo] = useState('');
+  // Топы «Самые продаваемые» / «Самые активные»: один запрос на максимум из двух выборов
+  const [topSellers, setTopSellers] = useState<TopSellerItem[]>([]);
+  const [mostActive, setMostActive] = useState<MostActiveItem[]>([]);
+  const [topLimit, setTopLimit] = useState(10);
+  const [activeLimit, setActiveLimit] = useState(10);
+  const STATS_PAGE = 50;
 
-  // Топ продаваемых товаров по расходным движениям (для виджета «Самые продаваемые»)
-  const topProducts = useMemo(() => {
-    const agg = new Map<string, { name: string; unit: string; qty: number; ops: number }>();
-    for (const m of movements) {
-      if (m.type !== 'outcome' || !m.product) continue;
-      const cur = agg.get(m.product.name) || { name: m.product.name, unit: m.product.unit || '', qty: 0, ops: 0 };
-      cur.qty += m.quantity;
-      cur.ops += 1;
-      agg.set(m.product.name, cur);
+  const loadStatsMovements = async (offset = 0) => {
+    setStatsLoading(true);
+    try {
+      const data = await api.products.movements({
+        warehouseId: statsWhFilter === 'all' ? undefined : statsWhFilter,
+        dateFrom: statsDateFrom || undefined,
+        dateTo: statsDateTo || undefined,
+        limit: STATS_PAGE,
+        offset,
+      });
+      setStatsTotal(data.total);
+      setStatsMovements(prev => (offset === 0 ? data.items : [...prev, ...data.items]));
+    } catch (e: any) {
+      alert(e.message || 'Ошибка загрузки');
+    } finally {
+      setStatsLoading(false);
     }
-    return [...agg.values()].sort((a, b) => b.qty - a.qty).slice(0, 10);
-  }, [movements]);
-  const topMaxQty = topProducts[0]?.qty || 1;
+  };
+
+  const loadStatsTops = async (limit: number) => {
+    try {
+      const data = await api.products.statsTop(limit);
+      setTopSellers(data.topSellers);
+      setMostActive(data.mostActive);
+    } catch (e: any) {
+      alert(e.message || 'Ошибка загрузки');
+    }
+  };
+
+  // журнал: первую страницу перезагружаем при смене склада или периода
+  useEffect(() => {
+    if (effectiveTab === 'stats') loadStatsMovements(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveTab, statsWhFilter, statsDateFrom, statsDateTo]);
+
+  // топы: при открытии вкладки и при смене размера выборки
+  useEffect(() => {
+    if (effectiveTab === 'stats') loadStatsTops(Math.max(topLimit, activeLimit));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveTab, topLimit, activeLimit]);
+
+  const visibleMovements = statsMovements;
+  const shownSellers = topSellers.slice(0, topLimit);
+  const topMaxQty = shownSellers[0]?.qty || 1;
+  const shownActive = mostActive.slice(0, activeLimit);
+  const topMaxOps = shownActive[0]?.ops || 1;
+  const topSelectStyle: React.CSSProperties = { ...inputStyle, width: 'auto', padding: '4px 8px', fontSize: 13 };
 
   // товары (не услуги) для складского учёта
   const stockProducts = useMemo(() => visible.filter(p => p.kind !== 'service'), [visible]);
@@ -959,10 +1000,31 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
       {/* ===== Статистика ===== */}
       {effectiveTab === 'stats' && (
         <div className='mobile-grid-1' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(520px, 1fr))', gap: 16, alignItems: 'start' }}>
-          {/* Виджет среднего размера — первая ячейка сетки статистики; рядом в будущем — виджет «Самые продаваемые» */}
+          {/* Виджет журнала: фильтры (склад + период) и порционная загрузка «Показать ещё» */}
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '12px 12px 8px' }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, marginRight: 8 }}>История движений</h3>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>период:</span>
+              <input
+                type='date'
+                value={statsDateFrom}
+                onChange={e => setStatsDateFrom(e.target.value)}
+                title='Дата от'
+                style={{ ...inputStyle, width: 'auto', padding: '4px 8px', fontSize: 13 }}
+              />
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>—</span>
+              <input
+                type='date'
+                value={statsDateTo}
+                onChange={e => setStatsDateTo(e.target.value)}
+                title='Дата до'
+                style={{ ...inputStyle, width: 'auto', padding: '4px 8px', fontSize: 13 }}
+              />
+              {(statsDateFrom || statsDateTo) && (
+                <button onClick={() => { setStatsDateFrom(''); setStatsDateTo(''); }} style={{ ...btnGhost, fontSize: 12, padding: '4px 10px' }}>
+                  Сбросить период
+                </button>
+              )}
               <button
                 onClick={() => setStatsWhFilter('all')}
                 style={{ ...btnGhost, background: statsWhFilter === 'all' ? 'var(--bg-hover)' : 'var(--bg-card)', fontWeight: statsWhFilter === 'all' ? 600 : 400 }}
@@ -1020,28 +1082,74 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
                 </tbody>
               </table>
             </div>
+            {visibleMovements.length < statsTotal && (
+              <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+                <button
+                  onClick={() => loadStatsMovements(visibleMovements.length)}
+                  disabled={statsLoading}
+                  style={{ ...btnGhost, opacity: statsLoading ? 0.6 : 1 }}
+                >
+                  {statsLoading ? 'Загрузка…' : `Показать ещё (осталось ${statsTotal - visibleMovements.length})`}
+                </button>
+              </div>
+            )}
           </div>
-          {/* Виджет среднего размера — топ продаваемых товаров по истории движений (расход) */}
+          {/* Виджет «Самые продаваемые»: расход склада + заказы OZON, выбор размера ТОПа */}
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ padding: '12px 12px 8px' }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Самые продаваемые</h3>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Топ-10 по расходу за всё время</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px 8px', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Самые продаваемые</h3>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>по расходу склада и заказам OZON (90 дней)</div>
+              </div>
+              <select value={topLimit} onChange={e => setTopLimit(Number(e.target.value))} title='Размер топа' style={topSelectStyle}>
+                {[5, 10, 25, 50].map(n => <option key={n} value={n}>ТОП {n}</option>)}
+              </select>
             </div>
             <div style={{ padding: '4px 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {topProducts.map((t, i) => (
+              {shownSellers.map((t, i) => (
                 <div key={t.name} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
-                    <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i + 1}. {t.name}</span>
-                    <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtMoney(t.qty)} {t.unit}</span>
+                    <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.sources.includes('stock') && t.sources.includes('ozon') ? 'Склад + OZON' : t.sources.includes('ozon') ? 'OZON' : 'Склад'}>{i + 1}. {t.name}</span>
+                    <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtMoney(t.qty)} {t.unit} · {t.ops} оп.</span>
                   </div>
                   <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-hover)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${Math.round((t.qty / topMaxQty) * 100)}%`, borderRadius: 4, background: i === 0 ? '#059669' : '#3b82f6' }} />
                   </div>
                 </div>
               ))}
-              {topProducts.length === 0 && (
+              {shownSellers.length === 0 && (
                 <div style={{ fontSize: 14, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
-                  Расходных движений пока нет
+                  Расходных движений и заказов пока нет
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Виджет «Самые активные»: позиции с самым частым изменением остатка */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px 8px', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Самые активные</h3>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>самое частое изменение остатка за всё время</div>
+              </div>
+              <select value={activeLimit} onChange={e => setActiveLimit(Number(e.target.value))} title='Размер топа' style={topSelectStyle}>
+                {[5, 10, 25, 50].map(n => <option key={n} value={n}>ТОП {n}</option>)}
+              </select>
+            </div>
+            <div style={{ padding: '4px 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {shownActive.map((t, i) => (
+                <div key={t.name} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
+                    <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i + 1}. {t.name}</span>
+                    <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{t.ops} движ. · {fmtMoney(t.volume)} {t.unit}</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-hover)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.round((t.ops / topMaxOps) * 100)}%`, borderRadius: 4, background: i === 0 ? '#d97706' : '#8b5cf6' }} />
+                  </div>
+                </div>
+              ))}
+              {shownActive.length === 0 && (
+                <div style={{ fontSize: 14, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
+                  Движений пока нет
                 </div>
               )}
             </div>

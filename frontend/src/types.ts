@@ -133,6 +133,13 @@ export interface PromoBlock { id: string; title: string; subtitle?: string | nul
 export interface LoginBrandText { title?: string | null; accent?: string | null; subtitle?: string | null; }
 export interface LoginSlide { id: string; title: string; description?: string | null; imageUrl?: string | null; sortOrder: number; isActive: boolean; createdAt: string; updatedAt: string; }
 export interface StockMovement { id: string; productId: string; warehouseId: string; type: 'income' | 'outcome' | 'adjust'; quantity: number; price?: number | null; comment?: string | null; date: string; userId?: string | null; createdAt: string; product?: { name: string; sku?: string | null; unit: string }; warehouse?: { name: string }; user?: { name: string } | null; }
+// Элемент виджета «Самые продаваемые»: расход склада + заказы OZON
+export interface TopSellerItem { key: string; name: string; unit: string; qty: number; ops: number; sources: string[]; }
+// Элемент виджета «Самые активные»: частота изменения остатка
+export interface MostActiveItem { key: string; name: string; unit: string; ops: number; volume: number; }
+// Страница журнала складских движений (пагинация «Показать ещё»)
+export interface StockMovementsPage { items: StockMovement[]; total: number; }
+
 export interface PriceHistory { id: string; productId: string; priceTypeId: string; oldPrice: number; newPrice: number; createdAt: string; priceType?: { label: string }; user?: { name: string } | null; }
 export interface ProductImage { id: string; productId: string; attachmentId: string; url: string; sortOrder: number; createdAt: string; }
 export interface Product { id: string; sku?: string | null; article?: string | null; name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages?: string[] | null; crmRenewMonths?: number | null; crmCameras?: boolean; crmSubscriptions?: boolean; crmAccounting?: boolean; crmVideoNotes?: boolean; description?: string | null; category?: string | null; subcategory?: string | null; categoryId?: string | null; unit: string; barcode?: string | null; weight?: number | null; width?: number | null; height?: number | null; depth?: number | null; brand?: string | null; tnved?: string | null; syncToVk: boolean; vkItemId?: number | null; syncToOzon: boolean; ozonProductId?: string | null; ozonSyncedAt?: string | null; syncToWb: boolean; wbProductId?: string | null; wbSyncedAt?: string | null; isActive: boolean; onVitrine: boolean; isSubscription: boolean; tags?: string[]; createdAt: string; updatedAt: string; stocks?: StockBalance[]; prices?: ProductPrice[]; images?: ProductImage[]; }
