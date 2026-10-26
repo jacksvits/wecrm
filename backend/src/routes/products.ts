@@ -8,10 +8,11 @@ import { syncProductsToOzon, fetchOzonPostings } from '../lib/ozon.js';
 import { generateUniqueArticle } from '../lib/article.js';
 
 const router = Router();
-import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
+import { uploadsRoot, tenantUploadPrefix, tenantContext } from '../lib/tenant.js';
 
-// Кэш отправлений OZON для виджета «Самые продаваемые» — выборка из кабинета идёт до 50 запросов, кэшируем на 10 минут
-let ozonPostingsCache: { at: number; items: any[] } | null = null;
+// Кэш отправлений OZON для виджета «Самые продаваемые» — выборка из кабинета идёт до 50 запросов, кэшируем на 10 минут.
+// Строго по тенантам: у каждой организации (и у главного домена) свой кабинет OZON и свои отправления.
+const ozonPostingsCache = new Map<string, { at: number; items: any[] }>();
 const OZON_POSTINGS_CACHE_TTL = 10 * 60 * 1000;
 
 // Нормализация тегов карточки: обрезка пробелов, без дубликатов и пустых значений
@@ -410,15 +411,20 @@ router.get('/meta/stats/top', async (req, res) => {
        FROM stock_movements WHERE type = 'outcome' GROUP BY product_id`
     ) as any[];
 
-    // заказы OZON из кабинета (не подключён/ошибка → статистика только по складу)
-    if (!ozonPostingsCache || Date.now() - ozonPostingsCache.at > OZON_POSTINGS_CACHE_TTL) {
+    // заказы OZON из кабинета текущего тенанта (не подключён/ошибка → статистика только по складу)
+    const tenant = tenantContext.getStore();
+    const cacheKey = tenant && !tenant.isMain ? tenant.dbName : 'main';
+    let cached = ozonPostingsCache.get(cacheKey);
+    if (!cached || Date.now() - cached.at > OZON_POSTINGS_CACHE_TTL) {
       try {
-        ozonPostingsCache = { at: Date.now(), items: await fetchOzonPostings(90) };
+        cached = { at: Date.now(), items: await fetchOzonPostings(90) };
+        ozonPostingsCache.set(cacheKey, cached);
       } catch {
-        ozonPostingsCache = null;
+        ozonPostingsCache.delete(cacheKey);
+        cached = null;
       }
     }
-    const ozonPostings = ozonPostingsCache?.items || [];
+    const ozonPostings = cached?.items || [];
 
     // агрегация заказов по артикулу (offer_id)
     const ozonAgg = new Map<string, { name: string; qty: number; ops: number }>();
