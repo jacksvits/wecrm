@@ -227,6 +227,8 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
 
   const fromId = msg.peer_id;
   const text = msg.text || '';
+  // Исходящее = отправлено от имени сообщества (менеджером через интерфейс ВК)
+  const isOutgoing = msg.out === 1;
   if (!text.trim() && (!msg.attachments || msg.attachments.length === 0)) {
     console.log(`[VK Processor] Msg ${msg.id} has no text/attachments, skipping`);
     return;
@@ -300,6 +302,11 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
     if (msg.attachments && msg.attachments.length > 0) {
       commentText += ` [${msg.attachments.length} влож.]`;
     }
+    // Исходящие помечаем префиксом: автор бабла — бот «Группа VK» в обоих
+    // направлениях, без пометки переписка выглядит односторонней
+    if (isOutgoing && commentText.trim()) {
+      commentText = `Мы (ВК): ${commentText}`;
+    }
 
     const attachmentIds: string[] = [];
     if (msg.attachments && msg.attachments.length > 0) {
@@ -331,15 +338,18 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
 
     const comment = await prisma.comment.create({
       data: {
-        content: commentText || '📎 Вложение из ВК',
+        content: commentText || (isOutgoing ? '📎 Вложение из ВК (исходящее)' : '📎 Вложение из ВК'),
         authorId: settings.defaultCreatorId || latestTask.creatorId,
         taskId: latestTask.id,
         vkMessageId: msg.id,
       },
     });
 
-    // Автоответчик: проверка триггеров по тексту сообщения
-    processAutoReply(latestTask.id, commentText || '').catch(() => {});
+    // Автоответчик: проверка триггеров по тексту сообщения (только входящие —
+    // на собственные исходящие отвечать не нужно)
+    if (!isOutgoing) {
+      processAutoReply(latestTask.id, commentText || '').catch(() => {});
+    }
 
     if (attachmentIds.length > 0) {
       await prisma.fileAttachment.updateMany({
@@ -353,33 +363,36 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
     broadcast(CHANNELS.COMMENTS, { action: 'new_comment', entity: 'task', id: latestTask.id });
 
     // Отправляем уведомления исполнителям, кураторам, создателю и админам
-    try {
-      const taskForNotify = await prisma.task.findUnique({
-        where: { id: latestTask.id },
-        include: {
-          assignees: { include: { user: true } },
-          curators: { include: { user: true } },
-          creator: true,
-        },
-      });
+    // (не рассылаем уведомления о собственных исходящих ответах)
+    if (!isOutgoing) {
+      try {
+        const taskForNotify = await prisma.task.findUnique({
+          where: { id: latestTask.id },
+          include: {
+            assignees: { include: { user: true } },
+            curators: { include: { user: true } },
+            creator: true,
+          },
+        });
 
-      if (taskForNotify) {
-        const authorName = contact?.name || `VK ${fromId}`;
-        const notifyPayload = {
-          title: 'Новое сообщение из ВК',
-          body: formatExternalMessageNotifyBody(authorName, taskForNotify, commentText),
-          url: '/tasks/' + taskForNotify.id,
-        };
-        const excludeUserId = settings.defaultCreatorId || latestTask.creatorId;
+        if (taskForNotify) {
+          const authorName = contact?.name || `VK ${fromId}`;
+          const notifyPayload = {
+            title: 'Новое сообщение из ВК',
+            body: formatExternalMessageNotifyBody(authorName, taskForNotify, commentText),
+            url: '/tasks/' + taskForNotify.id,
+          };
+          const excludeUserId = settings.defaultCreatorId || latestTask.creatorId;
 
-        await notifyTaskAssignees(taskForNotify.id, notifyPayload, excludeUserId);
-        await notifyTaskCurators(taskForNotify.id, notifyPayload, excludeUserId);
-        await notifyTaskCreator(taskForNotify.id, notifyPayload);
-        await notifyRoleUsers(['admin'], notifyPayload, excludeUserId);
-        console.log(`[VK Processor] Notifications sent for task ${latestTask.id}`);
+          await notifyTaskAssignees(taskForNotify.id, notifyPayload, excludeUserId);
+          await notifyTaskCurators(taskForNotify.id, notifyPayload, excludeUserId);
+          await notifyTaskCreator(taskForNotify.id, notifyPayload);
+          await notifyRoleUsers(['admin'], notifyPayload, excludeUserId);
+          console.log(`[VK Processor] Notifications sent for task ${latestTask.id}`);
+        }
+      } catch (notifyErr) {
+        console.error(`[VK Processor] Failed to send notifications for task ${latestTask.id}:`, notifyErr);
       }
-    } catch (notifyErr) {
-      console.error(`[VK Processor] Failed to send notifications for task ${latestTask.id}:`, notifyErr);
     }
   } else {
     // Create new task
@@ -396,7 +409,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
       const mergedAssigneeIds = Array.from(new Set([...(settings.assigneeIds || []), ...defaultAssignees]));
       const task = await prisma.task.create({
         data: {
-          title: text.slice(0, 100) || 'Сообщение из ВК',
+          title: text.slice(0, 100) || (isOutgoing ? 'Ответ из ВК' : 'Сообщение из ВК'),
           description: text,
           status: 'open',
           priority: 'medium',
@@ -421,7 +434,9 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
       const senderName = contact?.name || `VK ${fromId}`;
       const contactUrl = contactId ? `https://welans.cc/contacts/${contactId}` : null;
       const authorLink = contactUrl ? `[${senderName}](${contactUrl})` : senderName;
-      const firstMessageText = text ? `${authorLink}:\n${text}` : '📎 Вложение из ВК';
+      const firstMessageText = isOutgoing
+        ? (text ? `Мы (ВК): ${text}` : '📎 Вложение из ВК (исходящее)')
+        : (text ? `${authorLink}:\n${text}` : '📎 Вложение из ВК');
       const firstComment = await prisma.comment.create({
         data: {
           content: firstMessageText,
@@ -482,32 +497,35 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
       broadcast(CHANNELS.TASKS, { action: 'create', entity: 'task', id: task.id });
 
       // Отправляем уведомления исполнителям, кураторам, создателю и админам о новой задаче
-      try {
-        const taskForNotify = await prisma.task.findUnique({
-          where: { id: task.id },
-          include: {
-            assignees: { include: { user: true } },
-            curators: { include: { user: true } },
-            creator: true,
-          },
-        });
+      // (задачи из собственных исходящих ответов не уведомляем)
+      if (!isOutgoing) {
+        try {
+          const taskForNotify = await prisma.task.findUnique({
+            where: { id: task.id },
+            include: {
+              assignees: { include: { user: true } },
+              curators: { include: { user: true } },
+              creator: true,
+            },
+          });
 
-        if (taskForNotify) {
-          const authorName = contact?.name || `VK ${fromId}`;
-          const notifyPayload = {
-            title: 'Новая задача из ВК',
-            body: formatExternalNewTaskNotifyBody(authorName, taskForNotify),
-            url: '/tasks/' + taskForNotify.id,
-          };
+          if (taskForNotify) {
+            const authorName = contact?.name || `VK ${fromId}`;
+            const notifyPayload = {
+              title: 'Новая задача из ВК',
+              body: formatExternalNewTaskNotifyBody(authorName, taskForNotify),
+              url: '/tasks/' + taskForNotify.id,
+            };
 
-          await notifyTaskAssignees(taskForNotify.id, notifyPayload, creatorId);
-          await notifyTaskCurators(taskForNotify.id, notifyPayload, creatorId);
-          await notifyTaskCreator(taskForNotify.id, notifyPayload);
-          await notifyRoleUsers(['admin'], notifyPayload, creatorId);
-          console.log(`[VK Processor] Notifications sent for new task ${task.id}`);
+            await notifyTaskAssignees(taskForNotify.id, notifyPayload, creatorId);
+            await notifyTaskCurators(taskForNotify.id, notifyPayload, creatorId);
+            await notifyTaskCreator(taskForNotify.id, notifyPayload);
+            await notifyRoleUsers(['admin'], notifyPayload, creatorId);
+            console.log(`[VK Processor] Notifications sent for new task ${task.id}`);
+          }
+        } catch (notifyErr) {
+          console.error(`[VK Processor] Failed to send notifications for new task ${task.id}:`, notifyErr);
         }
-      } catch (notifyErr) {
-        console.error(`[VK Processor] Failed to send notifications for new task ${task.id}:`, notifyErr);
       }
     } catch (createErr) {
       console.error(`[VK Processor] FAILED to create task for peer ${fromId} msg ${msg.id}:`, createErr);

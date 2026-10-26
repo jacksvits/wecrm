@@ -53,7 +53,9 @@ function applyTaskVariables(content: string, task: any): string {
 
 // Отправка авто-ответа клиенту в канал-источник задачи (MAX / Telegram / ВК).
 // HTML из WYSIWYG-редактора конвертируется в чистый текст — мессенджеры его не понимают.
-export async function sendToChannel(task: any, text: string): Promise<void> {
+// Возвращает id отправленного сообщения ВК (или null — для других каналов / при ошибке),
+// чтобы вызывающий код мог пометить комментарий и воркер не импортировал его повторно.
+export async function sendToChannel(task: any, text: string): Promise<number | null> {
   // MAX: user_id задачи
   if (task.maxUserId || task.maxChatId) {
     try {
@@ -74,7 +76,7 @@ export async function sendToChannel(task: any, text: string): Promise<void> {
     } catch (err: any) {
       console.error('[Handler] MAX send error:', err?.message || err);
     }
-    return;
+    return null;
   }
 
   // Telegram: chat_id задачи
@@ -96,7 +98,7 @@ export async function sendToChannel(task: any, text: string): Promise<void> {
     } catch (err: any) {
       console.error('[Handler] Telegram send error:', err?.message || err);
     }
-    return;
+    return null;
   }
 
   // ВК сообщество: peer_id задачи
@@ -111,13 +113,16 @@ export async function sendToChannel(task: any, text: string): Promise<void> {
         if (vkData.error) {
           console.error('[Handler] VK send failed:', vkData.error.error_msg, '(code', vkData.error.error_code, ')');
         } else {
-          console.log('[Handler] VK auto-reply sent to peer', task.vkPeerId);
+          console.log('[Handler] VK auto-reply sent to peer', task.vkPeerId, 'msg_id:', vkData.response);
+          const vkMsgId = Array.isArray(vkData.response) ? vkData.response[0] : vkData.response;
+          if (typeof vkMsgId === 'number') return vkMsgId;
         }
       }
     } catch (err: any) {
       console.error('[Handler] VK send error:', err?.message || err);
     }
   }
+  return null;
 }
 
 // Публикация автоматического сообщения в обсуждение задачи от имени выбранного пользователя
@@ -137,7 +142,7 @@ async function postAutoMessage(taskId: string, content: string): Promise<void> {
   if (!author) return;
 
   const resolved = applyTaskVariables(content, task);
-  await prisma.comment.create({
+  const comment = await prisma.comment.create({
     data: {
       content: resolved,
       authorId: settings.userId,
@@ -148,7 +153,16 @@ async function postAutoMessage(taskId: string, content: string): Promise<void> {
   broadcast(CHANNELS.COMMENTS, { action: 'create', entity: 'comment', taskId });
 
   // Отправляем авто-ответ клиенту в канал-источник задачи
-  await sendToChannel(task, htmlToText(resolved));
+  const vkMsgId = await sendToChannel(task, htmlToText(resolved));
+  // Запоминаем id сообщения ВК: воркер импортирует исходящие (out = 1),
+  // без пометки авто-ответ продублировался бы в обсуждении
+  if (typeof vkMsgId === 'number') {
+    try {
+      await prisma.comment.update({ where: { id: comment.id }, data: { vkMessageId: vkMsgId } });
+    } catch (e: any) {
+      console.error('[Handler] Failed to store vkMessageId:', e?.message || e);
+    }
+  }
 }
 
 // «Приветствие» — при создании новой задачи

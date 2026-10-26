@@ -67,8 +67,10 @@ export class VkCommunityWorker {
         const history = await this.api('messages.getHistory', { peer_id: peerId, count: 50 });
         if (!history?.items?.length) continue;
 
+        // Исходящие (out = 1) тоже обрабатываем — обсуждение должно быть полной
+        // перепиской. Отправленные из CRM не дублируются: у таких комментариев
+        // выставлен vkMessageId (см. routes/comments.ts, lib/handler-messages.ts)
         const messages = history.items
-          .filter((m: VkMessage) => m.out !== 1)
           .sort((a: VkMessage, b: VkMessage) => a.id - b.id);
 
         for (const msg of messages) {

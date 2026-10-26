@@ -380,6 +380,16 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
             console.error('[VK Community Comment Send] VK API error:', vkData.error.error_msg, '(code', vkData.error.error_code, ')');
           } else {
             console.log('[VK Community Comment Send] Sent successfully, msg_id:', vkData.response);
+            // Запоминаем id сообщения ВК: воркер импортирует исходящие (out = 1),
+            // без пометки ответ продублировался бы в обсуждении
+            try {
+              const vkMsgId = Array.isArray(vkData.response) ? vkData.response[0] : vkData.response;
+              if (typeof vkMsgId === 'number') {
+                await prisma.comment.update({ where: { id: comment.id }, data: { vkMessageId: vkMsgId } });
+              }
+            } catch (e: any) {
+              console.error('[VK Community Comment Send] Failed to store vkMessageId:', e?.message || e);
+            }
           }
         } else {
           console.log('[VK Community Comment Send] No active VK settings for group', task.vkGroupId);

@@ -39,7 +39,7 @@ export async function processAutoReply(taskId: string, commentContent: string): 
     const author = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!author) return;
 
-    await prisma.comment.create({
+    const replyComment = await prisma.comment.create({
       data: {
         content: hit.answer,
         authorId: userId,
@@ -53,7 +53,16 @@ export async function processAutoReply(taskId: string, commentContent: string): 
     // Дублируем авто-ответ клиенту в канал-источник задачи (MAX / Telegram / ВК)
     const task = await prisma.task.findUnique({ where: { id: taskId } });
     if (task) {
-      await sendToChannel(task, htmlToText(hit.answer));
+      const vkMsgId = await sendToChannel(task, htmlToText(hit.answer));
+      // Запоминаем id сообщения ВК: воркер импортирует исходящие (out = 1),
+      // без пометки авто-ответ продублировался бы в обсуждении
+      if (typeof vkMsgId === 'number') {
+        try {
+          await prisma.comment.update({ where: { id: replyComment.id }, data: { vkMessageId: vkMsgId } });
+        } catch (e: any) {
+          console.error('[AutoReply] Не удалось сохранить vkMessageId:', e?.message || e);
+        }
+      }
     }
   } catch (err: any) {
     console.error('[AutoReply] Ошибка:', err?.message || err);
