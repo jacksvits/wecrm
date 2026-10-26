@@ -529,9 +529,10 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   };
 
   // ===== Виджеты вкладки «Статистика» =====
-  // Журнал движений: серверная фильтрация (склад + период) и порционная загрузка «Показать ещё»
+  // Журнал движений: серверная фильтрация (склад + период) и постраничная пагинация (по 25 записей)
   const [statsMovements, setStatsMovements] = useState<StockMovement[]>([]);
   const [statsTotal, setStatsTotal] = useState(0);
+  const [statsPage, setStatsPage] = useState(0);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsDateFrom, setStatsDateFrom] = useState('');
   const [statsDateTo, setStatsDateTo] = useState('');
@@ -540,9 +541,21 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   const [mostActive, setMostActive] = useState<MostActiveItem[]>([]);
   const [topLimit, setTopLimit] = useState(10);
   const [activeLimit, setActiveLimit] = useState(10);
-  const STATS_PAGE = 50;
+  const STATS_PAGE = 25;
+  const statsTotalPages = Math.max(1, Math.ceil(statsTotal / STATS_PAGE));
+  // окно номеров страниц: первая, последняя и ±2 вокруг текущей (остальное — многоточие)
+  const statsPages: (number | '…')[] = [];
+  for (let p = 0; p < statsTotalPages; p++) {
+    if (p === 0 || p === statsTotalPages - 1 || Math.abs(p - statsPage) <= 2) statsPages.push(p);
+  }
+  for (let i = 1; i < statsPages.length; i++) {
+    if (statsPages[i] !== '…' && statsPages[i - 1] !== '…' && (statsPages[i] as number) - (statsPages[i - 1] as number) > 1) {
+      statsPages.splice(i, 0, '…');
+      i++;
+    }
+  }
 
-  const loadStatsMovements = async (offset = 0) => {
+  const loadStatsMovements = async (page = 0) => {
     setStatsLoading(true);
     try {
       const data = await api.products.movements({
@@ -550,10 +563,11 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
         dateFrom: statsDateFrom || undefined,
         dateTo: statsDateTo || undefined,
         limit: STATS_PAGE,
-        offset,
+        offset: page * STATS_PAGE,
       });
       setStatsTotal(data.total);
-      setStatsMovements(prev => (offset === 0 ? data.items : [...prev, ...data.items]));
+      setStatsMovements(data.items);
+      setStatsPage(page);
     } catch (e: any) {
       alert(e.message || 'Ошибка загрузки');
     } finally {
@@ -1060,7 +1074,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
               )}
             </div>
           </div>
-          {/* Виджет журнала: фильтры (склад + период) и порционная загрузка «Показать ещё» */}
+          {/* Виджет журнала: фильтры (склад + период) и постраничная пагинация (по 25 записей) */}
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', gridColumn: '1 / -1' }}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '12px 12px 8px' }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, marginRight: 8 }}>История движений</h3>
@@ -1142,15 +1156,25 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
                 </tbody>
               </table>
             </div>
-            {visibleMovements.length < statsTotal && (
-              <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
-                <button
-                  onClick={() => loadStatsMovements(visibleMovements.length)}
-                  disabled={statsLoading}
-                  style={{ ...btnGhost, opacity: statsLoading ? 0.6 : 1 }}
-                >
-                  {statsLoading ? 'Загрузка…' : `Показать ещё (осталось ${statsTotal - visibleMovements.length})`}
-                </button>
+            {statsTotal > 0 && (
+              <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border-color)', display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', marginRight: 4 }}>
+                  {statsTotal} записей · стр. {statsPage + 1} из {statsTotalPages}
+                </span>
+                <button onClick={() => loadStatsMovements(statsPage - 1)} disabled={statsLoading || statsPage === 0} style={{ ...btnGhost, padding: '4px 10px', opacity: statsPage === 0 ? 0.5 : 1 }} title='Предыдущая страница'>‹</button>
+                {statsPages.map((p, i) => p === '…'
+                  ? <span key={`e${i}`} style={{ color: 'var(--text-muted)', fontSize: 13 }}>…</span>
+                  : (
+                    <button
+                      key={p}
+                      onClick={() => loadStatsMovements(p)}
+                      disabled={statsLoading}
+                      style={{ ...btnGhost, padding: '4px 10px', fontWeight: p === statsPage ? 700 : 400, background: p === statsPage ? 'var(--bg-hover)' : 'var(--bg-card)' }}
+                    >
+                      {p + 1}
+                    </button>
+                  ))}
+                <button onClick={() => loadStatsMovements(statsPage + 1)} disabled={statsLoading || statsPage >= statsTotalPages - 1} style={{ ...btnGhost, padding: '4px 10px', opacity: statsPage >= statsTotalPages - 1 ? 0.5 : 1 }} title='Следующая страница'>›</button>
               </div>
             )}
           </div>
