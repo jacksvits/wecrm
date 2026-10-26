@@ -848,6 +848,11 @@ export function MailClient() {
                 <input type='checkbox' checked={accountForm.secure} onChange={e => setForm({ secure: e.target.checked })} />
                 SSL/TLS (рекомендуется)
               </label>
+              {accountForm.secure && accountForm.imapPort !== 993 && (
+                <div style={{ fontSize: 12, color: '#d93025' }}>
+                  SSL/TLS несовместим с IMAP-портом {accountForm.imapPort} — укажите порт 993 или снимите флажок (будет использоваться STARTTLS)
+                </div>
+              )}
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                 <input type='checkbox' checked={accountForm.isDefault} onChange={e => setForm({ isDefault: e.target.checked })} />
                 Аккаунт по умолчанию

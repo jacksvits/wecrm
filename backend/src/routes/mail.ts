@@ -254,8 +254,9 @@ router.get('/messages', async (req: AuthRequest, res) => {
         const total = uids.length;
         const slice = uids.slice(Math.max(0, total - page * limit), total - (page - 1) * limit).reverse();
         if (!slice.length) return { total, messages: [] };
+        // uids в slice идут по возрастанию — диапазон fetch строим от меньшего к большему
         const range = `${slice[slice.length - 1]}:${slice[0]}`;
-        const fetched = await client.fetch(range, { uid: true, envelope: true, flags: true, bodyStructure: true, size: true }, { uid: true });
+        const fetched = await client.fetchAll(range, { uid: true, envelope: true, flags: true, bodyStructure: true, size: true }, { uid: true });
         const messages = Array.from(fetched as any)
           .map((m: any) => ({
             uid: m.uid,
