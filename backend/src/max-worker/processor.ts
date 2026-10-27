@@ -447,8 +447,9 @@ async function downloadMaxAttachment(attachment: any, taskDir: string): Promise<
       ext = path.extname(rawName);
       originalName = rawName || 'max_doc_' + (attachment.id || attachment.payload?.fileId || 'unknown') + (ext || '.bin');
     } else if (attachment.type === 'video') {
-      console.log('[MAX Processor] Video attachment skipped');
-      return null;
+      url = payloadUrl || attachment.url || attachment.file_url;
+      ext = '.mp4';
+      originalName = 'max_video_' + (attachment.id || 'unknown') + ext;
     } else if (attachment.type === 'audio' || attachment.type === 'voice') {
       url = payloadUrl || attachment.url || attachment.file_url;
       ext = '.mp3';

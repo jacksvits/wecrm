@@ -2280,6 +2280,8 @@ export function TaskDetail() {
                                 const downloadUrl = `${origin}/api/uploads/${a.id}/download`;
                                 const isImage =
                                   a.mimeType?.startsWith("image/");
+                                const isVideo =
+                                  a.mimeType?.startsWith("video/");
                                 if (isImage) {
                                   return (
                                     <div
@@ -2319,6 +2321,26 @@ export function TaskDetail() {
                                         }}
                                       />{" "}
                                     </div>
+                                  );
+                                }
+                                if (isVideo) {
+                                  return (
+                                    <video
+                                      key={a.id}
+                                      src={fileUrl}
+                                      controls
+                                      preload="metadata"
+                                      style={{
+                                        maxWidth: 320,
+                                        maxHeight: 240,
+                                        borderRadius: 14,
+                                        display: "block",
+                                        boxShadow: "0 4px 16px rgba(0,0,0,0.20)",
+                                        border:
+                                          "1px solid rgba(255,255,255,0.15)",
+                                        background: "#000",
+                                      }}
+                                    />
                                   );
                                 }
                                 return (
