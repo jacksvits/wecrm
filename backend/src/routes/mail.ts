@@ -82,11 +82,25 @@ async function getAccount(req: AuthRequest, res: any): Promise<MailAccountRow | 
   return account;
 }
 
-// Флаг secure для SMTP-транспорта. Порт 465 — SMTPS с неявным TLS (RFC 8314):
-// если secure выключен, nodemailer шлёт plaintext и зависает в ожидании
-// приветствия TLS-сервера («Отправка…» без ответа). Принудительно включаем TLS.
+// Режим шифрования определяем по порту: общий флаг secure аккаунта не может
+// описать типовую связку «IMAP 143 (STARTTLS) + SMTP 465 (implicit TLS)» —
+// одно значение для двух протоколов гарантированно ломает одно из подключений.
+// Нестандартные порты: ориентируемся на флаг secure из настроек аккаунта.
+
+// IMAP: 993 — неявный TLS, 143 — STARTTLS-апгрейд (imapflow делает его сам при secure=false)
+function imapSecure(account: MailAccountRow): boolean {
+  if (account.imapPort === 993) return true;
+  if (account.imapPort === 143) return false;
+  return account.secure;
+}
+
+// SMTP: 465 — SMTPS с неявным TLS (RFC 8314); если шлём plaintext на этот порт,
+// nodemailer зависает в ожидании приветствия («Отправка…» без ответа).
+// Порты 25/587 — обычный plaintext с STARTTLS-апгрейдом.
 function smtpSecure(account: MailAccountRow): boolean {
-  return account.secure || account.smtpPort === 465;
+  if (account.smtpPort === 465) return true;
+  if (account.smtpPort === 25 || account.smtpPort === 587) return false;
+  return account.secure;
 }
 
 // Открывает IMAP-подключение на время операции и гарантированно закрывает его
@@ -94,7 +108,7 @@ async function withImap<T>(account: MailAccountRow, fn: (client: ImapFlow) => Pr
   const client = new ImapFlow({
     host: account.imapHost,
     port: account.imapPort,
-    secure: account.secure,
+    secure: imapSecure(account),
     // при secure=false imapflow сам делает STARTTLS-апгрейд (порт 143), если сервер поддерживает
     auth: { user: account.imapUser, pass: account.imapPass },
     logger: false,
