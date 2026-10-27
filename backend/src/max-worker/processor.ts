@@ -199,11 +199,6 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
 
   if (latestTask && !isCompleted) {
     console.log('[MAX Processor] Adding comment to active task', latestTask.id);
-    let commentText = text;
-    if (msg.attachments && msg.attachments.length > 0) {
-      commentText += ' [' + msg.attachments.length + ' влож.]';
-    }
-
     const attachmentIds: string[] = [];
     if (msg.attachments && msg.attachments.length > 0) {
       const taskDir = path.join(TASKS_DIR, String(latestTask.ticketNumber || latestTask.id));
@@ -226,8 +221,17 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
             },
           });
           attachmentIds.push(attachment.id);
+        } else {
+          console.error('[MAX Processor] Attachment lost for msg', msg.id, ': type', att?.type);
         }
       }
+    }
+
+    // Метку [N влож.] добавляем по факту сохранённых файлов — иначе при
+    // ошибке скачивания в обсуждении остаётся «пустое» вложение
+    let commentText = text;
+    if (attachmentIds.length > 0) {
+      commentText += ' [' + attachmentIds.length + ' влож.]';
     }
 
     const senderName = msg.sender_name || 'Клиент';
@@ -328,7 +332,7 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
       const contactUrl = contactId ? `https://welans.cc/contacts/${contactId}` : null;
       const authorLink = contactUrl ? `[${senderName}](${contactUrl})` : senderName;
       const firstMessageText = text ? `${authorLink}:\n${text}` : '📎 Вложение из MAX';
-      await prisma.comment.create({
+      const firstComment = await prisma.comment.create({
         data: {
           content: firstMessageText,
           authorId: creatorId,
@@ -343,11 +347,12 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
         fs.mkdirSync(taskDir, { recursive: true });
       }
 
+      const firstCommentAttachmentIds: string[] = [];
       if (msg.attachments && msg.attachments.length > 0) {
         for (const att of msg.attachments) {
           const fileInfo = await downloadMaxAttachment(att, taskDir);
           if (fileInfo) {
-            await prisma.fileAttachment.create({
+            const firstAttachment = await prisma.fileAttachment.create({
               data: {
                 filename: fileInfo.filename,
                 originalName: fileInfo.originalName,
@@ -359,7 +364,18 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
                 authorId: creatorId,
               },
             });
+            firstCommentAttachmentIds.push(firstAttachment.id);
+          } else {
+            console.error('[MAX Processor] Attachment lost for msg', msg.id, ': type', att?.type);
           }
+        }
+        // Привязываем вложения к первому комментарию задачи,
+        // иначе файлы остаются «pending» и не видны в обсуждении
+        if (firstCommentAttachmentIds.length > 0) {
+          await prisma.fileAttachment.updateMany({
+            where: { id: { in: firstCommentAttachmentIds } },
+            data: { entityId: firstComment.id },
+          });
         }
       }
 

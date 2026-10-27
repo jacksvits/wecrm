@@ -306,12 +306,9 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
   if (latestTask && !isCompleted) {
     // Active task exists — add comment
     console.log(`[VK Processor] Adding comment to active task ${latestTask.id}`);
-    let commentText = text;
-    if (msg.attachments && msg.attachments.length > 0) {
-      commentText += ` [${msg.attachments.length} влож.]`;
-    }
     // Исходящие помечаем префиксом: автор бабла — бот «Группа VK» в обоих
     // направлениях, без пометки переписка выглядит односторонней
+    let commentText = text;
     if (isOutgoing && commentText.trim()) {
       commentText = `Мы (ВК): ${commentText}`;
     }
@@ -341,6 +338,11 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
         } else {
           console.error(`[VK Processor] Attachment lost for msg ${msg.id}: type ${att?.type}`);
         }
+      }
+      // Метку [N влож.] добавляем по факту сохранённых файлов — иначе при
+      // ошибке скачивания в обсуждении остаётся «пустое» вложение
+      if (attachmentIds.length > 0) {
+        commentText += ` [${attachmentIds.length} влож.]`;
       }
     }
 
