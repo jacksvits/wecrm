@@ -1493,3 +1493,16 @@ html, body { overflow-x: hidden; }
 /* Почтовый клиент: hover-эффекты строк списка и дерева папок (классический стиль) */
 .mail-row:hover { background: var(--bg-hover) !important; }
 .mail-folder-row:hover { background: var(--bg-hover) !important; }
+
+/* Активное (открытое) письмо — градиент как у кнопки «Корзина» (.btn-cart) */
+.mail-row-active,
+.mail-row-active:hover {
+  background: linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%) !important;
+}
+
+/* Кнопка «+» (создание подпапки) — видна при наведении на строку папки */
+.mail-folder-add { opacity: 0; transition: opacity .12s ease; }
+.mail-folder-row:hover .mail-folder-add { opacity: 1; }
+@media (hover: none) {
+  .mail-folder-add { opacity: .6; }
+}

@@ -233,6 +233,35 @@ router.get('/folders', async (req: AuthRequest, res) => {
   }
 });
 
+// Создание папки / подпапки: IMAP CREATE с разделителем иерархии сервера
+router.post('/folders', async (req: AuthRequest, res) => {
+  try {
+    const account = await getAccount(req, res);
+    if (!account) return;
+    const parent = String(req.body.parent || '').trim();
+    const name = String(req.body.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Укажите имя папки' });
+    if (/[\\/]/.test(name)) return res.status(400).json({ error: 'Имя папки не должно содержать / и \\' });
+
+    const created = await withImap(account, async client => {
+      let delimiter = '.';
+      try {
+        const ns = await client.namespace();
+        const personal = Array.isArray(ns) ? ns.find((n: any) => n.scope === 'personal') : null;
+        if (personal && personal.delimiter) delimiter = personal.delimiter;
+      } catch {
+        // NAMESPACE не поддерживается сервером — остаётся '.'
+      }
+      const path = parent ? `${parent}${delimiter}${name}` : name;
+      await client.createMailbox(path);
+      return { path };
+    });
+    res.json(created);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ---- Письма ----
 
 function structureHasAttachments(structure: any): boolean {
@@ -245,6 +274,9 @@ function structureHasAttachments(structure: any): boolean {
 
 function formatAddress(addr: any): string {
   if (!addr) return '';
+  // mailparser отдаёт AddressObject { value, text, html } — нормализуем к массиву,
+  // иначе в шапке письма «От:»/«Кому:» пустые (envelope от imapflow — уже массив)
+  if (!Array.isArray(addr) && Array.isArray(addr.value)) addr = addr.value;
   if (Array.isArray(addr)) return addr.map(formatAddress).filter(Boolean).join(', ');
   const a = addr as { name?: string; address?: string };
   return a.name ? `${a.name} <${a.address || ''}>` : (a.address || '');

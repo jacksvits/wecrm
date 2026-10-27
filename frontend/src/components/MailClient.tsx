@@ -199,6 +199,8 @@ export function MailClient() {
   // Drag & drop: перетаскиваемое письмо (uid) и папка-приёмник под курсором
   const [dragUid, setDragUid] = useState<number | null>(null);
   const [dropFolder, setDropFolder] = useState<string | null>(null);
+  // Создание подпапки: родительская папка + вводимое имя
+  const [creatingSubfolder, setCreatingSubfolder] = useState<{ parent: string; name: string } | null>(null);
 
   const account: MailAccount | undefined = accounts.find(a => a.id === selectedAccountId);
 
@@ -470,6 +472,26 @@ export function MailClient() {
       afterListAction();
     } catch (e: any) {
       setError(e.message || 'Не удалось переместить письма');
+    }
+  };
+
+  // Создание подпапки в выбранной папке
+  const createSubfolder = async () => {
+    if (!selectedAccountId || !creatingSubfolder) return;
+    const name = creatingSubfolder.name.trim();
+    if (!name) { setCreatingSubfolder(null); return; }
+    try {
+      await api.mail.createFolder(selectedAccountId, creatingSubfolder.parent, name);
+      // Раскрываем родителя, чтобы новая подпапка была видна сразу
+      setCollapsedFolders(prev => {
+        const next = new Set(prev);
+        next.delete(creatingSubfolder.parent);
+        return next;
+      });
+      setCreatingSubfolder(null);
+      await loadFolders();
+    } catch (e: any) {
+      setError(e.message || 'Не удалось создать папку');
     }
   };
 
@@ -822,7 +844,30 @@ export function MailClient() {
                 <Icon name='trash' size={13} />
               </span>
             )}
+            <span
+              onClick={e => { e.stopPropagation(); setCreatingSubfolder({ parent: f.path, name: '' }); }}
+              title={`Создать подпапку в «${folderLabel(f)}»`}
+              className='mail-folder-add'
+              style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: isActive ? '#0a246a' : 'var(--text-muted)', cursor: 'pointer', fontSize: 13, fontWeight: 700, lineHeight: 1, borderRadius: 3 }}
+            >
+              +
+            </span>
           </button>
+          {creatingSubfolder && creatingSubfolder.parent === f.path && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: `1px 6px 3px ${20 + depth * 16}px`, margin: '0 2px' }}>
+              <span style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', color: '#d9a62e' }}>
+                <Icon name='folder' size={13} />
+              </span>
+              <input
+                autoFocus
+                value={creatingSubfolder.name}
+                onChange={e => setCreatingSubfolder({ parent: f.path, name: e.target.value })}
+                onKeyDown={e => { if (e.key === 'Enter') createSubfolder(); if (e.key === 'Escape') setCreatingSubfolder(null); }}
+                placeholder='Имя подпапки'
+                style={{ ...inputStyle, height: 22, fontSize: 12, flex: 1, minWidth: 0 }}
+              />
+            </div>
+          )}
           {hasKids && !isCollapsed && renderFolderTree(f.children, depth + 1)}
         </div>
       );
@@ -852,7 +897,7 @@ export function MailClient() {
           return (
             <div
               key={m.uid}
-              className='mail-row'
+              className={active ? 'mail-row mail-row-active' : 'mail-row'}
               onClick={() => openUid(m.uid)}
               draggable
               onDragStart={e => {
@@ -864,7 +909,7 @@ export function MailClient() {
               style={{
                 padding: '5px 10px 6px 8px', cursor: 'pointer',
                 borderBottom: '1px solid var(--border-color)',
-                background: active ? 'linear-gradient(to bottom, #5b9bea 0%, #2f74d0 100%) !important' : 'transparent',
+                background: 'transparent',
                 display: 'flex', flexDirection: 'column', gap: 1,
                 opacity: dragUid === m.uid ? 0.45 : 1,
               }}
@@ -1065,8 +1110,9 @@ export function MailClient() {
               title='Написать письмо'
               style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                height: 38, borderRadius: 6, border: '1px solid #1c4f8f', cursor: 'pointer',
-                background: 'linear-gradient(to bottom, #6aa6ec 0%, #2f6fc0 100%)',
+                height: 38, borderRadius: 6, border: '1px solid rgba(120,180,255,0.40)', cursor: 'pointer',
+                background: 'linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%)',
+                boxShadow: '0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)',
                 color: '#fff', fontSize: 14.5, fontWeight: 700,
               }}
             >
@@ -1149,8 +1195,9 @@ export function MailClient() {
           title='Написать письмо'
           style={{
             display: 'flex', alignItems: 'center', gap: 5, height: 28, padding: '0 16px', borderRadius: 3,
-            border: '1px solid #1c4f8f', cursor: 'pointer',
-            background: 'linear-gradient(to bottom, #6aa6ec 0%, #2f6fc0 100%)',
+            border: '1px solid rgba(120,180,255,0.40)', cursor: 'pointer',
+            background: 'linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%)',
+            boxShadow: '0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)',
             color: '#fff', fontSize: 13, fontWeight: 700, textShadow: '0 1px 1px rgba(0,0,0,0.3)', flexShrink: 0,
           }}
         >
