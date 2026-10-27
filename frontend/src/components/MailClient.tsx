@@ -657,7 +657,7 @@ export function MailClient() {
     }
   };
 
-  // ---- Рендер дерева папок ----
+  // ---- Рендер дерева папок (классический стиль) ----
   function renderFolderTree(nodes: MailFolder[], depth: number): React.ReactNode {
     return nodes.map(f => {
       const hasKids = f.children && f.children.length > 0;
@@ -668,12 +668,15 @@ export function MailClient() {
           <button
             onClick={() => { setSelectedFolder(f.path); setOpenMessage(null); }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: `7px 10px 7px ${8 + depth * 20}`,
-              width: '100%', borderRadius: 9, boxSizing: 'border-box',
-              border: 'none', cursor: 'pointer', fontSize: 13.5, textAlign: 'left',
-              background: isActive ? 'var(--bg-hover)' : 'transparent',
-              color: 'var(--text-primary)', fontWeight: f.unseen > 0 ? 600 : 400,
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: `0 6px 0 ${6 + depth * 16}`,
+              margin: '1px 4px',
+              height: 24, width: 'calc(100% - 8px)', boxSizing: 'border-box',
+              borderRadius: 3, cursor: 'pointer', fontSize: 12.5, textAlign: 'left',
+              border: isActive ? '1px solid #8fb4e3' : '1px solid transparent',
+              background: isActive ? '#dbe9fa' : 'transparent',
+              color: isActive ? '#174a7c' : 'var(--text-primary)',
+              fontWeight: f.unseen > 0 ? 700 : 400,
             }}
           >
             {hasKids ? (
@@ -686,19 +689,19 @@ export function MailClient() {
                     return next;
                   });
                 }}
-                style={{ width: 15, flexShrink: 0, fontSize: 10, color: 'var(--text-muted)', cursor: 'pointer', textAlign: 'center' }}
+                style={{ width: 13, flexShrink: 0, fontSize: 9, color: 'var(--text-muted)', cursor: 'pointer', textAlign: 'center' }}
               >
                 {isCollapsed ? '▸' : '▾'}
               </span>
             ) : (
-              <span style={{ width: 15, flexShrink: 0 }} />
+              <span style={{ width: 13, flexShrink: 0 }} />
             )}
-            <span style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', color: isActive ? '#007AFF' : 'var(--text-muted)' }}>
+            <span style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', color: f.specialUse || /^INBOX$/i.test(f.path) ? (isActive ? '#174a7c' : '#b8860b') : '#c9a227' }}>
               <Icon name={folderIconName(f)} size={14} />
             </span>
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folderLabel(f)}</span>
             {f.unseen > 0 && (
-              <span style={{ fontSize: 11, background: '#007AFF', color: '#fff', borderRadius: 9, padding: '1px 6px', flexShrink: 0, fontWeight: 600 }}>{f.unseen}</span>
+              <span style={{ fontSize: 11, color: isActive ? '#174a7c' : '#b03060', flexShrink: 0, fontWeight: 700 }}>({f.unseen})</span>
             )}
           </button>
           {hasKids && !isCollapsed && renderFolderTree(f.children, depth + 1)}
@@ -707,8 +710,9 @@ export function MailClient() {
     });
   }
 
-  // ---- Рендер списка писем ----
+  // ---- Рендер списка писем (классический стиль) ----
   function renderMessageList() {
+    const isOpen = (uid: number) => openMessage?.uid === uid;
     return (
       <div style={{
         width: isMobile ? '100%' : 380, flexShrink: 0, overflowY: 'auto',
@@ -721,127 +725,139 @@ export function MailClient() {
             {searchQ ? 'Ничего не найдено' : 'Папка пуста'}
           </div>
         )}
-        {!loading && sortedMessages.map(m => (
-          <div
-            key={m.uid}
-            onClick={() => openUid(m.uid)}
-            style={{
-              padding: '9px 12px 9px 10px', cursor: 'pointer',
-              borderBottom: `1px solid ${borderColor}`,
-              background: openMessage?.uid === m.uid ? 'var(--bg-hover)' : 'transparent',
-              display: 'flex', flexDirection: 'column', gap: 2,
-            }}
-          >
-            {/* Строка 1: чекбокс + отправитель + действия выбранного + дата */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <input
-                type='checkbox'
-                checked={selected.has(m.uid)}
-                onClick={e => e.stopPropagation()}
-                onChange={() => toggleSelect(m.uid)}
-                style={{ flexShrink: 0, margin: 0 }}
-              />
-              {!m.seen && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#007AFF', flexShrink: 0 }} />}
-              <span style={{ flex: 1, fontSize: 13.5, fontWeight: m.seen ? 400 : 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {m.fromName || m.from || '(без отправителя)'}
-              </span>
-              {selected.has(m.uid) && (
-                <>
-                  <button
-                    onClick={e => { e.stopPropagation(); toggleReadOne(m); }}
-                    title={m.seen ? 'Отметить непрочитанным' : 'Отметить прочитанным'}
-                    style={{ ...iconBtnStyle, width: 26, height: 26 }}
-                  >
-                    <Icon name='mail' size={14} />
-                  </button>
-                  <button
-                    onClick={e => { e.stopPropagation(); deleteOne(m.uid); }}
-                    title={currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину'}
-                    style={{ ...iconBtnStyle, width: 26, height: 26, color: '#d93025' }}
-                  >
-                    <Icon name='trash' size={14} />
-                  </button>
-                </>
-              )}
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{formatMailDate(m.date)}</span>
+        {!loading && sortedMessages.map(m => {
+          const active = isOpen(m.uid);
+          const sel = selected.has(m.uid);
+          const rowColor = active ? '#fff' : 'var(--text-primary)';
+          const subColor = active ? '#e6effc' : 'var(--text-muted)';
+          return (
+            <div
+              key={m.uid}
+              onClick={() => openUid(m.uid)}
+              style={{
+                padding: '5px 10px 6px 8px', cursor: 'pointer',
+                borderBottom: '1px solid var(--border-color)',
+                background: active ? 'linear-gradient(to bottom, #5b9bea 0%, #2f74d0 100%)' : 'transparent',
+                display: 'flex', flexDirection: 'column', gap: 1,
+              }}
+            >
+              {/* Строка 1: чекбокс + отправитель + действия выбранного + дата */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type='checkbox'
+                  checked={sel}
+                  onClick={e => e.stopPropagation()}
+                  onChange={() => toggleSelect(m.uid)}
+                  style={{ flexShrink: 0, margin: 0 }}
+                />
+                {!m.seen && <span style={{ width: 7, height: 7, borderRadius: '50%', background: active ? '#fff' : '#2f74d0', flexShrink: 0 }} />}
+                <span style={{ flex: 1, fontSize: 13, fontWeight: m.seen ? 400 : 700, color: rowColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {m.fromName || m.from || '(без отправителя)'}
+                </span>
+                {sel && (
+                  <>
+                    <button
+                      onClick={e => { e.stopPropagation(); toggleReadOne(m); }}
+                      title={m.seen ? 'Отметить непрочитанным' : 'Отметить прочитанным'}
+                      style={{ ...iconBtnStyle, width: 24, height: 24, color: active ? '#fff' : 'var(--text-primary)' }}
+                    >
+                      <Icon name='mail' size={13} />
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); deleteOne(m.uid); }}
+                      title={currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину'}
+                      style={{ ...iconBtnStyle, width: 24, height: 24, color: active ? '#ffd9d9' : '#d93025' }}
+                    >
+                      <Icon name='trash' size={13} />
+                    </button>
+                  </>
+                )}
+                <span style={{ fontSize: 11.5, color: subColor, flexShrink: 0 }}>{formatMailDate(m.date)}</span>
+              </div>
+              {/* Строка 2: тема + вложение + размер */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 22 }}>
+                <span style={{ flex: 1, fontSize: 12, color: subColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.subject}</span>
+                {m.hasAttachments && <span title='Вложения' style={{ fontSize: 11, flexShrink: 0, color: subColor }}>📎</span>}
+                <span style={{ fontSize: 11, color: subColor, flexShrink: 0 }}>{formatSize(m.size)}</span>
+              </div>
             </div>
-            {/* Строка 2: тема + размер + вложение */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 23 }}>
-              <span style={{ flex: 1, fontSize: 12.5, color: m.seen ? 'var(--text-muted)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.subject}</span>
-              {m.hasAttachments && <span title='Вложения' style={{ fontSize: 11, flexShrink: 0, color: 'var(--text-muted)' }}>📎</span>}
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{formatSize(m.size)}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
         {totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '10px 0', borderTop: `1px solid ${borderColor}` }}>
-            <button disabled={page <= 1} onClick={() => loadMessages(page - 1)} style={{ ...iconBtnStyle, width: 'auto', padding: '4px 12px', fontSize: 12, background: 'var(--bg-hover)', opacity: page <= 1 ? 0.4 : 1 }}>← Новее</button>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{page} / {totalPages}</span>
-            <button disabled={page >= totalPages} onClick={() => loadMessages(page + 1)} style={{ ...iconBtnStyle, width: 'auto', padding: '4px 12px', fontSize: 12, background: 'var(--bg-hover)', opacity: page >= totalPages ? 0.4 : 1 }}>Старее →</button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '8px 0', borderTop: `1px solid ${borderColor}` }}>
+            <button disabled={page <= 1} onClick={() => loadMessages(page - 1)} style={{ ...iconBtnStyle, width: 'auto', padding: '3px 10px', fontSize: 11.5, background: 'var(--bg-hover)', opacity: page <= 1 ? 0.4 : 1 }}>← Новее</button>
+            <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{page} / {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => loadMessages(page + 1)} style={{ ...iconBtnStyle, width: 'auto', padding: '3px 10px', fontSize: 11.5, background: 'var(--bg-hover)', opacity: page >= totalPages ? 0.4 : 1 }}>Старее →</button>
           </div>
         )}
       </div>
     );
   }
 
-  // ---- Область чтения ----
+  // ---- Область чтения (классический стиль) ----
   function renderReadingPane() {
     if (!openMessage) {
       return (
-        <div className='desktop-only' style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--text-muted)' }}>
+        <div className='desktop-only' style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--text-muted)', background: 'var(--bg-card)' }}>
           <Icon name='mail' size={44} color='var(--border-color)' />
           <div style={{ fontSize: 14 }}>Выберите письмо</div>
         </div>
       );
     }
     const isUnread = messages.find(m => m.uid === openMessage!.uid)?.seen === false;
+    const fieldRow = (label: string, value: string) => (
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, fontSize: 12.5 }}>
+        <span style={{ width: 62, flexShrink: 0, fontWeight: 700, color: 'var(--text-primary)' }}>{label}</span>
+        <span style={{ color: '#0b5fd0', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{value || '—'}</span>
+      </div>
+    );
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-card)' }}>
-        {/* Шапка письма */}
-        <div style={{ padding: '12px 16px', borderBottom: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {isMobile && (
-              <button onClick={() => setOpenMessage(null)} style={iconBtnStyle} title='Назад'>
-                <Icon name='prev' size={17} />
-              </button>
-            )}
-            <div style={{ fontSize: 15.5, fontWeight: 700, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{openMessage.subject}</div>
-            <button onClick={startReply} title='Ответить' style={iconBtnStyle}><Icon name='reply' size={16} /></button>
-            <button onClick={startForward} title='Переслать' style={iconBtnStyle}><Icon name='forward' size={16} /></button>
-            <button
-              onClick={async () => {
-                if (!selectedAccountId || !openMessage) return;
-                try {
-                  if (isUnread) await api.mail.markRead(selectedAccountId, selectedFolder, openMessage.uid);
-                  else await api.mail.markUnread(selectedAccountId, selectedFolder, openMessage.uid);
-                  setMessages(prev => prev.map(m => (m.uid === openMessage!.uid ? { ...m, seen: !isUnread } : m)));
-                  setFolders(prev => updateFolderUnseen(prev, selectedFolder, isUnread ? -1 : 1));
-                } catch (e: any) { setError(e.message || 'Не удалось изменить статус'); }
-              }}
-              title={isUnread ? 'Отметить прочитанным' : 'Отметить непрочитанным'}
-              style={iconBtnStyle}
-            >
-              <span style={{ position: 'relative', display: 'inline-flex' }}>
-                <Icon name='mail' size={16} />
-                {isUnread && <span style={{ position: 'absolute', top: -2, right: -3, width: 7, height: 7, borderRadius: '50%', background: '#007AFF' }} />}
-              </span>
+        {/* Шапка письма: Subject + быстрые действия */}
+        <div style={{ padding: '6px 10px', borderBottom: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', gap: 2 }}>
+          {isMobile && (
+            <button onClick={() => setOpenMessage(null)} style={{ ...iconBtnStyle, width: 28, height: 28 }} title='Назад'>
+              <Icon name='prev' size={16} />
             </button>
-            <button onClick={deleteSelected} title={currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину'} style={{ ...iconBtnStyle, color: '#d93025' }}>
-              <Icon name='trash' size={16} />
-            </button>
-          </div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span><b style={{ color: 'var(--text-primary)', fontWeight: 600 }}>От:</b> {openMessage.from}</span>
-            <span><b style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Кому:</b> {openMessage.to || '—'}</span>
-            {openMessage.cc && <span><b style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Копия:</b> {openMessage.cc}</span>}
-            <span><b style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Дата:</b> {formatMailDate(openMessage.date)}</span>
-          </div>
+          )}
+          <div style={{ fontSize: 14, fontWeight: 700, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{openMessage.subject}</div>
+          <button onClick={startReply} title='Ответить' style={{ ...iconBtnStyle, width: 28, height: 28 }}><Icon name='reply' size={15} /></button>
+          <button onClick={startForward} title='Переслать' style={{ ...iconBtnStyle, width: 28, height: 28 }}><Icon name='forward' size={15} /></button>
+          <button
+            onClick={async () => {
+              if (!selectedAccountId || !openMessage) return;
+              try {
+                if (isUnread) await api.mail.markRead(selectedAccountId, selectedFolder, openMessage.uid);
+                else await api.mail.markUnread(selectedAccountId, selectedFolder, openMessage.uid);
+                setMessages(prev => prev.map(m => (m.uid === openMessage!.uid ? { ...m, seen: !isUnread } : m)));
+                setFolders(prev => updateFolderUnseen(prev, selectedFolder, isUnread ? -1 : 1));
+              } catch (e: any) { setError(e.message || 'Не удалось изменить статус'); }
+            }}
+            title={isUnread ? 'Отметить прочитанным' : 'Отметить непрочитанным'}
+            style={{ ...iconBtnStyle, width: 28, height: 28 }}
+          >
+            <span style={{ position: 'relative', display: 'inline-flex' }}>
+              <Icon name='mail' size={15} />
+              {isUnread && <span style={{ position: 'absolute', top: -2, right: -3, width: 7, height: 7, borderRadius: '50%', background: '#2f74d0' }} />}
+            </span>
+          </button>
+          <button onClick={deleteSelected} title={currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину'} style={{ ...iconBtnStyle, width: 28, height: 28, color: '#d93025' }}>
+            <Icon name='trash' size={15} />
+          </button>
+        </div>
+        {/* Поля From/To/Date/Subject — как в классическом клиенте */}
+        <div style={{ padding: '8px 12px', borderBottom: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {fieldRow('От:', openMessage.from)}
+          {fieldRow('Кому:', openMessage.to)}
+          {openMessage.cc && fieldRow('Копия:', openMessage.cc)}
+          {fieldRow('Дата:', formatMailDate(openMessage.date))}
+          {fieldRow('Тема:', openMessage.subject)}
         </div>
         {loadingMessage ? (
           <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>Загрузка письма…</div>
         ) : (
           <>
-            <div style={{ flex: 1, overflow: 'auto', padding: '0 16px' }}>
+            <div style={{ flex: 1, overflow: 'auto', padding: '0 12px' }}>
               {openMessage.html ? (
                 // Письма чужие — изолируем HTML в sandbox-iframe без скриптов
                 <iframe
@@ -851,20 +867,20 @@ export function MailClient() {
                   style={{ width: '100%', height: '100%', minHeight: 260, border: 'none', display: 'block' }}
                 />
               ) : (
-                <pre style={{ fontFamily: 'inherit', fontSize: 14, whiteSpace: 'pre-wrap', margin: '12px 0' }}>{openMessage.text || '(пустое письмо)'}</pre>
+                <pre style={{ fontFamily: 'inherit', fontSize: 13.5, whiteSpace: 'pre-wrap', margin: '10px 0' }}>{openMessage.text || '(пустое письмо)'}</pre>
               )}
             </div>
             {openMessage.attachments.length > 0 && (
-              <div style={{ padding: '10px 16px', borderTop: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600 }}>Вложения ({openMessage.attachments.length})</div>
+              <div style={{ padding: '8px 12px', borderTop: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ fontSize: 12, fontWeight: 700 }}>Вложения ({openMessage.attachments.length})</div>
                 {openMessage.attachments.map(att => (
                   <button
                     key={att.index}
                     onClick={() => downloadAttachment(att)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 9,
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 3,
                       border: `1px solid ${borderColor}`, background: 'var(--bg-hover)', color: 'var(--text-primary)',
-                      cursor: 'pointer', fontSize: 13, textAlign: 'left',
+                      cursor: 'pointer', fontSize: 12.5, textAlign: 'left',
                     }}
                   >
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {att.filename}</span>
@@ -879,44 +895,164 @@ export function MailClient() {
     );
   }
 
-  // ---- Разметка ----
+  // ---- Разметка (классический почтовый клиент) ----
   const borderColor = 'var(--border-color)';
 
-  const headerBtnStyle: React.CSSProperties = {
-    ...iconBtnStyle,
-    background: 'var(--bg-hover)',
+  // Кнопка серебристого тулбара
+  const tbBtn = (title: string, onClick: () => void, icon: React.ReactNode, disabled = false, extra: React.CSSProperties = {}): React.ReactNode => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        width: 28, height: 28, borderRadius: 3, border: '1px solid transparent', cursor: disabled ? 'default' : 'pointer',
+        background: 'transparent', color: 'var(--text-primary)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: disabled ? 0.35 : 1,
+        ...extra,
+      }}
+    >
+      {icon}
+    </button>
+  );
+  const tbSep: React.ReactNode = <span style={{ width: 1, height: 22, background: 'var(--border-color)', margin: '0 3px', flexShrink: 0 }} />;
+  const tbSelect: React.CSSProperties = {
+    height: 26, borderRadius: 3, border: '1px solid var(--border-color)', background: 'var(--bg-input)',
+    color: 'var(--text-primary)', fontSize: 12, padding: '0 4px', flexShrink: 0,
   };
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg-body)' }}>
-      {/* Верхняя панель: аккаунт и общие действия */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${borderColor}`, flexWrap: 'wrap', background: 'var(--bg-card)' }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Почтовый клиент</h2>
+  // Серебристый тулбар в стиле классического почтового клиента
+  function renderToolbar() {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 3, padding: '4px 8px',
+        background: 'linear-gradient(to bottom, var(--bg-card) 0%, var(--bg-hover) 100%)',
+        borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap',
+      }}>
+        {/* Новое ▾ */}
+        <select
+          value=''
+          onChange={e => { const v = e.target.value; e.target.value = ''; if (v === 'compose') startCompose(); if (v === 'settings') setShowSettings(true); }}
+          title='Создать'
+          style={{ ...tbSelect, fontWeight: 600 }}
+        >
+          <option value=''>Новое ▾</option>
+          <option value='compose'>Письмо…</option>
+          <option value='settings'>Настройки аккаунта…</option>
+        </select>
+        {tbSep}
+        {tbBtn('Обновить', refresh, <Icon name='refresh' size={15} />)}
+        {tbSep}
+        {/* Поиск */}
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '0 1 240px', minWidth: 120 }}>
+          <span style={{ position: 'absolute', left: 6, color: 'var(--text-muted)', display: 'flex', pointerEvents: 'none' }}>
+            <Icon name='search' size={13} />
+          </span>
+          <input
+            style={{ ...inputStyle, height: 26, paddingLeft: 26, paddingRight: searchInput ? 24 : 8, fontSize: 12, borderRadius: 3 }}
+            placeholder='Поиск…'
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+          />
+          {searchInput && (
+            <button
+              onClick={() => setSearchInput('')}
+              title='Очистить поиск'
+              style={{ position: 'absolute', right: 2, width: 20, height: 20, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >✕</button>
+          )}
+        </div>
         {accounts.length > 0 && (
           <select
             value={selectedAccountId}
             onChange={e => setSelectedAccountId(e.target.value)}
-            style={{ ...inputStyle, width: 'auto', minWidth: 170, marginLeft: 4 }}
+            title='Почтовый аккаунт'
+            style={{ ...tbSelect, maxWidth: 190 }}
           >
             {accounts.map(a => (
               <option key={a.id} value={a.id}>{a.label ? `${a.label} (${a.email})` : a.email}</option>
             ))}
           </select>
         )}
+        {/* Сортировка ▾ */}
+        <select
+          value={`${sortField}:${sortAsc ? 'asc' : 'desc'}`}
+          onChange={e => { const [f, d] = e.target.value.split(':'); setSortField(f as any); setSortAsc(d === 'asc'); }}
+          title='Сортировка'
+          style={{ ...tbSelect, fontWeight: 600 }}
+        >
+          <option value='date:desc'>Сортировка: новые ▾</option>
+          <option value='date:asc'>Сначала старые</option>
+          <option value='sender:asc'>Отправитель А–Я</option>
+          <option value='sender:desc'>Отправитель Я–А</option>
+          <option value='subject:asc'>Тема А–Я</option>
+          <option value='size:desc'>Большие сначала</option>
+          <option value='size:asc'>Маленькие сначала</option>
+        </select>
+        {/* Выбор ▾ */}
+        <select
+          value=''
+          onChange={e => { const v = e.target.value; e.target.value = ''; if (v) applySelectMode(v); }}
+          title='Выбрать'
+          style={tbSelect}
+        >
+          <option value=''>Выбрать ▾</option>
+          <option value='all'>Все</option>
+          <option value='none'>Ни одного</option>
+          <option value='unread'>Непрочитанные</option>
+          <option value='read'>Прочитанные</option>
+        </select>
+        {selected.size > 0 && (
+          <select
+            value=''
+            onChange={e => { const v = e.target.value; e.target.value = ''; if (v) moveSelected(v); }}
+            title='Переместить выбранные'
+            style={tbSelect}
+          >
+            <option value=''>Переместить ({selected.size}) ▾</option>
+            {flatFolders.filter(f => f.path !== selectedFolder).map(f => (
+              <option key={f.path} value={f.path}>{f.label}</option>
+            ))}
+          </select>
+        )}
         <div style={{ flex: 1 }} />
-        <button onClick={refresh} title='Обновить' style={headerBtnStyle}><Icon name='refresh' size={16} /></button>
-        <button onClick={startCompose} title='Написать письмо' style={{
-          display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 9,
-          border: 'none', cursor: 'pointer', background: '#007AFF', color: '#fff', fontSize: 13.5, fontWeight: 600,
-        }}>
-          <Icon name='mail' size={15} color='#fff' /> Написать
+        {/* Compose */}
+        <button
+          onClick={startCompose}
+          title='Написать письмо'
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5, height: 28, padding: '0 16px', borderRadius: 3,
+            border: '1px solid #1c4f8f', cursor: 'pointer',
+            background: 'linear-gradient(to bottom, #6aa6ec 0%, #2f6fc0 100%)',
+            color: '#fff', fontSize: 13, fontWeight: 700, textShadow: '0 1px 1px rgba(0,0,0,0.3)', flexShrink: 0,
+          }}
+        >
+          <Icon name='mail' size={14} color='#fff' /> Написать
         </button>
-        <button onClick={() => setShowSettings(true)} title='Настройки почтовых аккаунтов' style={headerBtnStyle}>
-          <svg width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
+        {tbSep}
+        {tbBtn('Предыдущее письмо', () => openRelative(-1), <Icon name='prev' size={16} />, !canPrev)}
+        {tbBtn('Следующее письмо', () => openRelative(1), <Icon name='next' size={16} />, !canNext)}
+        {tbSep}
+        {tbBtn('Ответить', startReply, <Icon name='reply' size={15} />, !openMessage)}
+        {tbBtn('Переслать', startForward, <Icon name='forward' size={15} />, !openMessage)}
+        {tbSep}
+        {tbBtn(currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину', deleteSelected, <Icon name='trash' size={15} />, false, { color: '#d93025' })}
+        {tbBtn(currentFolderIsJunk ? 'Не спам (во Входящие)' : 'Спам', spamAction, <Icon name='spamShield' size={15} color={currentFolderIsJunk ? '#188038' : '#e37400'} />)}
+        {tbBtn('Печать', printMessage, <Icon name='print' size={15} />, !openMessage)}
+        {tbSep}
+        {tbBtn('Настройки почтовых аккаунтов', () => setShowSettings(true), (
+          <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
             <path d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' />
           </svg>
-        </button>
+        ))}
       </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg-body)' }}>
+      {/* Заголовок окна + классический серебристый тулбар */}
+      <div style={{ padding: '4px 10px', fontSize: 15, fontWeight: 700, borderBottom: `1px solid ${borderColor}`, background: 'var(--bg-card)' }}>Почтовый клиент</div>
+      {renderToolbar()}
 
       {error && (
         <div style={{ padding: '7px 14px', fontSize: 13, color: '#d93025', borderBottom: `1px solid ${borderColor}`, background: 'var(--bg-card)' }}>{error}</div>
@@ -966,84 +1102,23 @@ export function MailClient() {
           {/* Центральная часть: тулбар + список/чтение + статусная строка */}
           {(!isMobile || openMessage) && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-              {/* Тулбар списка */}
-              {!isMobile && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderBottom: `1px solid ${borderColor}`, flexWrap: 'wrap', background: 'var(--bg-card)' }}>
-                  <select
-                    value=''
-                    onChange={e => { const v = e.target.value; e.target.value = ''; if (v) applySelectMode(v); }}
-                    title='Выбрать'
-                    style={{ ...inputStyle, width: 'auto', fontSize: 12.5, padding: '5px 6px' }}
-                  >
-                    <option value=''>✓ Выбрать…</option>
-                    <option value='all'>Все</option>
-                    <option value='none'>Ни одного</option>
-                    <option value='unread'>Непрочитанные</option>
-                    <option value='read'>Прочитанные</option>
-                  </select>
-                  <div style={{ position: 'relative', flex: '1 1 160px', minWidth: 140, maxWidth: 320 }}>
-                    <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', display: 'flex' }}>
-                      <Icon name='search' size={13} />
-                    </span>
-                    <input
-                      style={{ ...inputStyle, paddingLeft: 28, fontSize: 12.5 }}
-                      placeholder='Поиск по теме, отправителю…'
-                      value={searchInput}
-                      onChange={e => setSearchInput(e.target.value)}
-                    />
-                  </div>
-                  <select
-                    value={`${sortField}:${sortAsc ? 'asc' : 'desc'}`}
-                    onChange={e => { const [f, d] = e.target.value.split(':'); setSortField(f as any); setSortAsc(d === 'asc'); }}
-                    title='Сортировка'
-                    style={{ ...inputStyle, width: 'auto', fontSize: 12.5, padding: '5px 6px' }}
-                  >
-                    <option value='date:desc'>Сначала новые</option>
-                    <option value='date:asc'>Сначала старые</option>
-                    <option value='sender:asc'>Отправитель А–Я</option>
-                    <option value='sender:desc'>Отправитель Я–А</option>
-                    <option value='subject:asc'>Тема А–Я</option>
-                    <option value='size:desc'>Большие сначала</option>
-                    <option value='size:asc'>Маленькие сначала</option>
-                  </select>
-                  {selected.size > 0 && (
-                    <>
-                      <span style={{ fontSize: 12.5, color: 'var(--text-primary)' }}>Выбрано: {selected.size}</span>
-                      <select
-                        value=''
-                        onChange={e => { const v = e.target.value; e.target.value = ''; if (v) moveSelected(v); }}
-                        style={{ ...inputStyle, width: 'auto', fontSize: 12.5, padding: '5px 6px' }}
-                      >
-                        <option value=''>Переместить…</option>
-                        {flatFolders.filter(f => f.path !== selectedFolder).map(f => (
-                          <option key={f.path} value={f.path}>{f.label}</option>
-                        ))}
-                      </select>
-                    </>
-                  )}
-                  <div style={{ flex: 1 }} />
-                  <button onClick={() => openRelative(-1)} disabled={!canPrev} title='Предыдущее (новее)' style={{ ...headerBtnStyle, opacity: canPrev ? 1 : 0.35 }}><Icon name='prev' size={16} /></button>
-                  <button onClick={() => openRelative(1)} disabled={!canNext} title='Следующее (старее)' style={{ ...headerBtnStyle, opacity: canNext ? 1 : 0.35 }}><Icon name='next' size={16} /></button>
-                  <button onClick={deleteSelected} title={currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину'} style={{ ...headerBtnStyle, color: '#d93025' }}><Icon name='trash' size={16} /></button>
-                  <button onClick={spamAction} title={currentFolderIsJunk ? 'Не спам (во Входящие)' : 'Спам'} style={{ ...headerBtnStyle, color: currentFolderIsJunk ? '#188038' : '#e37400' }}>
-                    <Icon name='spamShield' size={16} />
-                  </button>
-                  <button onClick={printMessage} disabled={!openMessage} title='Печать' style={{ ...headerBtnStyle, opacity: openMessage ? 1 : 0.35 }}><Icon name='print' size={16} /></button>
-                </div>
-              )}
               {/* Список + область чтения */}
               <div style={{ flex: 1, display: 'flex', overflow: 'hidden', flexDirection: 'row' }}>
                 {!isMobile && renderMessageList()}
                 {(!isMobile || openMessage) && renderReadingPane()}
               </div>
               {/* Статусная строка */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '4px 12px', borderTop: `1px solid ${borderColor}`, fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-card)' }}>
-                <span>Писем в папке: {searchQ ? totalMessages : currentFolderMeta.total}</span>
-                <span>Непрочитанных: {currentFolderMeta.unseen}</span>
-                {selected.size > 0 && <span>Выбрано: {selected.size}</span>}
-                {searchQ && <span>По запросу «{searchQ}»: {totalMessages}</span>}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 18, padding: '3px 10px',
+                borderTop: '1px solid var(--border-color)', fontSize: 11.5, color: 'var(--text-muted)',
+                background: 'linear-gradient(to bottom, var(--bg-card) 0%, var(--bg-hover) 100%)',
+              }}>
+                <span>📨 {searchQ ? totalMessages : currentFolderMeta.total} сообщений</span>
+                <span>✉ {currentFolderMeta.unseen} непрочитанных</span>
+                {selected.size > 0 && <span>☑ {selected.size} выбрано</span>}
                 <div style={{ flex: 1 }} />
-                <span>Страница {page} из {totalPages}</span>
+                {account && <span>Аккаунт: {account.email}</span>}
+                <span>Стр. {page} из {totalPages}</span>
               </div>
             </div>
           )}
