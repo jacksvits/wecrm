@@ -194,6 +194,8 @@ export function MailClient() {
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
   // Множественный выбор писем (uid → выбрано)
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  // Мобильная навигация: папки → список → письмо
+  const [mobileScreen, setMobileScreen] = useState<'folders' | 'list' | 'message'>('list');
 
   const account: MailAccount | undefined = accounts.find(a => a.id === selectedAccountId);
 
@@ -294,6 +296,7 @@ export function MailClient() {
     setTotalMessages(0);
     setPage(1);
     setSelected(new Set());
+    setMobileScreen('list');
     loadFolders();
     loadMessages(1);
   }, [selectedAccountId, selectedFolder]);
@@ -320,6 +323,7 @@ export function MailClient() {
     try {
       const full = await withTimeout(signal => api.mail.message(selectedAccountId, selectedFolder, uid, signal));
       setOpenMessage(full);
+      setMobileScreen('message');
       setMessages(prev => prev.map(m => (m.uid === uid ? { ...m, seen: true } : m)));
       setFolders(prev => updateFolderUnseen(prev, selectedFolder, -1));
     } catch (e: any) {
@@ -417,6 +421,19 @@ export function MailClient() {
     };
     return find(folders) || { total: totalMessages, unseen: 0 };
   }, [folders, selectedFolder, totalMessages]);
+
+  // Название текущей папки (для шапки мобильного списка)
+  const currentFolderLabel = useMemo(() => {
+    const find = (nodes: MailFolder[]): string | null => {
+      for (const n of nodes) {
+        if (n.path === selectedFolder) return folderLabel(n);
+        const nested = find(n.children || []);
+        if (nested) return nested;
+      }
+      return null;
+    };
+    return find(folders) || selectedFolder;
+  }, [folders, selectedFolder]);
 
   const afterListAction = () => {
     clearSelection();
@@ -708,7 +725,7 @@ export function MailClient() {
         <div key={f.path}>
           <button
             className='mail-folder-row'
-            onClick={() => { setSelectedFolder(f.path); setOpenMessage(null); }}
+            onClick={() => { setSelectedFolder(f.path); setOpenMessage(null); setMobileScreen('list'); }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: `0 5px 0 ${4 + depth * 16}px`,
@@ -859,8 +876,8 @@ export function MailClient() {
         {/* Шапка письма: Subject + быстрые действия */}
         <div style={{ padding: '6px 10px', borderBottom: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', gap: 2 }}>
           {isMobile && (
-            <button onClick={() => setOpenMessage(null)} style={{ ...iconBtnStyle, width: 28, height: 28 }} title='Назад'>
-              <Icon name='prev' size={16} />
+            <button onClick={() => { setOpenMessage(null); setMobileScreen('list'); }} style={{ ...iconBtnStyle, width: 32, height: 32 }} title='Назад к списку'>
+              <Icon name='prev' size={17} />
             </button>
           )}
           <div style={{ fontSize: 14, fontWeight: 700, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{openMessage.subject}</div>
@@ -965,6 +982,93 @@ export function MailClient() {
 
   // Серебристый тулбар — порядок кнопок как на эталонном скриншоте пользователя
   function renderToolbar() {
+    // ===== Мобильный тулбар: кнопки крупнее, поиск на всю ширину =====
+    if (isMobile) {
+      const hasTargets = selected.size > 0 || openMessage !== null;
+      return (
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 8px',
+          background: 'linear-gradient(to bottom, var(--bg-card) 0%, var(--bg-hover) 100%)',
+          borderBottom: '1px solid var(--border-color)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              onClick={startCompose}
+              title='Написать письмо'
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                height: 38, borderRadius: 6, border: '1px solid #1c4f8f', cursor: 'pointer',
+                background: 'linear-gradient(to bottom, #6aa6ec 0%, #2f6fc0 100%)',
+                color: '#fff', fontSize: 14.5, fontWeight: 700,
+              }}
+            >
+              <Icon name='mail' size={16} color='#fff' /> Написать
+            </button>
+            <button onClick={spamAction} disabled={!hasTargets} title={currentFolderIsJunk ? 'Не спам' : 'Спам'} style={{
+              width: 38, height: 38, borderRadius: 6, border: `1px solid ${borderColor}`, background: 'var(--bg-card)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hasTargets ? 1 : 0.35,
+            }}>
+              <Icon name='spamShield' size={17} color={currentFolderIsJunk ? '#188038' : '#e37400'} />
+            </button>
+            <button onClick={deleteSelected} disabled={!hasTargets} title={currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину'} style={{
+              width: 38, height: 38, borderRadius: 6, border: `1px solid ${borderColor}`, background: 'var(--bg-card)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d93025', opacity: hasTargets ? 1 : 0.35,
+            }}>
+              <Icon name='trash' size={17} />
+            </button>
+            <button onClick={refresh} title='Обновить' style={{
+              width: 38, height: 38, borderRadius: 6, border: `1px solid ${borderColor}`, background: 'var(--bg-card)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)',
+            }}>
+              <Icon name='refresh' size={17} />
+            </button>
+            <button onClick={() => setShowSettings(true)} title='Настройки почтовых аккаунтов' style={{
+              width: 38, height: 38, borderRadius: 6, border: `1px solid ${borderColor}`, background: 'var(--bg-card)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)',
+            }}>
+              <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
+                <path d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' />
+              </svg>
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1 }}>
+              <span style={{ position: 'absolute', left: 8, color: 'var(--text-muted)', display: 'flex', pointerEvents: 'none' }}>
+                <Icon name='search' size={15} />
+              </span>
+              <input
+                style={{ ...inputStyle, width: '100%', height: 36, paddingLeft: 30, paddingRight: searchInput ? 28 : 10, fontSize: 13.5, borderRadius: 6 }}
+                placeholder='Поиск по почте…'
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+              />
+              {searchInput && (
+                <button
+                  onClick={() => setSearchInput('')}
+                  title='Очистить поиск'
+                  style={{ position: 'absolute', right: 4, width: 24, height: 24, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >✕</button>
+              )}
+            </div>
+            <select
+              value={`${sortField}:${sortAsc ? 'asc' : 'desc'}`}
+              onChange={e => { const [f, d] = e.target.value.split(':'); setSortField(f as any); setSortAsc(d === 'asc'); }}
+              title='Сортировка'
+              style={{ ...inputStyle, width: 'auto', height: 36, fontSize: 12.5, borderRadius: 6 }}
+            >
+              <option value='date:desc'>Новые ▾</option>
+              <option value='date:asc'>Старые ▾</option>
+              <option value='sender:asc'>Отправитель А–Я</option>
+              <option value='sender:desc'>Отправитель Я–А</option>
+              <option value='subject:asc'>Тема А–Я</option>
+              <option value='size:desc'>Большие ▾</option>
+              <option value='size:asc'>Маленькие ▾</option>
+            </select>
+          </div>
+        </div>
+      );
+    }
+    // ===== Десктопный тулбар (зафиксирован) =====
     return (
       <div style={{
         display: 'flex', alignItems: 'center', gap: 3, padding: '4px 8px',
@@ -1069,6 +1173,24 @@ export function MailClient() {
     );
   }
 
+  // Статусная строка (десктоп и мобайл)
+  function renderStatusBar() {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 18, padding: '3px 10px',
+        borderTop: '1px solid var(--border-color)', fontSize: 11.5, color: 'var(--text-muted)',
+        background: 'linear-gradient(to bottom, var(--bg-card) 0%, var(--bg-hover) 100%)',
+      }}>
+        <span>📨 {searchQ ? totalMessages : currentFolderMeta.total} сообщений</span>
+        <span>✉ {currentFolderMeta.unseen} непрочитанных</span>
+        {selected.size > 0 && <span>☑ {selected.size} выбрано</span>}
+        <div style={{ flex: 1 }} />
+        {account && <span>Аккаунт: {account.email}</span>}
+        <span>Стр. {page} из {totalPages}</span>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg-body)' }}>
       {/* Классический серебристый тулбар — верхняя строка, как в референсе */}
@@ -1093,58 +1215,94 @@ export function MailClient() {
         </div>
       )}
 
-      {accounts.length > 0 && (
+      {/* ===== Десктопная версия (зафиксирована) ===== */}
+      {accounts.length > 0 && !isMobile && (
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', flexDirection: 'row' }}>
           {/* Панель папок */}
-          {(!isMobile || (!openMessage && isMobile)) && (
-            <div className={isMobile ? '' : 'desktop-only'} style={{
-              width: isMobile ? '100%' : 210, flexShrink: 0, overflowY: 'auto',
-              borderRight: isMobile ? 'none' : `1px solid ${borderColor}`,
-              display: isMobile ? 'contents' : 'flex', flexDirection: 'column',
-              padding: 8, gap: 2, background: 'var(--bg-card)',
-            }}>
-              {isMobile ? (
-                <div style={{
-                  display: 'flex', flexDirection: 'column', gap: 2,
-                  padding: '4px 6px 8px', borderBottom: `1px solid ${borderColor}`,
-                  maxHeight: '38vh', overflowY: 'auto',
-                }}>
-                  {renderAccountSelect()}
-                  {renderFolderTree(folders, 0)}
-                </div>
-              ) : (
+          <div className='desktop-only' style={{
+            width: 210, flexShrink: 0, overflowY: 'auto',
+            borderRight: `1px solid ${borderColor}`,
+            display: 'flex', flexDirection: 'column',
+            padding: 8, gap: 2, background: 'var(--bg-card)',
+          }}>
+            {renderAccountSelect()}
+            {renderFolderTree(folders, 0)}
+          </div>
+
+          {/* Центральная часть: список/чтение + статусная строка */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden', flexDirection: 'row' }}>
+              {renderMessageList()}
+              {renderReadingPane()}
+            </div>
+            {renderStatusBar()}
+          </div>
+        </div>
+      )}
+
+      {/* ===== Мобильная версия: Папки → Список → Письмо ===== */}
+      {accounts.length > 0 && isMobile && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {mobileScreen === 'folders' ? (
+            <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-card)', padding: '6px 0' }}>
+              {renderAccountSelect()}
+              {renderFolderTree(folders, 0)}
+            </div>
+          ) : (
+            <>
+              {/* Шапка экрана списка */}
+              {mobileScreen === 'list' && (
                 <>
-                  {renderAccountSelect()}
-                  {renderFolderTree(folders, 0)}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: `1px solid ${borderColor}`, background: 'var(--bg-card)' }}>
+                    <button
+                      onClick={() => setMobileScreen('folders')}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px',
+                        borderRadius: 8, border: `1px solid ${borderColor}`, background: 'var(--bg-input)',
+                        color: 'var(--text-primary)', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
+                      }}
+                    >
+                      <Icon name='folder' size={15} color='#d9a62e' /> Папки
+                    </button>
+                    <div style={{ flex: 1, fontSize: 14.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
+                      {currentFolderLabel}
+                      {currentFolderMeta.unseen > 0 && <span style={{ color: '#2f6fc0' }}> ({currentFolderMeta.unseen})</span>}
+                    </div>
+                    {selected.size > 0 && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>☑ {selected.size}</span>}
+                  </div>
+                  {/* Действия при множественном выборе */}
+                  {selected.size > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderBottom: `1px solid ${borderColor}`, background: 'var(--bg-card)' }}>
+                      <select
+                        value=''
+                        onChange={e => { const v = e.target.value; e.target.value = ''; if (v) moveSelected(v); }}
+                        style={{ ...inputStyle, width: 'auto', height: 32, fontSize: 13, borderRadius: 8 }}
+                      >
+                        <option value=''>Переместить ({selected.size})…</option>
+                        {flatFolders.filter(f => f.path !== selectedFolder).map(f => (
+                          <option key={f.path} value={f.path}>{f.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={deleteSelected}
+                        style={{
+                          height: 32, padding: '0 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                          background: '#d93025', color: '#fff', fontSize: 13, fontWeight: 600,
+                        }}
+                      >
+                        {currentFolderIsTrash ? 'Удалить навсегда' : 'В Корзину'}
+                      </button>
+                      <button onClick={clearSelection} style={{ ...iconBtnStyle, width: 32, height: 32, background: 'var(--bg-hover)' }} title='Снять выбор'>✕</button>
+                    </div>
+                  )}
                 </>
               )}
-              {/* На мобильном под деревом — список писем */}
-              {isMobile && renderMessageList()}
-            </div>
-          )}
-
-          {/* Центральная часть: тулбар + список/чтение + статусная строка */}
-          {(!isMobile || openMessage) && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-              {/* Список + область чтения */}
+              {/* Список или письмо на весь экран */}
               <div style={{ flex: 1, display: 'flex', overflow: 'hidden', flexDirection: 'row' }}>
-                {!isMobile && renderMessageList()}
-                {(!isMobile || openMessage) && renderReadingPane()}
+                {mobileScreen === 'list' ? renderMessageList() : renderReadingPane()}
               </div>
-              {/* Статусная строка */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 18, padding: '3px 10px',
-                borderTop: '1px solid var(--border-color)', fontSize: 11.5, color: 'var(--text-muted)',
-                background: 'linear-gradient(to bottom, var(--bg-card) 0%, var(--bg-hover) 100%)',
-              }}>
-                <span>📨 {searchQ ? totalMessages : currentFolderMeta.total} сообщений</span>
-                <span>✉ {currentFolderMeta.unseen} непрочитанных</span>
-                {selected.size > 0 && <span>☑ {selected.size} выбрано</span>}
-                <div style={{ flex: 1 }} />
-                {account && <span>Аккаунт: {account.email}</span>}
-                <span>Стр. {page} из {totalPages}</span>
-              </div>
-            </div>
+              {renderStatusBar()}
+            </>
           )}
         </div>
       )}
