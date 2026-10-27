@@ -82,6 +82,13 @@ async function getAccount(req: AuthRequest, res: any): Promise<MailAccountRow | 
   return account;
 }
 
+// Флаг secure для SMTP-транспорта. Порт 465 — SMTPS с неявным TLS (RFC 8314):
+// если secure выключен, nodemailer шлёт plaintext и зависает в ожидании
+// приветствия TLS-сервера («Отправка…» без ответа). Принудительно включаем TLS.
+function smtpSecure(account: MailAccountRow): boolean {
+  return account.secure || account.smtpPort === 465;
+}
+
 // Открывает IMAP-подключение на время операции и гарантированно закрывает его
 async function withImap<T>(account: MailAccountRow, fn: (client: ImapFlow) => Promise<T>): Promise<T> {
   const client = new ImapFlow({
@@ -173,7 +180,7 @@ router.post('/accounts/:id/test', async (req: AuthRequest, res) => {
       const transport = nodemailer.createTransport({
         host: account.smtpHost,
         port: account.smtpPort,
-        secure: account.secure,
+        secure: smtpSecure(account),
         auth: { user: account.smtpUser, pass: account.smtpPass },
         tls: { rejectUnauthorized: account.rejectUnauthorized },
         connectionTimeout: 15000,
@@ -588,7 +595,7 @@ router.post('/send', upload.array('files', 10), async (req: AuthRequest, res) =>
     const transport = nodemailer.createTransport({
       host: account.smtpHost,
       port: account.smtpPort,
-      secure: account.secure,
+      secure: smtpSecure(account),
       auth: { user: account.smtpUser, pass: account.smtpPass },
       tls: { rejectUnauthorized: account.rejectUnauthorized },
       connectionTimeout: 30000,
