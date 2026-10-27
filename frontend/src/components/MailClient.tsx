@@ -984,7 +984,7 @@ export function MailClient() {
         {tbBtn('Обновить', refresh, <Icon name='refresh' size={15} />)}
         {tbSep}
         {/* Поиск */}
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '0 1 240px', minWidth: 120 }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: 250, flexShrink: 0 }}>
           <span style={{ position: 'absolute', left: 6, color: 'var(--text-muted)', display: 'flex', pointerEvents: 'none' }}>
             <Icon name='search' size={13} />
           </span>
@@ -1002,18 +1002,7 @@ export function MailClient() {
             >✕</button>
           )}
         </div>
-        {accounts.length > 0 && (
-          <select
-            value={selectedAccountId}
-            onChange={e => setSelectedAccountId(e.target.value)}
-            title='Почтовый аккаунт'
-            style={{ ...tbSelect, maxWidth: 190 }}
-          >
-            {accounts.map(a => (
-              <option key={a.id} value={a.id}>{a.label ? `${a.label} (${a.email})` : a.email}</option>
-            ))}
-          </select>
-        )}
+        {tbSep}
         {/* Сортировка ▾ */}
         <select
           value={`${sortField}:${sortAsc ? 'asc' : 'desc'}`}
@@ -1055,7 +1044,19 @@ export function MailClient() {
             ))}
           </select>
         )}
-        <div style={{ flex: 1 }} />
+        {/* Аккаунт — в тулбаре, как элемент панели (в референсе сверху нет) */}
+        {accounts.length > 0 && (
+          <select
+            value={selectedAccountId}
+            onChange={e => setSelectedAccountId(e.target.value)}
+            title='Почтовый аккаунт'
+            style={{ ...tbSelect, maxWidth: 200 }}
+          >
+            {accounts.map(a => (
+              <option key={a.id} value={a.id}>{a.label ? `${a.label} (${a.email})` : a.email}</option>
+            ))}
+          </select>
+        )}
         {/* Compose */}
         <button
           onClick={startCompose}
@@ -1079,6 +1080,7 @@ export function MailClient() {
         {tbBtn(currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину', deleteSelected, <Icon name='trash' size={15} />, false, { color: '#d93025' })}
         {tbBtn(currentFolderIsJunk ? 'Не спам (во Входящие)' : 'Спам', spamAction, <Icon name='spamShield' size={15} color={currentFolderIsJunk ? '#188038' : '#e37400'} />)}
         {tbBtn('Печать', printMessage, <Icon name='print' size={15} />, !openMessage)}
+        <div style={{ flex: 1 }} />
         {tbSep}
         {tbBtn('Настройки почтовых аккаунтов', () => setShowSettings(true), (
           <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
@@ -1091,8 +1093,7 @@ export function MailClient() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg-body)' }}>
-      {/* Заголовок окна + классический серебристый тулбар */}
-      <div style={{ padding: '4px 10px', fontSize: 15, fontWeight: 700, borderBottom: `1px solid ${borderColor}`, background: 'var(--bg-card)' }}>Почтовый клиент</div>
+      {/* Классический серебристый тулбар — верхняя строка, как в референсе */}
       {renderToolbar()}
 
       {error && (
