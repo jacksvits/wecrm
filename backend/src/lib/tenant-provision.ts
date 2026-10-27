@@ -5,6 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import pg from 'pg';
+import { execFile } from 'child_process';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { platformPrisma, tenantDbUrl } from './tenant.js';
@@ -63,6 +64,26 @@ async function applyBaseline(dbName: string): Promise<void> {
   }
 }
 
+/**
+ * Применяет `prisma migrate deploy` к свежесозданной БД tenant'а
+ * (CLI-процесс с подменой DATABASE_URL, как в tenant-loop.ts).
+ * Baseline-снапшот отстаёт от актуальной схемы: без этого сид упадёт
+ * на колонках, добавленных миграциями после снапшота (например, users.timezone).
+ */
+function runTenantMigrateDeploy(dbName: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile('npx', ['prisma', 'migrate', 'deploy'], {
+      cwd: process.cwd(),
+      env: { ...process.env, DATABASE_URL: tenantDbUrl(dbName) },
+      timeout: 120000,
+      maxBuffer: 5 * 1024 * 1024,
+    }, (err, _stdout, stderr) => {
+      if (err) return reject(new Error(`migrate deploy (${dbName}): ${stderr || err.message}`));
+      resolve();
+    });
+  });
+}
+
 async function seedTenant(client: PrismaClient, admin: { name: string; email: string; password: string }) {
   const adminRole = await client.role.upsert({
     where: { name: 'admin' },
@@ -108,6 +129,9 @@ export async function provisionTenantDb(
   await platformPrisma.$executeRawUnsafe(`CREATE DATABASE "${dbName}"`);
   try {
     await applyBaseline(dbName);
+    // Догоняем схему свежей БД до актуальной, иначе сид падает на колонках,
+    // которых нет в baseline-снапшоте (P2022)
+    await runTenantMigrateDeploy(dbName);
     const client = new PrismaClient({ datasources: { db: { url: tenantDbUrl(dbName) } } });
     try {
       await seedTenant(client, admin);
