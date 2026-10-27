@@ -826,6 +826,11 @@ model MailAccount {
   smtpPass    String   @map("smtp_pass")
   secure      Boolean  @default(true)
   rejectUnauthorized Boolean @default(false) @map("reject_unauthorized")
+  // Подпись (HTML) и опции автоподстановки в редактор письма
+  signature   String   @default("")
+  sigOnNew    Boolean  @default(true)  @map("sig_on_new")
+  sigOnReply  Boolean  @default(true)  @map("sig_on_reply")
+  sigOnForward Boolean @default(true)  @map("sig_on_forward")
   // Аккаунт по умолчанию выбирается в клиенте автоматически
   isDefault   Boolean  @default(false) @map("is_default")
   createdAt   DateTime @default(now()) @map("created_at")

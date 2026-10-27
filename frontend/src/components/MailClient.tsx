@@ -24,6 +24,10 @@ interface MailAccount {
   hasSmtpPassword: boolean;
   secure: boolean;
   rejectUnauthorized: boolean;
+  signature: string;
+  sigOnNew: boolean;
+  sigOnReply: boolean;
+  sigOnForward: boolean;
   isDefault: boolean;
 }
 
@@ -80,6 +84,10 @@ const EMPTY_ACCOUNT_FORM = {
   smtpPass: '',
   secure: true,
   rejectUnauthorized: false,
+  signature: '',
+  sigOnNew: true,
+  sigOnReply: true,
+  sigOnForward: true,
   isDefault: false,
 };
 
@@ -624,8 +632,15 @@ export function MailClient() {
   const [sending, setSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // HTML подписи аккаунта (пустую/пробельную не подставляем)
+  const signatureHtml = (): string => {
+    const sig = account?.signature || '';
+    return sig.replace(/<[^>]*>/g, '').trim() ? sig : '';
+  };
+
   const startCompose = () => {
-    setCompose({ to: '', subject: '', body: '', files: [], inReplyTo: '', references: '' });
+    const body = account?.sigOnNew ? signatureHtml() : '';
+    setCompose({ to: '', subject: '', body, files: [], inReplyTo: '', references: '' });
     setShowCompose(true);
   };
 
@@ -638,7 +653,7 @@ export function MailClient() {
     setCompose({
       to: replyTo,
       subject: openMessage.subject.startsWith('Re:') ? openMessage.subject : `Re: ${openMessage.subject}`,
-      body: `<p></p>${quoteOriginal(openMessage)}`,
+      body: `<p></p>${account?.sigOnReply ? signatureHtml() : ''}${quoteOriginal(openMessage)}`,
       files: [],
       inReplyTo: openMessage.messageId || '',
       references: openMessage.messageId || '',
@@ -651,7 +666,7 @@ export function MailClient() {
     setCompose({
       to: '',
       subject: openMessage.subject.startsWith('Fwd:') ? openMessage.subject : `Fwd: ${openMessage.subject}`,
-      body: `<p></p>${quoteOriginal(openMessage)}`,
+      body: `<p></p>${account?.sigOnForward ? signatureHtml() : ''}${quoteOriginal(openMessage)}`,
       files: [],
       inReplyTo: '',
       references: '',
@@ -702,6 +717,7 @@ export function MailClient() {
       imapHost: a.imapHost, imapPort: a.imapPort, imapUser: a.imapUser, imapPass: '',
       smtpHost: a.smtpHost, smtpPort: a.smtpPort, smtpUser: a.smtpUser, smtpPass: '',
       secure: a.secure, rejectUnauthorized: a.rejectUnauthorized, isDefault: a.isDefault,
+      signature: a.signature || '', sigOnNew: a.sigOnNew, sigOnReply: a.sigOnReply, sigOnForward: a.sigOnForward,
     });
     setTestResult(null);
   };
@@ -1616,6 +1632,30 @@ export function MailClient() {
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                 <input type='checkbox' checked={accountForm.rejectUnauthorized} onChange={e => setForm({ rejectUnauthorized: e.target.checked })} />
                 Не проверять TLS-сертификат сервера
+              </label>
+              <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4 }}>Подпись</div>
+              <div>
+                <ReactQuill
+                  theme='snow'
+                  value={accountForm.signature}
+                  onChange={value => setForm({ signature: value })}
+                  placeholder='Подпись (HTML), например: С уважением, Иван'
+                  modules={quillModules}
+                  formats={quillFormats}
+                  style={{ borderRadius: 10, border: `1px solid ${borderColor}`, background: 'var(--bg-input)' }}
+                />
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                <input type='checkbox' checked={accountForm.sigOnNew} onChange={e => setForm({ sigOnNew: e.target.checked })} />
+                При отправке нового письма
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                <input type='checkbox' checked={accountForm.sigOnReply} onChange={e => setForm({ sigOnReply: e.target.checked })} />
+                При ответе на письмо
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                <input type='checkbox' checked={accountForm.sigOnForward} onChange={e => setForm({ sigOnForward: e.target.checked })} />
+                При пересылке письма
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button

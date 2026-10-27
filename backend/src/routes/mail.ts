@@ -43,6 +43,10 @@ type MailAccountRow = {
   smtpPass: string;
   secure: boolean;
   rejectUnauthorized: boolean;
+  signature: string;
+  sigOnNew: boolean;
+  sigOnReply: boolean;
+  sigOnForward: boolean;
   isDefault: boolean;
 };
 
@@ -59,6 +63,10 @@ const accountSchema = z.object({
   smtpPass: z.string().min(1, 'Укажите пароль SMTP'),
   secure: z.boolean().default(true),
   rejectUnauthorized: z.boolean().default(false),
+  signature: z.string().default(''),
+  sigOnNew: z.boolean().default(true),
+  sigOnReply: z.boolean().default(true),
+  sigOnForward: z.boolean().default(true),
   isDefault: z.boolean().default(false),
 });
 
