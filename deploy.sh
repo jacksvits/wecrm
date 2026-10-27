@@ -28,6 +28,10 @@ else
   echo "WARNING: backup.sh not found, skipping backup"
 fi
 
+# 1.5 Бекап файлов uploads (инкрементально; backup/ исключён — иначе рекурсия)
+echo "Backing up uploads to NFS..."
+rsync -a --delete --exclude='backup/' /mnt/nfs/wecrm-uploads/ /mnt/nfs/wecrm-uploads/backup/download/uploads-latest/ || echo 'WARNING: uploads backup failed, deploy continues'
+
 # 1. Update code
 echo "Pulling latest code..."
 git reset --hard origin/HEAD
