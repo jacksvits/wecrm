@@ -504,6 +504,23 @@ export function MailClient() {
     }
   };
 
+  // Полная очистка папки (Спам/Корзина): безвозвратное удаление всех писем
+  const emptyFolder = async (f: MailFolder) => {
+    if (!selectedAccountId) return;
+    if (!confirm(`Удалить все письма из папки «${folderLabel(f)}» безвозвратно?`)) return;
+    try {
+      await api.mail.emptyFolder(selectedAccountId, f.path);
+      if (selectedFolder === f.path) {
+        setOpenMessage(null);
+        clearSelection();
+        loadMessages(page);
+      }
+      loadFolders();
+    } catch (e: any) {
+      setError(e.message || 'Не удалось очистить папку');
+    }
+  };
+
   // Удаление одного письма из списка (в Корзину / безвозвратно из Корзины)
   const deleteOne = async (uid: number) => {
     if (!selectedAccountId) return;
@@ -795,6 +812,15 @@ export function MailClient() {
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folderLabel(f)}</span>
             {f.unseen > 0 && (
               <span style={{ fontSize: 11, color: isActive ? '#0a246a' : 'inherit', flexShrink: 0, fontWeight: 700 }}>({f.unseen})</span>
+            )}
+            {(f.specialUse === '\\Junk' || f.specialUse === '\\Trash') && (
+              <span
+                onClick={e => { e.stopPropagation(); emptyFolder(f); }}
+                title={`Очистить «${folderLabel(f)}» (удалить все письма)`}
+                style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', color: '#c0392b', cursor: 'pointer' }}
+              >
+                <Icon name='trash' size={13} />
+              </span>
             )}
           </button>
           {hasKids && !isCollapsed && renderFolderTree(f.children, depth + 1)}

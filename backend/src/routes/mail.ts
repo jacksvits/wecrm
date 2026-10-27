@@ -505,6 +505,31 @@ router.delete('/messages', async (req: AuthRequest, res) => {
   }
 });
 
+// Безвозвратная очистка папки: удаляются ВСЕ письма (\Deleted + expunge одним вызовом)
+router.delete('/messages/all', async (req: AuthRequest, res) => {
+  try {
+    const account = await getAccount(req, res);
+    if (!account) return;
+    const folder = String(req.body.folder || '');
+    if (!folder) return res.status(400).json({ error: 'folder обязателен' });
+    await withImap(account, async client => {
+      const lock = await client.getMailboxLock(folder);
+      try {
+        const uids: number[] = [];
+        for await (const msg of client.fetch('1:*', { uid: true })) {
+          if (msg.uid > 0) uids.push(msg.uid);
+        }
+        if (uids.length) await client.messageDelete(uids, { uid: true });
+      } finally {
+        lock.release();
+      }
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ---- Отправка ----
 
 const upload = multer({
