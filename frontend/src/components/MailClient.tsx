@@ -142,6 +142,10 @@ const ICONS: Record<string, string> = {
   file: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6',
   archive: 'M21 8v13H3V8 M1 3h22v5H1z M10 12h4',
   spam: 'M12 9v3 M12 16h.01 M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
+  warning: 'M12 8v4 M12 16h.01 M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
+  calendar: 'M8 2v4 M16 2v4 M3 10h18 M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z',
+  contacts: 'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2 M12 11a4 4 0 100-8 4 4 0 000 8',
+  notes: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6 M9 13h6 M9 17h4',
   trash: 'M3 6h18 M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6 M10 11v6 M14 11v6',
   folder: 'M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z',
   mail: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
@@ -201,12 +205,29 @@ export function MailClient() {
     f.specialUse === '\\Junk' ? 'Спам' :
     /^INBOX$/i.test(f.path) ? 'Входящие' : f.name;
 
-  const folderIconName = (f: MailFolder) =>
-    f.specialUse === '\\Sent' ? 'send' :
-    f.specialUse === '\\Trash' ? 'trash' :
-    f.specialUse === '\\Drafts' ? 'file' :
-    f.specialUse === '\\Junk' ? 'spamShield' :
-    /^INBOX$/i.test(f.path) ? 'inbox' : 'folder';
+  const folderIconName = (f: MailFolder) => {
+    const n = (f.name || '').toLowerCase();
+    if (f.specialUse === '\\Sent' || n === 'sent') return 'send';
+    if (f.specialUse === '\\Trash' || n === 'trash') return 'trash';
+    if (f.specialUse === '\\Drafts' || n === 'drafts' || n.includes('черновик')) return 'file';
+    if (f.specialUse === '\\Junk' || n === 'junk' || n === 'спам') return 'warning';
+    if (/^INBOX$/i.test(f.path)) return 'inbox';
+    if (n.includes('календар') || n.includes('calendar')) return 'calendar';
+    if (n.includes('контакт') || n.includes('contact')) return 'contacts';
+    if (n.includes('заметк') || n.includes('notes')) return 'notes';
+    if (n.includes('задач') || n.includes('task')) return 'check';
+    if (n.includes('архив')) return 'archive';
+    return 'folder';
+  };
+
+  // Цвет иконок как в классическом клиенте: жёлтые папки, синяя отправка, красный спам
+  const folderIconColor = (f: MailFolder) => {
+    const name = folderIconName(f);
+    if (name === 'folder' || name === 'inbox') return '#d9a62e';
+    if (name === 'send') return '#2f6fc0';
+    if (name === 'warning' || name === 'trash') return '#c0392b';
+    return '#8a8a8a';
+  };
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -657,7 +678,27 @@ export function MailClient() {
     }
   };
 
-  // ---- Рендер дерева папок (классический стиль) ----
+  // Заголовок ящика («Mailbox-demo» в референсе)
+  function renderMailboxHeader() {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 5, height: 24,
+        padding: '0 6px', margin: '0 2px 3px', boxSizing: 'border-box',
+        fontSize: 12, fontWeight: 700, color: 'var(--text-primary)',
+        borderBottom: '1px solid var(--border-color)',
+      }}>
+        <span style={{ width: 12, flexShrink: 0 }} />
+        <span style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', color: '#d9a62e' }}>
+          <Icon name='mail' size={14} />
+        </span>
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {account ? (account.label || account.email) : 'Ящик'}
+        </span>
+      </div>
+    );
+  }
+
+  // ---- Рендер дерева папок (классический стиль, как в референсе) ----
   function renderFolderTree(nodes: MailFolder[], depth: number): React.ReactNode {
     return nodes.map(f => {
       const hasKids = f.children && f.children.length > 0;
@@ -668,14 +709,14 @@ export function MailClient() {
           <button
             onClick={() => { setSelectedFolder(f.path); setOpenMessage(null); }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: `0 6px 0 ${6 + depth * 16}`,
-              margin: '1px 4px',
-              height: 24, width: 'calc(100% - 8px)', boxSizing: 'border-box',
-              borderRadius: 3, cursor: 'pointer', fontSize: 12.5, textAlign: 'left',
-              border: isActive ? '1px solid #8fb4e3' : '1px solid transparent',
-              background: isActive ? '#dbe9fa' : 'transparent',
-              color: isActive ? '#174a7c' : 'var(--text-primary)',
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: `0 5px 0 ${4 + depth * 14}`,
+              margin: '1px 2px',
+              height: 22, width: 'calc(100% - 4px)', boxSizing: 'border-box',
+              borderRadius: 0, cursor: 'pointer', fontSize: 12, textAlign: 'left',
+              border: isActive ? '1px solid #316ac5' : '1px solid transparent',
+              background: isActive ? '#ffffff' : 'transparent',
+              color: isActive ? '#0a246a' : 'var(--text-primary)',
               fontWeight: f.unseen > 0 ? 700 : 400,
             }}
           >
@@ -689,19 +730,19 @@ export function MailClient() {
                     return next;
                   });
                 }}
-                style={{ width: 13, flexShrink: 0, fontSize: 9, color: 'var(--text-muted)', cursor: 'pointer', textAlign: 'center' }}
+                style={{ width: 12, flexShrink: 0, fontSize: 9, color: 'var(--text-muted)', cursor: 'pointer', textAlign: 'center' }}
               >
                 {isCollapsed ? '▸' : '▾'}
               </span>
             ) : (
-              <span style={{ width: 13, flexShrink: 0 }} />
+              <span style={{ width: 12, flexShrink: 0 }} />
             )}
-            <span style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', color: f.specialUse || /^INBOX$/i.test(f.path) ? (isActive ? '#174a7c' : '#b8860b') : '#c9a227' }}>
+            <span style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', color: isActive ? '#0a246a' : folderIconColor(f) }}>
               <Icon name={folderIconName(f)} size={14} />
             </span>
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folderLabel(f)}</span>
             {f.unseen > 0 && (
-              <span style={{ fontSize: 11, color: isActive ? '#174a7c' : '#b03060', flexShrink: 0, fontWeight: 700 }}>({f.unseen})</span>
+              <span style={{ fontSize: 11, color: isActive ? '#0a246a' : 'inherit', flexShrink: 0, fontWeight: 700 }}>({f.unseen})</span>
             )}
           </button>
           {hasKids && !isCollapsed && renderFolderTree(f.children, depth + 1)}
@@ -1089,10 +1130,14 @@ export function MailClient() {
                   padding: '4px 6px 8px', borderBottom: `1px solid ${borderColor}`,
                   maxHeight: '38vh', overflowY: 'auto',
                 }}>
+                  {renderMailboxHeader()}
                   {renderFolderTree(folders, 0)}
                 </div>
               ) : (
-                renderFolderTree(folders, 0)
+                <>
+                  {renderMailboxHeader()}
+                  {renderFolderTree(folders, 0)}
+                </>
               )}
               {/* На мобильном под деревом — список писем */}
               {isMobile && renderMessageList()}
