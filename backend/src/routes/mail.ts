@@ -244,16 +244,17 @@ router.post('/folders', async (req: AuthRequest, res) => {
     if (/[\\/]/.test(name)) return res.status(400).json({ error: 'Имя папки не должно содержать / и \\' });
 
     const created = await withImap(account, async client => {
+      // Разделитель иерархии сервера берём из LIST (у imapflow 1.7.x нет client.namespace())
       let delimiter = '.';
       try {
-        const ns = await client.namespace();
-        const personal = Array.isArray(ns) ? ns.find((n: any) => n.scope === 'personal') : null;
-        if (personal && personal.delimiter) delimiter = personal.delimiter;
+        const mailboxes = await client.list();
+        const withDelim = mailboxes.find((m: any) => m.delimiter);
+        if (withDelim && withDelim.delimiter) delimiter = withDelim.delimiter;
       } catch {
-        // NAMESPACE не поддерживается сервером — остаётся '.'
+        // LIST не поддерживается — остаётся '.'
       }
       const path = parent ? `${parent}${delimiter}${name}` : name;
-      await client.createMailbox(path);
+      await client.mailboxCreate(path);
       return { path };
     });
     res.json(created);
