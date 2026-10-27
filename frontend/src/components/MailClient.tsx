@@ -716,7 +716,7 @@ export function MailClient() {
               height: 22, width: 'calc(100% - 4px)', boxSizing: 'border-box',
               borderRadius: 0, cursor: 'pointer', fontSize: 12, textAlign: 'left',
               border: isActive ? '1px solid #316ac5' : '1px solid transparent',
-              background: isActive ? '#ffffff !important' : undefined,
+              background: isActive ? '#ffffff !important' : 'transparent',
               color: isActive ? '#0a246a' : 'var(--text-primary)',
               fontWeight: f.unseen > 0 ? 700 : 400,
             }}
@@ -780,7 +780,7 @@ export function MailClient() {
               style={{
                 padding: '5px 10px 6px 8px', cursor: 'pointer',
                 borderBottom: '1px solid var(--border-color)',
-                background: active ? 'linear-gradient(to bottom, #5b9bea 0%, #2f74d0 100%) !important' : undefined,
+                background: active ? 'linear-gradient(to bottom, #5b9bea 0%, #2f74d0 100%) !important' : 'transparent',
                 display: 'flex', flexDirection: 'column', gap: 1,
               }}
             >
