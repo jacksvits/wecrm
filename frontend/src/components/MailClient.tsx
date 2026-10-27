@@ -196,6 +196,9 @@ export function MailClient() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   // Мобильная навигация: папки → список → письмо
   const [mobileScreen, setMobileScreen] = useState<'folders' | 'list' | 'message'>('list');
+  // Drag & drop: перетаскиваемое письмо (uid) и папка-приёмник под курсором
+  const [dragUid, setDragUid] = useState<number | null>(null);
+  const [dropFolder, setDropFolder] = useState<string | null>(null);
 
   const account: MailAccount | undefined = accounts.find(a => a.id === selectedAccountId);
 
@@ -445,6 +448,21 @@ export function MailClient() {
   const moveSelected = async (destination: string) => {
     if (!selectedAccountId || !destination) return;
     const targets = selected.size ? Array.from(selected) : (openMessage ? [openMessage.uid] : []);
+    if (!targets.length) return;
+    try {
+      await api.mail.moveMessages(selectedAccountId, selectedFolder, targets, destination);
+      if (openMessage && targets.includes(openMessage.uid)) setOpenMessage(null);
+      afterListAction();
+    } catch (e: any) {
+      setError(e.message || 'Не удалось переместить письма');
+    }
+  };
+
+  // Перемещение перетащенного письма в папку (drag & drop).
+  // Если письмо входит в множественный выбор — переносятся все выбранные.
+  const moveByDrag = async (destination: string, uid: number) => {
+    if (!selectedAccountId || !destination || destination === selectedFolder) return;
+    const targets = selected.has(uid) ? Array.from(selected) : [uid];
     if (!targets.length) return;
     try {
       await api.mail.moveMessages(selectedAccountId, selectedFolder, targets, destination);
@@ -726,15 +744,31 @@ export function MailClient() {
           <button
             className='mail-folder-row'
             onClick={() => { setSelectedFolder(f.path); setOpenMessage(null); setMobileScreen('list'); }}
+            onDragOver={e => {
+              // Приёмник только для писем из другой папки
+              if (dragUid === null || f.path === selectedFolder) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              if (dropFolder !== f.path) setDropFolder(f.path);
+            }}
+            onDragLeave={() => { if (dropFolder === f.path) setDropFolder(null); }}
+            onDrop={e => {
+              e.preventDefault();
+              const uid = dragUid;
+              setDropFolder(null);
+              setDragUid(null);
+              if (uid === null || f.path === selectedFolder) return;
+              moveByDrag(f.path, uid);
+            }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: `0 5px 0 ${4 + depth * 16}px`,
               margin: '1px 2px',
               height: 22, width: 'calc(100% - 4px)', boxSizing: 'border-box',
               borderRadius: 0, cursor: 'pointer', fontSize: 12, textAlign: 'left',
-              border: isActive ? '1px solid #316ac5' : '1px solid transparent',
-              background: isActive ? '#ffffff !important' : 'transparent',
-              color: isActive ? '#0a246a' : 'var(--text-primary)',
+              border: dropFolder === f.path ? '1px solid #316ac5' : (isActive ? '1px solid #316ac5' : '1px solid transparent'),
+              background: dropFolder === f.path ? '#d5e4fa !important' : (isActive ? '#ffffff !important' : 'transparent'),
+              color: isActive || dropFolder === f.path ? '#0a246a' : 'var(--text-primary)',
               fontWeight: f.unseen > 0 ? 700 : 400,
             }}
           >
@@ -794,11 +828,19 @@ export function MailClient() {
               key={m.uid}
               className='mail-row'
               onClick={() => openUid(m.uid)}
+              draggable
+              onDragStart={e => {
+                e.dataTransfer.setData('text/plain', String(m.uid));
+                e.dataTransfer.effectAllowed = 'move';
+                setDragUid(m.uid);
+              }}
+              onDragEnd={() => { setDragUid(null); setDropFolder(null); }}
               style={{
                 padding: '5px 10px 6px 8px', cursor: 'pointer',
                 borderBottom: '1px solid var(--border-color)',
                 background: active ? 'linear-gradient(to bottom, #5b9bea 0%, #2f74d0 100%) !important' : 'transparent',
                 display: 'flex', flexDirection: 'column', gap: 1,
+                opacity: dragUid === m.uid ? 0.45 : 1,
               }}
             >
               {/* Строка 1: чекбокс + отправитель + действия выбранного + дата */}
