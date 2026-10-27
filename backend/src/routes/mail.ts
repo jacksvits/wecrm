@@ -17,10 +17,12 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 const router = Router();
 router.use(authMiddleware);
 
-// Страница доступна только админам
+// Доступ: админам всегда; остальным — если роль включает страницу /mail
+// (пустой список страниц роли = полный доступ, как в RequireRole на фронте)
 router.use((req: AuthRequest, res, next) => {
-  if (req.user?.role !== 'admin') {
-    return res.status(403).json({ error: 'Доступ только для администраторов' });
+  const allowedPages = ((req.user as any)?.allowedPages as string[] | undefined) || [];
+  if (req.user?.role !== 'admin' && allowedPages.length > 0 && !allowedPages.includes('/mail')) {
+    return res.status(403).json({ error: 'Нет доступа к почтовому клиенту' });
   }
   next();
 });
