@@ -1057,7 +1057,7 @@ export function MailClient() {
         )}
         {tbSep}
         {tbBtn('Обновить', refresh, <Icon name='refresh' size={15} />)}
-        <div style={{ flex: 1 }} />
+        {tbSep}
         {tbBtn('Печать', printMessage, <Icon name='print' size={15} />, !openMessage)}
         {tbSep}
         {tbBtn('Настройки почтовых аккаунтов', () => setShowSettings(true), (
