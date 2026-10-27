@@ -1489,3 +1489,7 @@ html, body { overflow-x: hidden; }
   padding: 1px 6px;
   font-weight: 700;
 }
+
+/* Почтовый клиент: hover-эффекты строк списка и дерева папок (классический стиль) */
+.mail-row:hover { background: var(--bg-hover) !important; }
+.mail-folder-row:hover { background: var(--bg-hover) !important; }
