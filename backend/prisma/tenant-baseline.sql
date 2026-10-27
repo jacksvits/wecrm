@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict KrPG57faUU18cmFsZ2w8vCkgsKkJXtmw91fpsMTQAloEC59r4Tdu41vhKnrghqr
+\restrict NpmxcPJzzajp1GASsq7Ju3HuP44VjRwKHaKnZUJqDxAVUd6qeEho7PkjuUg73bM
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -188,7 +188,8 @@ CREATE TABLE public.branding (
     login_accent text,
     login_subtitle text,
     product_default_image_path text,
-    product_card_style text
+    product_card_style text,
+    timezone text DEFAULT 'UTC'::text NOT NULL
 );
 
 
@@ -243,6 +244,69 @@ CREATE TABLE public.camera_settings (
 
 
 --
+-- Name: cdek_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.cdek_settings (
+    id integer DEFAULT 1 NOT NULL,
+    is_active boolean DEFAULT false NOT NULL,
+    environment text DEFAULT 'test'::text NOT NULL,
+    account text DEFAULT ''::text NOT NULL,
+    secure_password text DEFAULT ''::text NOT NULL,
+    access_token text DEFAULT ''::text NOT NULL,
+    token_expires_at timestamp with time zone,
+    webhook_token text DEFAULT ''::text NOT NULL,
+    sender_city_code integer,
+    sender_company text DEFAULT ''::text NOT NULL,
+    sender_name text DEFAULT ''::text NOT NULL,
+    sender_phone text DEFAULT ''::text NOT NULL,
+    sender_address text DEFAULT ''::text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: cdek_shipments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.cdek_shipments (
+    id text NOT NULL,
+    uuid text,
+    cdek_number text,
+    deal_id text,
+    contact_id text,
+    im_number text NOT NULL,
+    tariff_code integer NOT NULL,
+    delivery_mode text DEFAULT 'door'::text NOT NULL,
+    delivery_sum double precision,
+    currency text DEFAULT 'RUB'::text NOT NULL,
+    from_city text DEFAULT ''::text NOT NULL,
+    to_city text NOT NULL,
+    to_address text DEFAULT ''::text NOT NULL,
+    delivery_point_code text,
+    recipient_name text NOT NULL,
+    recipient_phone text NOT NULL,
+    recipient_email text DEFAULT ''::text NOT NULL,
+    weight_grams integer NOT NULL,
+    length_cm integer,
+    width_cm integer,
+    height_cm integer,
+    cod_amount integer DEFAULT 0 NOT NULL,
+    declared_value integer DEFAULT 0 NOT NULL,
+    item_name text DEFAULT ''::text NOT NULL,
+    comment text DEFAULT ''::text NOT NULL,
+    status_code text,
+    status_name text,
+    status_at timestamp with time zone,
+    status_history text,
+    request_state text,
+    last_error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: chat_message_recipients; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -278,6 +342,45 @@ CREATE TABLE public.chat_reactions (
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     message_id text NOT NULL,
     user_id text NOT NULL
+);
+
+
+--
+-- Name: client_devices; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.client_devices (
+    id text NOT NULL,
+    contact_id text NOT NULL,
+    device_key text NOT NULL,
+    token text NOT NULL,
+    hostname text NOT NULL,
+    username text DEFAULT ''::text NOT NULL,
+    workgroup text DEFAULT ''::text NOT NULL,
+    os_caption text DEFAULT ''::text NOT NULL,
+    os_version text DEFAULT ''::text NOT NULL,
+    os_build text DEFAULT ''::text NOT NULL,
+    os_arch text DEFAULT ''::text NOT NULL,
+    os_install_date timestamp(3) without time zone,
+    manufacturer text DEFAULT ''::text NOT NULL,
+    model text DEFAULT ''::text NOT NULL,
+    serial_number text DEFAULT ''::text NOT NULL,
+    cpu text DEFAULT ''::text NOT NULL,
+    cpu_cores integer DEFAULT 0 NOT NULL,
+    cpu_threads integer DEFAULT 0 NOT NULL,
+    ram_total_mb integer DEFAULT 0 NOT NULL,
+    disks jsonb DEFAULT '[]'::jsonb NOT NULL,
+    pnp_devices jsonb DEFAULT '[]'::jsonb NOT NULL,
+    ip_address text DEFAULT ''::text NOT NULL,
+    mac_address text DEFAULT ''::text NOT NULL,
+    gpu text DEFAULT ''::text NOT NULL,
+    last_boot_at timestamp(3) without time zone,
+    agent_version text DEFAULT ''::text NOT NULL,
+    comment text DEFAULT ''::text NOT NULL,
+    first_seen_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    last_seen_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -382,7 +485,8 @@ CREATE TABLE public.contacts (
     onec_id text,
     birth_date timestamp(3) without time zone,
     address text,
-    telegram_username text
+    telegram_username text,
+    client_key text
 );
 
 
@@ -514,7 +618,8 @@ CREATE TABLE public.email_settings (
     "updatedAt" timestamp(3) without time zone NOT NULL,
     secure boolean DEFAULT true NOT NULL,
     "rejectUnauthorized" boolean DEFAULT false NOT NULL,
-    "requireTLS" boolean DEFAULT true NOT NULL
+    "requireTLS" boolean DEFAULT true NOT NULL,
+    "markAsRead" boolean DEFAULT true NOT NULL
 );
 
 
@@ -654,6 +759,31 @@ CREATE TABLE public.login_slides (
     image_url text,
     sort_order integer DEFAULT 0 NOT NULL,
     is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL
+);
+
+
+--
+-- Name: mail_accounts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mail_accounts (
+    id text NOT NULL,
+    user_id text NOT NULL,
+    label text DEFAULT ''::text NOT NULL,
+    email text NOT NULL,
+    imap_host text NOT NULL,
+    imap_port integer DEFAULT 993 NOT NULL,
+    imap_user text NOT NULL,
+    imap_pass text NOT NULL,
+    smtp_host text NOT NULL,
+    smtp_port integer DEFAULT 465 NOT NULL,
+    smtp_user text NOT NULL,
+    smtp_pass text NOT NULL,
+    secure boolean DEFAULT true NOT NULL,
+    reject_unauthorized boolean DEFAULT false NOT NULL,
+    is_default boolean DEFAULT false NOT NULL,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp(3) without time zone NOT NULL
 );
@@ -881,12 +1011,18 @@ CREATE TABLE public.ozon_seller_settings (
     client_id text DEFAULT ''::text NOT NULL,
     api_key text DEFAULT ''::text NOT NULL,
     is_active boolean DEFAULT false NOT NULL,
-    update_interval_minutes integer DEFAULT 60 NOT NULL,
     last_sync_at timestamp(3) without time zone,
     last_sync_result text,
     updated_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     default_type_id integer,
-    auto_sync boolean DEFAULT true NOT NULL
+    auto_sync boolean DEFAULT true NOT NULL,
+    stock_warehouse_id text,
+    products_mode text DEFAULT 'to_ozon'::text NOT NULL,
+    prices_mode text DEFAULT 'to_ozon'::text NOT NULL,
+    stocks_mode text DEFAULT 'to_ozon'::text NOT NULL,
+    products_interval_minutes integer DEFAULT 60 NOT NULL,
+    prices_interval_minutes integer DEFAULT 60 NOT NULL,
+    stocks_interval_minutes integer DEFAULT 60 NOT NULL
 );
 
 
@@ -920,7 +1056,9 @@ CREATE TABLE public.price_types (
     for_vitrine boolean DEFAULT false NOT NULL,
     for_vk boolean DEFAULT false NOT NULL,
     is_retail boolean DEFAULT false NOT NULL,
-    for_cashless boolean DEFAULT false NOT NULL
+    for_cashless boolean DEFAULT false NOT NULL,
+    for_ozon boolean DEFAULT false NOT NULL,
+    for_wb boolean DEFAULT false NOT NULL
 );
 
 
@@ -1033,7 +1171,10 @@ CREATE TABLE public.products (
     crm_video_notes boolean DEFAULT false NOT NULL,
     crm_calls boolean DEFAULT false NOT NULL,
     crm_integrations jsonb,
-    crm_renew_months integer
+    crm_renew_months integer,
+    sync_to_wb boolean DEFAULT false NOT NULL,
+    wb_product_id bigint,
+    wb_synced_at timestamp with time zone
 );
 
 
@@ -1590,7 +1731,8 @@ CREATE TABLE public.tasks (
     telegram_chat_id text,
     telegram_user_id text,
     support_owner_id text,
-    status_changed_at timestamp(3) without time zone
+    status_changed_at timestamp(3) without time zone,
+    "startDate" timestamp(3) without time zone DEFAULT now()
 );
 
 
@@ -1730,7 +1872,8 @@ CREATE TABLE public.tenant_tickets (
     subject text NOT NULL,
     status text DEFAULT 'open'::text NOT NULL,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp(3) without time zone NOT NULL
+    updated_at timestamp(3) without time zone NOT NULL,
+    task_id text
 );
 
 
@@ -1837,7 +1980,36 @@ CREATE TABLE public.users (
     stock_access boolean DEFAULT false NOT NULL,
     calendar_timeline_pos text DEFAULT 'bottom'::text NOT NULL,
     calendar_timeline_size integer DEFAULT 420 NOT NULL,
-    calendar_theme text DEFAULT 'classic'::text NOT NULL
+    calendar_theme text DEFAULT 'classic'::text NOT NULL,
+    timezone text
+);
+
+
+--
+-- Name: vitrine_favorite_groups; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vitrine_favorite_groups (
+    id text NOT NULL,
+    name text NOT NULL,
+    "ownerId" text NOT NULL,
+    shared_by_id text,
+    shared_by_name text,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL,
+    share_token text
+);
+
+
+--
+-- Name: vitrine_favorite_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vitrine_favorite_items (
+    id text NOT NULL,
+    "groupId" text NOT NULL,
+    "productId" text NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -1922,6 +2094,30 @@ CREATE TABLE public.warehouses (
     is_active boolean DEFAULT true NOT NULL,
     sort_order integer DEFAULT 0 NOT NULL,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: wb_seller_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.wb_seller_settings (
+    id integer DEFAULT 1 NOT NULL,
+    is_active boolean DEFAULT false NOT NULL,
+    auto_sync boolean DEFAULT true NOT NULL,
+    api_key text DEFAULT ''::text NOT NULL,
+    default_subject_id integer,
+    products_mode text DEFAULT 'from_wb'::text NOT NULL,
+    prices_mode text DEFAULT 'from_wb'::text NOT NULL,
+    stocks_mode text DEFAULT 'from_wb'::text NOT NULL,
+    products_interval_minutes integer DEFAULT 60 NOT NULL,
+    prices_interval_minutes integer DEFAULT 60 NOT NULL,
+    stocks_interval_minutes integer DEFAULT 60 NOT NULL,
+    stock_warehouse_id text,
+    last_sync_at timestamp with time zone,
+    last_sync_result text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -2056,6 +2252,22 @@ ALTER TABLE ONLY public.camera_settings
 
 
 --
+-- Name: cdek_settings cdek_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cdek_settings
+    ADD CONSTRAINT cdek_settings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: cdek_shipments cdek_shipments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cdek_shipments
+    ADD CONSTRAINT cdek_shipments_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: chat_message_recipients chat_message_recipients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2077,6 +2289,14 @@ ALTER TABLE ONLY public.chat_messages
 
 ALTER TABLE ONLY public.chat_reactions
     ADD CONSTRAINT chat_reactions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: client_devices client_devices_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.client_devices
+    ADD CONSTRAINT client_devices_pkey PRIMARY KEY (id);
 
 
 --
@@ -2277,6 +2497,14 @@ ALTER TABLE ONLY public.legal_documents
 
 ALTER TABLE ONLY public.login_slides
     ADD CONSTRAINT login_slides_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mail_accounts mail_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mail_accounts
+    ADD CONSTRAINT mail_accounts_pkey PRIMARY KEY (id);
 
 
 --
@@ -2824,6 +3052,22 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: vitrine_favorite_groups vitrine_favorite_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vitrine_favorite_groups
+    ADD CONSTRAINT vitrine_favorite_groups_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: vitrine_favorite_items vitrine_favorite_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vitrine_favorite_items
+    ADD CONSTRAINT vitrine_favorite_items_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: vk_auth_settings vk_auth_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2861,6 +3105,14 @@ ALTER TABLE ONLY public.vpn_settings
 
 ALTER TABLE ONLY public.warehouses
     ADD CONSTRAINT warehouses_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: wb_seller_settings wb_seller_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wb_seller_settings
+    ADD CONSTRAINT wb_seller_settings_pkey PRIMARY KEY (id);
 
 
 --
@@ -2950,6 +3202,20 @@ CREATE UNIQUE INDEX calls_pbx_call_id_key ON public.calls USING btree (pbx_call_
 
 
 --
+-- Name: cdek_shipments_contact_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX cdek_shipments_contact_id_idx ON public.cdek_shipments USING btree (contact_id);
+
+
+--
+-- Name: cdek_shipments_deal_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX cdek_shipments_deal_id_idx ON public.cdek_shipments USING btree (deal_id);
+
+
+--
 -- Name: chat_message_recipients_message_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3006,6 +3272,27 @@ CREATE INDEX chat_reactions_user_id_idx ON public.chat_reactions USING btree (us
 
 
 --
+-- Name: client_devices_contact_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX client_devices_contact_id_idx ON public.client_devices USING btree (contact_id);
+
+
+--
+-- Name: client_devices_device_key_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX client_devices_device_key_key ON public.client_devices USING btree (device_key);
+
+
+--
+-- Name: client_devices_token_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX client_devices_token_key ON public.client_devices USING btree (token);
+
+
+--
 -- Name: comments_task_id_pinned_at_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3045,6 +3332,13 @@ CREATE UNIQUE INDEX contact_projects_contact_id_project_id_key ON public.contact
 --
 
 CREATE INDEX contact_projects_project_id_idx ON public.contact_projects USING btree (project_id);
+
+
+--
+-- Name: contacts_client_key_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX contacts_client_key_key ON public.contacts USING btree (client_key);
 
 
 --
@@ -3143,6 +3437,13 @@ CREATE INDEX finance_documents_type_idx ON public.finance_documents USING btree 
 --
 
 CREATE UNIQUE INDEX help_articles_slug_key ON public.help_articles USING btree (slug);
+
+
+--
+-- Name: mail_accounts_user_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX mail_accounts_user_id_idx ON public.mail_accounts USING btree (user_id);
 
 
 --
@@ -3790,6 +4091,13 @@ CREATE INDEX tenant_tickets_status_idx ON public.tenant_tickets USING btree (sta
 
 
 --
+-- Name: tenant_tickets_task_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tenant_tickets_task_id_idx ON public.tenant_tickets USING btree (task_id);
+
+
+--
 -- Name: tenant_tickets_tenant_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3829,6 +4137,34 @@ CREATE UNIQUE INDEX users_email_key ON public.users USING btree (email);
 --
 
 CREATE UNIQUE INDEX users_username_key ON public.users USING btree (username);
+
+
+--
+-- Name: vitrine_favorite_groups_ownerId_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "vitrine_favorite_groups_ownerId_idx" ON public.vitrine_favorite_groups USING btree ("ownerId");
+
+
+--
+-- Name: vitrine_favorite_groups_share_token_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX vitrine_favorite_groups_share_token_key ON public.vitrine_favorite_groups USING btree (share_token);
+
+
+--
+-- Name: vitrine_favorite_items_groupId_productId_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX "vitrine_favorite_items_groupId_productId_key" ON public.vitrine_favorite_items USING btree ("groupId", "productId");
+
+
+--
+-- Name: vitrine_favorite_items_productId_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "vitrine_favorite_items_productId_idx" ON public.vitrine_favorite_items USING btree ("productId");
 
 
 --
@@ -4105,6 +4441,14 @@ ALTER TABLE ONLY public.finance_documents
 
 ALTER TABLE ONLY public.handler_settings
     ADD CONSTRAINT handler_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE SET NULL;
+
+
+--
+-- Name: mail_accounts mail_accounts_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mail_accounts
+    ADD CONSTRAINT mail_accounts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -4700,11 +5044,36 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: vitrine_favorite_groups vitrine_favorite_groups_ownerId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vitrine_favorite_groups
+    ADD CONSTRAINT "vitrine_favorite_groups_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: vitrine_favorite_items vitrine_favorite_items_groupId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vitrine_favorite_items
+    ADD CONSTRAINT "vitrine_favorite_items_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES public.vitrine_favorite_groups(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: vitrine_favorite_items vitrine_favorite_items_productId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vitrine_favorite_items
+    ADD CONSTRAINT "vitrine_favorite_items_productId_fkey" FOREIGN KEY ("productId") REFERENCES public.products(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
 -- Name: vk_community_settings vk_community_settings_default_creator_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.vk_community_settings
     ADD CONSTRAINT vk_community_settings_default_creator_id_fkey FOREIGN KEY (default_creator_id) REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE SET NULL;
+
 
 --
 -- Name: vk_community_settings vk_community_settings_default_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4734,13 +5103,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KrPG57faUU18cmFsZ2w8vCkgsKkJXtmw91fpsMTQAloEC59r4Tdu41vhKnrghqr
+\unrestrict NpmxcPJzzajp1GASsq7Ju3HuP44VjRwKHaKnZUJqDxAVUd6qeEho7PkjuUg73bM
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict jRaMqokNrgsEprBr844hMIhYgALQybxjzpKbMRn5aKbJa7ChBBCfdlHi3ckwmyR
+\restrict n7NsEVoab2I24m3DJlHuKTJHsPznAMlB3QlNgCzTK0Pq4NgYuUc0D95OQB5B4eC
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -4928,11 +5297,47 @@ INSERT INTO public._prisma_migrations VALUES ('12d42275-917f-494d-ac90-b9a20ae50
 INSERT INTO public._prisma_migrations VALUES ('15783a93-5e30-4f20-855f-77d7e2d3e430', '88c5c29c37e6b16a9527e2e09d26f552fe4a20f7716717cf326521b020fe7d07', '2026-10-20 17:00:37.046022+00', '20261020196000_vk_peer_id_bigint', NULL, NULL, '2026-10-20 17:00:37.040445+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('889e9906-ae83-46b9-9051-159c59dea9dc', '1b7241d7876616e1836afefe1188867c71e9e18a93b9df4d939d2b26221a8901', '2026-10-20 21:43:27.124818+00', '20261021001000_hikvision_plugin_settings', NULL, NULL, '2026-10-20 21:43:27.108178+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('f7090923-0c21-4441-879f-bf79a9d17b4a', '7ac0b996be0095be5f4a71d408c93eb78360ee2e2e20024e4489bd8cee5a0893', '2026-10-21 05:55:21.236165+00', '20261021083000_hikvision_validate_code', NULL, NULL, '2026-10-21 05:55:21.229662+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('a0ea9b73-37f5-441f-8226-04caff80b62a', 'ddc1d833fe5f8c14e7109c646ca26f36d66e5811859fddae38c68fca940fb0df', '2026-10-27 06:53:52.070544+00', '20261021160000_user_timezone_and_task_start_date', NULL, NULL, '2026-10-27 06:53:52.060193+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('34df85f0-e170-4f59-8873-b1273dca1c55', '5e5a2b7e81c432fdc4df594fb4c4cd71d1e59ec296d8d363cbd009b54298ae31', '2026-10-27 06:53:52.077399+00', '20261021165000_task_start_date_default_now', NULL, NULL, '2026-10-27 06:53:52.0711+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('0cfad592-e316-41d8-93a7-e03e7f3c38ed', '9fac8e6c8ce8255a887ba17f70f9108d0c0a9b5d8d18bc25698be45900fd5eb7', '2026-10-27 06:53:52.162574+00', '20261024041000_wb_seller_plugin', NULL, NULL, '2026-10-27 06:53:52.153836+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('4007277e-1c43-4e31-9682-b36137b133af', '88f812c5c8ee45533e8ef18634777b61965fd098da246f98f65ef2758d7be15a', '2026-10-27 06:53:52.081069+00', '20261021180000_add_email_mark_as_read', NULL, NULL, '2026-10-27 06:53:52.078193+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('5cb8da28-fb62-41aa-a47f-4e50018c448b', '5bb5f931d811d416234da2b157b1a66aeebae91ef70d1ca9221e2e75f0d2b494', '2026-10-27 06:53:52.099213+00', '20261021190000_client_devices_and_contact_key', NULL, NULL, '2026-10-27 06:53:52.081602+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('eeb2dc40-d074-4906-b29d-647b727015a5', 'dbf3c025606e815cea353427cd41ba9d0153de572c9965b9bed60267b2c38b4c', '2026-10-27 06:53:52.102418+00', '20261021210000_client_devices_updated_at', NULL, NULL, '2026-10-27 06:53:52.099668+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('d74b75d4-e590-476c-a209-115dc313d9a5', '6a0b0232d3bf10773255589ad4a176f1d66afb69e6dc8e4b170534f44a2a7e68', '2026-10-27 06:53:52.108193+00', '20261022190000_system_timezone', NULL, NULL, '2026-10-27 06:53:52.102852+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('9f5c100c-c67e-4abb-8aef-22d07cf682a5', '577ca7db06faf1b5f8f39d05e88584646440f853310c7d83e7291612a750973a', '2026-10-27 06:53:52.129245+00', '20261022233000_vitrine_favorites', NULL, NULL, '2026-10-27 06:53:52.108996+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('54a1f2a2-c467-4a0f-8664-05d9096d790b', '60741646c444b3be8ca7d2e508f6ea52acbd63ebd30318ef9c34f109e38f66fb', '2026-10-27 06:53:52.133229+00', '20261023000500_vitrine_favorite_share_link', NULL, NULL, '2026-10-27 06:53:52.129747+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('6f6388d5-5cec-4a63-9a65-fdd8b40efb59', 'd0aa72a702e7a62268098f7f33e917790e437c4a16d4fdc9b39d3363c676aed2', '2026-10-27 06:53:52.137384+00', '20261023170000_tenant_ticket_task_link', NULL, NULL, '2026-10-27 06:53:52.133711+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('b5a6b71b-cbed-4f13-82ab-bad6afe8c76d', 'a258f63636d75eb98ce9abab9c34000384b5d77e11db1c9a68e0a05afb6e5990', '2026-10-27 06:53:52.140477+00', '20261023235700_price_type_for_ozon', NULL, NULL, '2026-10-27 06:53:52.13785+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('4f234ca7-30a7-41e2-bc0b-bd1c8e3aa2fa', '585984f2646c297f4dcf66dcd75591172a34534550ef73a5741f4b34d456d42b', '2026-10-27 06:53:52.143596+00', '20261023235800_ozon_stock_source', NULL, NULL, '2026-10-27 06:53:52.141202+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('9ca1f995-8f32-4a13-8a3c-f9d0fd59a635', 'f9ecd641ce60a512bcde8f8cc0a9ac1a56e8a60650a1fc10b3d0c5fa0daf64f3', '2026-10-27 06:53:52.14647+00', '20261024002000_ozon_stock_warehouse', NULL, NULL, '2026-10-27 06:53:52.144134+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('795a8ab3-eff8-4539-89d9-1e2eaa875ef3', '45da77eb9d0cc5a05455417cf1e52c06c192727fb76fba719ed0b94ea4025252', '2026-10-27 06:53:52.153352+00', '20261024004000_ozon_modes_and_intervals', NULL, NULL, '2026-10-27 06:53:52.146946+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('583b5d96-210d-4c09-af0d-dd8a63023957', 'd5261ed224983b341b057ac339e8fde7ee72f8d03b20511ba1ed10f99472cdd9', NULL, '20261025110000_vk_community_default_project', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
+
+Migration name: 20261025110000_vk_community_default_project
+
+Database error code: 42701
+
+Database error:
+ERROR: column "default_project_id" of relation "vk_community_settings" already exists
+
+DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42701), message: "column \"default_project_id\" of relation \"vk_community_settings\" already exists", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("tablecmds.c"), line: Some(7356), routine: Some("check_for_column_name_collision") }
+
+   0: sql_schema_connector::apply_migration::apply_script
+           with migration_name="20261025110000_vk_community_default_project"
+             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
+   1: schema_core::commands::apply_migrations::Applying migration
+           with migration_name="20261025110000_vk_community_default_project"
+             at schema-engine/core/src/commands/apply_migrations.rs:91
+   2: schema_core::state::ApplyMigrations
+             at schema-engine/core/src/state.rs:226', '2026-10-27 06:56:34.266992+00', '2026-10-27 06:56:32.601545+00', 0);
+INSERT INTO public._prisma_migrations VALUES ('cdfdc539-f87b-4092-a988-a21a28eb81c9', 'd5261ed224983b341b057ac339e8fde7ee72f8d03b20511ba1ed10f99472cdd9', '2026-10-27 06:56:34.270258+00', '20261025110000_vk_community_default_project', '', NULL, '2026-10-27 06:56:34.270258+00', 0);
+INSERT INTO public._prisma_migrations VALUES ('7fea2d5b-6eef-474f-9d0f-83db5b627725', '8b2ab19318e144ad689222fa54ea23acf2e5bc10418482fabac4008812fd5470', '2026-10-27 06:56:35.929998+00', '20261025131500_cdek_plugin', NULL, NULL, '2026-10-27 06:56:35.901766+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('a12964cb-235d-4111-b7c5-17883f73e151', 'd74f38884583eea089b332037f32dc1f27fd328426bd2e302c219d89def9f447', '2026-10-27 06:56:35.942816+00', '20261027001500_mail_accounts', NULL, NULL, '2026-10-27 06:56:35.930867+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jRaMqokNrgsEprBr844hMIhYgALQybxjzpKbMRn5aKbJa7ChBBCfdlHi3ckwmyR
+\unrestrict n7NsEVoab2I24m3DJlHuKTJHsPznAMlB3QlNgCzTK0Pq4NgYuUc0D95OQB5B4eC
 
