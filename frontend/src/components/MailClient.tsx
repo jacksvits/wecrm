@@ -710,7 +710,7 @@ export function MailClient() {
             onClick={() => { setSelectedFolder(f.path); setOpenMessage(null); }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: `0 5px 0 ${4 + depth * 14}`,
+              padding: `0 5px 0 ${4 + depth * 16}px`,
               margin: '1px 2px',
               height: 22, width: 'calc(100% - 4px)', boxSizing: 'border-box',
               borderRadius: 0, cursor: 'pointer', fontSize: 12, textAlign: 'left',
