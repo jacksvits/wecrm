@@ -1,5 +1,5 @@
 import { Router } from 'express' ; import { z } from 'zod' ; import { prisma } from '../lib/prisma.js' ;
-import { uploadsRoot } from '../lib/tenant.js' ; import { authMiddleware, AuthRequest, guestCreateGuard } from '../middleware/auth.js' ; import { sendPushToTaskAssignees, sendPushToTaskCurators, sendPushToRoleUsers } from '../lib/push.js' ; import { notifyTaskAssignees, notifyTaskCurators, notifyRoleUsers } from '../lib/notifications.js' ; import { broadcast, CHANNELS } from '../lib/events.js' ; import { syncTaskStatusToTicket } from '../lib/support-ticket-tasks.js' ;
+import { uploadsRoot, pinTenantContext } from '../lib/tenant.js' ; import { authMiddleware, AuthRequest, guestCreateGuard } from '../middleware/auth.js' ; import { sendPushToTaskAssignees, sendPushToTaskCurators, sendPushToRoleUsers } from '../lib/push.js' ; import { notifyTaskAssignees, notifyTaskCurators, notifyRoleUsers } from '../lib/notifications.js' ; import { broadcast, CHANNELS } from '../lib/events.js' ; import { syncTaskStatusToTicket } from '../lib/support-ticket-tasks.js' ;
 import fs from 'fs' ;
 import path from 'path' ;
 import multer from 'multer' ;
@@ -237,4 +237,9 @@ router.get('/:id/files/:filename/download', async (req: AuthRequest, res) => {
   }
 });
 
+
+// Явно «прикалываем» контекст tenant'а (по Host) ко всем обработчикам роутера —
+// защита от молчаливой потери AsyncLocalStorage-контекста при загрузке файлов
+// (инцидент 27.10.2026: брендинг tenant'а записывался в главную организацию).
+pinTenantContext(router);
 export default router ;

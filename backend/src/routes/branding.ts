@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import sharp from 'sharp';
 import { prisma } from '../lib/prisma.js';
-import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
+import { uploadsRoot, tenantUploadPrefix, pinTenantContext } from '../lib/tenant.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -459,4 +459,9 @@ router.delete('/splash', authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+
+// Явно «прикалываем» контекст tenant'а (по Host) ко всем обработчикам роутера —
+// защита от молчаливой потери AsyncLocalStorage-контекста при загрузке файлов
+// (инцидент 27.10.2026: брендинг tenant'а записывался в главную организацию).
+pinTenantContext(router);
 export default router;

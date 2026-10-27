@@ -17,7 +17,7 @@ import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { currentTenant, platformPrisma } from '../lib/tenant.js';
+import { currentTenant, platformPrisma, pinTenantContext } from '../lib/tenant.js';
 import {
   createTaskForTicket,
   addTicketMessageToTask,
@@ -362,4 +362,9 @@ router.post('/admin/:id/status', authMiddleware, requirePlatformAdmin, async (re
   res.json(updated);
 });
 
+
+// Явно «прикалываем» контекст tenant'а (по Host) ко всем обработчикам роутера —
+// защита от молчаливой потери AsyncLocalStorage-контекста при загрузке файлов
+// (инцидент 27.10.2026: брендинг tenant'а записывался в главную организацию).
+pinTenantContext(router);
 export default router;

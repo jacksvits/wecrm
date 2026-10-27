@@ -6,6 +6,7 @@ import nodemailer from 'nodemailer';
 import multer from 'multer';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { pinTenantContext } from '../lib/tenant.js';
 
 /**
  * Почтовый клиент (страница «Почтовый клиент», только для админов).
@@ -559,4 +560,9 @@ router.post('/send', upload.array('files', 10), async (req: AuthRequest, res) =>
   }
 });
 
+
+// Явно «прикалываем» контекст tenant'а (по Host) ко всем обработчикам роутера —
+// защита от молчаливой потери AsyncLocalStorage-контекста при загрузке файлов
+// (инцидент 27.10.2026: брендинг tenant'а записывался в главную организацию).
+pinTenantContext(router);
 export default router;

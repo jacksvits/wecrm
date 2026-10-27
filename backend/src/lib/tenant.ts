@@ -14,6 +14,7 @@
 import { AsyncLocalStorage } from 'async_hooks';
 import { PrismaClient } from '@prisma/client';
 import { makeClientKeyMiddleware } from './client-key.js';
+import type { Router } from 'express';
 
 /** Данные tenant'а, доступные в рамках текущего запроса/задачи */
 export interface TenantInfo {
@@ -177,6 +178,40 @@ export function invalidateTenantCache(slug?: string) {
 /** Выполняет fn в контексте tenant'а (worker-циклы, provisioning) */
 export async function withTenant<T>(tenant: TenantInfo, fn: () => Promise<T>): Promise<T> {
   return tenantContext.run(tenant, fn);
+}
+
+/**
+ * «Прикалывает» контекст tenant'а ко ВСЕМ обработчикам роутера: каждый
+ * обработчик выполняется с явно перерезолвленным по Host-заголовку tenant'ом
+ * (тот же кэш, что и в middleware/tenant.ts). Защита от молчаливой потери
+ * AsyncLocalStorage-контекста между middleware и обработчиком — инцидент
+ * 27.10.2026: при загрузке брендинга с поддомена tenant'а запись уходила в
+ * главную организацию (БД и папка uploads главного домена). Вызывать после
+ * объявления всех роутов роутера. При расхождении текущего контекста с Host —
+ * громкая ошибка в лог (диагностика повторов).
+ */
+export function pinTenantContext(router: Router): void {
+  for (const layer of router.stack) {
+    const routeLayer = layer as any;
+    if (!routeLayer.route) continue;
+    for (const sub of routeLayer.route.stack as any[]) {
+      const original = sub.handle;
+      sub.handle = async (req: any, res: any, next: any) => {
+        try {
+          const host = (req.headers.host || '').toString();
+          const tenant = await resolveTenantByHost(host);
+          if (!tenant) return original(req, res, next); // middleware/tenant.ts ответит 404
+          const inContext = currentTenant();
+          if (inContext && inContext.slug !== tenant.slug) {
+            console.error(`[tenant] контекст запроса (${inContext.slug}) не совпадает с Host (${host} → ${tenant.slug})`);
+          }
+          await withTenant(tenant, () => Promise.resolve(original(req, res, next)));
+        } catch (e) {
+          next(e as Error);
+        }
+      };
+    }
+  }
 }
 
 /** Префикс папки для файлов tenant'а в общем томе uploads */
