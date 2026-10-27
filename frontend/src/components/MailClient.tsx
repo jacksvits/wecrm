@@ -678,23 +678,23 @@ export function MailClient() {
     }
   };
 
-  // Заголовок ящика («Mailbox-demo» в референсе)
-  function renderMailboxHeader() {
+  // Селект аккаунта над деревом папок (как на эталонном скриншоте пользователя)
+  function renderAccountSelect() {
+    if (!accounts.length) return null;
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 5, height: 24,
-        padding: '0 6px', margin: '0 2px 3px', boxSizing: 'border-box',
-        fontSize: 12, fontWeight: 700, color: 'var(--text-primary)',
-        borderBottom: '1px solid var(--border-color)',
-      }}>
-        <span style={{ width: 12, flexShrink: 0 }} />
-        <span style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', color: '#d9a62e' }}>
-          <Icon name='mail' size={14} />
-        </span>
-        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {account ? (account.label || account.email) : 'Ящик'}
-        </span>
-      </div>
+      <select
+        value={selectedAccountId}
+        onChange={e => setSelectedAccountId(e.target.value)}
+        title='Почтовый аккаунт'
+        style={{
+          ...inputStyle, height: 32, width: 'calc(100% - 12px)', margin: '2px 6px 8px',
+          fontSize: 13, flexShrink: 0,
+        }}
+      >
+        {accounts.map(a => (
+          <option key={a.id} value={a.id}>{a.label ? `${a.label} (${a.email})` : a.email}</option>
+        ))}
+      </select>
     );
   }
 
@@ -963,35 +963,44 @@ export function MailClient() {
     color: 'var(--text-primary)', fontSize: 12, padding: '0 4px', flexShrink: 0,
   };
 
-  // Серебристый тулбар в стиле классического почтового клиента
+  // Серебристый тулбар — порядок кнопок как на эталонном скриншоте пользователя
   function renderToolbar() {
     return (
       <div style={{
         display: 'flex', alignItems: 'center', gap: 3, padding: '4px 8px',
         background: 'linear-gradient(to bottom, var(--bg-card) 0%, var(--bg-hover) 100%)',
-        borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap',
+        borderBottom: '1px solid var(--border-color)', flexWrap: 'nowrap', overflowX: 'auto',
       }}>
-        {/* Новое ▾ */}
-        <select
-          value=''
-          onChange={e => { const v = e.target.value; e.target.value = ''; if (v === 'compose') startCompose(); if (v === 'settings') setShowSettings(true); }}
-          title='Создать'
-          style={{ ...tbSelect, fontWeight: 600 }}
+        {/* Compose — первая слева */}
+        <button
+          onClick={startCompose}
+          title='Написать письмо'
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5, height: 28, padding: '0 16px', borderRadius: 3,
+            border: '1px solid #1c4f8f', cursor: 'pointer',
+            background: 'linear-gradient(to bottom, #6aa6ec 0%, #2f6fc0 100%)',
+            color: '#fff', fontSize: 13, fontWeight: 700, textShadow: '0 1px 1px rgba(0,0,0,0.3)', flexShrink: 0,
+          }}
         >
-          <option value=''>Новое ▾</option>
-          <option value='compose'>Письмо…</option>
-          <option value='settings'>Настройки аккаунта…</option>
-        </select>
+          <Icon name='mail' size={14} color='#fff' /> Написать
+        </button>
         {tbSep}
-        {tbBtn('Обновить', refresh, <Icon name='refresh' size={15} />)}
+        {tbBtn('Предыдущее письмо', () => openRelative(-1), <Icon name='prev' size={16} />, !canPrev)}
+        {tbBtn('Следующее письмо', () => openRelative(1), <Icon name='next' size={16} />, !canNext)}
         {tbSep}
-        {/* Поиск */}
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: 250, flexShrink: 0 }}>
+        {tbBtn('Ответить', startReply, <Icon name='reply' size={15} />, !openMessage)}
+        {tbBtn('Переслать', startForward, <Icon name='forward' size={15} />, !openMessage)}
+        {tbSep}
+        {tbBtn(currentFolderIsJunk ? 'Не спам (во Входящие)' : 'Спам', spamAction, <Icon name='spamShield' size={15} color={currentFolderIsJunk ? '#188038' : '#e37400'} />)}
+        {tbBtn(currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину', deleteSelected, <Icon name='trash' size={15} />, false, { color: '#d93025' })}
+        {tbSep}
+        {/* Поиск — большое гибкое поле */}
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '1 1 auto', minWidth: 160 }}>
           <span style={{ position: 'absolute', left: 6, color: 'var(--text-muted)', display: 'flex', pointerEvents: 'none' }}>
             <Icon name='search' size={13} />
           </span>
           <input
-            style={{ ...inputStyle, height: 26, paddingLeft: 26, paddingRight: searchInput ? 24 : 8, fontSize: 12, borderRadius: 3 }}
+            style={{ ...inputStyle, width: '100%', height: 26, paddingLeft: 26, paddingRight: searchInput ? 24 : 8, fontSize: 12, borderRadius: 3 }}
             placeholder='Поиск…'
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
@@ -1010,7 +1019,7 @@ export function MailClient() {
           value={`${sortField}:${sortAsc ? 'asc' : 'desc'}`}
           onChange={e => { const [f, d] = e.target.value.split(':'); setSortField(f as any); setSortAsc(d === 'asc'); }}
           title='Сортировка'
-          style={{ ...tbSelect, fontWeight: 600 }}
+          style={{ ...tbSelect, fontWeight: 600, flexShrink: 0 }}
         >
           <option value='date:desc'>Сортировка: новые ▾</option>
           <option value='date:asc'>Сначала старые</option>
@@ -1046,41 +1055,9 @@ export function MailClient() {
             ))}
           </select>
         )}
-        {/* Аккаунт — в тулбаре, как элемент панели (в референсе сверху нет) */}
-        {accounts.length > 0 && (
-          <select
-            value={selectedAccountId}
-            onChange={e => setSelectedAccountId(e.target.value)}
-            title='Почтовый аккаунт'
-            style={{ ...tbSelect, maxWidth: 200 }}
-          >
-            {accounts.map(a => (
-              <option key={a.id} value={a.id}>{a.label ? `${a.label} (${a.email})` : a.email}</option>
-            ))}
-          </select>
-        )}
-        {/* Compose */}
-        <button
-          onClick={startCompose}
-          title='Написать письмо'
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5, height: 28, padding: '0 16px', borderRadius: 3,
-            border: '1px solid #1c4f8f', cursor: 'pointer',
-            background: 'linear-gradient(to bottom, #6aa6ec 0%, #2f6fc0 100%)',
-            color: '#fff', fontSize: 13, fontWeight: 700, textShadow: '0 1px 1px rgba(0,0,0,0.3)', flexShrink: 0,
-          }}
-        >
-          <Icon name='mail' size={14} color='#fff' /> Написать
-        </button>
         {tbSep}
-        {tbBtn('Предыдущее письмо', () => openRelative(-1), <Icon name='prev' size={16} />, !canPrev)}
-        {tbBtn('Следующее письмо', () => openRelative(1), <Icon name='next' size={16} />, !canNext)}
+        {tbBtn('Обновить', refresh, <Icon name='refresh' size={15} />)}
         {tbSep}
-        {tbBtn('Ответить', startReply, <Icon name='reply' size={15} />, !openMessage)}
-        {tbBtn('Переслать', startForward, <Icon name='forward' size={15} />, !openMessage)}
-        {tbSep}
-        {tbBtn(currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину', deleteSelected, <Icon name='trash' size={15} />, false, { color: '#d93025' })}
-        {tbBtn(currentFolderIsJunk ? 'Не спам (во Входящие)' : 'Спам', spamAction, <Icon name='spamShield' size={15} color={currentFolderIsJunk ? '#188038' : '#e37400'} />)}
         {tbBtn('Печать', printMessage, <Icon name='print' size={15} />, !openMessage)}
         <div style={{ flex: 1 }} />
         {tbSep}
@@ -1133,12 +1110,12 @@ export function MailClient() {
                   padding: '4px 6px 8px', borderBottom: `1px solid ${borderColor}`,
                   maxHeight: '38vh', overflowY: 'auto',
                 }}>
-                  {renderMailboxHeader()}
+                  {renderAccountSelect()}
                   {renderFolderTree(folders, 0)}
                 </div>
               ) : (
                 <>
-                  {renderMailboxHeader()}
+                  {renderAccountSelect()}
                   {renderFolderTree(folders, 0)}
                 </>
               )}
