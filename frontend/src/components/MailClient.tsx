@@ -113,6 +113,48 @@ function formatMailDate(iso: string | null): string {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined }) + ' ' + time;
 }
 
+// Период для группировки писем в списке: как в классических почтовых клиентах
+function messageDateGroup(iso: string | null): string {
+  if (!iso) return 'Без даты';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return 'Без даты';
+  const now = new Date();
+  const startOfDay = (x: Date) => { const y = new Date(x); y.setHours(0, 0, 0, 0); return y; };
+  const today = startOfDay(now);
+  const day = startOfDay(d);
+  const diffDays = Math.round((today.getTime() - day.getTime()) / 86400000);
+  if (diffDays <= 0) return 'Сегодня';
+  const mondayOffset = (today.getDay() + 6) % 7; // неделя начинается с понедельника
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - mondayOffset);
+  const lastWeekStart = new Date(weekStart);
+  lastWeekStart.setDate(weekStart.getDate() - 7);
+  const twoWeeksStart = new Date(weekStart);
+  twoWeeksStart.setDate(weekStart.getDate() - 14);
+  const threeWeeksStart = new Date(weekStart);
+  threeWeeksStart.setDate(weekStart.getDate() - 21);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  if (day >= weekStart) return 'На этой неделе';
+  if (day >= lastWeekStart) return 'На прошлой неделе';
+  if (day >= twoWeeksStart) return 'Две недели назад';
+  if (day >= threeWeeksStart) return 'Три недели назад';
+  if (day >= monthStart) return 'Ранее в этом месяце';
+  if (day >= prevMonthStart) return 'В прошлом месяце';
+  return 'Более старые';
+}
+
+function groupMailMessagesByDate(items: MailMessageItem[]): { key: string; label: string; items: MailMessageItem[] }[] {
+  const map = new Map<string, MailMessageItem[]>();
+  items.forEach(m => {
+    const label = messageDateGroup(m.date);
+    const group = map.get(label);
+    if (group) group.push(m);
+    else map.set(label, [m]);
+  });
+  return Array.from(map, ([label, groupItems]) => ({ key: label, label, items: groupItems }));
+}
+
 function formatSize(bytes: number): string {
   if (!bytes) return '0 KB';
   if (bytes < 1024) return `${bytes} Б`;
@@ -197,6 +239,10 @@ export function MailClient() {
   // Сортировка списка (клиентская, в пределах загруженной страницы)
   const [sortField, setSortField] = useState<'date' | 'sender' | 'subject' | 'size'>('date');
   const [sortAsc, setSortAsc] = useState(false);
+  // Фильтр списка писем: все / только непрочитанные
+  const [listFilter, setListFilter] = useState<'all' | 'unread'>('all');
+  // Свёрнутые группы писем по датам (название группы → скрыть письма)
+  const [collapsedMessageGroups, setCollapsedMessageGroups] = useState<Set<string>>(new Set());
 
   const [showSettings, setShowSettings] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
@@ -369,6 +415,28 @@ export function MailClient() {
 
   const totalPages = Math.max(1, Math.ceil(totalMessages / 25));
 
+  // Сортировка и фильтрация загруженной страницы
+  const sortedMessages = useMemo(() => {
+    const arr = [...messages];
+    const mult = sortAsc ? 1 : -1;
+    arr.sort((a, b) => {
+      if (sortField === 'sender') return mult * (a.fromName || a.from).localeCompare(b.fromName || b.from, 'ru');
+      if (sortField === 'subject') return mult * a.subject.localeCompare(b.subject, 'ru');
+      if (sortField === 'size') return mult * (a.size - b.size);
+      return mult * String(a.date || '').localeCompare(String(b.date || ''));
+    });
+    return arr;
+  }, [messages, sortField, sortAsc]);
+
+  const visibleMessages = useMemo(() => (
+    listFilter === 'unread' ? sortedMessages.filter(m => !m.seen) : sortedMessages
+  ), [sortedMessages, listFilter]);
+
+  // Группировка по датам применяем только для хронологической сортировки, чтобы группы не дробились
+  const groupedMessages = useMemo(() => (
+    sortField === 'date' ? groupMailMessagesByDate(visibleMessages) : [{ key: 'all', label: '', items: visibleMessages }]
+  ), [visibleMessages, sortField]);
+
   // ---- Множественный выбор ----
   const toggleSelect = (uid: number) => {
     setSelected(prev => {
@@ -378,14 +446,14 @@ export function MailClient() {
     });
   };
   const toggleSelectAll = () => {
-    setSelected(prev => (prev.size === messages.length && messages.length > 0 ? new Set() : new Set(messages.map(m => m.uid))));
+    setSelected(prev => (prev.size === visibleMessages.length && visibleMessages.length > 0 ? new Set() : new Set(visibleMessages.map(m => m.uid))));
   };
-  // Выбор из выпадающего списка: all / none / unread / read
+  // Выбор из выпадающего списка: all / none / unread / read — в рамках текущего фильтра
   const applySelectMode = (mode: string) => {
-    if (mode === 'all') setSelected(new Set(messages.map(m => m.uid)));
+    if (mode === 'all') setSelected(new Set(visibleMessages.map(m => m.uid)));
     else if (mode === 'none') setSelected(new Set());
-    else if (mode === 'unread') setSelected(new Set(messages.filter(m => !m.seen).map(m => m.uid)));
-    else if (mode === 'read') setSelected(new Set(messages.filter(m => m.seen).map(m => m.uid)));
+    else if (mode === 'unread') setSelected(new Set(visibleMessages.filter(m => !m.seen).map(m => m.uid)));
+    else if (mode === 'read') setSelected(new Set(visibleMessages.filter(m => m.seen).map(m => m.uid)));
   };
   const clearSelection = () => setSelected(new Set());
 
@@ -589,29 +657,16 @@ export function MailClient() {
     }
   };
 
-  // Навигация по списку: ‹ новее, › старее
+  // Навигация по списку: ‹ новее, › старее — с учётом фильтра «Непрочитанные» и сортировки
   const openRelative = (dir: 1 | -1) => {
     if (!openMessage) return;
-    const idx = messages.findIndex(m => m.uid === openMessage.uid);
-    const next = messages[idx + dir];
+    const idx = visibleMessages.findIndex(m => m.uid === openMessage.uid);
+    const next = visibleMessages[idx + dir];
     if (next) openUid(next.uid);
   };
 
-  const canPrev = openMessage !== null && messages.findIndex(m => m.uid === openMessage!.uid) > 0;
-  const canNext = openMessage !== null && messages.findIndex(m => m.uid === openMessage!.uid) >= 0 && messages.findIndex(m => m.uid === openMessage!.uid) < messages.length - 1;
-
-  // Сортировка загруженной страницы
-  const sortedMessages = useMemo(() => {
-    const arr = [...messages];
-    const mult = sortAsc ? 1 : -1;
-    arr.sort((a, b) => {
-      if (sortField === 'sender') return mult * (a.fromName || a.from).localeCompare(b.fromName || b.from, 'ru');
-      if (sortField === 'subject') return mult * a.subject.localeCompare(b.subject, 'ru');
-      if (sortField === 'size') return mult * (a.size - b.size);
-      return mult * String(a.date || '').localeCompare(String(b.date || ''));
-    });
-    return arr;
-  }, [messages, sortField, sortAsc]);
+  const canPrev = openMessage !== null && visibleMessages.findIndex(m => m.uid === openMessage!.uid) > 0;
+  const canNext = openMessage !== null && visibleMessages.findIndex(m => m.uid === openMessage!.uid) >= 0 && visibleMessages.findIndex(m => m.uid === openMessage!.uid) < visibleMessages.length - 1;
 
   // Печать письма
   const printMessage = () => {
@@ -959,84 +1014,169 @@ export function MailClient() {
   }
 
   // ---- Рендер списка писем (классический стиль) ----
+  function renderMessageRow(m: MailMessageItem) {
+    const active = openMessage?.uid === m.uid;
+    const sel = selected.has(m.uid);
+    const rowColor = active ? '#fff' : 'var(--text-primary)';
+    const subColor = active ? '#e6effc' : 'var(--text-muted)';
+    return (
+      <div
+        key={m.uid}
+        className={active ? 'mail-row mail-row-active' : 'mail-row'}
+        onClick={() => openUid(m.uid)}
+        draggable
+        onDragStart={e => {
+          e.dataTransfer.setData('text/plain', String(m.uid));
+          e.dataTransfer.effectAllowed = 'move';
+          setDragUid(m.uid);
+        }}
+        onDragEnd={() => { setDragUid(null); setDropFolder(null); }}
+        style={{
+          padding: '5px 10px 6px 8px', cursor: 'pointer',
+          borderBottom: '1px solid var(--border-color)',
+          background: 'transparent',
+          display: 'flex', flexDirection: 'column', gap: 1,
+          opacity: dragUid === m.uid ? 0.45 : 1,
+        }}
+      >
+        {/* Строка 1: чекбокс + отправитель + действия выбранного + дата */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <input
+            type='checkbox'
+            checked={sel}
+            onClick={e => e.stopPropagation()}
+            onChange={() => toggleSelect(m.uid)}
+            style={{ flexShrink: 0, margin: 0 }}
+          />
+          {!m.seen && <span style={{ width: 7, height: 7, borderRadius: '50%', background: active ? '#fff' : '#2f74d0', flexShrink: 0 }} />}
+          <span style={{ flex: 1, fontSize: 13, fontWeight: m.seen ? 400 : 700, color: rowColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {m.fromName || m.from || '(без отправителя)'}
+          </span>
+          {sel && (
+            <>
+              <button
+                onClick={e => { e.stopPropagation(); toggleReadOne(m); }}
+                title={m.seen ? 'Отметить непрочитанным' : 'Отметить прочитанным'}
+                style={{ ...iconBtnStyle, width: 24, height: 24, color: active ? '#fff' : 'var(--text-primary)' }}
+              >
+                <Icon name='mail' size={13} />
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); deleteOne(m.uid); }}
+                title={currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину'}
+                style={{ ...iconBtnStyle, width: 24, height: 24, color: active ? '#ffd9d9' : '#d93025' }}
+              >
+                <Icon name='trash' size={13} />
+              </button>
+            </>
+          )}
+          <span style={{ fontSize: 11.5, color: subColor, flexShrink: 0 }}>{formatMailDate(m.date)}</span>
+        </div>
+        {/* Строка 2: тема + вложение + размер */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 22 }}>
+          <span style={{ flex: 1, fontSize: 12, color: subColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.subject}</span>
+          {m.hasAttachments && <span title='Вложения' style={{ fontSize: 11, flexShrink: 0, color: subColor }}>📎</span>}
+          <span style={{ fontSize: 11, color: subColor, flexShrink: 0 }}>{formatSize(m.size)}</span>
+        </div>
+      </div>
+    );
+  }
+
   function renderMessageList() {
-    const isOpen = (uid: number) => openMessage?.uid === uid;
+    const filterTab = (key: 'all' | 'unread', label: string) => {
+      const active = listFilter === key;
+      return (
+        <button
+          key={key}
+          onClick={() => setListFilter(key)}
+          style={{
+            background: 'none', border: 'none', padding: '0 0 5px', cursor: 'pointer',
+            fontSize: 14, fontWeight: active ? 600 : 400,
+            color: active ? '#0b5fd0' : 'var(--text-primary)',
+            borderBottom: `2px solid ${active ? '#0b5fd0' : 'transparent'}`,
+          }}
+        >
+          {label}
+        </button>
+      );
+    };
+
     return (
       <div style={{
         width: isMobile ? '100%' : 380, flexShrink: 0, overflowY: 'auto',
         borderRight: isMobile ? 'none' : `1px solid ${borderColor}`,
         display: 'flex', flexDirection: 'column', background: 'var(--bg-card)',
       }}>
-        {loading && <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>Загрузка…</div>}
-        {!loading && sortedMessages.length === 0 && (
-          <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>
-            {searchQ ? 'Ничего не найдено' : 'Папка пуста'}
-          </div>
-        )}
-        {!loading && sortedMessages.map(m => {
-          const active = isOpen(m.uid);
-          const sel = selected.has(m.uid);
-          const rowColor = active ? '#fff' : 'var(--text-primary)';
-          const subColor = active ? '#e6effc' : 'var(--text-muted)';
-          return (
-            <div
-              key={m.uid}
-              className={active ? 'mail-row mail-row-active' : 'mail-row'}
-              onClick={() => openUid(m.uid)}
-              draggable
-              onDragStart={e => {
-                e.dataTransfer.setData('text/plain', String(m.uid));
-                e.dataTransfer.effectAllowed = 'move';
-                setDragUid(m.uid);
-              }}
-              onDragEnd={() => { setDragUid(null); setDropFolder(null); }}
+        {/* Панель фильтров и сортировки над списком писем — как на референсном скриншоте */}
+        <div style={{
+          flexShrink: 0, padding: '6px 12px 0', background: 'var(--bg-card)',
+          borderBottom: `1px solid ${borderColor}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {filterTab('all', 'Все')}
+            {filterTab('unread', 'Непрочитанные')}
+            <div style={{ flex: 1 }} />
+            <span style={{ fontSize: 12.5, color: 'var(--text-muted)', flexShrink: 0 }}>По</span>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              <select
+                value={sortField}
+                onChange={e => setSortField(e.target.value as 'date' | 'sender' | 'subject' | 'size')}
+                title='Поле сортировки'
+                style={{
+                  appearance: 'none', WebkitAppearance: 'none', border: 'none', background: 'transparent',
+                  color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, paddingRight: 14, outline: 'none',
+                }}
+              >
+                <option value='date'>Дата</option>
+                <option value='sender'>Отправитель</option>
+                <option value='subject'>Тема</option>
+                <option value='size'>Размер</option>
+              </select>
+              <span style={{ position: 'absolute', right: 0, color: 'var(--text-primary)', fontSize: 11, pointerEvents: 'none' }}>▾</span>
+            </div>
+            <button
+              onClick={() => setSortAsc(prev => !prev)}
+              title={sortAsc ? 'Сначала старые' : 'Сначала новые'}
               style={{
-                padding: '5px 10px 6px 8px', cursor: 'pointer',
-                borderBottom: '1px solid var(--border-color)',
-                background: 'transparent',
-                display: 'flex', flexDirection: 'column', gap: 1,
-                opacity: dragUid === m.uid ? 0.45 : 1,
+                width: 24, height: 24, border: 'none', borderRadius: 3, cursor: 'pointer',
+                background: 'transparent', color: 'var(--text-primary)', fontSize: 14,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}
             >
-              {/* Строка 1: чекбокс + отправитель + действия выбранного + дата */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input
-                  type='checkbox'
-                  checked={sel}
-                  onClick={e => e.stopPropagation()}
-                  onChange={() => toggleSelect(m.uid)}
-                  style={{ flexShrink: 0, margin: 0 }}
-                />
-                {!m.seen && <span style={{ width: 7, height: 7, borderRadius: '50%', background: active ? '#fff' : '#2f74d0', flexShrink: 0 }} />}
-                <span style={{ flex: 1, fontSize: 13, fontWeight: m.seen ? 400 : 700, color: rowColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {m.fromName || m.from || '(без отправителя)'}
-                </span>
-                {sel && (
-                  <>
-                    <button
-                      onClick={e => { e.stopPropagation(); toggleReadOne(m); }}
-                      title={m.seen ? 'Отметить непрочитанным' : 'Отметить прочитанным'}
-                      style={{ ...iconBtnStyle, width: 24, height: 24, color: active ? '#fff' : 'var(--text-primary)' }}
-                    >
-                      <Icon name='mail' size={13} />
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); deleteOne(m.uid); }}
-                      title={currentFolderIsTrash ? 'Удалить безвозвратно' : 'В Корзину'}
-                      style={{ ...iconBtnStyle, width: 24, height: 24, color: active ? '#ffd9d9' : '#d93025' }}
-                    >
-                      <Icon name='trash' size={13} />
-                    </button>
-                  </>
-                )}
-                <span style={{ fontSize: 11.5, color: subColor, flexShrink: 0 }}>{formatMailDate(m.date)}</span>
-              </div>
-              {/* Строка 2: тема + вложение + размер */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 22 }}>
-                <span style={{ flex: 1, fontSize: 12, color: subColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.subject}</span>
-                {m.hasAttachments && <span title='Вложения' style={{ fontSize: 11, flexShrink: 0, color: subColor }}>📎</span>}
-                <span style={{ fontSize: 11, color: subColor, flexShrink: 0 }}>{formatSize(m.size)}</span>
-              </div>
+              {sortAsc ? '↑' : '↓'}
+            </button>
+          </div>
+        </div>
+
+        {loading && <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>Загрузка…</div>}
+        {!loading && visibleMessages.length === 0 && (
+          <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>
+            {searchQ ? 'Ничего не найдено' : listFilter === 'unread' ? 'Непрочитанных писем нет' : 'Папка пуста'}
+          </div>
+        )}
+        {!loading && groupedMessages.map(group => {
+          if (!group.items.length) return null;
+          if (!group.label) return <div key={group.key}>{group.items.map(renderMessageRow)}</div>;
+          const isCollapsed = collapsedMessageGroups.has(group.key);
+          return (
+            <div key={group.key}>
+              <button
+                onClick={() => setCollapsedMessageGroups(prev => {
+                  const next = new Set(prev);
+                  if (next.has(group.key)) next.delete(group.key); else next.add(group.key);
+                  return next;
+                })}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '7px 10px', border: 'none', borderBottom: '1px solid var(--border-color)',
+                  background: 'var(--bg-hover)', color: 'var(--text-primary)',
+                  fontSize: 13, fontWeight: 700, textAlign: 'left', cursor: 'pointer', flexShrink: 0,
+                }}
+              >
+                <span style={{ width: 12, flexShrink: 0, color: 'var(--text-muted)', fontSize: 11 }}>{isCollapsed ? '›' : '⌄'}</span>
+                <span>{group.label}</span>
+              </button>
+              {!isCollapsed && group.items.map(renderMessageRow)}
             </div>
           );
         })}
