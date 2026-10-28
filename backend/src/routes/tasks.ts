@@ -121,7 +121,7 @@ if (rest.status === 'win' && prevTask && prevTask.status !== 'win') { postHandle
 router.post('/:id/mark-spam', async (req: AuthRequest, res) => {
   try {
     if (!isAdmin(req) && !req.user?.canHandleSpam) return res.status(403).json({ error: 'Нет права на обработку СПАМА' });
-    const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { id: true, title: true, status: true, sourceEmail: true } });
+    const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { id: true, title: true, status: true, sourceEmail: true, contactId: true } });
     if (!task) return res.status(404).json({ error: 'Задача не найдена' });
     if (!task.sourceEmail) return res.status(400).json({ error: 'У задачи нет адреса отправителя' });
     const existing = await prisma.emailFilter.findFirst({ where: { isSpam: true, fromContains: task.sourceEmail } });
@@ -144,7 +144,17 @@ router.post('/:id/mark-spam', async (req: AuthRequest, res) => {
       broadcast(CHANNELS.TASKS, { action: 'update', entity: 'task', id: task.id });
       taskListCache.clear();
     }
-    res.json({ filterCreated, message: filterCreated ? undefined : 'Адрес уже есть в списке спама' });
+    // Контакт задачи тоже помечаем как СПАМ (виден бейдж «СПАМ» в карточке контакта)
+    let contactMarkedSpam = false;
+    if (task.contactId) {
+      const contact = await prisma.contact.findUnique({ where: { id: task.contactId }, select: { isSpam: true } });
+      if (contact && !contact.isSpam) {
+        await prisma.contact.update({ where: { id: task.contactId }, data: { isSpam: true } });
+        await prisma.activity.create({ data: { action: 'updated', entity: 'contact', entityId: task.contactId, userId: req.user!.id } });
+        contactMarkedSpam = true;
+      }
+    }
+    res.json({ filterCreated, contactMarkedSpam, message: filterCreated ? undefined : 'Адрес уже есть в списке спама' });
   } catch (err: any) { res.status(500).json({ error: err.message }) }
 });
 

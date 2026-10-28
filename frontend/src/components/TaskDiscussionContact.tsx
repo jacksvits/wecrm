@@ -582,6 +582,25 @@ export function TaskDiscussionContact({
             }}
           >
             {contact.name}
+            {contact.isSpam && (
+              <span
+                title="Контакт помечен как СПАМ"
+                style={{
+                  marginLeft: 8,
+                  padding: "1px 8px",
+                  borderRadius: 8,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  background: "#fee2e2",
+                  color: "#b91c1c",
+                  border: "1px solid #fca5a5",
+                  whiteSpace: "nowrap",
+                  verticalAlign: "middle",
+                }}
+              >
+                ☠️ СПАМ
+              </span>
+            )}
           </span>
           <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
             {[contact.organization?.name, contact.position]

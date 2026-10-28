@@ -180,6 +180,8 @@ model Contact {
   onecId           String?  @map("onec_id")
   avatarUrl        String?  @map("avatar_url")
   description      String?  @map("description")
+  // Контакт помечен как СПАМ (кнопка «череп» на задаче из письма)
+  isSpam           Boolean  @default(false) @map("is_spam")
   lastActivityTime DateTime? @map("last_activity_time")
   createdAt        DateTime @default(now())
   updatedAt   DateTime @updatedAt
