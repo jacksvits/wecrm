@@ -582,7 +582,7 @@ export function TaskDiscussionContact({
             }}
           >
             {contact.name}
-            {contact.isSpam && (
+            {(contact.isSpam || contact.type === "spam") && (
               <span
                 title="Контакт помечен как СПАМ"
                 style={{

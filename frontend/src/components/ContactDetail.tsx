@@ -80,7 +80,7 @@ export function ContactDetail() {
           <div>
             <h2 style={{ margin: 0, fontSize: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
               {contact.name}
-              {contact.isSpam && (
+              {(contact.isSpam || contact.type === 'spam') && (
                 <span title="Контакт помечен как СПАМ" style={{ padding: '2px 10px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', whiteSpace: 'nowrap' }}>☠️ СПАМ</span>
               )}
             </h2>
