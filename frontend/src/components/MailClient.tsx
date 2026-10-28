@@ -180,6 +180,8 @@ export function MailClient() {
   const [accounts, setAccounts] = useState<MailAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>(() => localStorage.getItem('mailAccountId') || '');
   const [folders, setFolders] = useState<MailFolder[]>([]);
+  // Деревья папок по аккаунтам — нужны, чтобы в десктопной колонке показывать папки всех аккаунтов с ★
+  const [folderTrees, setFolderTrees] = useState<Record<string, MailFolder[]>>({});
   const [selectedFolder, setSelectedFolder] = useState<string>('INBOX');
   const [messages, setMessages] = useState<MailMessageItem[]>([]);
   const [totalMessages, setTotalMessages] = useState(0);
@@ -200,6 +202,8 @@ export function MailClient() {
   const [showCompose, setShowCompose] = useState(false);
   // Свёрнутые ветви дерева папок (path → скрыть детей)
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  // Свёрнутые аккаунты в десктопной колонке (accountId → скрыть папки)
+  const [collapsedAccounts, setCollapsedAccounts] = useState<Set<string>>(new Set());
   // Множественный выбор писем (uid → выбрано)
   const [selected, setSelected] = useState<Set<number>>(new Set());
   // Мобильная навигация: папки → список → письмо
@@ -207,10 +211,18 @@ export function MailClient() {
   // Drag & drop: перетаскиваемое письмо (uid) и папка-приёмник под курсором
   const [dragUid, setDragUid] = useState<number | null>(null);
   const [dropFolder, setDropFolder] = useState<string | null>(null);
-  // Создание подпапки: родительская папка + вводимое имя
-  const [creatingSubfolder, setCreatingSubfolder] = useState<{ parent: string; name: string } | null>(null);
+  // Создание подпапки: аккаунт + родительская папка + вводимое имя
+  const [creatingSubfolder, setCreatingSubfolder] = useState<{ accountId: string; parent: string; name: string } | null>(null);
 
   const account: MailAccount | undefined = accounts.find(a => a.id === selectedAccountId);
+
+  // В десктопной колонке показываем аккаунты с ★ (isDefault). Текущий аккаунт добавляем,
+  // даже если он без ★, чтобы пользователь не терял контекст открытой папки.
+  const sidebarAccounts = useMemo(() => {
+    const starred = accounts.filter(a => a.isDefault);
+    const current = accounts.find(a => a.id === selectedAccountId);
+    return current && !current.isDefault ? [...starred, current] : starred;
+  }, [accounts, selectedAccountId]);
 
   // Локализованное название системных папок (используется в дереве, списках и выборе назначения)
   const folderLabel = (f: MailFolder) =>
@@ -254,13 +266,15 @@ export function MailClient() {
   const loadAccounts = async () => {
     try {
       const data = await api.mail.accounts();
-      setAccounts(data || []);
+      const list = data || [];
+      setAccounts(list);
       setSelectedAccountId(prev => {
-        const list = data || [];
         if (prev && list.some((a: MailAccount) => a.id === prev)) return prev;
         const def = list.find((a: MailAccount) => a.isDefault) || list[0];
         return def ? def.id : '';
       });
+      // Сразу подгружаем папки аккаунтов с ★ — они выводятся в десктопной колонке отдельными узлами
+      list.filter((a: MailAccount) => a.isDefault).forEach((a: MailAccount) => loadFolders(a.id));
     } catch (e: any) {
       setError(e.message || 'Не удалось загрузить аккаунты');
     }
@@ -272,11 +286,12 @@ export function MailClient() {
     if (selectedAccountId) localStorage.setItem('mailAccountId', selectedAccountId);
   }, [selectedAccountId]);
 
-  const loadFolders = async () => {
-    if (!selectedAccountId) return;
+  const loadFolders = async (accountId = selectedAccountId) => {
+    if (!accountId) return;
     try {
-      const data = await withTimeout(signal => api.mail.folders(selectedAccountId, signal));
-      setFolders(data || []);
+      const data = await withTimeout(signal => api.mail.folders(accountId, signal));
+      setFolderTrees(prev => ({ ...prev, [accountId]: data || [] }));
+      if (accountId === selectedAccountId) setFolders(data || []);
     } catch (e: any) {
       setError(e.name === 'AbortError' ? 'Сервер не отвечает (превышено время ожидания)' : (e.message || 'Не удалось загрузить папки'));
     }
@@ -338,7 +353,7 @@ export function MailClient() {
       setOpenMessage(full);
       setMobileScreen('message');
       setMessages(prev => prev.map(m => (m.uid === uid ? { ...m, seen: true } : m)));
-      setFolders(prev => updateFolderUnseen(prev, selectedFolder, -1));
+      updateTreeUnseen(selectedAccountId, selectedFolder, -1);
     } catch (e: any) {
       setError(e.name === 'AbortError' ? 'Сервер не отвечает (превышено время ожидания)' : (e.message || 'Не удалось открыть письмо'));
     } finally {
@@ -380,6 +395,12 @@ export function MailClient() {
       ? { ...n, unseen: Math.max(0, n.unseen + delta) }
       : { ...n, children: updateFolderUnseen(n.children || [], path, delta) }));
 
+  // Тот же счётчик в папках выбранного аккаунта и в общем кеше деревьев для десктопной колонки
+  const updateTreeUnseen = (accountId: string, path: string, delta: number) => {
+    setFolders(prev => (accountId === selectedAccountId ? updateFolderUnseen(prev, path, delta) : prev));
+    setFolderTrees(prev => ({ ...prev, [accountId]: updateFolderUnseen(prev[accountId] || [], path, delta) }));
+  };
+
   // Прочитано/непрочитано для одного письма из списка
   const toggleReadOne = async (m: MailMessageItem) => {
     if (!selectedAccountId) return;
@@ -387,7 +408,7 @@ export function MailClient() {
       if (m.seen) await api.mail.markUnread(selectedAccountId, selectedFolder, m.uid);
       else await api.mail.markRead(selectedAccountId, selectedFolder, m.uid);
       setMessages(prev => prev.map(x => (x.uid === m.uid ? { ...x, seen: !m.seen } : x)));
-      setFolders(prev => updateFolderUnseen(prev, selectedFolder, m.seen ? 1 : -1));
+      updateTreeUnseen(selectedAccountId, selectedFolder, m.seen ? 1 : -1);
     } catch (e: any) {
       setError(e.message || 'Не удалось изменить статус');
     }
@@ -483,13 +504,14 @@ export function MailClient() {
     }
   };
 
-  // Создание подпапки в выбранной папке
+  // Создание подпапки в папке указанного аккаунта (не обязательно выбранного)
   const createSubfolder = async () => {
-    if (!selectedAccountId || !creatingSubfolder) return;
+    if (!creatingSubfolder) return;
+    const accountId = creatingSubfolder.accountId;
     const name = creatingSubfolder.name.trim();
     if (!name) { setCreatingSubfolder(null); return; }
     try {
-      await api.mail.createFolder(selectedAccountId, creatingSubfolder.parent, name);
+      await api.mail.createFolder(accountId, creatingSubfolder.parent, name);
       // Раскрываем родителя, чтобы новая подпапка была видна сразу
       setCollapsedFolders(prev => {
         const next = new Set(prev);
@@ -497,7 +519,7 @@ export function MailClient() {
         return next;
       });
       setCreatingSubfolder(null);
-      await loadFolders();
+      await loadFolders(accountId);
     } catch (e: any) {
       setError(e.message || 'Не удалось создать папку');
     }
@@ -768,7 +790,7 @@ export function MailClient() {
     }
   };
 
-  // Селект аккаунта над деревом папок (как на эталонном скриншоте пользователя)
+  // Мобильный селект аккаунта над деревом папок. В десктопе вместо него — узлы аккаунтов с ★.
   function renderAccountSelect() {
     if (!accounts.length) return null;
     return (
@@ -788,20 +810,66 @@ export function MailClient() {
     );
   }
 
+  // Десктопная колонка: аккаунты с ★ (isDefault) — отдельные раскрываемые узлы с их папками
+  function renderDesktopAccountTrees() {
+    if (!sidebarAccounts.length) return null;
+    return sidebarAccounts.map(a => {
+      const tree = folderTrees[a.id];
+      const isCollapsed = collapsedAccounts.has(a.id);
+      const isActiveAccount = a.id === selectedAccountId;
+      const title = a.label ? `${a.label} — ${a.email}` : a.email;
+      return (
+        <div key={a.id} style={{ margin: '0 2px 6px' }}>
+          <button
+            className='mail-folder-row'
+            onClick={() => setCollapsedAccounts(prev => {
+              const next = new Set(prev);
+              if (next.has(a.id)) next.delete(a.id); else next.add(a.id);
+              return next;
+            })}
+            title={a.isDefault ? 'Аккаунт по умолчанию' : 'Текущий аккаунт'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '0 5px', margin: '1px 0', height: 22, width: 'calc(100% - 4px)', boxSizing: 'border-box',
+              borderRadius: 0, cursor: 'pointer', fontSize: 12, textAlign: 'left',
+              border: '1px solid transparent', background: 'transparent',
+              color: isActiveAccount ? '#0a246a' : 'var(--text-primary)', fontWeight: 600,
+            }}
+          >
+            <span style={{ width: 12, flexShrink: 0, fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>{isCollapsed ? '▸' : '▾'}</span>
+            <span style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', color: a.isDefault ? '#f5a623' : 'var(--text-muted)', fontSize: 13 }}>{a.isDefault ? '★' : '☆'}</span>
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+          </button>
+          {!isCollapsed && (
+            tree
+              ? renderFolderTree(tree, 1, a.id)
+              : <div style={{ padding: '0 5px 0 24px', fontSize: 11, color: 'var(--text-muted)' }}>Загрузка папок…</div>
+          )}
+        </div>
+      );
+    });
+  }
+
   // ---- Рендер дерева папок (классический стиль, как в референсе) ----
-  function renderFolderTree(nodes: MailFolder[], depth: number): React.ReactNode {
+  function renderFolderTree(nodes: MailFolder[], depth: number, accountId = selectedAccountId): React.ReactNode {
     return nodes.map(f => {
       const hasKids = f.children && f.children.length > 0;
       const isCollapsed = collapsedFolders.has(f.path);
-      const isActive = selectedFolder === f.path;
+      const isCurrentAccount = accountId === selectedAccountId;
+      const isActive = isCurrentAccount && selectedFolder === f.path;
       return (
         <div key={f.path}>
           <button
             className='mail-folder-row'
-            onClick={() => { setSelectedFolder(f.path); setOpenMessage(null); setMobileScreen('list'); }}
+            onClick={() => {
+              if (accountId) setSelectedAccountId(accountId);
+              setSelectedFolder(f.path);
+              setOpenMessage(null);
+              setMobileScreen('list');
+            }}
             onDragOver={e => {
-              // Приёмник только для писем из другой папки
-              if (dragUid === null || f.path === selectedFolder) return;
+              // Drag & drop работает только внутри текущего аккаунта и между разными папками
+              if (!isCurrentAccount || dragUid === null || f.path === selectedFolder) return;
               e.preventDefault();
               e.dataTransfer.dropEffect = 'move';
               if (dropFolder !== f.path) setDropFolder(f.path);
@@ -812,7 +880,7 @@ export function MailClient() {
               const uid = dragUid;
               setDropFolder(null);
               setDragUid(null);
-              if (uid === null || f.path === selectedFolder) return;
+              if (!isCurrentAccount || uid === null || f.path === selectedFolder) return;
               moveByDrag(f.path, uid);
             }}
             style={{
@@ -861,7 +929,7 @@ export function MailClient() {
               </span>
             )}
             <span
-              onClick={e => { e.stopPropagation(); setCreatingSubfolder({ parent: f.path, name: '' }); }}
+              onClick={e => { e.stopPropagation(); if (accountId) setCreatingSubfolder({ accountId, parent: f.path, name: '' }); }}
               title={`Создать подпапку в «${folderLabel(f)}»`}
               className='mail-folder-add'
               style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: isActive ? '#0a246a' : 'var(--text-muted)', cursor: 'pointer', fontSize: 13, fontWeight: 700, lineHeight: 1, borderRadius: 3 }}
@@ -869,7 +937,7 @@ export function MailClient() {
               +
             </span>
           </button>
-          {creatingSubfolder && creatingSubfolder.parent === f.path && (
+          {creatingSubfolder && creatingSubfolder.accountId === accountId && creatingSubfolder.parent === f.path && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: `1px 6px 3px ${20 + depth * 16}px`, margin: '0 2px' }}>
               <span style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', color: '#d9a62e' }}>
                 <Icon name='folder' size={13} />
@@ -877,14 +945,14 @@ export function MailClient() {
               <input
                 autoFocus
                 value={creatingSubfolder.name}
-                onChange={e => setCreatingSubfolder({ parent: f.path, name: e.target.value })}
+                onChange={e => setCreatingSubfolder({ accountId: accountId || '', parent: f.path, name: e.target.value })}
                 onKeyDown={e => { if (e.key === 'Enter') createSubfolder(); if (e.key === 'Escape') setCreatingSubfolder(null); }}
                 placeholder='Имя подпапки'
                 style={{ ...inputStyle, height: 22, fontSize: 12, flex: 1, minWidth: 0 }}
               />
             </div>
           )}
-          {hasKids && !isCollapsed && renderFolderTree(f.children, depth + 1)}
+          {hasKids && !isCollapsed && renderFolderTree(f.children, depth + 1, accountId)}
         </div>
       );
     });
@@ -1019,7 +1087,7 @@ export function MailClient() {
                 if (isUnread) await api.mail.markRead(selectedAccountId, selectedFolder, openMessage.uid);
                 else await api.mail.markUnread(selectedAccountId, selectedFolder, openMessage.uid);
                 setMessages(prev => prev.map(m => (m.uid === openMessage!.uid ? { ...m, seen: !isUnread } : m)));
-                setFolders(prev => updateFolderUnseen(prev, selectedFolder, isUnread ? -1 : 1));
+                updateTreeUnseen(selectedAccountId, selectedFolder, isUnread ? -1 : 1);
               } catch (e: any) { setError(e.message || 'Не удалось изменить статус'); }
             }}
             title={isUnread ? 'Отметить прочитанным' : 'Отметить непрочитанным'}
@@ -1356,8 +1424,7 @@ export function MailClient() {
             display: 'flex', flexDirection: 'column',
             padding: 8, gap: 2, background: 'var(--bg-card)',
           }}>
-            {renderAccountSelect()}
-            {renderFolderTree(folders, 0)}
+            {renderDesktopAccountTrees()}
           </div>
 
           {/* Центральная часть: список/чтение + статусная строка */}
