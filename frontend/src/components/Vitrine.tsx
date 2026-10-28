@@ -1439,6 +1439,17 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
                             </svg>
                           </button>
                         )}
+                        {/* Резерв — рядом с корзиной, тот же зелёный стиль .btn-reserve, что и на карточках витрины */}
+                        {p.kind !== 'service' && inStock > 0 && (
+                          <button type="button" className="btn-reserve" title="В резерв" aria-label="В резерв"
+                            style={{ flexShrink: 0, flex: '0 0 auto', padding: 8 }}
+                            onClick={(e) => { e.stopPropagation(); addToReserve(p); }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                              <path fillRule="evenodd" clipRule="evenodd" d="M17 3.8H7C5.78497 3.8 4.8 4.78497 4.8 6V15.7647C4.8 16.574 5.24438 17.318 5.95698 17.7017L10.957 20.394C11.6081 20.7446 12.3919 20.7446 13.043 20.394L18.043 17.7017C18.7556 17.318 19.2 16.574 19.2 15.7647V6C19.2 4.78497 18.215 3.8 17 3.8ZM7 2C4.79086 2 3 3.79086 3 6V15.7647C3 17.2362 3.80796 18.5889 5.1036 19.2866L10.1036 21.9789C11.2875 22.6164 12.7125 22.6164 13.8964 21.9789L18.8964 19.2866C20.192 18.5889 21 17.2362 21 15.7647V6C21 3.79086 19.2091 2 17 2H7Z" fill="currentColor"/>
+                              <path fillRule="evenodd" clipRule="evenodd" d="M16.7248 8.63051C17.0763 8.98198 17.0763 9.55183 16.7248 9.9033L11.7627 14.8654C11.4113 15.2169 10.8414 15.2169 10.4899 14.8654L7.81839 12.1939C7.46692 11.8424 7.46691 11.2726 7.81839 10.9211C8.16986 10.5696 8.7397 10.5696 9.09118 10.9211L11.1263 12.9562L15.4521 8.63051C15.8035 8.27904 16.3734 8.27904 16.7248 8.63051Z" fill="currentColor"/>
+                            </svg>
+                          </button>
+                        )}
                         <button type="button" onClick={(e) => { e.stopPropagation(); api.favorites.removeItem(g.id, p.id).then(setFavGroups).catch(() => {}); }} title="Убрать из избранного"
                           style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#f59e0b', fontSize: 14, padding: 4, flexShrink: 0 }}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1449,14 +1460,25 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
                     );
                   })}
                   {!!expandedGroups.has(g.id) && g.items.length > 0 && (
-                    <button type="button" className="btn-action-cart" onClick={() => { g.items.forEach((i: any) => i.product && addToCart(i.product)); }}
-                      style={{ alignSelf: 'flex-start', padding: '6px 14px', fontWeight: 600, fontSize: 13 }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                      </svg>
-                      Все в корзину ({g.items.length})
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button type="button" className="btn-action-cart" onClick={() => { g.items.forEach((i: any) => i.product && addToCart(i.product)); }}
+                        style={{ padding: '6px 14px', fontWeight: 600, fontSize: 13 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                        </svg>
+                        Все в корзину ({g.items.length})
+                      </button>
+                      {/* Зелёный «Все в резерв» — тот же .btn-action, что и у карточек; только товары в наличии */}
+                      <button type="button" className="btn-action" onClick={() => { g.items.forEach((i: any) => { const p = i.product; if (p && p.kind !== 'service' && favInStock(p) > 0) addToReserve(p); }); }}
+                        style={{ padding: '6px 14px', fontWeight: 600, fontSize: 13 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                          <path fillRule="evenodd" clipRule="evenodd" d="M17 3.8H7C5.78497 3.8 4.8 4.78497 4.8 6V15.7647C4.8 16.574 5.24438 17.318 5.95698 17.7017L10.957 20.394C11.6081 20.7446 12.3919 20.7446 13.043 20.394L18.043 17.7017C18.7556 17.318 19.2 16.574 19.2 15.7647V6C19.2 4.78497 18.215 3.8 17 3.8ZM7 2C4.79086 2 3 3.79086 3 6V15.7647C3 17.2362 3.80796 18.5889 5.1036 19.2866L10.1036 21.9789C11.2875 22.6164 12.7125 22.6164 13.8964 21.9789L18.8964 19.2866C20.192 18.5889 21 17.2362 21 15.7647V6C21 3.79086 19.2091 2 17 2H7Z" fill="currentColor"/>
+                          <path fillRule="evenodd" clipRule="evenodd" d="M16.7248 8.63051C17.0763 8.98198 17.0763 9.55183 16.7248 9.9033L11.7627 14.8654C11.4113 15.2169 10.8414 15.2169 10.4899 14.8654L7.81839 12.1939C7.46692 11.8424 7.46691 11.2726 7.81839 10.9211C8.16986 10.5696 8.7397 10.5696 9.09118 10.9211L11.1263 12.9562L15.4521 8.63051C15.8035 8.27904 16.3734 8.27904 16.7248 8.63051Z" fill="currentColor"/>
+                        </svg>
+                        Все в резерв ({g.items.length})
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
