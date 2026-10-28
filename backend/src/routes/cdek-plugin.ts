@@ -6,6 +6,18 @@ import { cdekApi, cdekBaseUrl, CDEK_TEST_CREDENTIALS, getCdekSettings, getCdekTo
 
 const router = Router();
 
+// GET /api/cdek-plugin/status - { isActive } для меню (любой авторизованный;
+// утечки нет: видимость пункта меню «Логистика» ограничена включённым плагином)
+router.get('/status', authMiddleware, async (_req, res) => {
+  try {
+    const s = await prisma.cdekSettings.findUnique({ where: { id: 1 } });
+    res.json({ isActive: s?.isActive === true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
 // Настройки плагина CDEK: GET — состояние без секретов, POST — сохранение, /test — проверка подключения
 const saveSchema = z.object({
   isActive: z.boolean().optional(),
