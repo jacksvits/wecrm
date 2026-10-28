@@ -270,8 +270,8 @@ export function MailClient() {
       setAccounts(list);
       setSelectedAccountId(prev => {
         if (prev && list.some((a: MailAccount) => a.id === prev)) return prev;
-        const def = list.find((a: MailAccount) => a.isDefault) || list[0];
-        return def ? def.id : '';
+        const starredAccount = list.find((a: MailAccount) => a.isDefault) || list[0];
+        return starredAccount ? starredAccount.id : '';
       });
       // Сразу подгружаем папки аккаунтов с ★ — они выводятся в десктопной колонке отдельными узлами
       list.filter((a: MailAccount) => a.isDefault).forEach((a: MailAccount) => loadFolders(a.id));
@@ -827,7 +827,7 @@ export function MailClient() {
               if (next.has(a.id)) next.delete(a.id); else next.add(a.id);
               return next;
             })}
-            title={a.isDefault ? 'Аккаунт по умолчанию' : 'Текущий аккаунт'}
+            title={a.isDefault ? 'Отмечен звёздочкой' : 'Текущий аккаунт'}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: '0 5px', margin: '1px 0', height: 22, width: 'calc(100% - 4px)', boxSizing: 'border-box',
@@ -1631,7 +1631,7 @@ export function MailClient() {
                   <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, border: `1px solid ${borderColor}` }}>
                     <button
                       onClick={async () => { await api.mail.updateAccount(a.id, { isDefault: !a.isDefault }); loadAccounts(); }}
-                      title={a.isDefault ? 'Аккаунт по умолчанию' : 'Сделать аккаунтом по умолчанию'}
+                      title={a.isDefault ? 'Отмечен звёздочкой' : 'Отметить звёздочкой'}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: a.isDefault ? '#f5a623' : 'var(--text-muted)', padding: 2 }}
                     >{a.isDefault ? '★' : '☆'}</button>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -1694,7 +1694,7 @@ export function MailClient() {
               )}
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                 <input type='checkbox' checked={accountForm.isDefault} onChange={e => setForm({ isDefault: e.target.checked })} />
-                Аккаунт по умолчанию
+                Показывать в колонке папок (★)
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                 <input type='checkbox' checked={accountForm.rejectUnauthorized} onChange={e => setForm({ rejectUnauthorized: e.target.checked })} />

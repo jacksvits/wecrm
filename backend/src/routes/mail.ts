@@ -146,10 +146,7 @@ router.get('/accounts', async (req: AuthRequest, res) => {
 router.post('/accounts', async (req: AuthRequest, res) => {
   try {
     const data = accountSchema.parse(req.body);
-    // Аккаунт по умолчанию один — снимаем флаг у остальных
-    if (data.isDefault) {
-      await prisma.mailAccount.updateMany({ where: { userId: req.user!.id }, data: { isDefault: false } });
-    }
+    // Звёздочек может быть несколько — флаги у других аккаунтов не сбрасываем
     const account = (await prisma.mailAccount.create({ data: { ...data, userId: req.user!.id } })) as MailAccountRow;
     res.json(toSafeAccount(account));
   } catch (err: any) {
@@ -163,12 +160,7 @@ router.patch('/accounts/:id', async (req: AuthRequest, res) => {
     if (!account) return;
     // Пустой пароль в PATCH = «не менять»
     const data = accountSchema.partial().parse(req.body);
-    if (data.isDefault) {
-      await prisma.mailAccount.updateMany({
-        where: { userId: req.user!.id, NOT: { id: account.id } },
-        data: { isDefault: false },
-      });
-    }
+    // Звёздочек может быть несколько — флаги у других аккаунтов не сбрасываем
     const updated = (await prisma.mailAccount.update({ where: { id: account.id }, data })) as MailAccountRow;
     res.json(toSafeAccount(updated));
   } catch (err: any) {
