@@ -5,6 +5,7 @@ import "react-quill/dist/quill.snow.css";
 import { Contact, ContactAccess, ContactAccessDirection, Deal, Status } from "../types";
 import { Avatar } from "./Avatar";
 import { api } from "../api/client";
+import { useAuth } from "../context/AuthContext";
 
 // Контакт с подгруженными связями (эндпоинт GET /api/contacts/:id)
 export type DiscussionContact = Contact & {
@@ -197,6 +198,11 @@ export function TaskDiscussionContact({
   maxHeight?: string;
 }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // Права на вкладку «Доступы» (настраиваются в роли: чтение/редактирование/удаление),
+  // так же, как в ContactDetail и на бэкенде (routes/contact-accesses)
+  const canReadAccesses = user?.role === "admin" || user?.canReadContactAccesses !== false;
+  const canEditAccesses = user?.role === "admin" || user?.canEditContactAccesses === true;
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
@@ -208,6 +214,16 @@ export function TaskDiscussionContact({
   const [orders, setOrders] = useState<any[] | null>(null);
   const [reserves, setReserves] = useState<any[] | null>(null);
   const [expandedReserveId, setExpandedReserveId] = useState<string | null>(null);
+  // Форма добавления доступа (вкладка «Доступы»)
+  const [addingAccess, setAddingAccess] = useState(false);
+  const [accessDirection, setAccessDirection] = useState<ContactAccessDirection>("videoregistrator");
+  const [accessDescription, setAccessDescription] = useState("");
+  const [accessComment, setAccessComment] = useState("");
+  const [accessUrl, setAccessUrl] = useState("");
+  const [accessLogin, setAccessLogin] = useState("");
+  const [accessPassword, setAccessPassword] = useState("");
+  const [accessSaving, setAccessSaving] = useState(false);
+  const [accessError, setAccessError] = useState("");
 
   // Смена контакта — сброс вкладок и кэша
   useEffect(() => {
@@ -217,6 +233,8 @@ export function TaskDiscussionContact({
     setReserves(null);
     setEditingField(null);
     setEditError("");
+    resetAccessForm();
+    setAccessSaving(false);
   }, [contact?.id]);
 
   // Статусы задач — для подписи/цвета чипа в списке (как в TaskDetail)
@@ -234,6 +252,51 @@ export function TaskDiscussionContact({
       setAccesses(list);
     } catch {
       setAccesses([]);
+    }
+  };
+
+  // Принудительная перезагрузка списка доступов (после добавления)
+  const reloadAccesses = async () => {
+    if (!contact) return;
+    try {
+      const list = await api.contactAccesses.list(contact.id);
+      setAccesses(list);
+    } catch {
+      // Оставляем текущий список при ошибке
+    }
+  };
+
+  const resetAccessForm = () => {
+    setAddingAccess(false);
+    setAccessDirection("videoregistrator");
+    setAccessDescription("");
+    setAccessComment("");
+    setAccessUrl("");
+    setAccessLogin("");
+    setAccessPassword("");
+    setAccessError("");
+  };
+
+  const saveAccess = async () => {
+    if (!contact || accessSaving) return;
+    setAccessSaving(true);
+    setAccessError("");
+    try {
+      await api.contactAccesses.create({
+        contactId: contact.id,
+        direction: accessDirection,
+        description: accessDescription.trim() || null,
+        comment: accessComment.trim() || null,
+        url: accessUrl.trim() || null,
+        login: accessLogin.trim() || null,
+        password: accessPassword || null,
+      });
+      resetAccessForm();
+      await reloadAccesses();
+    } catch (err: any) {
+      setAccessError(err.message || "Ошибка сохранения");
+    } finally {
+      setAccessSaving(false);
     }
   };
 
@@ -622,7 +685,9 @@ export function TaskDiscussionContact({
         }}
         className="no-scrollbar"
       >
-        {(Object.keys(SECTION_TITLES) as SectionKey[]).map((key) => (
+        {(Object.keys(SECTION_TITLES) as SectionKey[])
+          .filter((key) => key !== "accesses" || canReadAccesses)
+          .map((key) => (
           <button
             key={key}
             onClick={() => switchSection(key)}
@@ -633,7 +698,7 @@ export function TaskDiscussionContact({
               <span style={{ fontSize: 11, opacity: 0.8 }}>({sectionCounts[key]})</span>
             )}
           </button>
-        ))}
+          ))}
       </div>
 
       {/* Содержимое активной вкладки */}
@@ -687,12 +752,114 @@ export function TaskDiscussionContact({
             })
           ))}
 
+        {activeSection === "accesses" && canEditAccesses && !addingAccess && (
+          <button
+            onClick={() => {
+              setAccessError("");
+              setAddingAccess(true);
+            }}
+            style={{
+              ...actionButtonStyle,
+              alignSelf: "flex-start",
+              color: "#1565c0",
+              border: "1px dashed var(--border-color)",
+              background: "transparent",
+            }}
+          >
+            + Добавить
+          </button>
+        )}
+
+        {activeSection === "accesses" && addingAccess && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              padding: 12,
+              borderRadius: 10,
+              border: "1px solid var(--border-color)",
+              background: "var(--bg-input)",
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+              Новый доступ
+            </div>
+            <select
+              value={accessDirection}
+              onChange={(e) => setAccessDirection(e.target.value as ContactAccessDirection)}
+              style={{ ...editInputStyle, cursor: "pointer" }}
+            >
+              {ACCESS_DIRECTIONS.map((d) => (
+                <option key={d.value} value={d.value}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+            <div>
+              <span style={infoLabelStyle}>Описание</span>
+              <div style={{ background: "var(--bg-card)", borderRadius: 10 }}>
+                <ReactQuill
+                  theme="snow"
+                  value={accessDescription}
+                  onChange={setAccessDescription}
+                  modules={quillModules}
+                  formats={quillFormats}
+                />
+              </div>
+            </div>
+            <div>
+              <span style={infoLabelStyle}>Комментарий</span>
+              <div style={{ background: "var(--bg-card)", borderRadius: 10 }}>
+                <ReactQuill
+                  theme="snow"
+                  value={accessComment}
+                  onChange={setAccessComment}
+                  modules={quillModules}
+                  formats={quillFormats}
+                />
+              </div>
+            </div>
+            <input
+              value={accessUrl}
+              onChange={(e) => setAccessUrl(e.target.value)}
+              placeholder="Ссылка (https://...)"
+              style={editInputStyle}
+            />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <input
+                value={accessLogin}
+                onChange={(e) => setAccessLogin(e.target.value)}
+                placeholder="Логин"
+                style={editInputStyle}
+              />
+              <input
+                value={accessPassword}
+                onChange={(e) => setAccessPassword(e.target.value)}
+                placeholder="Пароль"
+                style={editInputStyle}
+              />
+            </div>
+            {accessError && (
+              <div style={{ fontSize: 12, color: "#dc2626" }}>{accessError}</div>
+            )}
+            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+              <button onClick={resetAccessForm} disabled={accessSaving} style={actionButtonStyle}>
+                Отмена
+              </button>
+              <button onClick={saveAccess} disabled={accessSaving} style={primaryButtonStyle}>
+                {accessSaving ? "Сохранение..." : "Сохранить"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {activeSection === "accesses" &&
           (accesses === null ? (
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Загрузка...</div>
-          ) : accesses.length === 0 ? (
+          ) : accesses.length === 0 && !addingAccess ? (
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Доступов нет</div>
-          ) : (
+          ) : accesses.length === 0 ? null : (
             accesses.map((a) => (
               <div
                 key={a.id}
