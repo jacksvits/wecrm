@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import { Contact, ContactAccess, ContactAccessDirection, Deal, Status } from "../types";
+import { Contact, ContactAccess, ContactAccessDirection, ClientDevice, Deal, Status } from "../types";
 import { Avatar } from "./Avatar";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -20,7 +20,7 @@ export type DiscussionContact = Contact & {
   }[];
 };
 
-type SectionKey = "tasks" | "accesses" | "orders" | "reserves";
+type SectionKey = "tasks" | "devices" | "accesses" | "orders" | "reserves";
 
 // Метки направлений доступов, как в ContactAccesses
 const ACCESS_DIRECTIONS: { value: ContactAccessDirection; label: string }[] = [
@@ -61,6 +61,7 @@ type EditableField = "phones" | "emails" | "address" | "notes" | null;
 
 const SECTION_TITLES: Record<SectionKey, string> = {
   tasks: "Задачи",
+  devices: "Устройства",
   accesses: "Доступы",
   orders: "Заказы",
   reserves: "Резервы",
@@ -209,6 +210,7 @@ export function TaskDiscussionContact({
   const [editError, setEditError] = useState("");
   const [activeSection, setActiveSection] = useState<SectionKey>("tasks");
   // Данные вкладок подгружаются лениво (при первом открытии вкладки)
+  const [devices, setDevices] = useState<ClientDevice[] | null>(null);
   const [accesses, setAccesses] = useState<ContactAccess[] | null>(null);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [orders, setOrders] = useState<any[] | null>(null);
@@ -228,6 +230,7 @@ export function TaskDiscussionContact({
   // Смена контакта — сброс вкладок и кэша
   useEffect(() => {
     setActiveSection("tasks");
+    setDevices(null);
     setAccesses(null);
     setOrders(null);
     setReserves(null);
@@ -244,6 +247,16 @@ export function TaskDiscussionContact({
       .then(setStatuses)
       .catch(() => {});
   }, []);
+
+  const loadDevices = async () => {
+    if (devices !== null || !contact) return;
+    try {
+      const list = await api.clientDevices.list(contact.id);
+      setDevices(list);
+    } catch {
+      setDevices([]);
+    }
+  };
 
   const loadAccesses = async () => {
     if (accesses !== null || !contact) return;
@@ -340,6 +353,7 @@ export function TaskDiscussionContact({
 
   const switchSection = (key: SectionKey) => {
     setActiveSection(key);
+    if (key === "devices") loadDevices();
     if (key === "accesses") loadAccesses();
     if (key === "orders") loadOrders();
     if (key === "reserves") loadReserves();
@@ -487,6 +501,14 @@ export function TaskDiscussionContact({
   // Счётчики для вкладок
   const sectionCounts: Record<SectionKey, string> = {
     tasks: String(contact._count?.tasks ?? tasks.length),
+    devices:
+      devices !== null
+        ? String(devices.length)
+        : (contact as any).devicesTotal !== undefined
+          ? String((contact as any).devicesTotal)
+          : contact._count?.devices !== undefined
+            ? String(contact._count.devices)
+            : "",
     accesses: accesses !== null ? String(accesses.length) : contact._count?.accesses !== undefined ? String(contact._count.accesses) : "",
     orders: orders !== null ? String(orders.length) : "",
     reserves: reserves !== null ? String(reserves.length) : "",
@@ -750,6 +772,58 @@ export function TaskDiscussionContact({
                 </div>
               );
             })
+          ))}
+
+        {activeSection === "devices" &&
+          (devices === null ? (
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Загрузка...</div>
+          ) : devices.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Устройств нет</div>
+          ) : (
+            devices.map((d) => (
+              <div
+                key={d.id}
+                onClick={() => navigate(`/contacts/${contact.id}`)}
+                style={activityRowStyle}
+                title={d.hostname}
+              >
+                <span
+                  title={d.isOnline ? "Включено" : "Выключено"}
+                  style={{
+                    display: "inline-block",
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: d.isOnline ? "#2e7d32" : "#bdbdbd",
+                    flexShrink: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    ...activityTextStyle,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                    whiteSpace: "normal",
+                  }}
+                >
+                  <span style={{ fontWeight: 500 }}>
+                    {d.hostname}
+                    {d.username ? ` · ${d.username}` : ""}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                    {[d.osCaption, d.ipAddress].filter(Boolean).join(" · ") || "—"}
+                  </span>
+                </span>
+                <span style={{ ...activityMetaStyle, color: d.isOnline ? "#2e7d32" : undefined }}>
+                  {d.isOnline
+                    ? "Включено"
+                    : d.lastSeenAt
+                      ? `Выключено · было ${formatDate(d.lastSeenAt)}`
+                      : "Выключено"}
+                </span>
+              </div>
+            ))
           ))}
 
         {activeSection === "accesses" && canEditAccesses && !addingAccess && (
