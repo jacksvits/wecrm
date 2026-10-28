@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client';
+import { useNavigate } from 'react-router-dom';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -101,6 +102,35 @@ const quillModules = {
   ],
 };
 const quillFormats = ['bold', 'italic', 'underline', 'strike', 'list', 'bullet', 'color', 'background', 'link'];
+
+// ---- Привязка писем к контактам CRM ----
+const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+
+function extractEmails(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  EMAIL_RE.lastIndex = 0;
+  while ((m = EMAIL_RE.exec(raw)) !== null) out.push(m[0].toLowerCase());
+  return out;
+}
+
+// Разбор строки адресов «Имя <email>, "Имя, с запятой" <email2>, bare@email.ru»
+function parseAddressList(raw: string | null | undefined): { name: string; email: string }[] {
+  if (!raw) return [];
+  const result: { name: string; email: string }[] = [];
+  const addrRe = /(?:^|,)\s*(?:"([^"]*)"|([^,<>]*?))?\s*<([^<>\s]+@[^<>\s]+)>/g;
+  let m: RegExpExecArray | null;
+  while ((m = addrRe.exec(raw)) !== null) {
+    result.push({ name: (m[1] ?? m[2] ?? '').trim(), email: m[3].toLowerCase() });
+  }
+  // Адреса без угловых скобок: «a@b.ru, c@d.ru»
+  const withoutAngles = raw.replace(/<[^<>\s]+@[^<>\s]+>/g, '');
+  let b: RegExpExecArray | null;
+  EMAIL_RE.lastIndex = 0;
+  while ((b = EMAIL_RE.exec(withoutAngles)) !== null) result.push({ name: '', email: b[0].toLowerCase() });
+  return result;
+}
 
 function formatMailDate(iso: string | null): string {
   if (!iso) return '';
@@ -243,6 +273,9 @@ export function MailClient() {
   const [listFilter, setListFilter] = useState<'all' | 'unread'>('all');
   // Свёрнутые группы писем по датам (название группы → скрыть письма)
   const [collapsedMessageGroups, setCollapsedMessageGroups] = useState<Set<string>>(new Set());
+  // Привязка адресов открытого письма к контактам CRM (email в нижнем регистре → контакт)
+  const [mailContacts, setMailContacts] = useState<Record<string, { id: string; name: string }>>({});
+  const navigate = useNavigate();
 
   const [showSettings, setShowSettings] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
@@ -301,6 +334,22 @@ export function MailClient() {
     if (name === 'warning' || name === 'trash') return '#c0392b';
     return '#8a8a8a';
   };
+
+  // Подгружаем контакты CRM для адресов открытого письма (От/Кому/Копия)
+  useEffect(() => {
+    const emails = [...new Set([openMessage?.from, openMessage?.to, openMessage?.cc]
+      .filter((v): v is string => !!v)
+      .flatMap(v => extractEmails(v)))];
+    if (emails.length === 0) {
+      setMailContacts({});
+      return;
+    }
+    let cancelled = false;
+    api.contacts.byEmails(emails)
+      .then(map => { if (!cancelled) setMailContacts(map || {}); })
+      .catch(() => { if (!cancelled) setMailContacts({}); });
+    return () => { cancelled = true; };
+  }, [openMessage?.from, openMessage?.to, openMessage?.cc]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -1208,6 +1257,39 @@ export function MailClient() {
         <span style={{ color: '#0b5fd0', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{value || '—'}</span>
       </div>
     );
+    // Строка с адресами: совпавшие с контактами CRM — ссылками на карточку контакта
+    const addressRow = (label: string, raw: string) => {
+      const addrs = parseAddressList(raw);
+      if (addrs.length === 0) return fieldRow(label, raw);
+      return (
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, fontSize: 12.5 }}>
+          <span style={{ width: 62, flexShrink: 0, fontWeight: 700, color: 'var(--text-primary)' }}>{label}</span>
+          <span style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+            {addrs.map((a, i) => {
+              const contact = mailContacts[a.email];
+              if (!contact) {
+                return (
+                  <span key={i} style={{ color: '#0b5fd0', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {a.name ? `${a.name} <${a.email}>` : a.email}
+                  </span>
+                );
+              }
+              return (
+                <button
+                  key={i}
+                  onClick={() => navigate(`/contacts/${contact.id}`)}
+                  title={`Контакт CRM «${contact.name}» — открыть карточку`}
+                  style={{ background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer', fontSize: 12.5, color: '#0b5fd0', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                >
+                  {a.name && a.name !== contact.name ? `${a.name} · ${contact.name}` : contact.name}
+                  <span style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>{` <${a.email}>`}</span>
+                </button>
+              );
+            })}
+          </span>
+        </div>
+      );
+    };
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-card)' }}>
         {/* Шапка письма: Subject + быстрые действия */}
@@ -1244,9 +1326,9 @@ export function MailClient() {
         </div>
         {/* Поля From/To/Date/Subject — как в классическом клиенте */}
         <div style={{ padding: '8px 12px', borderBottom: `1px solid ${borderColor}`, display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {fieldRow('От:', openMessage.from)}
-          {fieldRow('Кому:', openMessage.to)}
-          {openMessage.cc && fieldRow('Копия:', openMessage.cc)}
+          {addressRow('От:', openMessage.from)}
+          {addressRow('Кому:', openMessage.to)}
+          {openMessage.cc && addressRow('Копия:', openMessage.cc)}
           {fieldRow('Дата:', formatMailDate(openMessage.date))}
           {fieldRow('Тема:', openMessage.subject)}
         </div>

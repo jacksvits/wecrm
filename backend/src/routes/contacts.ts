@@ -105,6 +105,44 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Поиск контактов по списку email-адресов (привязка полей «От»/«Кому» писем к контактам CRM).
+// Возвращает карту: email (в нижнем регистре) → { id, name } первого совпавшего контакта.
+router.post('/by-emails', async (req, res) => {
+  try {
+    const raw = Array.isArray(req.body?.emails) ? req.body.emails : [];
+    const emails = [...new Set(
+      raw.map((e: unknown) => String(e).trim().toLowerCase()).filter((e: string) => e.includes('@'))
+    )].slice(0, 100);
+    if (emails.length === 0) return res.json({});
+    // Точное совпадение по основному email (регистронезависимо) или по массиву доп. emails
+    const contacts = await prisma.contact.findMany({
+      where: {
+        OR: [
+          { email: { in: emails, mode: 'insensitive' } },
+          { emails: { hasSome: emails } },
+        ],
+      },
+      select: { id: true, name: true, email: true, emails: true },
+      take: 200,
+    });
+    const map: Record<string, { id: string; name: string }> = {};
+    for (const contact of contacts) {
+      const allEmails = [contact.email, ...contact.emails]
+        .filter((e): e is string => !!e)
+        .map(e => e.toLowerCase());
+      for (const email of emails) {
+        if (!map[email] && allEmails.includes(email)) {
+          map[email] = { id: contact.id, name: contact.name };
+        }
+      }
+    }
+    res.json(map);
+  } catch (err: any) {
+    console.error('[Contacts by-emails] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const contact = await prisma.contact.findUnique({
