@@ -16,7 +16,10 @@ services:
 
   backend:
     build: ./backend
-    image: wecrm-backend:multitenant
+    image: wecrm-backend:latest
+    # доступ к сервису tapo (host-сеть) и другим host-сервисам
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # Порт слушается только на localhost: nginx проксирует API с хоста,
     # внешний доступ (туннель) идёт напрямую по docker-сети (--local-host backend)
     ports:
@@ -142,11 +145,15 @@ services:
 
   # Плагин «Камеры Hik-Connect»: Python-сервис (библиотека hikcloudstream) —
   # вход в облако Hik-Connect по логину/паролю, список камер и live-потоки
-  # через облачный VTM relay в MJPEG. Слушает только внутреннюю docker-сеть;
+  # через облачный VTM relay: H.264/HEVC в fMP4 для MSE-плеера (/h264,
+  # streamlib/fmp4.py), MJPEG (/mjpeg) — fallback для HEVC-камер. Слушает
+  # только внутреннюю docker-сеть;
   # Node-бэкенд проксирует его наружу (/api/hikvision-plugin/*) с проверкой
   # роли admin и флага is_active плагина.
   hikvision:
-    build: ./hikvision-stream
+    build:
+      context: .
+      dockerfile: hikvision-stream/Dockerfile
     image: wecrm-hikvision:latest
     # каждая VTM-сессия + сокеты облака = FD; дефолтного 1024 мало при шторме
     ulimits:
@@ -155,6 +162,19 @@ services:
         hard: 65536
     expose:
       - "8557"
+    restart: unless-stopped
+
+  # Сервис плагина «Камеры Tapo» (TP-Link): облако TP-Link (логин/пароль TP-Link
+  # ID), сопоставление камер с LAN сервера по MAC (ARP) и RTSP-потоки -> fMP4
+  # (H.264 MSE) + JPEG-снапшоты. Host-сеть обязательна: RTSP и ARP недостижимы
+  # из docker-моста. Порт наружу не публикуется — только через Node-бэкенд
+  # (/api/tapo-plugin/*); бэкенд ходит на host.docker.internal (extra_hosts).
+  tapo:
+    build:
+      context: .
+      dockerfile: tapo-stream/Dockerfile
+    image: wecrm-tapo:latest
+    network_mode: host
     restart: unless-stopped
 
   # SNI-роутер внешнего HTTPS (443): welans.cc + *.welans.cc -> хостовый nginx :10443

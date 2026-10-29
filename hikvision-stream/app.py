@@ -458,6 +458,224 @@ def decrypting_chunks(stream, key: str):
             yield out
 
 
+# ---------------------------------------------------------- H.264 -> fMP4
+# Видео из VTM relay — сырой Annex-B (H.264/H.265) без таймстампов. Для
+# просмотра в браузере через MSE муксируем его в fMP4 (streamlib/fmp4.py):
+# таймстампы (90 кГц) привязываем к моменту прибытия чанков, фрагменты
+# закрываем по ключевым кадрам. Кодек определяем двумя парсерами, как в
+# stream_mjpeg_auto. Транскодирования нет — только перепаковка битстрима.
+
+def stream_h264_fmp4(stream, output, *, stream_type=1, chunks_iter=None, should_abort=None):
+    """Annex-B чанки VTM relay -> fMP4 через ffmpeg (pipe).
+
+    Кодек определяем парсером PyAV (два кандидата, как в stream_mjpeg_auto),
+    ffmpeg перепаковывает без транскодирования: -f h264/hevc, метки времени
+    по прибытию (use_wallclock_as_timestamps), фрагменты ~0.8 с.
+    """
+    import av
+    from streamlib import fmp4
+
+    codecs = {"h264": av.CodecContext.create("h264", "r"), "hevc": av.CodecContext.create("hevc", "r")}
+    active = set(codecs)
+    produced: dict[str, bool] = {}
+    proc = None
+    buffered = bytearray()   # чанки до определения кодека
+    stats = {"frames": 0, "reason": "eof"}
+
+    def emit(data: bytes) -> None:
+        if not data:
+            return
+        try:
+            output.put(data, timeout=5)
+        except queue.Full:
+            pass
+
+    def start_ffmpeg(fmt: str) -> None:
+        nonlocal proc
+        import subprocess
+        args = fmp4.raw_remux_args(fmt)
+        app.logger.warning("h264 ffmpeg cmd: %s", " ".join(args))
+        proc = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        if buffered:
+            proc.stdin.write(bytes(buffered))
+            proc.stdin.flush()
+            buffered.clear()
+        # stderr читаем отдельным потоком, чтобы труба не забилась
+        def _drain_err():
+            for line in iter(proc.stderr.readline, b""):
+                app.logger.warning("h264 ffmpeg: %s", line.decode("utf-8", "replace").rstrip())
+        threading.Thread(target=_drain_err, daemon=True).start()
+
+    def pump():
+        # читаем stdout ffmpeg и кладём в очередь; конец — None
+        try:
+            while True:
+                chunk = proc.stdout.read(65536)
+                if not chunk:
+                    break
+                emit(chunk)
+        except Exception as exc:
+            app.logger.warning("h264 pump ended: %s", exc)
+
+    try:
+        chunk_iter = chunks_iter if chunks_iter is not None else iter_annex_b_chunks(stream)
+        while True:
+            if should_abort is not None and should_abort():
+                stats["reason"] = "client_gone"
+                break
+            try:
+                _transport, chunk = next(chunk_iter)
+            except StopIteration:
+                break
+            except OSError:
+                stats["reason"] = "oserror"
+                break
+            if proc is None:
+                buffered.extend(chunk)
+                if len(buffered) > 4 * 1024 * 1024:
+                    stats["reason"] = "codec_detect_timeout"
+                    break
+                for name in list(active):
+                    codec = codecs[name]
+                    try:
+                        packets = codec.parse(bytes(buffered))
+                    except av.error.InvalidDataError:
+                        continue
+                    for packet in packets:
+                        try:
+                            frames = codec.decode(packet)
+                        except av.error.InvalidDataError:
+                            frames = []
+                        if frames:
+                            produced[name] = True
+                            for other in list(active):
+                                if other != name:
+                                    active.discard(other)
+                            break
+                    if produced.get(name):
+                        break
+                if produced:
+                    fmt = next(iter(produced))
+                    try:
+                        start_ffmpeg(fmt)
+                        stats["codec"] = fmt
+                    except Exception as exc:
+                        app.logger.warning("h264 ffmpeg start failed: %s", exc)
+                        stats["reason"] = "ffmpeg_start_failed"
+                        break
+                    threading.Thread(target=pump, daemon=True).start()
+            else:
+                try:
+                    proc.stdin.write(chunk)
+                    proc.stdin.flush()
+                except (BrokenPipeError, OSError) as exc:
+                    app.logger.warning("h264 ffmpeg stdin closed: %s", exc)
+                    stats["reason"] = "ffmpeg_broken_pipe"
+                    break
+        if proc is not None:
+            try:
+                proc.stdin.close()
+            except Exception:
+                pass
+            proc.wait(timeout=10)
+            stats["frames"] = proc.returncode
+    finally:
+        if proc is not None and proc.poll() is None:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+    return stats
+
+
+@app.get("/h264/<int:index>")
+def h264(index: int):
+    login = request.args.get("login", "")
+    password = request.args.get("password", "")
+    api_base = request.args.get("api") or DEFAULT_API_BASE
+    stream_type = int(request.args.get("streamType", "0") or 0)
+    validate_code = request.args.get("validateCode", "")
+    if not login or not password:
+        return jsonify(error="login/password required"), 400
+
+    q: "queue.Queue[bytes | None]" = queue.Queue(maxsize=120)
+
+    acc_key = _account_key(login, password, api_base)
+    cam_key = f"{acc_key}:{index}"
+    # общий со /mjpeg учёт слотов: на аккаунте ~2 VTM-сессии суммарно
+    if _ACCOUNT_STREAMS.get(cam_key, 0) >= _MAX_PER_CAMERA or _ACCOUNT_STREAMS.get(acc_key, 0) >= _MAX_PER_ACCOUNT:
+        return (jsonify(error="stream limit: camera or account busy, retry later"), 429)
+    slot_keys = [acc_key, cam_key]
+
+    def release_slots() -> None:
+        for k in slot_keys:
+            _ACCOUNT_STREAMS[k] = max(0, _ACCOUNT_STREAMS.get(k, 1) - 1)
+
+    def produce() -> None:
+        for k in slot_keys:
+            _ACCOUNT_STREAMS[k] = _ACCOUNT_STREAMS.get(k, 0) + 1
+        try:
+            client = get_client(login, password, api_base)
+            cams = get_cameras(client, login, password, api_base)
+            cam = next((c for c in cams if c.index == index), None)
+            if cam is None:
+                app.logger.warning("h264: camera %s not found", index)
+                return
+            session = open_live_stream(client, cam, stream_type=stream_type or StreamType.AUTO)
+            try:
+                info = session.start()
+                if getattr(info, "result", 0) not in (0, None):
+                    raise HikCloudStreamError(f"VTM negotiation failed (code {info.result})")
+                chunks_iter = None
+                if validate_code:
+                    enc_key = client.query_device_encrypt_key(cam.device_serial, validate_code)
+                    chunks_iter = decrypting_chunks(session._client, enc_key)
+                stats = stream_h264_fmp4(
+                    session._client, q,
+                    stream_type=session.stream_type,
+                    chunks_iter=chunks_iter,
+                    should_abort=_abandoned,
+                )
+                app.logger.warning("h264 camera=%s closed: %s", index, stats)
+            finally:
+                try:
+                    session.close()
+                except Exception:
+                    pass
+        except Exception as exc:
+            app.logger.warning("h264 camera=%s ended: %s", index, exc)
+            drop_client(login, password, api_base)
+        finally:
+            release_slots()
+            try:
+                q.put_nowait(None)
+            except queue.Full:
+                pass
+
+    last_read = [time.time()]
+
+    def generate():
+        threading.Thread(target=produce, daemon=True).start()
+        while True:
+            chunk = q.get()
+            if chunk is None:
+                break
+            last_read[0] = time.time()
+            yield chunk
+
+    def _abandoned() -> bool:
+        # 60 с: облачная negotiation VTM и первый ключевой кадр могут
+        # занять заметное время, байтов в потоке до этого нет
+        return time.time() - last_read[0] > 60.0
+
+    return Response(
+        generate(),
+        mimetype="video/mp4",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
+
+
 # Лимиты VTM-сессий: облако Hik-Connect держит ~2 потока на аккаунт, а
 # ВИДЕОДАННЫЕ по конкретной камере шлёт только в ОДНУ сессию — параллельные
 # сессии на ту же камеру голодные (placeholder вечно). Поэтому: 1 поток на

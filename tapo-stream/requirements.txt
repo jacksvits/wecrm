@@ -1,0 +1,6 @@
+# Плагин «Камеры Tapo»: Flask + облако TP-Link (requests) + RTSP/декод (PyAV)
+flask==3.0.3
+requests>=2.31,<3
+av>=12
+pillow>=10,<12
+WSDiscovery>=2.0.0

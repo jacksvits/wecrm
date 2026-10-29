@@ -141,6 +141,41 @@ router.get('/snapshot/:index', authMiddleware, async (req: AuthRequest, res) => 
   }
 });
 
+
+// GET /api/hikvision-plugin/h264/:index — H.264/HEVC fMP4-поток для MSE-плеера
+// (proxy от сервиса; /stream/:index MJPEG остаётся fallback, напр. для HEVC)
+router.get('/h264/:index', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const s = await getSettings();
+    if (!s?.isActive) return res.status(503).json({ error: 'Плагин выключен' });
+    const index = encodeURIComponent(req.params.index);
+    const streamType = req.query.streamType ? `&streamType=${encodeURIComponent(String(req.query.streamType))}` : '';
+    const url = `${HIK_SERVICE}/h264/${index}?login=${encodeURIComponent(s.login)}&password=${encodeURIComponent(s.password)}&api=${encodeURIComponent(s.apiBaseUrl)}&validateCode=${encodeURIComponent(s.validateCode || '')}${streamType}`;
+    const controller = new AbortController();
+    const startTimer = setTimeout(() => controller.abort(), 15_000);
+    let upstream: Response;
+    try {
+      upstream = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(startTimer);
+    }
+    if (!upstream.ok || !upstream.body) {
+      const text = await upstream.text().catch(() => '');
+      if (!res.headersSent) return res.status(502).json({ error: text || `Сервис камер вернул HTTP ${upstream.status}` });
+    }
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Accel-Buffering', 'no');
+    const { Readable } = await import('stream');
+    const readable = Readable.fromWeb(upstream.body as any);
+    readable.on('error', () => { try { res.end(); } catch {} });
+    readable.pipe(res);
+  } catch (e: any) {
+    if (!res.headersSent) res.status(502).json({ error: e.message });
+  }
+});
+
 // GET /api/hikvision-plugin/stream/:index — MJPEG-поток камеры (proxy от сервиса)
 router.get('/stream/:index', authMiddleware, async (req: AuthRequest, res) => {
   try {

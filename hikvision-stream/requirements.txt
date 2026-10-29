@@ -1,3 +1,5 @@
 # hikcloudstream без пина: в PyPI актуальная линейка 0.1.x
 hikcloudstream[viewer]>=0.1.4,<0.2
 flask==3.0.3
+
+# PyAV (парсер Annex-B и fMP4-упаковка для /h264) ставится транзитивно через hikcloudstream[viewer]

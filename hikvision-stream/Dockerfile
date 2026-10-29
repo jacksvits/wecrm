@@ -7,10 +7,12 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY hikvision-stream/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py .
+# Общий fMP4-муксер (MSE) — build-контекст теперь корень репозитория
+COPY streamlib ./streamlib
+COPY hikvision-stream/app.py .
 
 EXPOSE 8557
 

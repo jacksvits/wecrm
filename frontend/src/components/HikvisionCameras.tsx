@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { HikvisionSettings, type HikvisionSettingsData } from "./HikvisionSettings";
+import { H264Player } from "./H264Player";
 
 // Страница «Камеры Hik-Connect» (плагин облачных камер).
 // Доступна только администраторам и только при включённом плагине (роут в
@@ -25,152 +26,6 @@ const cardStyle: React.CSSProperties = {
 
 function getToken() {
   return localStorage.getItem("token") || "";
-}
-
-function indexOfSub(hay: Uint8Array, needle: Uint8Array, from: number): number {
-  outer: for (let i = from; i + needle.length <= hay.length; i++) {
-    for (let j = 0; j < needle.length; j++) if (hay[i + j] !== needle[j]) continue outer;
-    return i;
-  }
-  return -1;
-}
-
-// Вырезаем JPEG из multipart-сегмента: пропускаем CRLF и парт-заголовки
-// до маркера SOI (0xFFD8), срезаем хвостовой CRLF после EOI
-function trimFrame(f: Uint8Array): Uint8Array {
-  const start = f.findIndex((b, i) => b === 0xff && f[i + 1] === 0xd8);
-  if (start === -1) return f;
-  let end = f.length;
-  while (end > start + 2 && (f[end - 1] === 0x0a || f[end - 1] === 0x0d)) end--;
-  return f.slice(start, end);
-}
-
-// MJPEG-плеер: читает поток через fetch, разбирает кадры по boundary,
-// следит за «замиранием» (нет кадров 10 с) и сам переподключается.
-// Прямой <img src=поток> не умеет ни диагностировать обрыв, ни восстанавливаться.
-function MjpegPlayer({ src, style }: { src: string; style?: React.CSSProperties }) {
-  const [frameUrl, setFrameUrl] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(true);
-  const [limitMsg, setLimitMsg] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-    let watchdog: ReturnType<typeof setInterval> | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let activeCtrl: AbortController | null = null;
-    let attempts = 0;
-
-    const scheduleReconnect = () => {
-      attempts += 1;
-      reconnectTimer = setTimeout(connect, Math.min(15000, 500 * attempts));
-    };
-
-    const connect = async () => {
-      if (cancelled) return;
-      // обрываем предыдущую попытку: иначе старый fetch держит облачный
-      // слот потока, и плеер блочит сам себя (лимит 2 на аккаунт)
-      if (activeCtrl) activeCtrl.abort();
-      activeCtrl = new AbortController();
-      setConnecting(true);
-      setLimitMsg(false);
-      try {
-        const resp = await fetch(src, { headers: { "X-Auth-Token": getToken() }, signal: activeCtrl.signal });
-        if (!cancelled && resp.status === 429) {
-          // лимит облака (2 потока): не долбим, показываем подсказку
-          setLimitMsg(true);
-          setConnecting(false);
-          scheduleReconnect();
-          return;
-        }
-        if (!cancelled && (!resp.ok || !resp.body)) throw new Error(`HTTP ${resp.status}`);
-        const ct = resp.headers.get("content-type") || "";
-        const bm = ct.match(/boundary=([^;]+)/);
-        const bBytes = new TextEncoder().encode(`--${bm ? bm[1].trim() : "hikframe"}`);
-
-        reader = resp.body!.getReader();
-        let buf = new Uint8Array(0);
-        let lastFrameAt = Date.now();
-        attempts = 0;
-
-        watchdog = setInterval(() => {
-          if (!cancelled && Date.now() - lastFrameAt > 10_000) {
-            try { reader?.cancel(); } catch { /* ignore */ }
-            scheduleReconnect();
-          }
-        }, 3000);
-
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done || cancelled) break;
-          const next = new Uint8Array(buf.length + value.length);
-          next.set(buf);
-          next.set(value, buf.length);
-          buf = next;
-          for (;;) {
-            const first = indexOfSub(buf, bBytes, 0);
-            if (first === -1) {
-              // мусор без boundary не копим больше 512 КБ
-              if (buf.length > 512 * 1024) buf = buf.slice(buf.length - bBytes.length);
-              break;
-            }
-            const second = indexOfSub(buf, bBytes, first + bBytes.length);
-            if (second === -1) {
-              buf = buf.slice(first);
-              break;
-            }
-            const frame = trimFrame(buf.slice(first + bBytes.length, second));
-            if (frame.length > 100 && frame[0] === 0xff && frame[1] === 0xd8) {
-              lastFrameAt = Date.now();
-              if (!cancelled) {
-                const url = URL.createObjectURL(new Blob([frame.buffer as ArrayBuffer], { type: "image/jpeg" }));
-                setFrameUrl((old) => {
-                  if (old) URL.revokeObjectURL(old);
-                  return url;
-                });
-                setConnecting(false);
-              }
-            }
-            buf = buf.slice(second);
-          }
-        }
-      } catch {
-        // обрыв сети / ошибка сервера — переподключимся ниже
-      }
-      if (!cancelled) scheduleReconnect();
-    };
-
-    connect();
-    return () => {
-      cancelled = true;
-      if (watchdog) clearInterval(watchdog);
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      activeCtrl?.abort();
-      try { reader?.cancel(); } catch { /* ignore */ }
-      setFrameUrl((old) => {
-        if (old) URL.revokeObjectURL(old);
-        return null;
-      });
-    };
-  }, [src]);
-
-  return (
-    <div style={{ position: "relative", background: "#000", borderRadius: 10, overflow: "hidden", ...style }}>
-      {frameUrl && (
-        <img src={frameUrl} alt="live" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
-      )}
-      {connecting && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 12, color: "rgba(255,255,255,0.8)", fontSize: 13, background: frameUrl ? "rgba(0,0,0,0.45)" : "transparent" }}>
-          Подключение… пробуждение камеры через облако может занять до 15 с
-        </div>
-      )}
-      {limitMsg && !connecting && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 12, color: "#ffd479", fontSize: 13, background: "rgba(0,0,0,0.55)" }}>
-          Лимит облака: не более 2 одновременных просмотров. Закройте другие окна камер и подождите ~15 с.
-        </div>
-      )}
-    </div>
-  );
 }
 
 async function apiFetch(path: string, options?: RequestInit) {
@@ -338,8 +193,9 @@ export function HikvisionCameras() {
           </div>
           {/* Плеер сам следит за потоком и переподключается при обрыве */}
           <div onClick={(e) => e.stopPropagation()}>
-            <MjpegPlayer
-              src={`/api/hikvision-plugin/stream/${liveCamera.index}?streamType=${liveStreamType}`}
+            <H264Player
+              src={`/api/hikvision-plugin/h264/${liveCamera.index}?streamType=${liveStreamType}`}
+              mjpegFallback={`/api/hikvision-plugin/stream/${liveCamera.index}?streamType=${liveStreamType}`}
               style={{ width: "min(92vw, 1100px)", height: "min(65vh, 600px)" }}
             />
           </div>

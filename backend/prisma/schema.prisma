@@ -1857,6 +1857,18 @@ model HikvisionPluginSettings {
   @@map("hikvision_plugin_settings")
 }
 
+// Плагин «Камеры Tapo» (TP-Link): учётные данные облачного аккаунта TP-Link ID.
+// Страница камер доступна только администраторам и только при is_active = true.
+model TapoPluginSettings {
+  id        Int      @id @default(1)
+  login     String   @default("")
+  password  String   @default("")
+  isActive  Boolean  @default(false) @map("is_active")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("tapo_plugin_settings")
+}
+
 model Reservation {
   id          String      @id @default(cuid())
   number      Int         @unique

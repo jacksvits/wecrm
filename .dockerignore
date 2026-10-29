@@ -1,0 +1,9 @@
+# Контекст сборки сервисов потоков (hikvision-stream, tapo-stream) — корень
+# репозитория; копируются только streamlib и каталоги сервисов (см. Dockerfile'ы).
+*
+!streamlib/
+!streamlib/**
+!hikvision-stream/
+!hikvision-stream/**
+!tapo-stream/
+!tapo-stream/**
