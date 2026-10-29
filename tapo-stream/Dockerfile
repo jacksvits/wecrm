@@ -11,6 +11,8 @@ COPY tapo-stream/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY streamlib ./streamlib
+COPY tapo-stream/topo ./topo
+COPY tapo-stream/tapo_cloud_relay.py .
 COPY tapo-stream/app.py .
 
 EXPOSE 8558

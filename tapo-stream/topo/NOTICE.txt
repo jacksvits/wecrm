@@ -1,0 +1,3 @@
+tapo_cloud_probe.py и tapo_cloud_app.py взяты из проекта filirnd/topo
+(https://github.com/filirnd/topo), лицензия MIT. Автор: filirnd.
+Используются как клиент облака TP-Link (CIPC relay) для live-видео.

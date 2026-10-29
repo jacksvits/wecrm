@@ -192,4 +192,83 @@ router.get('/stream/:index', authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+// POST /api/tapo-plugin/cloud-cameras — список камер из облака TP-Link (CIPC)
+router.post('/cloud-cameras', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const s = await getSettings();
+    const body = req.body || {};
+    const login = body.login || s?.login || '';
+    const password = body.password || s?.password || '';
+    if (!login || !password) return res.status(400).json({ error: 'Заполните логин и пароль TP-Link ID в настройках плагина' });
+    const upstream = await fetch(`${TAPO_SERVICE}/cloud/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login, password }),
+      signal: AbortSignal.timeout(45_000),
+    });
+    const data: any = await upstream.json().catch(() => ({}));
+    if (!upstream.ok) return res.status(502).json({ error: data.error || `Сервис Tapo вернул HTTP ${upstream.status}` });
+    return res.json(data); // {ok, cameras} или {ok:false, mfa_required, mfa_types}
+  } catch (e: any) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+// POST /api/tapo-plugin/cloud-mfa — запрос/подтверждение кода MFA
+router.post('/cloud-mfa', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const s = await getSettings();
+    const body = req.body || {};
+    const login = body.login || s?.login || '';
+    const password = body.password || s?.password || '';
+    if (!login || !password) return res.status(400).json({ error: 'Заполните логин и пароль TP-Link ID в настройках плагина' });
+    const upstream = await fetch(`${TAPO_SERVICE}/cloud/mfa`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login, password, code: body.code || '', mfa_type: body.mfa_type || 2 }),
+      signal: AbortSignal.timeout(45_000),
+    });
+    const data: any = await upstream.json().catch(() => ({}));
+    if (!upstream.ok) return res.status(502).json({ error: data.error || `Сервис Tapo вернул HTTP ${upstream.status}` });
+    return res.json(data);
+  } catch (e: any) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+// GET /api/tapo-plugin/cloud-stream/:deviceId — fMP4-поток из облака (proxy)
+router.get('/cloud-stream/:deviceId', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const s = await getSettings();
+    if (!s?.isActive) return res.status(503).json({ error: 'Плагин выключен' });
+    const deviceId = encodeURIComponent(req.params.deviceId);
+    const url = `${TAPO_SERVICE}/cloud/h264/${deviceId}?login=${encodeURIComponent(s.login)}&password=${encodeURIComponent(s.password)}`;
+    const controller = new AbortController();
+    const startTimer = setTimeout(() => controller.abort(), 15_000);
+    let upstream: Response;
+    try {
+      upstream = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(startTimer);
+    }
+    if (!upstream.ok || !upstream.body) {
+      const text = await upstream.text().catch(() => '');
+      if (!res.headersSent) return res.status(502).json({ error: text || `Сервис Tapo вернул HTTP ${upstream.status}` });
+    }
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Accel-Buffering', 'no');
+    const { Readable } = await import('stream');
+    const readable = Readable.fromWeb(upstream.body as any);
+    readable.on('error', () => { try { res.end(); } catch {} });
+    readable.pipe(res);
+  } catch (e: any) {
+    if (!res.headersSent) res.status(502).json({ error: e.message });
+  }
+});
+
 export default router;
+

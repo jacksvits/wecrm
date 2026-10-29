@@ -507,6 +507,108 @@ def h264(index: int):
     )
 
 
+
+
+# ================== облачный live-просмотр (CIPC relay; вендор: filirnd/topo, MIT) ==================
+
+@app.post("/cloud/login")
+def cloud_login_ep():
+    body = request.get_json(force=True, silent=True) or {}
+    login = str(body.get("login") or "")
+    password = str(body.get("password") or "")
+    if not login or not password:
+        return jsonify(error="login/password required"), 400
+    from tapo_cloud_relay import CloudError, MFARequired, cloud_cameras
+    try:
+        cams = cloud_cameras(login, password)
+        return jsonify({"ok": True, "cameras": cams})
+    except MFARequired as exc:
+        return jsonify({"ok": False, "mfa_required": True, "mfa_types": exc.mfa_types})
+    except CloudError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+    except Exception as exc:
+        app.logger.warning("tapo /cloud/login failed: %s", exc)
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+@app.post("/cloud/mfa")
+def cloud_mfa_ep():
+    body = request.get_json(force=True, silent=True) or {}
+    login = str(body.get("login") or "")
+    password = str(body.get("password") or "")
+    mfa_type = int(body.get("mfa_type") or 2)  # 1=подтверждение в приложении, 2=email
+    if not login or not password:
+        return jsonify(error="login/password required"), 400
+    from tapo_cloud_relay import CloudError, MFARequired, cloud_cameras, request_mfa, verify_mfa
+    try:
+        code = str(body.get("code") or "").strip()
+        if not code:
+            request_mfa(login, password, mfa_type)
+            return jsonify({"ok": True, "mfa_sent": True, "mfa_type": mfa_type})
+        verify_mfa(login, password, code, mfa_type)
+        return jsonify({"ok": True, "cameras": cloud_cameras(login, password)})
+    except MFARequired as exc:
+        return jsonify({"ok": False, "mfa_required": True, "mfa_types": exc.mfa_types})
+    except CloudError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+    except Exception as exc:
+        app.logger.warning("tapo /cloud/mfa failed: %s", exc)
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+@app.get("/cloud/h264/<device_id>")
+def cloud_h264_ep(device_id: str):
+    login = request.args.get("login", "")
+    password = request.args.get("password", "")
+    if not login or not password:
+        return jsonify(error="login/password required"), 400
+
+    from tapo_cloud_relay import (CloudError, MFARequired, acquire_stream_slot,
+                                  release_stream_slot, stream_cloud_fmp4)
+
+    if not acquire_stream_slot(login, password):
+        return jsonify(error="stream limit: слишком много облачных потоков на аккаунте"), 429
+
+    q: "queue.Queue[bytes | None]" = queue.Queue(maxsize=120)
+    last_read = [time.time()]
+
+    def _abandoned() -> bool:
+        # облачная negotiation быстрая, 60 с с запасом на ретраи relay
+        return time.time() - last_read[0] > 60.0
+
+    def produce() -> None:
+        try:
+            stats = stream_cloud_fmp4(login, password, device_id, q, _abandoned)
+            app.logger.warning("tapo cloud h264 %s closed: %s", device_id[:8], stats)
+        except MFARequired:
+            app.logger.warning("tapo cloud h264: MFA required")
+        except CloudError as exc:
+            app.logger.warning("tapo cloud h264: %s", exc)
+        except Exception as exc:
+            app.logger.warning("tapo cloud h264 ended: %s", exc)
+        finally:
+            release_stream_slot(login, password)
+            try:
+                q.put_nowait(None)
+            except queue.Full:
+                pass
+
+    def generate():
+        threading.Thread(target=produce, daemon=True).start()
+        while True:
+            chunk = q.get()
+            if chunk is None:
+                break
+            last_read[0] = time.time()
+            yield chunk
+
+    return Response(
+        generate(),
+        mimetype="video/mp4",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
+
+
 if __name__ == "__main__":
     # threaded=True: каждый зритель — свой поток и своя RTSP-сессия
     app.run(host="0.0.0.0", port=PORT, threaded=True)
