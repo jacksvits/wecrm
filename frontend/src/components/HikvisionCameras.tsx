@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { HikvisionSettings, type HikvisionSettingsData } from "./HikvisionSettings";
 import { H264Player } from "./H264Player";
+import { cameraIconBtnStyle, HiddenCamerasModal, useHiddenCameras } from "./HiddenCameras";
 
 // Страница «Камеры Hik-Connect» (плагин облачных камер).
 // Доступна только администраторам и только при включённом плагине (роут в
@@ -47,15 +48,30 @@ async function apiFetch(path: string, options?: RequestInit) {
 }
 
 // Карточка камеры: ленивое превью-снапшот; при недоступности — заглушка
-function CameraCard({ cam, onOpen }: { cam: HikCamera; onOpen: () => void }) {
+function CameraCard({ cam, onOpen, onHide }: { cam: HikCamera; onOpen: () => void; onHide: (index: number) => void }) {
   const [previewOk, setPreviewOk] = useState(true);
   return (
-    <div
-      style={{ ...cardStyle, padding: 12, cursor: "pointer" }}
-      onClick={onOpen}
-      title="Открыть live-поток"
-    >
-      <div style={{ borderRadius: 8, overflow: "hidden", background: "#000", aspectRatio: "16/10", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ ...cardStyle, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 500, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={cam.name}>{cam.name}</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+            {cam.deviceName} · канал {cam.channelNo}
+          </div>
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onHide(cam.index); }}
+          title="Скрыть камеру"
+          style={cameraIconBtnStyle}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+        >✕</button>
+      </div>
+      <div
+        style={{ margin: "0 16px 16px", borderRadius: 10, overflow: "hidden", background: "#000", aspectRatio: "16/10", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+        onClick={onOpen}
+        title="Открыть live-поток"
+      >
         {previewOk ? (
           <img
             src={`/api/hikvision-plugin/snapshot/${cam.index}?token=${encodeURIComponent(getToken())}`}
@@ -71,15 +87,13 @@ function CameraCard({ cam, onOpen }: { cam: HikCamera; onOpen: () => void }) {
           </div>
         )}
       </div>
-      <div style={{ fontSize: 14, fontWeight: 500, marginTop: 10 }}>{cam.name}</div>
-      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-        {cam.deviceName} · канал {cam.channelNo}
-      </div>
     </div>
   );
 }
 
 export function HikvisionCameras() {
+  const { hidden, hide, restore, restoreAll } = useHiddenCameras("hik");
+  const [showHidden, setShowHidden] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [hasLogin, setHasLogin] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -151,6 +165,11 @@ export function HikvisionCameras() {
           <button onClick={() => setShowSettings((v) => !v)} style={btnStyle}>
             {showSettings ? "Скрыть настройки" : "Настройки"}
           </button>
+          {hidden.length > 0 && (
+            <button onClick={() => setShowHidden(true)} style={btnStyle} title="Скрытые камеры">
+              ⚙️ Скрытые ({hidden.length})
+            </button>
+          )}
         </div>
       </div>
 
@@ -172,8 +191,8 @@ export function HikvisionCameras() {
 
       {isActive && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
-          {cameras.map((cam) => (
-            <CameraCard key={`${cam.deviceSerial}-${cam.channelNo}`} cam={cam} onOpen={() => setLiveCamera(cam)} />
+          {cameras.filter((c) => !hidden.includes(String(c.index))).map((cam) => (
+            <CameraCard key={`${cam.deviceSerial}-${cam.channelNo}`} cam={cam} onOpen={() => setLiveCamera(cam)} onHide={(index) => hide(String(index))} />
           ))}
           {cameras.length === 0 && !camerasLoading && !camerasError && (
             <div style={{ ...cardStyle, color: "var(--text-muted)", fontSize: 14 }}>
@@ -220,6 +239,15 @@ export function HikvisionCameras() {
           </div>
         </div>
       )}
+      {/* Возврат скрытых камер */}
+      <HiddenCamerasModal
+        title="Скрытые камеры"
+        items={cameras.filter((c) => hidden.includes(String(c.index))).map((c) => ({ id: String(c.index), label: c.name }))}
+        open={showHidden}
+        onClose={() => setShowHidden(false)}
+        onRestore={(id) => restore(id)}
+        onRestoreAll={restoreAll}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { TapoSettings, type TapoSettingsData } from "./TapoSettings";
 import { H264Player } from "./H264Player";
+import { cameraIconBtnStyle, HiddenCamerasModal, useHiddenCameras } from "./HiddenCameras";
 
 // Страница «Камеры Tapo» (TP-Link): сетка камер облачного аккаунта TP-Link ID
 // с live-просмотром. По аналогии с HikvisionCameras: только администраторы,
@@ -65,7 +66,7 @@ async function apiFetch(path: string, options?: RequestInit) {
   return res.json();
 }
 
-function CameraCard({ cam, token, onWatch }: { cam: TapoCamera; token: string; onWatch: () => void }) {
+function CameraCard({ cam, token, onWatch, onHide }: { cam: TapoCamera; token: string; onWatch: () => void; onHide: (index: number) => void }) {
   const [snap, setSnap] = useState<string | null>(null);
   const [snapErr, setSnapErr] = useState(false);
 
@@ -78,11 +79,26 @@ function CameraCard({ cam, token, onWatch }: { cam: TapoCamera; token: string; o
 
   return (
     <div style={{ ...card, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <div style={{ fontWeight: 600, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cam.name}</div>
-        <div style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{cam.ip}</div>
+      <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <div style={{ fontWeight: 500, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={cam.name}>{cam.name}</div>
+        <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); reload(); }}
+            title="Обновить превью"
+            style={cameraIconBtnStyle}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+          >↻</button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onHide(cam.index); }}
+            title="Скрыть камеру"
+            style={cameraIconBtnStyle}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+          >✕</button>
+        </span>
       </div>
-      <div style={{ position: "relative", background: "#000", aspectRatio: "16/9", cursor: "pointer" }} onClick={onWatch}>
+      <div style={{ position: "relative", background: "#000", aspectRatio: "16/9", cursor: "pointer", margin: "0 16px 16px", borderRadius: 10, overflow: "hidden" }} onClick={onWatch}>
         {snap && !snapErr && (
           <img src={snap} alt={cam.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
             onError={() => setSnapErr(true)} />
@@ -92,15 +108,6 @@ function CameraCard({ cam, token, onWatch }: { cam: TapoCamera; token: string; o
             {snapErr ? "Превью недоступно" : "Загрузка…"}
           </div>
         )}
-        <button
-          onClick={(e) => { e.stopPropagation(); reload(); }}
-          title="Обновить превью"
-          style={{ position: "absolute", top: 8, right: 8, padding: "4px 8px", borderRadius: 8, border: "1px solid var(--border-color)", background: "rgba(0,0,0,.55)", color: "#fff", fontSize: 12, cursor: "pointer" }}
-        >↻</button>
-      </div>
-      <div style={{ padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{cam.model || "Tapo"}</span>
-        <button onClick={onWatch} style={btnPrimaryStyle}>Смотреть</button>
       </div>
     </div>
   );
@@ -110,10 +117,12 @@ function CameraCard({ cam, token, onWatch }: { cam: TapoCamera; token: string; o
 // ==== облачные камеры (CIPC relay; камеры вне LAN сервера) ====
 type CloudCamera = { deviceId: string; name: string; model: string; status?: number };
 
-function CloudCamerasSection({ settings, lanNames, onLive }: {
+function CloudCamerasSection({ settings, lanNames, onLive, hidden, onHide }: {
   settings: TapoSettingsData | null;
   lanNames: Set<string>;
   onLive: (cam: CloudCamera) => void;
+  hidden: string[];
+  onHide: (deviceId: string) => void;
 }) {
   const [cloudCams, setCloudCams] = useState<CloudCamera[]>([]);
   const [mfa, setMfa] = useState<{ types: number[]; code: string; mfaType: number; busy: boolean; msg: string } | null>(null);
@@ -190,7 +199,7 @@ function CloudCamerasSection({ settings, lanNames, onLive }: {
     );
   }
 
-  const visible = cloudCams.filter((c) => !lanNames.has(c.name));
+  const visible = cloudCams.filter((c) => !lanNames.has(c.name) && !hidden.includes(`cloud:${c.deviceId}`));
   if (!visible.length && !msg) return null;
 
   return (
@@ -200,16 +209,22 @@ function CloudCamerasSection({ settings, lanNames, onLive }: {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
         {visible.map((cam) => (
           <div key={cam.deviceId} style={{ ...card, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-              <div style={{ fontWeight: 600, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cam.name}</div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>облако</div>
+            <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <div style={{ fontWeight: 500, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={cam.name}>{cam.name}</div>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>облако</span>
+                <button
+                  onClick={() => onHide(cam.deviceId)}
+                  title="Скрыть камеру"
+                  style={cameraIconBtnStyle}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+                >✕</button>
+              </span>
             </div>
-            <div style={{ position: "relative", background: "#000", aspectRatio: "16/9", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
+            <div style={{ position: "relative", background: "#000", aspectRatio: "16/9", cursor: "pointer", margin: "0 16px 16px", borderRadius: 10, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: 8 }}
+              onClick={() => onLive(cam)} title="Открыть трансляцию">
               Прямая трансляция через облако TP-Link (~1–2 с задержки)
-            </div>
-            <div style={{ padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{cam.model || "Tapo"}</span>
-              <button onClick={() => onLive(cam)} style={btnPrimaryStyle}>Смотреть</button>
             </div>
           </div>
         ))}
@@ -227,6 +242,8 @@ export function TapoCameras() {
   const [liveCamera, setLiveCamera] = useState<TapoCamera | null>(null);
   const [liveStreamType, setLiveStreamType] = useState<1 | 2>(1);
   const [liveCloud, setLiveCloud] = useState<CloudCamera | null>(null);
+  const { hidden, hide, restore, restoreAll } = useHiddenCameras("tapo");
+  const [showHidden, setShowHidden] = useState(false);
   const token = localStorage.getItem("token") || "";
 
   const load = useCallback(async () => {
@@ -255,12 +272,21 @@ export function TapoCameras() {
     setRefreshing(false);
   };
 
+  const visibleCameras = cameras.filter((c) => !hidden.includes(String(c.index)));
+  const hiddenItems = [
+    ...cameras.filter((c) => hidden.includes(String(c.index))).map((c) => ({ id: String(c.index), label: `${c.name} (${c.ip || "Tapo"})` })),
+    ...hidden.filter((id) => id.startsWith("cloud:")).map((id) => ({ id, label: `Облачная камера ${id.replace("cloud:", "")}` })),
+  ];
+
   return (
     <div style={{ padding: 20 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
         <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Камеры Tapo</div>
         {settings?.isActive && (
           <button onClick={refresh} disabled={refreshing} style={{ ...btnStyle, marginLeft: "auto" }}>{refreshing ? "Обновление…" : "Обновить"}</button>
+        )}
+        {hidden.length > 0 && (
+          <button onClick={() => setShowHidden(true)} style={btnStyle} title="Скрытые камеры">⚙️ Скрытые ({hidden.length})</button>
         )}
       </div>
       <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
@@ -276,6 +302,8 @@ export function TapoCameras() {
           settings={settings}
           lanNames={new Set(cameras.map((c) => c.name))}
           onLive={(cam) => setLiveCloud(cam)}
+          hidden={hidden}
+          onHide={(deviceId) => hide(`cloud:${deviceId}`)}
         />
       )}
 
@@ -290,10 +318,10 @@ export function TapoCameras() {
         </div>
       )}
 
-      {!!cameras.length && (
+      {!!visibleCameras.length && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
-          {cameras.map((cam) => (
-            <CameraCard key={cam.index} cam={cam} token={token} onWatch={() => { setLiveCamera(cam); setLiveStreamType(1); }} />
+          {visibleCameras.map((cam) => (
+            <CameraCard key={cam.index} cam={cam} token={token} onWatch={() => { setLiveCamera(cam); setLiveStreamType(1); }} onHide={(index) => hide(String(index))} />
           ))}
         </div>
       )}
@@ -345,6 +373,15 @@ export function TapoCameras() {
           </div>
         </div>
       )}
+      {/* Возврат скрытых камер */}
+      <HiddenCamerasModal
+        title="Скрытые камеры"
+        items={hiddenItems}
+        open={showHidden}
+        onClose={() => setShowHidden(false)}
+        onRestore={(id) => restore(id)}
+        onRestoreAll={restoreAll}
+      />
     </div>
   );
 }

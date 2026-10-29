@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CameraWidget } from "./CameraWidget";
 import { CameraStreamImage } from "./CameraStreamImage";
+import { HiddenCamerasModal, useHiddenCameras } from "./HiddenCameras";
 import { api } from "../api/client";
 
 // Вкладка «Локальные» страницы «Видеорегистратор»: локальные RTSP-камеры,
@@ -19,6 +20,8 @@ const cardStyle: React.CSSProperties = {
 };
 
 export function LocalCameras() {
+  const { hidden, hide, restore, restoreAll } = useHiddenCameras("local");
+  const [showHidden, setShowHidden] = useState(false);
   const [cameraSettingsList, setCameraSettingsList] = useState<any[]>([]);
   const [editingCameraId, setEditingCameraId] = useState<string | null>(null);
   // Камеры в режиме «картинка в картинке» (общие с CameraPipOverlay через localStorage)
@@ -54,7 +57,8 @@ export function LocalCameras() {
     return () => clearInterval(interval);
   }, []);
 
-  const activeCameras = cameraSettingsList.filter((c: any) => c.isActive !== false);
+  const activeCameras = cameraSettingsList.filter((c: any) => c.isActive !== false && !hidden.includes(String(c.id)));
+  const hiddenCameras = cameraSettingsList.filter((c: any) => hidden.includes(String(c.id)));
 
   return (
     <div>
@@ -73,6 +77,19 @@ export function LocalCameras() {
         >
           ＋ Добавить камеру
         </button>
+        {hidden.length > 0 && (
+          <button
+            onClick={() => setShowHidden(true)}
+            style={{
+              padding: '6px 12px', borderRadius: 10, border: '1px solid var(--border-color)',
+              background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 13,
+              cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+            title="Скрытые камеры"
+          >
+            ⚙️ Скрытые ({hidden.length})
+          </button>
+        )}
       </div>
 
       {cameraSettingsList.length === 0 ? (
@@ -90,6 +107,7 @@ export function LocalCameras() {
                 pipActive={pipCameraIds.includes(cam.id)}
                 onTogglePip={() => toggleCameraPip(cam.id)}
                 onFullscreen={() => setFullscreenCamera({ id: cam.id, label: cam.label })}
+                onClose={() => hide(String(cam.id))}
               />
             </div>
           ))}
@@ -294,6 +312,16 @@ export function LocalCameras() {
           </div>
         </div>
       )}
+
+      {/* Возврат скрытых камер */}
+      <HiddenCamerasModal
+        title="Скрытые камеры"
+        items={hiddenCameras.map((c: any) => ({ id: String(c.id), label: c.label || c.ip || "Видеокамера" }))}
+        open={showHidden}
+        onClose={() => setShowHidden(false)}
+        onRestore={(id) => restore(id)}
+        onRestoreAll={restoreAll}
+      />
     </div>
   );
 }

@@ -9,11 +9,12 @@ type CameraWidgetProps = {
   pipActive: boolean;
   onTogglePip: () => void;
   onFullscreen: () => void;
+  onClose: () => void;
 };
 
 // Контент виджета камеры на странице «Директор» — вкладка «Камеры».
 // Поток обновляется принудительной сменой key у <img> (refreshKey).
-export const CameraWidget = memo(function CameraWidget({ cam, refreshKey, onEdit, pipActive, onTogglePip, onFullscreen }: CameraWidgetProps) {
+export const CameraWidget = memo(function CameraWidget({ cam, refreshKey, onEdit, pipActive, onTogglePip, onFullscreen, onClose }: CameraWidgetProps) {
   // PiP — только десктоп (viewport >= 1024px)
   const [isDesktop, setIsDesktop] = useState<boolean>(() => window.innerWidth >= 1024);
   useEffect(() => {
@@ -53,6 +54,15 @@ export const CameraWidget = memo(function CameraWidget({ cam, refreshKey, onEdit
             title="Настройки камеры"
           >
             ⚙️
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
+            style={iconBtn}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+            title="Скрыть камеру"
+          >
+            ✕
           </button>
         </span>
       </div>
