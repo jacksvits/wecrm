@@ -130,6 +130,7 @@ router.post('/register', async (req, res) => {
         allowedPages,
         mobileNav: user.mobileNav || [],
       timezone: user.timezone || 'UTC',
+      soundEnabled: user.soundEnabled,
         stockAccess,
         showCalendarMetric: user.role?.showCalendarMetric ?? true,
         canReadContactAccesses: user.role?.canReadContactAccesses ?? true,

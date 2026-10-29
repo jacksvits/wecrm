@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api/client';
+import { playNotificationSound } from '../lib/sound';
 import { ChatMessage, FileAttachment, User } from '../types';
 import { FileUpload } from './FileUpload';
 import { LinkifyText } from './LinkifyText';
@@ -103,7 +104,6 @@ function VideoNotePlayer({ src }: { src: string }) {
   );
 }
 
-
 export function GlobalChat() {
   const { user } = useAuth();
   const userRole = typeof user?.role === 'string' ? null : user?.role;
@@ -137,18 +137,6 @@ export function GlobalChat() {
   const stickToBottomRef = useRef(true);
   const loadingMoreRef = useRef(false);
   const prevScrollHeightRef = useRef(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    audioRef.current = new Audio('/icq-message.mp3');
-    audioRef.current.volume = 0.5;
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
 
   useEffect(() => {
     setIsDark(localStorage.getItem('darkTheme') === 'true');
@@ -197,9 +185,8 @@ export function GlobalChat() {
               if (prev.some(m => m.id === msg.id)) return prev;
               return [...prev, msg];
             });
-            if (!initialLoadRef.current && msg.authorId !== user?.id && audioRef.current && user?.soundEnabled) {
-              audioRef.current.currentTime = 0;
-              audioRef.current.play().catch(() => {});
+            if (!initialLoadRef.current && msg.authorId !== user?.id) {
+              playNotificationSound((user as any)?.soundEnabled);
             }
           }
           if (data.channel === 'chat' && data.action === 'update_reaction' && data.message) {
@@ -227,9 +214,8 @@ export function GlobalChat() {
             const uniqueNew = newMsgs.filter(m => !existingIds.has(m.id));
             return [...prev, ...uniqueNew];
           });
-          if (!initialLoadRef.current && hasOthersMessages && audioRef.current && user?.soundEnabled) {
-            audioRef.current.currentTime = 0;
-            audioRef.current.play().catch(() => {});
+          if (!initialLoadRef.current && hasOthersMessages) {
+            playNotificationSound((user as any)?.soundEnabled);
           }
         }
       } catch (e) {}

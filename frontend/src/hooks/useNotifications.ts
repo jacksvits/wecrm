@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { api } from '../api/client';
 import { updateAppBadge } from '../lib/appBadge';
+import { playNotificationSound } from '../lib/sound';
 
 /**
  * Единый хук уведомлений для десктопной и мобильной версий.
@@ -32,9 +33,7 @@ export function useNotifications() {
       if (msg.type === 'connected') return;
       loadNotifications();
       if (soundEnabled && msg.type === 'notification') {
-        const audio = new Audio('/icq-message.mp3');
-        audio.volume = 0.5;
-        audio.play().catch(() => {});
+        playNotificationSound((user as any)?.soundEnabled);
       }
     };
     es.onerror = () => {};

@@ -16,7 +16,10 @@ function CallOverlay() {
     <WebPhoneWidget />
   </>) ;
 }
+import { initSoundUnlock } from './lib/sound' ;
 function App() { const { user, loading } = useAuth() ; const location = useLocation() ;
+  // Разблокировка звуковых уведомлений первым жестом пользователя (autoplay policy)
+  useEffect(() => { initSoundUnlock() ; }, []) ;
 
   // Global heartbeat: mark user as online on every navigation and every 30s
   useEffect(() => {
