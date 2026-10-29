@@ -169,6 +169,7 @@ def stream_cloud_fmp4(login: str, password: str, device_id: str,
     worker = _get_worker(login, password, device_id)
     sub = worker.subscribe_native_video()
     stats = {"reason": "eof"}
+    last_data = time.time()
     try:
         while True:
             if should_abort is not None and should_abort():
@@ -186,7 +187,15 @@ def stream_cloud_fmp4(login: str, password: str, device_id: str,
             try:
                 chunk = sub.get(timeout=1)
             except pyqueue.Empty:
+                # облако иногда «голодает»: relay открыт, но данных нет
+                # (лимиты при частых переподключениях) — рвём, чтобы
+                # освободить слот и дать плееру честный ретрай
+                if time.time() - last_data > 25:
+                    stats["reason"] = "starved_no_data_25s"
+                    break
                 continue
+            else:
+                last_data = time.time()
             if chunk is None:
                 # сигнал _broadcast_native_reset: relay пересоздаётся,
                 # этот HTTP-ответ нужно закрыть (новый получит новый init)
@@ -214,6 +223,7 @@ def stream_cloud_mjpeg(login: str, password: str, device_id: str,
     worker = _get_worker(login, password, device_id)
     sub = worker.subscribe()
     stats = {"reason": "eof"}
+    last_data = time.time()
     try:
         while True:
             if should_abort is not None and should_abort():
@@ -229,7 +239,12 @@ def stream_cloud_mjpeg(login: str, password: str, device_id: str,
             try:
                 chunk = sub.get(timeout=1)
             except pyqueue.Empty:
+                if time.time() - last_data > 30:
+                    stats["reason"] = "starved_no_data_30s"
+                    break
                 continue
+            else:
+                last_data = time.time()
             if chunk is None:
                 stats["reason"] = "relay_reset"
                 break
