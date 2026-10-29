@@ -140,8 +140,9 @@ function renderPluginSettings(pluginKey: PluginKey) {
     case "vpn":
       return <VpnSettings />;
     case "hikvision":
-    case "tapo":
       return <HikvisionSettings />;
+    case "tapo":
+      return <TapoSettings />;
     case "cdek":
       return <CdekSettings />;
     default:
