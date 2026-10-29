@@ -416,7 +416,8 @@ def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: 
         return None
     try:
         proc = subprocess.Popen(
-            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", "pipe:0",
+            ["ffmpeg", "-hide_banner", "-loglevel", "error",
+             "-f", "mp4", "-i", "pipe:0",
              "-frames:v", "1", "-q:v", "4", "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         )
