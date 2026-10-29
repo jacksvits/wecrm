@@ -527,23 +527,23 @@ export function TaskList() {
               {" "}
               <span>
                 {task.startDate ? `Начало: ${formatDateTime(task.startDate, user?.timezone)} · ` : ""}
-                {task.dueDate
-                  ? formatDateTime(task.dueDate, user?.timezone)
-                  : "Без срока"}
+                {task.dueDate ? (
+                  <b>{formatDateTime(task.dueDate, user?.timezone)}</b>
+                ) : (
+                  "Без срока"
+                )}
               </span>{" "}
-              <span>
-                {task.assignees?.map((a) => a.user.name).join(", ") ||
-                  "Не назначено"}
-              </span>{" "}
+            </div>{" "}
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+              Исполнители:{" "}
+              {task.assignees?.map((a) => a.user.name).join(", ") ||
+                "Не назначено"}
             </div>{" "}
             {task.curators && task.curators.length > 0 && (
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
                 Кураторы: {task.curators.map((c) => c.name).join(", ")}
               </div>
             )}{" "}
-            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-              Создал: {task.creator?.name || "—"}
-            </div>{" "}
             {task.contact && (
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
                 Контакт:{" "}
@@ -782,9 +782,11 @@ export function TaskList() {
             </span>{" "}
             <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
               {task.startDate ? `${formatDateTime(task.startDate, user?.timezone)} → ` : ""}
-              {task.dueDate
-                ? formatDateTime(task.dueDate, user?.timezone)
-                : "—"}
+              {task.dueDate ? (
+                <b>{formatDateTime(task.dueDate, user?.timezone)}</b>
+              ) : (
+                "—"
+              )}
             </span>{" "}
             <span style={{ color: "var(--text-secondary)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {task.contact?.name || "—"}
@@ -806,9 +808,7 @@ export function TaskList() {
                 Кураторы: {task.curators.map((c) => c.name).join(", ")}
               </span>
             )}{" "}
-            <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
-              Создал: {task.creator?.name || "—"}
-            </span>{" "}
+
             <div
               style={{ display: "flex", gap: 6, justifyContent: "center" }}
               onClick={(e) => e.stopPropagation()}
@@ -1041,10 +1041,14 @@ export function TaskList() {
       </div>{" "}
       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
         {task.startDate ? `Начало: ${formatDateTime(task.startDate, user?.timezone)} · ` : ""}
-        {task.dueDate
-          ? formatDateTime(task.dueDate, user?.timezone)
-          : "Без срока"}{" "}
-        ·{" "}
+        {task.dueDate ? (
+          <b>{formatDateTime(task.dueDate, user?.timezone)}</b>
+        ) : (
+          "Без срока"
+        )}
+      </div>{" "}
+      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+        Исполнители:{" "}
         {task.assignees?.map((a) => a.user.name).join(", ") ||
           "Не назначено"}
       </div>{" "}
@@ -1053,11 +1057,8 @@ export function TaskList() {
           Кураторы: {task.curators.map((c) => c.name).join(", ")}
         </div>
       )}{" "}
-      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, paddingRight: 32 }}>
-        Создал: {task.creator?.name || "—"}
-      </div>{" "}
       {task.contact && (
-        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, paddingRight: 32 }}>
           Контакт:{" "}
           <span
             style={{ color: "#1565c0", cursor: "pointer" }}
