@@ -225,46 +225,92 @@ def stream_cloud_fmp4(login: str, password: str, device_id: str,
 
 def stream_cloud_mjpeg(login: str, password: str, device_id: str,
                        output: "pyqueue.Queue", should_abort) -> dict:
-    """MJPEG-поток камеры из облака (для браузеров без H.264 в MSE)."""
+    # MJPEG-поток камеры из облака (для браузеров без H.264 в MSE).
+    # Нативный fMP4-поток воркера (проверенный путь) транскодируется своим
+    # ffmpeg в JPEG ~1.5 к/с. Вендорный MJPEG-ремуксер не используется:
+    # в смешанном режиме (H.264 + MJPEG подписчики) он голодал.
+    import subprocess
     worker = _get_worker(login, password, device_id)
-    sub = worker.subscribe()
+    sub = worker.subscribe_native_video()
     stats = {"reason": "eof"}
-    last_data = time.time()
+    proc = None
     try:
+        proc = subprocess.Popen(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error",
+             "-f", "mp4", "-i", "pipe:0",
+             "-vf", "fps=1.5,scale=1280:-2", "-q:v", "6",
+             "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+        def _pump_in() -> None:
+            try:
+                while True:
+                    if (should_abort is not None and should_abort()) or worker.stop.is_set():
+                        break
+                    try:
+                        chunk = sub.get(timeout=1)
+                    except pyqueue.Empty:
+                        continue
+                    if chunk is None:
+                        break
+                    if isinstance(chunk, (bytes, bytearray)) and proc.stdin:
+                        try:
+                            proc.stdin.write(bytes(chunk))
+                            proc.stdin.flush()
+                        except (BrokenPipeError, OSError):
+                            break
+            except Exception:
+                pass
+            try:
+                if proc.stdin:
+                    proc.stdin.close()
+            except Exception:
+                pass
+
+        threading.Thread(target=_pump_in, daemon=True).start()
+
+        pending = bytearray()
         while True:
             if should_abort is not None and should_abort():
                 stats["reason"] = "client_gone"
                 break
-            if worker.stop.is_set():
-                stats["reason"] = "worker_stopped"
+            if proc.poll() is not None:
+                stats["reason"] = "ffmpeg rc=%s" % proc.returncode
                 break
-            err = worker.last_error
-            if err:
-                stats["reason"] = f"relay: {err}"
+            data = proc.stdout.read1(65536) if hasattr(proc.stdout, "read1") else proc.stdout.read(65536)
+            if not data:
+                stats["reason"] = "ffmpeg eof"
                 break
-            try:
-                chunk = sub.get(timeout=1)
-            except pyqueue.Empty:
-                if time.time() - last_data > 30:
-                    stats["reason"] = "starved_no_data_30s"
+            pending.extend(data)
+            # нарезаем поток на JPEG по маркерам FFD8..FFD9
+            while True:
+                s = pending.find(b"\xff\xd8")
+                if s < 0:
+                    pending = pending[-1:] if pending else pending
                     break
-                continue
-            else:
-                last_data = time.time()
-            if chunk is None:
-                stats["reason"] = "relay_reset"
-                break
-            if not isinstance(chunk, (bytes, bytearray)):
-                continue
-            try:
-                output.put(bytes(chunk), timeout=5)
-            except pyqueue.Full:
-                stats["reason"] = "client_slow"
+                e = pending.find(b"\xff\xd9", s + 2)
+                if e < 0:
+                    if s > 0:
+                        del pending[:s]
+                    break
+                frame = bytes(pending[s:e + 2])
+                del pending[:e + 2]
+                try:
+                    output.put(frame, timeout=5)
+                except pyqueue.Full:
+                    stats["reason"] = "client_slow"
+                    break
+            if stats["reason"] != "eof":
                 break
     finally:
         try:
-            worker.unsubscribe(sub)
+            worker.unsubscribe_native_video(sub)
         except Exception:
             pass
+        if proc is not None and proc.poll() is None:
+            try:
+                proc.kill()
+            except Exception:
+                pass
         _release_worker(login, password, device_id)
     return stats
