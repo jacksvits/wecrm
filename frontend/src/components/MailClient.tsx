@@ -599,7 +599,7 @@ export function MailClient() {
     if (!targets.length) return;
     try {
       await api.mail.moveMessages(selectedAccountId, selectedFolder, targets, destination);
-      if (openMessage && targets.includes(openMessage.uid)) setOpenMessage(null);
+      if (openMessage && targets.includes(openMessage.uid)) { setOpenMessage(null); setMobileScreen('list'); }
       afterListAction();
     } catch (e: any) {
       setError(e.message || 'Не удалось переместить письма');
@@ -614,7 +614,7 @@ export function MailClient() {
     if (!targets.length) return;
     try {
       await api.mail.moveMessages(selectedAccountId, selectedFolder, targets, destination);
-      if (openMessage && targets.includes(openMessage.uid)) setOpenMessage(null);
+      if (openMessage && targets.includes(openMessage.uid)) { setOpenMessage(null); setMobileScreen('list'); }
       afterListAction();
     } catch (e: any) {
       setError(e.message || 'Не удалось переместить письма');
@@ -651,7 +651,7 @@ export function MailClient() {
     try {
       if (currentFolderIsTrash) await api.mail.deleteMessages(selectedAccountId, selectedFolder, targets);
       else await api.mail.moveMessages(selectedAccountId, selectedFolder, targets, trashPath || 'Trash');
-      if (openMessage && targets.includes(openMessage.uid)) setOpenMessage(null);
+      if (openMessage && targets.includes(openMessage.uid)) { setOpenMessage(null); setMobileScreen('list'); }
       afterListAction();
     } catch (e: any) {
       setError(e.message || 'Не удалось удалить письма');
@@ -666,7 +666,7 @@ export function MailClient() {
     const destination = currentFolderIsJunk ? 'INBOX' : (junkPath || 'Junk');
     try {
       await api.mail.moveMessages(selectedAccountId, selectedFolder, targets, destination);
-      if (openMessage && targets.includes(openMessage.uid)) setOpenMessage(null);
+      if (openMessage && targets.includes(openMessage.uid)) { setOpenMessage(null); setMobileScreen('list'); }
       afterListAction();
     } catch (e: any) {
       setError(e.message || 'Не удалось выполнить действие');
@@ -681,6 +681,7 @@ export function MailClient() {
       await api.mail.emptyFolder(selectedAccountId, f.path);
       if (selectedFolder === f.path) {
         setOpenMessage(null);
+        setMobileScreen('list');
         clearSelection();
         loadMessages(page);
       }
@@ -698,7 +699,7 @@ export function MailClient() {
       if (currentFolderIsTrash) await api.mail.deleteMessages(selectedAccountId, selectedFolder, [uid]);
       else await api.mail.moveMessages(selectedAccountId, selectedFolder, [uid], trashPath || 'Trash');
       setSelected(prev => { const next = new Set(prev); next.delete(uid); return next; });
-      if (openMessage?.uid === uid) setOpenMessage(null);
+      if (openMessage?.uid === uid) { setOpenMessage(null); setMobileScreen('list'); }
       loadMessages(page);
       loadFolders();
     } catch (e: any) {
@@ -1719,7 +1720,7 @@ export function MailClient() {
               )}
               {/* Список или письмо на весь экран */}
               <div style={{ flex: 1, display: 'flex', overflow: 'hidden', flexDirection: 'row' }}>
-                {mobileScreen === 'list' ? renderMessageList() : renderReadingPane()}
+                {mobileScreen === 'list' || !openMessage ? renderMessageList() : renderReadingPane()}
               </div>
               {renderStatusBar()}
             </>
