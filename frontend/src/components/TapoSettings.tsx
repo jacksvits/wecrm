@@ -94,7 +94,10 @@ export function TapoSettings({ onSaved }: { onSaved?: (s: TapoSettingsData) => v
         method: "POST",
         body: JSON.stringify({ login: settings.login, password: settings.password }),
       });
-      setTestMsg({ ok: true, text: `Подключено. Камер в аккаунте: ${Array.isArray(r.cameras) ? r.cameras.length : 0}` });
+      const n = Array.isArray(r.cameras) ? r.cameras.length : 0;
+      const total = typeof r.devices === 'number' ? r.devices : n;
+      const hint = r.hint ? ` ${r.hint}` : '';
+      setTestMsg({ ok: n > 0, text: `Подключено. Устройств в аккаунте: ${total}, камер доступно по RTSP: ${n}.${hint}` });
     } catch (e: any) {
       setTestMsg({ ok: false, text: e.message || "Ошибка подключения" });
     } finally {

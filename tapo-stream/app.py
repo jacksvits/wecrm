@@ -138,8 +138,12 @@ def read_arp() -> dict[str, str]:
 
 
 def local_networks() -> list[tuple[int, int]]:
-    """(network, mask) хостового порядка для подсетей UP-интерфейсов."""
+    # Подсети интерфейсов default gateway (камеры достижимы через них).
+    # У самого default-маршрута маска /0, поэтому берём подключённые
+    # маршруты (connected) его интерфейсов. Иначе sweep либо пуст, либо
+    # идёт по docker-мостам (172.17/172.18... — каждый /16 это ~4000 проб).
     nets: set[tuple[int, int]] = set()
+    default_ifaces: set[str] = set()
 
     def le_hex(value: str) -> int:
         return int.from_bytes(bytes.fromhex(value), "little")
@@ -147,26 +151,33 @@ def local_networks() -> list[tuple[int, int]]:
     try:
         with open("/proc/net/route") as fh:
             next(fh, None)
-            for line in fh:
-                fields = line.split()
-                if len(fields) < 8:
-                    continue
-                flags = int(fields[3], 16)
-                if not (flags & 0x1):          # RTF_UP
-                    continue
-                dest, gateway, mask = fields[1], fields[2], fields[7]
-                mask_i = le_hex(mask)
-                bits = bin(mask_i).count("1")
-                if not (16 <= bits <= 30):
-                    continue
-                if dest == "00000000":
-                    network = le_hex(gateway) & mask_i
-                else:
-                    network = le_hex(dest) & mask_i
-                if network and network != 0x7F000000:  # не loopback
-                    nets.add((network, mask_i))
+            rows = [line.split() for line in fh if len(line.split()) >= 8]
     except OSError:
-        pass
+        return []
+
+    for fields in rows:
+        flags = int(fields[3], 16)
+        if not (flags & 0x1):  # RTF_UP
+            continue
+        if fields[1] == "00000000":
+            default_ifaces.add(fields[0])
+
+    for fields in rows:
+        if fields[0] not in default_ifaces:
+            continue
+        flags = int(fields[3], 16)
+        if not (flags & 0x1):
+            continue
+        dest, mask = fields[1], fields[7]
+        if dest == "00000000":
+            continue
+        mask_i = le_hex(mask)
+        bits = bin(mask_i).count("1")
+        if not (16 <= bits <= 30):
+            continue
+        network = le_hex(dest) & mask_i
+        if network and network != 0x7F000000:  # не loopback
+            nets.add((network, mask_i))
     return list(nets)
 
 
@@ -191,7 +202,8 @@ def sweep_rtsp_hosts() -> None:
 
 # --------------------------------------------------------------- список камер
 
-def get_cameras(login: str, password: str, sweep: bool = False) -> list[dict]:
+def get_cameras(login: str, password: str, sweep: bool = False) -> tuple[list[dict], int]:
+    # Список камер + число устройств в облаке (устройства без LAN-IP не попадают)
     key = _creds_key(login, password)
     now = time.time()
     hit = _cameras_cache.get(key)
@@ -218,8 +230,8 @@ def get_cameras(login: str, password: str, sweep: bool = False) -> list[dict]:
             "ip": ip,
             "mac": mac,
         })
-    _cameras_cache[key] = (time.time(), cams)
-    return cams
+    _cameras_cache[key] = (time.time(), (cams, len(devices)))
+    return cams, len(devices)
 
 
 # ---------------------------------------------------------------------- RTSP
@@ -345,11 +357,13 @@ def cameras():
     if not login or not password:
         return jsonify(error="login/password required"), 400
     try:
-        cams = get_cameras(login, password)
-        if not cams:
+        cams, total = get_cameras(login, password)
+        if not cams and total:
             # ARP может ещё не видеть камеры (idle) — будим сеть и повторяем
-            cams = get_cameras(login, password, sweep=True)
-        return jsonify(cams)
+            cams, total = get_cameras(login, password, sweep=True)
+        resp = jsonify(cams)
+        resp.headers["X-Devices-Total"] = str(total)
+        return resp
     except TapoCloudError as exc:
         return jsonify(error=str(exc)), 502
     except Exception as exc:
@@ -372,7 +386,7 @@ def snapshot(index: int):
     if hit and time.time() - hit[0] < SNAPSHOT_TTL:
         return Response(hit[1], mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
     try:
-        cams = get_cameras(login, password)
+        cams, _total = get_cameras(login, password)
         cam = next((c for c in cams if c["index"] == index), None)
         if cam is None:
             return jsonify(error=f"camera {index} not found"), 404
@@ -415,7 +429,7 @@ def h264(index: int):
         for k in slot_keys:
             _STREAMS[k] = _STREAMS.get(k, 0) + 1
         try:
-            cams = get_cameras(login, password)
+            cams, _total = get_cameras(login, password)
             cam = next((c for c in cams if c["index"] == index), None)
             if cam is None:
                 app.logger.warning("tapo h264: camera %s not found", index)

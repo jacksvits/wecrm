@@ -89,7 +89,12 @@ router.post('/test', authMiddleware, async (req: AuthRequest, res) => {
     if (!upstream.ok) {
       return res.status(502).json({ ok: false, error: data.error || `Сервис Tapo вернул HTTP ${upstream.status}` });
     }
-    return res.json({ ok: true, cameras: Array.isArray(data) ? data : [] });
+    const devices = Number(upstream.headers.get('x-devices-total') || '0');
+    const cameras = Array.isArray(data) ? data : [];
+    const hint = devices > 0 && cameras.length === 0
+      ? 'Устройства в аккаунте есть, но ни одно не найдено в LAN сервера: камеры должны быть в одной локальной сети с сервером wecrm, RTSP включён в приложении Tapo.'
+      : '';
+    return res.json({ ok: true, cameras, devices, hint });
   } catch (e: any) {
     return res.status(502).json({ ok: false, error: e.message });
   }
