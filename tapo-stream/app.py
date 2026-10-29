@@ -202,43 +202,88 @@ def sweep_rtsp_hosts() -> None:
 
 # --------------------------------------------------------------- список камер
 
-def get_cameras(login: str, password: str, sweep: bool = False) -> tuple[list[dict], int]:
+def _probe_rtsp(ip: str, port: int, timeout: float = 4.0) -> bool:
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        ok = s.connect_ex((ip, port)) == 0
+        s.close()
+        return ok
+    except OSError:
+        return False
+
+
+def get_cameras(login: str, password: str, sweep: bool = False,
+                extra: list[dict] | None = None) -> tuple[list[dict], int]:
     # Список камер + число устройств в облаке (устройства без LAN-IP не попадают)
     key = _creds_key(login, password)
     now = time.time()
     hit = _cameras_cache.get(key)
     if hit and now - hit[0] < CAMERAS_CACHE_TTL and not sweep:
-        return hit[1]
-    devices = cloud_devices(login, password)
-    if sweep:
-        # часть MAC не видна в ARP (idle/просроченные записи) — будим сеть
-        sweep_rtsp_hosts()
-    arp = read_arp()
-    cams: list[dict] = []
-    for d in devices:
-        mac = (d.get("deviceMac") or "").replace(":", "").replace("-", "").upper()
-        if not mac:
-            continue
-        ip = arp.get(mac)
-        if not ip:
-            continue  # устройство не в LAN сервера — RTSP до него не достучаться
-        cams.append({
-            "index": len(cams) + 1,
-            "name": d.get("alias") or d.get("deviceName") or "Tapo",
-            "deviceId": d.get("deviceId") or "",
-            "model": d.get("deviceModel") or d.get("deviceName") or "",
-            "ip": ip,
-            "mac": mac,
-        })
-    _cameras_cache[key] = (time.time(), (cams, len(devices)))
-    return cams, len(devices)
+        cams, total = hit[1]
+        if extra is None:
+            return cams, total
+    else:
+        devices = cloud_devices(login, password)
+        if sweep:
+            # часть MAC не видна в ARP (idle/просроченные записи) — будим сеть
+            sweep_rtsp_hosts()
+        arp = read_arp()
+        cams = []
+        for d in devices:
+            mac = (d.get("deviceMac") or "").replace(":", "").replace("-", "").upper()
+            if not mac:
+                continue
+            ip = arp.get(mac)
+            if not ip:
+                continue  # устройство не в LAN сервера — RTSP до него не достучаться
+            cams.append({
+                "index": len(cams) + 1,
+                "name": d.get("alias") or d.get("deviceName") or "Tapo",
+                "deviceId": d.get("deviceId") or "",
+                "model": d.get("deviceModel") or d.get("deviceName") or "",
+                "ip": ip,
+                "port": 554,
+                "mac": mac,
+                "manual": False,
+            })
+        total = len(devices)
+        _cameras_cache[key] = (time.time(), (cams, total))
+    # Камеры вне LAN (белый IP/проброс портов/VPN): добавляем поверх облачных
+    if extra:
+        from concurrent.futures import ThreadPoolExecutor
+        ips = []
+        for e in extra:
+            ip = str(e.get("ip") or "").strip()
+            if not ip:
+                continue
+            port = int(e.get("port") or 554)
+            name = str(e.get("name") or "").strip() or ip
+            ips.append((ip, port, name))
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            online = list(ex.map(lambda t: _probe_rtsp(t[0], t[1]), ips))
+        for (ip, port, name), ok in zip(ips, online):
+            cams.append({
+                "index": len(cams) + 1,
+                "name": name,
+                "deviceId": "",
+                "model": "Tapo (вне LAN)",
+                "ip": ip,
+                "port": port,
+                "mac": "",
+                "manual": True,
+                "online": ok,
+            })
+    return cams, total
 
 
 # ---------------------------------------------------------------------- RTSP
 
 def rtsp_url(cam: dict, user: str, password: str, stream_type: int) -> str:
     path = RTSP_PATHS.get(stream_type, "stream1")
-    return f"rtsp://{quote(user, safe='')}:{quote(password, safe='')}@{cam['ip']}:554/{path}"
+    port = int(cam.get("port") or 554)
+    return f"rtsp://{quote(user, safe='')}:{quote(password, safe='')}@{cam['ip']}:{port}/{path}"
 
 
 def rtsp_credentials(login: str, password: str, cam: dict) -> tuple[str, str]:
@@ -354,13 +399,14 @@ def cameras():
     body = request.get_json(force=True, silent=True) or {}
     login = str(body.get("login") or "")
     password = str(body.get("password") or "")
+    extra = body.get("extra") if isinstance(body.get("extra"), list) else None
     if not login or not password:
         return jsonify(error="login/password required"), 400
     try:
-        cams, total = get_cameras(login, password)
-        if not cams and total:
+        cams, total = get_cameras(login, password, extra=extra)
+        if not any(not c.get("manual") for c in cams) and total:
             # ARP может ещё не видеть камеры (idle) — будим сеть и повторяем
-            cams, total = get_cameras(login, password, sweep=True)
+            cams, total = get_cameras(login, password, sweep=True, extra=extra)
         resp = jsonify(cams)
         resp.headers["X-Devices-Total"] = str(total)
         return resp

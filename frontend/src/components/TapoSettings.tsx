@@ -6,9 +6,12 @@ import { useEffect, useState } from "react";
 // берётся из облака, видео идёт по RTSP напрямую из LAN сервера (камеры
 // должны быть в одной локальной сети с сервером wecrm).
 
+export type TapoExtraCamera = { ip: string; port?: number; name?: string };
+
 export type TapoSettingsData = {
   login: string;
   password: string;
+  extraCameras: string; // JSON TapoExtraCamera[]
   isActive: boolean;
 };
 
@@ -35,6 +38,35 @@ const btnStyle: React.CSSProperties = {
 
 const btnPrimaryStyle: React.CSSProperties = { ...btnStyle, background: "#007AFF", borderColor: "#007AFF", color: "#fff" };
 
+// extraCameras (JSON) <-> текстовое поле ("Имя IP:порт" построчно)
+function extraToText(raw: string): string {
+  try {
+    const arr = JSON.parse(raw || "[]");
+    if (!Array.isArray(arr)) return "";
+    return arr.map((e: any) => {
+      const addr = e.port && Number(e.port) !== 554 ? `${e.ip}:${e.port}` : e.ip;
+      return e.name && e.name !== e.ip ? `${e.name} ${addr}` : addr;
+    }).join("\n");
+  } catch {
+    return "";
+  }
+}
+
+function textToExtra(text: string): string {
+  const out: TapoExtraCamera[] = [];
+  for (const line of text.split(/\n+/)) {
+    const t = line.trim();
+    if (!t) continue;
+    const parts = t.split(/\s+/);
+    const addr = parts[parts.length - 1];
+    const m = addr.match(/^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?$/);
+    if (!m) continue;
+    const name = parts.length > 1 ? parts.slice(0, -1).join(" ") : "";
+    out.push({ ip: m[1], port: m[2] ? Number(m[2]) : 554, name });
+  }
+  return JSON.stringify(out);
+}
+
 async function apiFetch(path: string, options?: RequestInit) {
   const token = localStorage.getItem("token") || "";
   const res = await fetch(path, {
@@ -55,7 +87,7 @@ async function apiFetch(path: string, options?: RequestInit) {
 }
 
 export function TapoSettings({ onSaved }: { onSaved?: (s: TapoSettingsData) => void }) {
-  const [settings, setSettings] = useState<TapoSettingsData>({ login: "", password: "", isActive: false });
+  const [settings, setSettings] = useState<TapoSettingsData>({ login: "", password: "", extraCameras: "[]", isActive: false });
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -64,7 +96,7 @@ export function TapoSettings({ onSaved }: { onSaved?: (s: TapoSettingsData) => v
 
   useEffect(() => {
     apiFetch("/api/tapo-plugin/settings")
-      .then((s: any) => setSettings({ login: s.login || "", password: s.password || "", isActive: !!s.isActive }))
+      .then((s: any) => setSettings({ login: s.login || "", password: s.password || "", extraCameras: s.extraCameras || "[]", isActive: !!s.isActive }))
       .catch(() => {})
       .finally(() => setLoaded(true));
   }, []);
@@ -75,7 +107,7 @@ export function TapoSettings({ onSaved }: { onSaved?: (s: TapoSettingsData) => v
     setTestMsg(null);
     try {
       const s: any = await apiFetch("/api/tapo-plugin/settings", { method: "PUT", body: JSON.stringify(settings) });
-      const next: TapoSettingsData = { login: s.login || "", password: s.password || "", isActive: !!s.isActive };
+      const next: TapoSettingsData = { login: s.login || "", password: s.password || "", extraCameras: s.extraCameras || "[]", isActive: !!s.isActive };
       setSettings(next);
       setSaveMsg("Сохранено");
       onSaved?.(next);
@@ -92,7 +124,7 @@ export function TapoSettings({ onSaved }: { onSaved?: (s: TapoSettingsData) => v
     try {
       const r: any = await apiFetch("/api/tapo-plugin/test", {
         method: "POST",
-        body: JSON.stringify({ login: settings.login, password: settings.password }),
+        body: JSON.stringify({ login: settings.login, password: settings.password, extraCameras: settings.extraCameras }),
       });
       const n = Array.isArray(r.cameras) ? r.cameras.length : 0;
       const total = typeof r.devices === 'number' ? r.devices : n;
@@ -132,6 +164,16 @@ export function TapoSettings({ onSaved }: { onSaved?: (s: TapoSettingsData) => v
           />
         </label>
       </div>
+      <label style={{ fontSize: 13, color: "var(--text-muted)", display: "block", marginBottom: 12 }}>
+        Камеры вне сети сервера (опционально) — по одной на строку:
+        <span style={{ opacity: 0.8 }}> IP или IP:порт или «Имя IP» (белый IP, проброс порта RTSP 554 на роутере или VPN)</span>
+        <textarea
+          style={{ ...inputStyle, marginTop: 4, minHeight: 64, resize: "vertical", fontFamily: "inherit" }}
+          value={extraToText(settings.extraCameras)}
+          onChange={(e) => setSettings({ ...settings, extraCameras: textToExtra(e.target.value) })}
+          placeholder={"Двор 192.168.1.50\nОфис 203.0.113.10:10554"}
+        />
+      </label>
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, marginBottom: 12, cursor: "pointer" }}>
         <input type="checkbox" checked={settings.isActive} onChange={(e) => setSettings({ ...settings, isActive: e.target.checked })} />
         Плагин включён (страница «Камеры Tapo» видна администраторам)

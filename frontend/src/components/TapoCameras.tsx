@@ -112,7 +112,7 @@ export function TapoCameras() {
     setLoadError("");
     try {
       const s: any = await apiFetch("/api/tapo-plugin/settings");
-      const next: TapoSettingsData = { login: s.login || "", password: s.password || "", isActive: !!s.isActive };
+      const next: TapoSettingsData = { login: s.login || "", password: s.password || "", extraCameras: s.extraCameras || "[]", isActive: !!s.isActive };
       setSettings(next);
       if (!next.isActive) {
         setCameras([]);

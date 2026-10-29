@@ -36,6 +36,16 @@ function invalidateSettings() {
   settingsCache = null;
 }
 
+// extraCameras: JSON строка из настроек -> массив {ip, port?, name?}
+function parseExtraCameras(raw: any): any[] {
+  try {
+    const arr = JSON.parse(raw || '[]');
+    return Array.isArray(arr) ? arr.filter((e: any) => e && typeof e.ip === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 // GET /api/tapo-plugin/status — для меню и страницы интеграций
 router.get('/status', authMiddleware, async (_req, res) => {
   try {
@@ -62,10 +72,11 @@ router.put('/settings', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (!requireAdmin(req, res)) return;
     const { login, password, isActive } = req.body || {};
+    const extraCameras = typeof req.body?.extraCameras === 'string' ? req.body.extraCameras : undefined;
     const s = await prisma.tapoPluginSettings.upsert({
       where: { id: 1 },
-      update: { login: login ?? '', password: password ?? '', isActive: !!isActive },
-      create: { id: 1, login: login ?? '', password: password ?? '', isActive: !!isActive },
+      update: { login: login ?? '', password: password ?? '', isActive: !!isActive, ...(extraCameras !== undefined ? { extraCameras } : {}) },
+      create: { id: 1, login: login ?? '', password: password ?? '', isActive: !!isActive, extraCameras: extraCameras ?? '[]' },
     });
     invalidateSettings();
     res.json(s);
@@ -82,7 +93,7 @@ router.post('/test', authMiddleware, async (req: AuthRequest, res) => {
     const upstream = await fetch(`${TAPO_SERVICE}/cameras`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login: body.login || '', password: body.password || '' }),
+      body: JSON.stringify({ login: body.login || '', password: body.password || '', extra: parseExtraCameras(body.extraCameras) }),
       signal: AbortSignal.timeout(45_000),
     });
     const data: any = await upstream.json().catch(() => ({}));
@@ -110,7 +121,7 @@ router.get('/cameras', authMiddleware, async (req: AuthRequest, res) => {
     const upstream = await fetch(`${TAPO_SERVICE}/cameras`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login: s.login, password: s.password }),
+      body: JSON.stringify({ login: s.login, password: s.password, extra: parseExtraCameras(s.extraCameras) }),
       signal: AbortSignal.timeout(45_000),
     });
     const data: any = await upstream.json().catch(() => ({}));
