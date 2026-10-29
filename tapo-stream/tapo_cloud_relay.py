@@ -206,3 +206,44 @@ def stream_cloud_fmp4(login: str, password: str, device_id: str,
             pass
         _release_worker(login, password, device_id)
     return stats
+
+
+def stream_cloud_mjpeg(login: str, password: str, device_id: str,
+                       output: "pyqueue.Queue", should_abort) -> dict:
+    """MJPEG-поток камеры из облака (для браузеров без H.264 в MSE)."""
+    worker = _get_worker(login, password, device_id)
+    sub = worker.subscribe()
+    stats = {"reason": "eof"}
+    try:
+        while True:
+            if should_abort is not None and should_abort():
+                stats["reason"] = "client_gone"
+                break
+            if worker.stop.is_set():
+                stats["reason"] = "worker_stopped"
+                break
+            err = worker.last_error
+            if err:
+                stats["reason"] = f"relay: {err}"
+                break
+            try:
+                chunk = sub.get(timeout=1)
+            except pyqueue.Empty:
+                continue
+            if chunk is None:
+                stats["reason"] = "relay_reset"
+                break
+            if not isinstance(chunk, (bytes, bytearray)):
+                continue
+            try:
+                output.put(bytes(chunk), timeout=5)
+            except pyqueue.Full:
+                stats["reason"] = "client_slow"
+                break
+    finally:
+        try:
+            worker.unsubscribe(sub)
+        except Exception:
+            pass
+        _release_worker(login, password, device_id)
+    return stats

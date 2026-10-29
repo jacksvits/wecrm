@@ -270,5 +270,38 @@ router.get('/cloud-stream/:deviceId', authMiddleware, async (req: AuthRequest, r
   }
 });
 
+// GET /api/tapo-plugin/cloud-stream-mjpeg/:deviceId — MJPEG из облака (fallback)
+router.get('/cloud-stream-mjpeg/:deviceId', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const s = await getSettings();
+    if (!s?.isActive) return res.status(503).json({ error: 'Плагин выключен' });
+    const deviceId = encodeURIComponent(req.params.deviceId);
+    const url = `${TAPO_SERVICE}/cloud/mjpeg/${deviceId}?login=${encodeURIComponent(s.login)}&password=${encodeURIComponent(s.password)}`;
+    const controller = new AbortController();
+    const startTimer = setTimeout(() => controller.abort(), 15_000);
+    let upstream: Response;
+    try {
+      upstream = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(startTimer);
+    }
+    if (!upstream.ok || !upstream.body) {
+      const text = await upstream.text().catch(() => '');
+      if (!res.headersSent) return res.status(502).json({ error: text || `Сервис Tapo вернул HTTP ${upstream.status}` });
+    }
+    res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Accel-Buffering', 'no');
+    const { Readable } = await import('stream');
+    const readable = Readable.fromWeb(upstream.body as any);
+    readable.on('error', () => { try { res.end(); } catch {} });
+    readable.pipe(res);
+  } catch (e: any) {
+    if (!res.headersSent) res.status(502).json({ error: e.message });
+  }
+});
+
 export default router;
+
 

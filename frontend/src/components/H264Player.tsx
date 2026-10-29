@@ -68,6 +68,7 @@ export function H264Player({ src, mjpegFallback, style }: H264PlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [state, setState] = useState<"connecting" | "live" | "error">("connecting");
   const [hint, setHint] = useState("");
+  const [diag, setDiag] = useState("");
   const [imgKey, setImgKey] = useState(0);
 
   useEffect(() => {
@@ -151,10 +152,15 @@ export function H264Player({ src, mjpegFallback, style }: H264PlayerProps) {
         reader = resp.body.getReader();
 
         let buf: Uint8Array<ArrayBuffer> = new Uint8Array(0);
+        let gotBytes = 0;
         for (;;) {
           const { done, value } = await reader.read();
           if (cancelled || done) break;
           buf = concatU8(buf, value);
+          gotBytes += value.length;
+          if (gotBytes % 65536 < value.length) {
+            setDiag(`получено ${(gotBytes / 1024) | 0} КБ${initSent ? "" : ", init не найден"}`);
+          }
 
           if (!initSent) {
             // init-сегмент = всё до конца moov (ftyp+moov); ждём его целиком
@@ -171,8 +177,10 @@ export function H264Player({ src, mjpegFallback, style }: H264PlayerProps) {
               const init = buf.slice(0, moovEnd);
               buf = buf.slice(moovEnd);
               const codec = parseCodecFromInit(init);
-              if (!codec || !window.MediaSource || !MediaSource.isTypeSupported(codec)) {
-                throw new Error(`Кодек не поддерживается браузером: ${codec || "?"}`);
+              const supported = codec && window.MediaSource ? MediaSource.isTypeSupported(codec) : false;
+              setDiag(`init ${init.length} Б, кодек ${codec || "?"}, поддержка: ${supported}`);
+              if (!codec || !window.MediaSource || !supported) {
+                throw new Error(`Кодек не поддерживается браузером: ${codec || "?"} (поддержка: ${supported})`);
               }
               ms = new MediaSource();
               objectUrl = URL.createObjectURL(ms);
@@ -217,6 +225,8 @@ export function H264Player({ src, mjpegFallback, style }: H264PlayerProps) {
       } catch (e: any) {
         if (cancelled || e?.name === "AbortError") return;
         setHint(e?.message || "Ошибка потока");
+        setDiag(`ошибка: ${e?.name || "?"}: ${e?.message || e}`);
+        console.error("[H264Player]", e);
         handleFatal();
       }
     }
@@ -263,10 +273,16 @@ export function H264Player({ src, mjpegFallback, style }: H264PlayerProps) {
         <img key={imgKey} src={fallbackSrc} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
       )}
       {state === "connecting" && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", background: "rgba(0,0,0,.4)", fontSize: 14 }}>Подключение…</div>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, color: "#fff", background: "rgba(0,0,0,.4)", fontSize: 14 }}>
+          <div>Подключение…</div>
+          {diag && <div style={{ fontSize: 11, opacity: 0.75, fontFamily: "monospace" }}>{diag}</div>}
+        </div>
       )}
       {state === "error" && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 12, color: "#fff", background: "rgba(0,0,0,.55)", fontSize: 14 }}>{hint || "Ошибка потока"}</div>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 12, color: "#fff", background: "rgba(0,0,0,.55)", fontSize: 14 }}>
+          <div>{hint || "Ошибка потока"}</div>
+          {diag && <div style={{ fontSize: 11, opacity: 0.75, marginTop: 6, fontFamily: "monospace" }}>{diag}</div>}
+        </div>
       )}
     </div>
   );

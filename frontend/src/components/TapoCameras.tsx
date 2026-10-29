@@ -312,6 +312,7 @@ export function TapoCameras() {
             </div>
             <H264Player
               src={`/api/tapo-plugin/cloud-stream/${encodeURIComponent(liveCloud.deviceId)}`}
+              mjpegFallback={`/api/tapo-plugin/cloud-stream-mjpeg/${encodeURIComponent(liveCloud.deviceId)}`}
               style={{ width: "100%", aspectRatio: "16/9", background: "#000" }}
             />
             <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>

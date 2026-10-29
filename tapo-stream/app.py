@@ -610,6 +610,59 @@ def cloud_h264_ep(device_id: str):
     )
 
 
+
+
+@app.get("/cloud/mjpeg/<device_id>")
+def cloud_mjpeg_ep(device_id: str):
+    login = request.args.get("login", "")
+    password = request.args.get("password", "")
+    if not login or not password:
+        return jsonify(error="login/password required"), 400
+    from tapo_cloud_relay import (CloudError, MFARequired, acquire_stream_slot,
+                                  release_stream_slot, stream_cloud_mjpeg)
+    if not acquire_stream_slot(login, password):
+        return jsonify(error="stream limit: слишком много облачных потоков на аккаунте"), 429
+
+    q: "queue.Queue[bytes | None]" = queue.Queue(maxsize=8)
+    last_read = [time.time()]
+
+    def _abandoned() -> bool:
+        return time.time() - last_read[0] > 30.0
+
+    def produce() -> None:
+        try:
+            stats = stream_cloud_mjpeg(login, password, device_id, q, _abandoned)
+            app.logger.warning("tapo cloud mjpeg %s closed: %s", device_id[:8], stats)
+        except MFARequired:
+            app.logger.warning("tapo cloud mjpeg: MFA required")
+        except CloudError as exc:
+            app.logger.warning("tapo cloud mjpeg: %s", exc)
+        except Exception as exc:
+            app.logger.warning("tapo cloud mjpeg ended: %s", exc)
+        finally:
+            release_stream_slot(login, password)
+            try:
+                q.put_nowait(None)
+            except queue.Full:
+                pass
+
+    def generate():
+        threading.Thread(target=produce, daemon=True).start()
+        boundary = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
+        while True:
+            frame = q.get()
+            if frame is None:
+                break
+            last_read[0] = time.time()
+            yield boundary + frame + b"\r\n"
+
+    return Response(
+        generate(),
+        mimetype="multipart/x-mixed-replace",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
+
+
 if __name__ == "__main__":
-    # threaded=True: каждый зритель — свой поток и своя RTSP-сессия
+    # threaded=True: каждый зритель — свой поток и своя RTSP/облачная сессия
     app.run(host="0.0.0.0", port=PORT, threaded=True)
