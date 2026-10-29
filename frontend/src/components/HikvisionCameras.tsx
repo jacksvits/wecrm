@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { HikvisionSettings, type HikvisionSettingsData } from "./HikvisionSettings";
 import { H264Player } from "./H264Player";
 import { cameraIconBtnStyle, HiddenCamerasModal, useHiddenCameras } from "./HiddenCameras";
 
@@ -97,7 +96,6 @@ export function HikvisionCameras() {
   const [isActive, setIsActive] = useState(false);
   const [hasLogin, setHasLogin] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [cameras, setCameras] = useState<HikCamera[]>([]);
   const [camerasLoading, setCamerasLoading] = useState(false);
   const [camerasError, setCamerasError] = useState<string | null>(null);
@@ -134,14 +132,6 @@ export function HikvisionCameras() {
     if (settingsLoaded && isActive && hasLogin) loadCameras();
   }, [settingsLoaded, isActive, hasLogin, loadCameras]);
 
-  const onSettingsSaved = (s: HikvisionSettingsData) => {
-    setIsActive(s.isActive);
-    setHasLogin(!!s.login);
-    // Список камер при включении плагина или смене логина перечитываем
-    if (s.isActive && s.login) loadCameras();
-    else setCameras([]);
-  };
-
   const btnStyle: React.CSSProperties = {
     padding: "7px 14px",
     borderRadius: 8,
@@ -162,9 +152,6 @@ export function HikvisionCameras() {
               {camerasLoading ? "Загрузка…" : "Обновить"}
             </button>
           )}
-          <button onClick={() => setShowSettings((v) => !v)} style={btnStyle}>
-            {showSettings ? "Скрыть настройки" : "Настройки"}
-          </button>
           {hidden.length > 0 && (
             <button onClick={() => setShowHidden(true)} style={btnStyle} title="Скрытые камеры">
               ⚙️ Скрытые ({hidden.length})
@@ -172,12 +159,6 @@ export function HikvisionCameras() {
           )}
         </div>
       </div>
-
-      {showSettings && (
-        <div style={{ ...cardStyle, marginBottom: 16 }}>
-          <HikvisionSettings onSaved={onSettingsSaved} />
-        </div>
-      )}
 
       {!isActive && settingsLoaded && (
         <div style={{ ...cardStyle, color: "var(--text-muted)", fontSize: 14 }}>
