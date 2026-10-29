@@ -1,7 +1,4 @@
 import { useEffect, useState } from "react";
-import { CameraWidget } from "./CameraWidget";
-import { CameraStreamImage } from "./CameraStreamImage";
-
 import { useNavigate } from "react-router-dom";
 import {
   DndContext,
@@ -29,7 +26,7 @@ import { FinanceReconciliationWidget } from "./accounting/FinanceReconciliationW
 
 type WidgetSize = "small" | "medium" | "large";
 type WidgetId = string;
-type WidgetTab = "Основное" | "Камеры" | "Биллинг" | "Бухгалтерия";
+type WidgetTab = "Основное" | "Биллинг" | "Бухгалтерия";
 
 interface WidgetDef {
   id: WidgetId;
@@ -67,7 +64,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "widget-finance-reconciliation", size: "medium", label: "Сверка с банком", tab: "Бухгалтерия" },
 ];
 
-const TABS: WidgetTab[] = ["Основное", "Камеры", "Биллинг", "Бухгалтерия"];
+const TABS: WidgetTab[] = ["Основное", "Биллинг", "Бухгалтерия"];
 
 const DEFAULT_VISIBLE = ALL_WIDGETS.map((w) => w.id);
 
@@ -84,8 +81,7 @@ function loadOrder(): string[] | null {
       const savedIds = new Set(saved);
       const missing = ALL_WIDGETS.filter((w) => !savedIds.has(w.id)).map((w) => w.id);
       // Удаляем виджеты, которых больше нет в ALL_WIDGETS
-      // Динамические виджеты камер (widget-camera-*) не входят в ALL_WIDGETS — сохраняем их
-      const valid = saved.filter((id) => allIds.has(id) || id.startsWith("widget-camera-"));
+      const valid = saved.filter((id) => allIds.has(id));
       return [...valid, ...missing];
     }
   } catch {}
@@ -253,46 +249,14 @@ export function Director() {
   // Переименование счетов Точки прямо в виджете
   const [pskovlinePlugin, setPskovlinePlugin] = useState<any>(null);
   const [pskovlineAccountsData, setPskovlineAccountsData] = useState<any[]>([]);
-  const [cameraSettingsList, setCameraSettingsList] = useState<any[]>([]);
-  // Редактируемая камера (по id; null — нет, "new" — новая)
-  const [editingCameraId, setEditingCameraId] = useState<string | null>(null);
-  // Камеры в режиме «картинка в картинке» (общие с CameraPipOverlay через localStorage)
-  const [pipCameraIds, setPipCameraIds] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem("camera_pip_ids") || "[]"); } catch { return []; }
-  });
-  // Черновик камеры в модалке (копия редактируемой или новая)
-  const [cameraDraft, setCameraDraft] = useState<any | null>(null);
-  const openCameraEditor = (cam: any | null) => {
-    if (cam) {
-      setCameraDraft({ ...cam });
-      setEditingCameraId(cam.id);
-    } else {
-      setCameraDraft({ label: `Видеокамера ${cameraSettingsList.length + 1}`, ip: "", port: 554, channel: "", username: "", password: "", isActive: true, isNew: true });
-      setEditingCameraId("new");
-    }
-  };
-  const toggleCameraPip = (id: string) => {
-    const next = pipCameraIds.includes(id) ? pipCameraIds.filter(x => x !== id) : [...pipCameraIds, id];
-    setPipCameraIds(next);
-    try { localStorage.setItem("camera_pip_ids", JSON.stringify(next)); } catch {}
-    window.dispatchEvent(new CustomEvent("camera-pip-toggle", { detail: id }));
-  };
-  const [fullscreenCamera, setFullscreenCamera] = useState<{ id: string; label: string } | null>(null);
-  const [cameraRefreshKey, setCameraRefreshKey] = useState(0);
   const [taskFinanceStats, setTaskFinanceStats] = useState<any>(null);
   // Детализация месяца в виджете «Помесячный отчёт по задачам»
   const [expandedTaskMonth, setExpandedTaskMonth] = useState<string | null>(null);
   const [monthTaskDetails, setMonthTaskDetails] = useState<Record<string, any[]>>({});
   const [monthTasksLoading, setMonthTasksLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Refresh camera streams every 10 seconds
-  useEffect(() => {
-    const interval = setInterval(() => setCameraRefreshKey(Date.now()), 600000);
-    return () => clearInterval(interval);
-  }, []);
   const [activeTab, setActiveTab] = useState<WidgetTab>("Основное");
-  useEffect(() => { const u3 = user as any; if (activeTab === 'Камеры' && u3?.crmCameras === false) setActiveTab('Основное'); if (activeTab === 'Биллинг' && u3?.crmBilling === false) setActiveTab('Основное'); if (activeTab === 'Бухгалтерия' && u3?.crmAccounting === false) setActiveTab('Основное'); }, [activeTab, user]); const dealsAllowed = (() => { const ap = (user as any)?.allowedPages ; return !ap || ap.length === 0 || ap.includes('/deals') })();
+  useEffect(() => { const u3 = user as any; if (activeTab === 'Биллинг' && u3?.crmBilling === false) setActiveTab('Основное'); if (activeTab === 'Бухгалтерия' && u3?.crmAccounting === false) setActiveTab('Основное'); }, [activeTab, user]); const dealsAllowed = (() => { const ap = (user as any)?.allowedPages ; return !ap || ap.length === 0 || ap.includes('/deals') })();
   const [showWidgetSettings, setShowWidgetSettings] = useState(false);
 
   const savedOrder = loadOrder();
@@ -371,7 +335,6 @@ export function Director() {
       }).catch(() => {});
       loadPskovlineData();
       const token = localStorage.getItem('token');
-      api.camera.getSettings().then((list: any[]) => setCameraSettingsList(list)).catch(() => {});
       fetch("/api/dashboard/task-finances", { headers: token ? { 'X-Auth-Token': token as string } : {} })
         .then(r => r.ok ? r.json() : null)
         .then(setTaskFinanceStats)
@@ -448,17 +411,7 @@ export function Director() {
         tab: "Бухгалтерия",
       }))
     : [];
-  // Виджеты камер — динамически из настроек (API camera/settings),
-  // только активные; id вида widget-camera-<id камеры>
-  const cameraWidgets: WidgetDef[] = cameraSettingsList
-    .filter((c: any) => c.isActive !== false)
-    .map((c: any) => ({
-      id: `widget-camera-${c.id}`,
-      size: "medium",
-      label: c.label || "Видеокамера",
-      tab: "Камеры",
-    }));
-  const ALL_WIDGETS_EFF: WidgetDef[] = [...ALL_WIDGETS, ...pskovlineWidgets, ...cameraWidgets];
+  const ALL_WIDGETS_EFF: WidgetDef[] = [...ALL_WIDGETS, ...pskovlineWidgets];
 
   const tabWidgets = ALL_WIDGETS_EFF.filter((w) => w.tab === activeTab);
 
@@ -503,24 +456,6 @@ export function Director() {
           <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{label}</div>
           <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, opacity: 0.7 }}>{data?.period || "—"}</div>
         </>
-      );
-    }
-
-    // Динамические виджеты камер: id вида widget-camera-<id камеры>,
-    // данные — из cameraSettingsList (загружается из API)
-    if (widget.id.startsWith("widget-camera-")) {
-      const camId = widget.id.replace("widget-camera-", "");
-      const cam = cameraSettingsList.find((c: any) => c.id === camId);
-      if (!cam) return null;
-      return (
-        <CameraWidget
-          cam={cam}
-          refreshKey={cameraRefreshKey}
-          onEdit={() => openCameraEditor(cam)}
-          pipActive={pipCameraIds.includes(cam.id)}
-          onTogglePip={() => toggleCameraPip(cam.id)}
-          onFullscreen={() => setFullscreenCamera({ id: cam.id, label: cam.label })}
-        />
       );
     }
 
@@ -1010,7 +945,7 @@ export function Director() {
         <h2 style={{ margin: 0, fontSize: 18 }}>Директор</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ display: "flex", gap: 4, background: "var(--bg-input)", borderRadius: 10, padding: 4 }}>
-            {((u2 => { let list = TABS; if (u2?.crmCameras === false) list = list.filter(t2 => t2 !== 'Камеры'); if (u2?.crmBilling === false) list = list.filter(t2 => t2 !== 'Биллинг'); if (u2?.crmAccounting === false) list = list.filter(t2 => t2 !== 'Бухгалтерия'); return list; })(user)).map((tab) => (
+            {((u2 => { let list = TABS; if (u2?.crmBilling === false) list = list.filter(t2 => t2 !== 'Биллинг'); if (u2?.crmAccounting === false) list = list.filter(t2 => t2 !== 'Бухгалтерия'); return list; })(user)).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1031,19 +966,6 @@ export function Director() {
               </button>
             ))}
           </div>
-          {activeTab === 'Камеры' && (
-            <button
-              onClick={() => openCameraEditor(null)}
-              style={{
-                padding: '6px 14px', borderRadius: 10, border: '1px solid var(--border-color)',
-                background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 13,
-                cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap',
-              }}
-              title='Добавить камеру'
-            >
-              ＋ Добавить камеру
-            </button>
-          )}
           <button
             onClick={() => setShowWidgetSettings(true)}
             style={{
@@ -1208,204 +1130,6 @@ export function Director() {
       ) : null}
 
       
-      {/* Модальное окно настроек камеры */}
-      {editingCameraId !== null && cameraDraft && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0,0,0,0.4)", zIndex: 100,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: "max(16px, env(safe-area-inset-top, 0)) max(16px, env(safe-area-inset-right, 0)) max(16px, env(safe-area-inset-bottom, 0)) max(16px, env(safe-area-inset-left, 0))",
-        }} onClick={() => setEditingCameraId(null)}>
-          <div style={{
-            background: "var(--bg-card)", borderRadius: 16, padding: 24,
-            width: "100%", maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-            border: "1px solid var(--border-color)",
-          }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 600 }}>{cameraDraft.isNew ? "Новая камера" : "Настройки камеры"}</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Название виджета</label>
-                <input
-                  type="text"
-                  value={cameraDraft.label || ""}
-                  onChange={(e) => setCameraDraft((d: any) => ({ ...d, label: e.target.value }))}
-                  style={{
-                    width: "100%", padding: "10px 12px", borderRadius: 10,
-                    border: "1px solid var(--border-color)", background: "var(--bg-input)",
-                    color: "var(--text-primary)", fontSize: 14,
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>IP-адрес</label>
-                <input
-                  type="text"
-                  value={cameraDraft.ip || ""}
-                  onChange={(e) => setCameraDraft((d: any) => ({ ...d, ip: e.target.value }))}
-                  style={{
-                    width: "100%", padding: "10px 12px", borderRadius: 10,
-                    border: "1px solid var(--border-color)", background: "var(--bg-input)",
-                    color: "var(--text-primary)", fontSize: 14,
-                  }}
-                />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Порт RTSP</label>
-                  <input
-                    type="number"
-                    value={cameraDraft.port || 554}
-                    onChange={(e) => setCameraDraft((d: any) => ({ ...d, port: parseInt(e.target.value) || 554 }))}
-                    style={{
-                      width: "100%", padding: "10px 12px", borderRadius: 10,
-                      border: "1px solid var(--border-color)", background: "var(--bg-input)",
-                      color: "var(--text-primary)", fontSize: 14,
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Канал</label>
-                  <input
-                    type="text"
-                    value={cameraDraft.channel || ""}
-                    onChange={(e) => setCameraDraft((d: any) => ({ ...d, channel: e.target.value }))}
-                    style={{
-                      width: "100%", padding: "10px 12px", borderRadius: 10,
-                      border: "1px solid var(--border-color)", background: "var(--bg-input)",
-                      color: "var(--text-primary)", fontSize: 14,
-                    }}
-                  />
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Логин</label>
-                <input
-                  type="text"
-                  value={cameraDraft.username || ""}
-                  onChange={(e) => setCameraDraft((d: any) => ({ ...d, username: e.target.value }))}
-                  style={{
-                    width: "100%", padding: "10px 12px", borderRadius: 10,
-                    border: "1px solid var(--border-color)", background: "var(--bg-input)",
-                    color: "var(--text-primary)", fontSize: 14,
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Пароль</label>
-                <input
-                  type="password"
-                  value={cameraDraft.password || ""}
-                  onChange={(e) => setCameraDraft((d: any) => ({ ...d, password: e.target.value }))}
-                  style={{
-                    width: "100%", padding: "10px 12px", borderRadius: 10,
-                    border: "1px solid var(--border-color)", background: "var(--bg-input)",
-                    color: "var(--text-primary)", fontSize: 14,
-                  }}
-                />
-              </div>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={cameraDraft.isActive !== false}
-                  onChange={(e) => setCameraDraft((d: any) => ({ ...d, isActive: e.target.checked }))}
-                  style={{ width: 16, height: 16, accentColor: "#007AFF" }}
-                />
-                Камера активна
-              </label>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
-              {!cameraDraft.isNew && (
-                <button
-                  onClick={async () => {
-                    try {
-                      if (!cameraDraft.id) return;
-                      if (!window.confirm(`Удалить камеру «${cameraDraft.label}»?`)) return;
-                      await api.camera.deleteCamera(cameraDraft.id);
-                      setCameraSettingsList((list: any[]) => list.filter((c: any) => c.id !== cameraDraft.id));
-                      toggleCameraPip(cameraDraft.id);
-                      setPipCameraIds((prev: string[]) => {
-                        const next = prev.filter((x) => x !== cameraDraft.id);
-                        try { localStorage.setItem("camera_pip_ids", JSON.stringify(next)); } catch {}
-                        return next;
-                      });
-                      setEditingCameraId(null);
-                    } catch {}
-                  }}
-                  style={{
-                    padding: "8px 16px", borderRadius: 10, border: "1px solid #dc2626",
-                    background: "transparent", color: "#dc2626", fontSize: 13, cursor: "pointer", marginRight: "auto",
-                  }}
-                >Удалить</button>
-              )}
-              <button
-                onClick={() => setEditingCameraId(null)}
-                style={{
-                  padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border-color)",
-                  background: "var(--bg-input)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer",
-                }}
-              >Отмена</button>
-              <button
-                onClick={async () => {
-                  try {
-                    const { isNew, ...payload } = cameraDraft;
-                    let saved: any;
-                    if (isNew) {
-                      saved = await api.camera.createCamera(payload);
-                      const refreshed = await api.camera.getSettings();
-                      setCameraSettingsList(refreshed);
-                    } else {
-                      saved = await api.camera.saveCamera(cameraDraft.id, payload);
-                      setCameraSettingsList((list: any[]) => list.map((c: any) => (c.id === saved.id ? saved : c)));
-                    }
-                    setEditingCameraId(null);
-                  } catch {}
-                }}
-                style={{
-                  padding: "8px 16px", borderRadius: 10, border: "none",
-                  background: "#007AFF", color: "#fff", fontSize: 13, cursor: "pointer", fontWeight: 500,
-                }}
-              >Сохранить</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Полноэкранный просмотр камеры */}
-      {fullscreenCamera && (
-        <div
-          style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            background: "#000", zIndex: 200,
-            display: "flex", flexDirection: "column",
-          }}
-          onClick={() => setFullscreenCamera(null)}
-        >
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "calc(12px + env(safe-area-inset-top, 0)) 20px 12px", background: "rgba(0,0,0,0.8)",
-          }}>
-            <span style={{ color: "#fff", fontSize: 15, fontWeight: 500 }}>{fullscreenCamera.label}</span>
-            <button
-              onClick={() => setFullscreenCamera(null)}
-              style={{
-                background: "none", border: "none", color: "#fff",
-                fontSize: 20, cursor: "pointer", padding: "4px 8px",
-              }}
-            >
-              ✕
-            </button>
-          </div>
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-            <CameraStreamImage
-              cameraId={fullscreenCamera.id}
-              refreshKey={cameraRefreshKey}
-              alt={fullscreenCamera.label}
-              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

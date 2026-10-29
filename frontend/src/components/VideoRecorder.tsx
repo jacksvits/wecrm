@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { HikvisionCameras } from "./HikvisionCameras";
 import { TapoCameras } from "./TapoCameras";
+import { LocalCameras } from "./LocalCameras";
 
-// Страница «Видеорегистратор»: объединяет вкладки облачных камер «Tapo» и
-// «Hik-Connect». Вкладка видна, только если соответствующий плагин включён
-// (статусы /api/tapo-plugin/status и /api/hikvision-plugin/status). Активная
-// вкладка хранится в URL (?tab=tapo|hik): так старые адреса /tapo-cameras и
-// /hikvision-cameras редиректятся сюда без потери контекста.
+// Страница «Видеорегистратор»: объединяет вкладки камер «Локальные» (локальные
+// RTSP-камеры, перенесены из «Директора»), «Tapo» и «Hik-Connect» (облачные
+// плагины). Облачные вкладки видны, только если соответствующий плагин
+// включён (статусы /api/tapo-plugin/status и /api/hikvision-plugin/status).
+// Активная вкладка хранится в URL (?tab=local|tapo|hik): так старые адреса
+// /tapo-cameras и /hikvision-cameras редиректятся сюда без потери контекста.
 
-type Tab = "tapo" | "hik";
+type Tab = "local" | "tapo" | "hik";
 
 function getToken() {
   return localStorage.getItem("token") || "";
@@ -37,18 +39,20 @@ export function VideoRecorder() {
     });
   }, []);
 
-  // Порядок вкладок — как в прежнем меню: сначала Tapo, затем Hik-Connect.
-  // Если выбранная в URL вкладка недоступна (плагин выключен) — показываем
-  // первую доступную.
-  const requestedTab: Tab = params.get("tab") === "hik" ? "hik" : "tapo";
+  // Вкладка «Локальные» доступна всегда (встроенная функция, не плагин);
+  // «Tapo» и «Hik-Connect» — только при включённом плагине. Если выбранная
+  // в URL вкладка недоступна — показываем первую доступную.
+  const requestedTab: Tab =
+    params.get("tab") === "tapo" ? "tapo" : params.get("tab") === "hik" ? "hik" : "local";
   const availableTabs: Tab[] = [
+    "local",
     ...(tapoActive ? (["tapo"] as Tab[]) : []),
     ...(hikActive ? (["hik"] as Tab[]) : []),
   ];
   const activeTab: Tab =
     availableTabs.includes(requestedTab) && availableTabs.length > 0
       ? requestedTab
-      : availableTabs[0] ?? "tapo";
+      : availableTabs[0] ?? "local";
 
   const setTab = (tab: Tab) => setParams({ tab });
 
@@ -67,26 +71,27 @@ export function VideoRecorder() {
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "16px 16px 32px" }}>
       <h1 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 16px" }}>Видеорегистратор</h1>
-      {statusesLoaded && availableTabs.length === 0 ? (
-        <div style={{ fontSize: 14, color: "var(--text-muted)" }}>
-          Ни один плагин камер не включён. Включите «Tapo» или «Hik-Connect» в разделе «Настройки» → «Интеграции».
-        </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <button style={tabStyle(activeTab === "local")} onClick={() => setTab("local")}>
+          Локальные
+        </button>
+        {tapoActive && (
+          <button style={tabStyle(activeTab === "tapo")} onClick={() => setTab("tapo")}>
+            Tapo
+          </button>
+        )}
+        {hikActive && (
+          <button style={tabStyle(activeTab === "hik")} onClick={() => setTab("hik")}>
+            Hik-Connect
+          </button>
+        )}
+      </div>
+      {activeTab === "local" ? (
+        <LocalCameras />
+      ) : activeTab === "tapo" ? (
+        <TapoCameras />
       ) : (
-        <>
-          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-            {tapoActive && (
-              <button style={tabStyle(activeTab === "tapo")} onClick={() => setTab("tapo")}>
-                Tapo
-              </button>
-            )}
-            {hikActive && (
-              <button style={tabStyle(activeTab === "hik")} onClick={() => setTab("hik")}>
-                Hik-Connect
-              </button>
-            )}
-          </div>
-          {activeTab === "tapo" ? <TapoCameras /> : <HikvisionCameras />}
-        </>
+        <HikvisionCameras />
       )}
     </div>
   );
