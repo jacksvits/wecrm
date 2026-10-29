@@ -170,7 +170,7 @@ export function HikvisionSettings({ onSaved }: { onSaved?: (s: HikvisionSettings
       </div>
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, marginBottom: 12, cursor: "pointer" }}>
         <input type="checkbox" checked={settings.isActive} onChange={(e) => setSettings({ ...settings, isActive: e.target.checked })} />
-        Плагин включён (страница «Камеры Hik-Connect» видна администраторам)
+        Плагин включён (вкладка «Hik-Connect» в разделе «Видеорегистратор» видна администраторам)
       </label>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <button onClick={save} disabled={saving} style={btnPrimaryStyle}>{saving ? "Сохранение…" : "Сохранить"}</button>
