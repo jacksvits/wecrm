@@ -528,7 +528,16 @@ export function TaskList() {
               <span>
                 {task.startDate ? `Начало: ${formatDateTime(task.startDate, user?.timezone)} · ` : ""}
                 {task.dueDate ? (
-                  <b>{formatDateTime(task.dueDate, user?.timezone)}</b>
+                  <b
+                    style={{
+                      color:
+                        new Date(task.dueDate).getTime() < Date.now()
+                          ? "#dc2626"
+                          : "var(--text-color)",
+                    }}
+                  >
+                    {formatDateTime(task.dueDate, user?.timezone)}
+                  </b>
                 ) : (
                   "Без срока"
                 )}
@@ -783,7 +792,16 @@ export function TaskList() {
             <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
               {task.startDate ? `${formatDateTime(task.startDate, user?.timezone)} → ` : ""}
               {task.dueDate ? (
-                <b>{formatDateTime(task.dueDate, user?.timezone)}</b>
+                <b
+                  style={{
+                    color:
+                      new Date(task.dueDate).getTime() < Date.now()
+                        ? "#dc2626"
+                        : "var(--text-color)",
+                  }}
+                >
+                  {formatDateTime(task.dueDate, user?.timezone)}
+                </b>
               ) : (
                 "—"
               )}
@@ -1042,7 +1060,16 @@ export function TaskList() {
       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
         {task.startDate ? `Начало: ${formatDateTime(task.startDate, user?.timezone)} · ` : ""}
         {task.dueDate ? (
-          <b>{formatDateTime(task.dueDate, user?.timezone)}</b>
+          <b
+            style={{
+              color:
+                new Date(task.dueDate).getTime() < Date.now()
+                  ? "#dc2626"
+                  : "var(--text-color)",
+            }}
+          >
+            {formatDateTime(task.dueDate, user?.timezone)}
+          </b>
         ) : (
           "Без срока"
         )}
