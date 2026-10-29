@@ -117,6 +117,50 @@ function CameraCard({ cam, token, onWatch, onHide }: { cam: TapoCamera; token: s
 // ==== облачные камеры (CIPC relay; камеры вне LAN сервера) ====
 type CloudCamera = { deviceId: string; name: string; model: string; status?: number };
 
+// Карточка облачной камеры с серверным превью (кадр из облачной трансляции,
+// /api/tapo-plugin/cloud-snapshot/:deviceId, кэш на сервисе ~2 мин).
+function CloudCameraCard({ cam, snapKey, onLive, onHide }: {
+  cam: CloudCamera;
+  snapKey: number;
+  onLive: () => void;
+  onHide: () => void;
+}) {
+  const [snapOk, setSnapOk] = useState(true);
+  const token = localStorage.getItem("token") || "";
+  return (
+    <div style={{ ...card, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <div style={{ fontWeight: 500, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={cam.name}>{cam.name}</div>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>облако</span>
+          <button
+            onClick={onHide}
+            title="Скрыть камеру"
+            style={cameraIconBtnStyle}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+          >✕</button>
+        </span>
+      </div>
+      <div style={{ position: "relative", background: "#000", aspectRatio: "16/9", cursor: "pointer", margin: "0 16px 16px", borderRadius: 10, overflow: "hidden" }} onClick={onLive} title="Открыть трансляцию">
+        {snapOk ? (
+          <img
+            src={`/api/tapo-plugin/cloud-snapshot/${encodeURIComponent(cam.deviceId)}?token=${encodeURIComponent(token)}&k=${snapKey}`}
+            alt={cam.name}
+            loading="lazy"
+            onError={() => setSnapOk(false)}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: 8 }}>
+            Прямая трансляция через облако TP-Link (~1–2 с задержки)
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CloudCamerasSection({ settings, lanNames, onLive, hidden, onHide }: {
   settings: TapoSettingsData | null;
   lanNames: Set<string>;
@@ -127,6 +171,13 @@ function CloudCamerasSection({ settings, lanNames, onLive, hidden, onHide }: {
   const [cloudCams, setCloudCams] = useState<CloudCamera[]>([]);
   const [mfa, setMfa] = useState<{ types: number[]; code: string; mfaType: number; busy: boolean; msg: string } | null>(null);
   const [msg, setMsg] = useState("");
+
+  // Обновление превью каждые 2 минуты (серверный кэш снапшота — ~120 с)
+  const [snapKey, setSnapKey] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setSnapKey(Date.now()), 120000);
+    return () => clearInterval(interval);
+  }, []);
 
   const load = useCallback(async () => {
     if (!settings?.login || !settings?.password) return;
@@ -208,25 +259,13 @@ function CloudCamerasSection({ settings, lanNames, onLive, hidden, onHide }: {
       {msg && <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8 }}>{msg}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
         {visible.map((cam) => (
-          <div key={cam.deviceId} style={{ ...card, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-            <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-              <div style={{ fontWeight: 500, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={cam.name}>{cam.name}</div>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>облако</span>
-                <button
-                  onClick={() => onHide(cam.deviceId)}
-                  title="Скрыть камеру"
-                  style={cameraIconBtnStyle}
-                  onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
-                  onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
-                >✕</button>
-              </span>
-            </div>
-            <div style={{ position: "relative", background: "#000", aspectRatio: "16/9", cursor: "pointer", margin: "0 16px 16px", borderRadius: 10, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: 8 }}
-              onClick={() => onLive(cam)} title="Открыть трансляцию">
-              Прямая трансляция через облако TP-Link (~1–2 с задержки)
-            </div>
-          </div>
+          <CloudCameraCard
+            key={cam.deviceId}
+            cam={cam}
+            snapKey={snapKey}
+            onLive={() => onLive(cam)}
+            onHide={() => onHide(cam.deviceId)}
+          />
         ))}
       </div>
     </div>

@@ -238,6 +238,35 @@ router.post('/cloud-mfa', authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+// GET /api/tapo-plugin/cloud-snapshot/:deviceId — JPEG-превью из облачной трансляции (proxy)
+router.get('/cloud-snapshot/:deviceId', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const s = await getSettings();
+    if (!s?.isActive) return res.status(503).json({ error: 'Плагин выключен' });
+    const deviceId = encodeURIComponent(req.params.deviceId);
+    const url = `${TAPO_SERVICE}/cloud/snapshot/${deviceId}?login=${encodeURIComponent(s.login)}&password=${encodeURIComponent(s.password)}`;
+    const controller = new AbortController();
+    const startTimer = setTimeout(() => controller.abort(), 60_000);
+    let upstream: Response;
+    try {
+      upstream = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(startTimer);
+    }
+    if (!upstream.ok) {
+      const text = await upstream.text().catch(() => '');
+      return res.status(upstream.status === 425 ? 425 : 502).json({ error: text || `Сервис Tapo вернул HTTP ${upstream.status}` });
+    }
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(buf);
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || 'Ошибка получения превью' });
+  }
+});
+
 // GET /api/tapo-plugin/cloud-stream/:deviceId — fMP4-поток из облака (proxy)
 router.get('/cloud-stream/:deviceId', authMiddleware, async (req: AuthRequest, res) => {
   try {

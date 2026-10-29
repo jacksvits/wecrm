@@ -22,7 +22,9 @@ import hashlib
 import io
 import os
 import queue
+import re
 import struct
+import subprocess
 import threading
 import time
 import uuid
@@ -31,7 +33,7 @@ from urllib.parse import quote
 
 import av
 import requests
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify, request, send_file
 
 from streamlib import fmp4
 
@@ -388,6 +390,114 @@ def stream_camera_fmp4(login: str, password: str, cam: dict, stream_type: int,
 
 
 # ------------------------------------------------------------------ эндпоинты
+
+# --- Превью облачных камер: захват одного кадра из облачного fMP4-потока ---
+# JPEG кэшируется на 120 с на устройство; захват занимает облачный слот на
+# несколько секунд (лимит MAX_CLOUD_STREAMS_PER_ACCOUNT в tapo_cloud_relay).
+SNAPSHOT_DIR = "/tmp/tapo_cloud_snapshots"
+SNAPSHOT_TTL = 120
+_snapshot_locks: dict = {}
+
+
+def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: float = 25) -> bytes | None:
+    """Один JPEG-кадр из облачной трансляции камеры. None при недоступности."""
+    from tapo_cloud_relay import (
+        _get_worker, _release_worker, acquire_stream_slot, release_stream_slot,
+    )
+    if not acquire_stream_slot(login, password):
+        return None
+    worker = _get_worker(login, password, device_id)
+    sub = None
+    try:
+        sub = worker.subscribe_native_video()
+    except Exception:
+        _release_worker(login, password, device_id)
+        release_stream_slot(login, password)
+        return None
+    try:
+        proc = subprocess.Popen(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", "pipe:0",
+             "-frames:v", "1", "-q:v", "4", "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        )
+        last_data = [time.time()]
+
+        def _pump():
+            while True:
+                try:
+                    chunk = sub.get(timeout=1)
+                except queue.Empty:
+                    if time.time() - last_data[0] > timeout:
+                        break
+                    continue
+                if not chunk or not isinstance(chunk, (bytes, bytearray)):
+                    continue
+                last_data[0] = time.time()
+                try:
+                    proc.stdin.write(bytes(chunk))
+                    proc.stdin.flush()
+                except (BrokenPipeError, OSError, ValueError):
+                    break
+
+        th = threading.Thread(target=_pump, daemon=True)
+        th.start()
+        try:
+            out, _ = proc.communicate(timeout=timeout + 15)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            out = b""
+        if proc.returncode == 0 and out.startswith(b"\xff\xd8"):
+            return out
+        return None
+    except Exception:
+        return None
+    finally:
+        try:
+            worker.unsubscribe_native_video(sub)
+        except Exception:
+            pass
+        _release_worker(login, password, device_id)
+        release_stream_slot(login, password)
+
+
+@app.get("/cloud/snapshot/<device_id>")
+def cloud_snapshot_ep(device_id: str):
+    login = request.args.get("login", "")
+    password = request.args.get("password", "")
+    if not login or not password:
+        return jsonify(error="login/password required"), 400
+    os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "_", device_id)
+    path = os.path.join(SNAPSHOT_DIR, safe_id + ".jpg")
+    try:
+        age = time.time() - os.path.getmtime(path)
+    except OSError:
+        age = None
+    if age is not None and age < SNAPSHOT_TTL:
+        return send_file(path, mimetype="image/jpeg")
+    lock = _snapshot_locks.setdefault(path, threading.Lock())
+    if not lock.acquire(blocking=False):
+        # Захват уже идёт по другому запросу — отдаём имеющееся или просим подождать
+        if os.path.exists(path):
+            return send_file(path, mimetype="image/jpeg")
+        return jsonify(error="snapshot in progress"), 425
+    try:
+        if age is not None and time.time() - os.path.getmtime(path) < SNAPSHOT_TTL:
+            return send_file(path, mimetype="image/jpeg")
+        jpeg = _capture_cloud_snapshot(login, password, device_id)
+        if not jpeg:
+            # Не удалось захватить — отдаём устаревший кадр, если есть
+            if os.path.exists(path):
+                return send_file(path, mimetype="image/jpeg")
+            return jsonify(error="snapshot unavailable"), 502
+        tmp = path + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(jpeg)
+        os.replace(tmp, path)
+        return send_file(path, mimetype="image/jpeg")
+    finally:
+        lock.release()
+
 
 @app.get("/health")
 def health():
