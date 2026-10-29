@@ -89,6 +89,7 @@ export function H264Player({ src, mjpegFallback, style }: H264PlayerProps) {
     let initSent = false;
     let lastAdvance = Date.now();
     let fallbackUsed = false;
+    let seekEdgeDone = false;
 
     const teardownMs = () => {
       if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
@@ -139,7 +140,11 @@ export function H264Player({ src, mjpegFallback, style }: H264PlayerProps) {
         if (resp.status === 429) {
           setHint("Лимит потоков: камера или аккаунт заняты, повторите позже");
           setState("error");
-          scheduleReconnect();
+          // длинный backoff, чтобы не забивать лимит повторами
+          if (!cancelled) {
+            attempts += 1;
+            reconnectTimer = setTimeout(connect, 20000);
+          }
           return;
         }
         if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
@@ -175,7 +180,22 @@ export function H264Player({ src, mjpegFallback, style }: H264PlayerProps) {
               await once(ms, "sourceopen");
               if (cancelled) return;
               sb = ms.addSourceBuffer(codec);
-              sb.addEventListener("updateend", flushAppend);
+              // live-потоки несут PTS камеры/ретранслятора (не от 0):
+              // после первого append и при отставании переносим currentTime
+              // на live-край буфера, иначе кадры есть, а экран чёрный
+              const seekToLiveEdge = () => {
+                try {
+                  if (!video.buffered.length) return;
+                  const end = video.buffered.end(video.buffered.length - 1);
+                  if (!seekEdgeDone) {
+                    seekEdgeDone = true;
+                    video.currentTime = end - 0.3;
+                  } else if (video.currentTime < video.buffered.start(0) - 0.5 || end - video.currentTime > 30) {
+                    video.currentTime = end - 0.3;
+                  }
+                } catch {}
+              };
+              sb.addEventListener("updateend", () => { flushAppend(); seekToLiveEdge(); });
               sb.addEventListener("error", onSbError);
               sb.appendBuffer(init);
               initSent = true;
@@ -211,6 +231,7 @@ export function H264Player({ src, mjpegFallback, style }: H264PlayerProps) {
         teardownMs();
         initSent = false;
         sbFailed = false;
+        seekEdgeDone = false;
         connect();
       }
     }, 3000);

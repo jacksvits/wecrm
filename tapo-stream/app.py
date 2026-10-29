@@ -573,8 +573,9 @@ def cloud_h264_ep(device_id: str):
     last_read = [time.time()]
 
     def _abandoned() -> bool:
-        # облачная negotiation быстрая, 60 с с запасом на ретраи relay
-        return time.time() - last_read[0] > 60.0
+        # данные из облака идут сразу; 20 с без чтения — клиент ушёл,
+        # слот нужно вернуть (лимит облачных потоков маленький)
+        return time.time() - last_read[0] > 20.0
 
     def produce() -> None:
         try:
