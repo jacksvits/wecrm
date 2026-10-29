@@ -6,6 +6,7 @@ import { Contact, ContactAccess, ContactAccessDirection, ClientDevice, Deal, Sta
 import { Avatar } from "./Avatar";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { stripHtml } from "../lib/stripHtml";
 
 // Контакт с подгруженными связями (эндпоинт GET /api/contacts/:id)
 export type DiscussionContact = Contact & {
@@ -958,7 +959,7 @@ export function TaskDiscussionContact({
                 key={a.id}
                 onClick={() => navigate(`/contacts/${contact.id}`)}
                 style={activityRowStyle}
-                title={a.description || accessDirectionLabel(a.direction)}
+                title={a.description ? stripHtml(a.description) : accessDirectionLabel(a.direction)}
               >
                 <span
                   style={{
@@ -971,7 +972,7 @@ export function TaskDiscussionContact({
                 >
                   <span style={{ fontWeight: 500 }}>
                     {accessDirectionLabel(a.direction)}
-                    {a.description ? ` — ${a.description}` : ""}
+                    {a.description ? ` — ${stripHtml(a.description)}` : ""}
                   </span>
                   {a.login && (
                     <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
