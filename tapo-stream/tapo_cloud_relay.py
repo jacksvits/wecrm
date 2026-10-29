@@ -177,12 +177,25 @@ def stream_cloud_fmp4(login: str, password: str, device_id: str,
             if worker.stop.is_set():
                 stats["reason"] = "worker_stopped"
                 break
+            err = worker.last_error
+            if err:
+                # ретранслятор сообщил об ошибке — завершаем ответ,
+                # плеер переподключится (новый relay = новый init-сегмент)
+                stats["reason"] = f"relay: {err}"
+                break
             try:
                 chunk = sub.get(timeout=1)
             except pyqueue.Empty:
                 continue
+            if chunk is None:
+                # сигнал _broadcast_native_reset: relay пересоздаётся,
+                # этот HTTP-ответ нужно закрыть (новый получит новый init)
+                stats["reason"] = "relay_reset"
+                break
+            if not isinstance(chunk, (bytes, bytearray)):
+                continue
             try:
-                output.put(chunk, timeout=5)
+                output.put(bytes(chunk), timeout=5)
             except pyqueue.Full:
                 stats["reason"] = "client_slow"
                 break
