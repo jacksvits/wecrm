@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { TapoSettings, type TapoSettingsData } from "./TapoSettings";
 import { H264Player } from "./H264Player";
 
@@ -220,7 +219,6 @@ function CloudCamerasSection({ settings, lanNames, onLive }: {
 }
 
 export function TapoCameras() {
-  const navigate = useNavigate();
   const [settings, setSettings] = useState<TapoSettingsData | null>(null);
   const [cameras, setCameras] = useState<TapoCamera[]>([]);
   const [loading, setLoading] = useState(true);
@@ -260,10 +258,9 @@ export function TapoCameras() {
   return (
     <div style={{ padding: 20 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
-        <button onClick={() => navigate("/settings")} style={btnStyle}>← Назад</button>
-        <h1 style={{ fontSize: 22, margin: 0 }}>Камеры Tapo</h1>
+        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Камеры Tapo</div>
         {settings?.isActive && (
-          <button onClick={refresh} disabled={refreshing} style={btnStyle}>{refreshing ? "Обновление…" : "Обновить"}</button>
+          <button onClick={refresh} disabled={refreshing} style={{ ...btnStyle, marginLeft: "auto" }}>{refreshing ? "Обновление…" : "Обновить"}</button>
         )}
       </div>
       <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
