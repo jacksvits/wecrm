@@ -646,7 +646,10 @@ class CloudMediaWorker:
                                 # is roughly two seconds; keyframe-only MP4
                                 # fragments therefore make a browser player
                                 # sit about two seconds behind the live edge.
-                                "+empty_moov+default_base_moof+frag_every_frame",
+                                # wecrm: фрагмент по ключевым кадрам (GOP ~2 с), а не
+                                # по кадрам — браузерный MSE требует, чтобы сегменты
+                                # начинались с ключевого кадра (Chrome иначе чёрный экран)
+                                "+frag_keyframe+empty_moov+default_base_moof",
                                 "-f",
                                 "mp4",
                                 "pipe:1",
