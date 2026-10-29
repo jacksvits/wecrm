@@ -70,6 +70,7 @@ export function H264Player({ src, mjpegFallback, style }: H264PlayerProps) {
   const [hint, setHint] = useState("");
   const [diag, setDiag] = useState("");
   const [imgKey, setImgKey] = useState(0);
+  const imgRetries = useRef(0);
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -121,8 +122,10 @@ export function H264Player({ src, mjpegFallback, style }: H264PlayerProps) {
       teardownMs();
       try { video.removeAttribute("src"); video.load(); } catch {}
       if (mjpegFallback && !fallbackUsed) {
-        // HEVC-камеры Hik-Connect: браузер без HEVC — откат на MJPEG <img>
+        // браузер без H.264/HEVC (MSE) — откат на MJPEG <img>;
+        // H264-fetch прекращаем сразу, чтобы освободить слот потока
         fallbackUsed = true;
+        ctrl?.abort();
         setImgKey((k) => k + 1);
         setState("live");
         return;
@@ -270,7 +273,23 @@ export function H264Player({ src, mjpegFallback, style }: H264PlayerProps) {
     <div style={boxStyle}>
       <video ref={videoRef} muted playsInline autoPlay style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
       {mjpegFallback && imgKey > 0 && (
-        <img key={imgKey} src={fallbackSrc} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
+        <img
+          key={imgKey}
+          src={fallbackSrc}
+          alt=""
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }}
+          onError={() => {
+            // облако может вернуть 429/502 при частых подключениях —
+            // пробуем ещё через 8 с, но не более 10 раз
+            imgRetries.current += 1;
+            if (imgRetries.current <= 10) {
+              setTimeout(() => setImgKey((k) => k + 1), 8000);
+            } else {
+              setState("error");
+              setHint("MJPEG-поток недоступен (лимит облака). Подождите минуту и откройте камеру заново.");
+            }
+          }}
+        />
       )}
       {state === "connecting" && (
         <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, color: "#fff", background: "rgba(0,0,0,.4)", fontSize: 14 }}>

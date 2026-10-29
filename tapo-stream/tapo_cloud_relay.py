@@ -136,10 +136,16 @@ def _get_worker(login: str, password: str, device_id: str) -> "CloudMediaWorker"
 
 
 def _release_worker(login: str, password: str, device_id: str) -> None:
+    # закрываем воркер только когда нет НИ ОДНОГО подписчика: MJPEG-зритель
+    # должен продолжать получать кадры с того же relay, на который камера
+    # уже шлёт (камера кормит только один ретранслятор одновременно)
     wkey = (_key(login, password), device_id)
     with _lock:
         worker = _workers.get(wkey)
-    if worker is not None and not worker.native_video_subscribers:
+    if worker is None:
+        return
+    other_subs = len(getattr(worker, "subscribers", []) or []) if hasattr(worker, "subscribers") else 0
+    if not worker.native_video_subscribers and other_subs == 0:
         with _lock:
             _workers.pop(wkey, None)
         try:
