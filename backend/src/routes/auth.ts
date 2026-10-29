@@ -272,6 +272,7 @@ router.get('/me', async (req, res) => {
       crmIntegrations: await getTenantIntegrations(),
       mobileNav: user.mobileNav || [],
       timezone: user.timezone || 'UTC',
+      soundEnabled: user.soundEnabled,
       showFinancesTab: user.role?.showFinancesTab ?? false,
       calendarTimelinePos: user.calendarTimelinePos || 'bottom',
       calendarTimelineSize: user.calendarTimelineSize ?? 420,
