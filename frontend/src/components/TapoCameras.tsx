@@ -123,8 +123,9 @@ type CloudCamera = { deviceId: string; name: string; model: string; status?: num
 // получен — статус «камера недоступна» вместо постоянной чёрной заглушки.
 const SNAP_MAX_ATTEMPTS = 3;
 
-function CloudCameraCard({ cam, snapKey, onLive, onHide }: {
+function CloudCameraCard({ cam, index, snapKey, onLive, onHide }: {
   cam: CloudCamera;
+  index: number;
   snapKey: number;
   onLive: () => void;
   onHide: () => void;
@@ -132,6 +133,14 @@ function CloudCameraCard({ cam, snapKey, onLive, onHide }: {
   const [snapState, setSnapState] = useState<"loading" | "ok" | "fail">("loading");
   const [attempt, setAttempt] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Старт превью с задержкой по индексу: облако TP-Link держит ~4 потока
+  // на аккаунт, все 17+ камер сразу создают очередь и часть падает по таймауту.
+  const [go, setGo] = useState(index < 4);
+  useEffect(() => {
+    if (go) return;
+    const t = setTimeout(() => setGo(true), index * 1500);
+    return () => clearTimeout(t);
+  }, [go, index]);
 
   // При каждом автообновлении (смена snapKey) пробуем загрузить превью заново —
   // иначе одна неудачная попытка оставляла текстовую заглушку до перезагрузки страницы.
@@ -166,7 +175,7 @@ function CloudCameraCard({ cam, snapKey, onLive, onHide }: {
         </span>
       </div>
       <div style={{ position: "relative", background: "#000", aspectRatio: "16/9", cursor: "pointer", margin: "0 16px 16px", borderRadius: 10, overflow: "hidden" }} onClick={onLive} title="Открыть трансляцию">
-        {snapState !== "fail" ? (
+        {snapState !== "fail" && go ? (
           <img
             src={`/api/tapo-plugin/cloud-snapshot/${encodeURIComponent(cam.deviceId)}?token=${encodeURIComponent(token)}&k=${snapKey}-${attempt}`}
             alt={cam.name}
@@ -295,10 +304,11 @@ function CloudCamerasSection({ settings, lanNames, onLive, hidden, onHide }: {
       <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Камеры через облако TP-Link</div>
       {msg && <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8 }}>{msg}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
-        {visible.map((cam) => (
+        {visible.map((cam, index) => (
           <CloudCameraCard
             key={cam.deviceId}
             cam={cam}
+            index={index}
             snapKey={snapKey}
             onLive={() => onLive(cam)}
             onHide={() => onHide(cam.deviceId)}
