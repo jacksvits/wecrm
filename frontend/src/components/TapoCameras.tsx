@@ -365,7 +365,7 @@ export function TapoCameras() {
   ];
 
   return (
-    <div style={{ padding: 20 }}>
+    <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
         <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Камеры Tapo</div>
         {settings?.isActive && (

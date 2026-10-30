@@ -143,7 +143,7 @@ export function HikvisionCameras() {
   };
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "16px 16px 32px" }}>
+    <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Камеры Hik-Connect</div>
         <div style={{ display: "flex", gap: 8 }}>
