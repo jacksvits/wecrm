@@ -247,7 +247,7 @@ router.get('/cloud-snapshot/:deviceId', authMiddleware, async (req: AuthRequest,
     const deviceId = encodeURIComponent(req.params.deviceId);
     const url = `${TAPO_SERVICE}/cloud/snapshot/${deviceId}?login=${encodeURIComponent(s.login)}&password=${encodeURIComponent(s.password)}`;
     const controller = new AbortController();
-    const startTimer = setTimeout(() => controller.abort(), 60_000);
+    const startTimer = setTimeout(() => controller.abort(), 90_000);
     let upstream: Response;
     try {
       upstream = await fetch(url, { signal: controller.signal });

@@ -126,6 +126,9 @@ function CloudCameraCard({ cam, snapKey, onLive, onHide }: {
   onHide: () => void;
 }) {
   const [snapOk, setSnapOk] = useState(true);
+  // При каждом автообновлении (смена snapKey) пробуем загрузить превью заново —
+  // иначе одна неудачная попытка оставляла текстовую заглушку до перезагрузки страницы.
+  useEffect(() => { setSnapOk(true); }, [snapKey]);
   const token = localStorage.getItem("token") || "";
   return (
     <div style={{ ...card, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
