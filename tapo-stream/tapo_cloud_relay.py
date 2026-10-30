@@ -187,6 +187,18 @@ def release_stream_slot(login: str, password: str) -> None:
         _slot_cond.notify()
 
 
+def drop_worker(login: str, password: str, device_id: str) -> None:
+    """Принудительно закрыть воркер камеры (битый relay, ошибки подписки)."""
+    wkey = (_key(login, password), device_id)
+    with _lock:
+        worker = _workers.pop(wkey, None)
+    if worker is not None:
+        try:
+            worker.close()
+        except Exception:
+            pass
+
+
 def stream_cloud_fmp4(login: str, password: str, device_id: str,
                       output: "pyqueue.Queue", should_abort) -> dict:
     """fMP4-поток камеры из облака (CIPC relay -> ffmpeg -> fMP4/MSE)."""

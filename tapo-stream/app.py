@@ -400,14 +400,15 @@ SNAPSHOT_TTL = 120
 _snapshot_locks: dict = {}
 
 
-SLOT_WAIT_TIMEOUT = 35.0  # сколько ждём освобождения облачного слота
+SLOT_WAIT_TIMEOUT = 45.0  # сколько ждём освобождения облачного слота
 SNAPSHOT_ATTEMPTS = 2     # повтор захвата при сбое воркера (relay пересоздаётся в фоне)
+SNAPSHOT_BYTES_CAP = 3_000_000  # столько fMP4-данных достаточно для одного кадра
 
 
 def _grab_cloud_jpeg_once(login: str, password: str, device_id: str, timeout: float) -> tuple[bytes | None, bool]:
     """Одна попытка захвата: True во втором элементе — повторить (временный сбой)."""
     from tapo_cloud_relay import (
-        _get_worker, _release_worker, release_stream_slot, wait_stream_slot,
+        _get_worker, _release_worker, drop_worker, release_stream_slot, wait_stream_slot,
     )
     if not wait_stream_slot(login, password, SLOT_WAIT_TIMEOUT):
         print(f"[snapshot] {device_id}: слот не освободился за {SLOT_WAIT_TIMEOUT:.0f} с", flush=True)
@@ -428,7 +429,7 @@ def _grab_cloud_jpeg_once(login: str, password: str, device_id: str, timeout: fl
         total = 0
         deadline = time.time() + timeout
         with os.fdopen(fd, "wb") as f:
-            while time.time() < deadline and total < 6_000_000:
+            while time.time() < deadline and total < SNAPSHOT_BYTES_CAP:
                 werr = getattr(worker, "last_error", None)
                 if werr:
                     print(f"[snapshot] {device_id}: ошибка воркера: {werr}", flush=True)
@@ -479,13 +480,15 @@ def _grab_cloud_jpeg_once(login: str, password: str, device_id: str, timeout: fl
                 pass
 
 
-def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: float = 25) -> bytes | None:
+def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: float = 18) -> bytes | None:
     """Один JPEG-кадр из облачной трансляции камеры. None при недоступности.
 
     fMP4-чанки складываются во временный файл (без pipe — иначе взаимные
     блокировки буферов), затем ffmpeg извлекает первый кадр локально.
-    Слот ждём (не падаем сразу 502), временные сбои воркера — с повтором.
+    Слот ждём (не падаем сразу 502), временные сбои воркера — с повтором
+    на свежем воркере (битый relay пересоздаётся, кэш воркера сбрасываем).
     """
+    from tapo_cloud_relay import drop_worker
     for attempt in range(1, SNAPSHOT_ATTEMPTS + 1):
         jpeg, retry = _grab_cloud_jpeg_once(login, password, device_id, timeout)
         if jpeg:
@@ -493,6 +496,7 @@ def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: 
         if not retry or attempt == SNAPSHOT_ATTEMPTS:
             return None
         print(f"[snapshot] {device_id}: повтор {attempt + 1}/{SNAPSHOT_ATTEMPTS} через 3 с", flush=True)
+        drop_worker(login, password, device_id)
         time.sleep(3)
     return None
 
