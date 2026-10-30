@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { CameraStreamImage } from "./CameraStreamImage";
+import { getPipLabel, splitPipKey } from "../pip";
 
 const STORAGE_KEY = "camera_pip_ids";
 const STORAGE_WIDTH = "camera_pip_width";
@@ -127,7 +128,8 @@ export function CameraPipOverlay() {
       if (e.key === STORAGE_POS) setPosition(loadPosition());
     };
     const onToggle = (e: Event) => {
-      const id = (e as CustomEvent<string>).detail;
+      const d = (e as CustomEvent).detail;
+      const id = typeof d === "string" ? d : d?.key; // legacy: строка
       if (!id) return;
       setPipIds((prev) => {
         const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
@@ -167,18 +169,29 @@ export function CameraPipOverlay() {
     });
   };
 
-  const pipCameras = pipIds
-    .map((id) => cameras.find((c) => c.id === id))
-    .filter(Boolean);
+  // Окна всех вкладок видеорегистратора: локальные (поток MJPEG), Tapo RTSP,
+  // Tapo-облако и Hik-Connect — снапшоты по токену, обновляются с refreshKey.
+  const token = localStorage.getItem("token") || "";
+  const pipWindows = pipIds
+    .map((key) => {
+      const { kind, id } = splitPipKey(key);
+      if (kind === "local") {
+        const cam = cameras.find((c) => String(c.id) === id);
+        if (!cam) return null;
+        return { key, kind, id, label: cam.label || "Камера", cam };
+      }
+      return { key, kind, id, label: getPipLabel(key) || "Камера", cam: null as any };
+    })
+    .filter(Boolean) as { key: string; kind: string; id: string; label: string; cam: any }[];
 
   // PiP — только на десктопной версии
-  if (!isDesktop || pipCameras.length === 0) return null;
+  if (!isDesktop || pipWindows.length === 0) return null;
 
   // Вертикальный стек с учётом фактической высоты каждого окна
-  const stack = pipCameras.map((cam: any) => {
-    const aspect = aspects[cam.id] || DEFAULT_ASPECT;
+  const stack = pipWindows.map((w) => {
+    const aspect = aspects[w.key] || DEFAULT_ASPECT;
     const imgH = Math.max(56, Math.round((width - 2) / aspect));
-    return { cam, imgH };
+    return { w, imgH };
   });
   const stackH = stack.reduce((sum, w) => sum + HEADER_H + w.imgH + GAP + 2, 0);
   // Начальная вертикальная координата стека в зависимости от выбранного расположения
@@ -186,10 +199,10 @@ export function CameraPipOverlay() {
   if (position === "middle") topOffset = Math.max(16, Math.round((viewportH - stackH) / 2));
   if (position === "bottom") topOffset = Math.max(16, viewportH - stackH - 16);
   const stackStart = topOffset;
-  const wins = stack.map(({ cam, imgH }) => {
+  const wins = stack.map(({ w, imgH }) => {
     const top = topOffset;
     topOffset += HEADER_H + imgH + GAP + 2;
-    return { cam, imgH, top };
+    return { w, imgH, top };
   });
   const stackEnd = topOffset; // низ стека (с учётом GAP последнего окна)
   // Кнопка настроек: под стеком (вверху/центр) или над стеком (внизу), всегда в пределах экрана
@@ -197,13 +210,15 @@ export function CameraPipOverlay() {
     ? Math.max(4, stackStart - 36)
     : Math.min(stackEnd + 4, viewportH - 32);
 
-  const expanded = expandedId ? cameras.find((c) => c.id === expandedId) : null;
+  // Развёрнутый просмотр — только для локальных камер (живой MJPEG-поток)
+  const expandedWin = expandedId ? pipWindows.find((w) => w.key === expandedId) : null;
+  const expanded = expandedWin && expandedWin.kind === "local" ? expandedWin.cam : null;
 
   return (
     <>
-      {wins.map(({ cam, imgH, top }) => (
+      {wins.map(({ w, imgH, top }) => (
         <div
-          key={cam.id}
+          key={w.key}
           style={{
             position: "fixed",
             top: `calc(${top}px + env(safe-area-inset-top, 0px))`,
@@ -222,14 +237,14 @@ export function CameraPipOverlay() {
               display: "flex", alignItems: "center", justifyContent: "space-between",
               height: HEADER_H - 1, padding: "0 8px", cursor: "pointer",
             }}
-            onClick={() => setExpandedId(cam.id)}
-            title="Развернуть"
+            onClick={() => { if (w.kind === "local") setExpandedId(w.key); }}
+            title={w.kind === "local" ? "Развернуть" : w.label}
           >
             <span style={{ fontSize: 11, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {cam.label || "Камера"}
+              {w.label}
             </span>
             <button
-              onClick={(e) => { e.stopPropagation(); close(cam.id); }}
+              onClick={(e) => { e.stopPropagation(); close(w.key); }}
               style={{
                 background: "none", border: "none", cursor: "pointer",
                 color: "var(--text-muted)", fontSize: 13, padding: "0 2px", lineHeight: 1,
@@ -240,20 +255,41 @@ export function CameraPipOverlay() {
             </button>
           </div>
           <div style={{ position: "relative" }}>
-            <CameraStreamImage
-              cameraId={cam.id}
-              refreshKey={refreshKey}
-              alt={cam.label || "Камера"}
-              onClick={() => setExpandedId(cam.id)}
-              onLoad={(e) => {
-                const img = e.target as HTMLImageElement;
-                if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                  const a = img.naturalWidth / img.naturalHeight;
-                  setAspects((prev) => (prev[cam.id] === a ? prev : { ...prev, [cam.id]: a }));
+            {w.kind === "local" ? (
+              <CameraStreamImage
+                cameraId={w.id}
+                refreshKey={refreshKey}
+                alt={w.label}
+                onClick={() => setExpandedId(w.key)}
+                onLoad={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                    const a = img.naturalWidth / img.naturalHeight;
+                    setAspects((prev) => (prev[w.key] === a ? prev : { ...prev, [w.key]: a }));
+                  }
+                }}
+                style={{ width: "100%", height: imgH, objectFit: "cover", cursor: "pointer" }}
+              />
+            ) : (
+              <img
+                src={
+                  w.kind === "tapo"
+                    ? `/api/tapo-plugin/snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&ts=${refreshKey}`
+                    : w.kind === "tapoc"
+                      ? `/api/tapo-plugin/cloud-snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&k=${refreshKey}`
+                      : `/api/hikvision-plugin/snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&ts=${refreshKey}`
                 }
-              }}
-              style={{ width: "100%", height: imgH, objectFit: "cover", cursor: "pointer" }}
-            />
+                alt={w.label}
+                onLoad={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                    const a = img.naturalWidth / img.naturalHeight;
+                    setAspects((prev) => (prev[w.key] === a ? prev : { ...prev, [w.key]: a }));
+                  }
+                }}
+                style={{ width: "100%", height: imgH, objectFit: "cover", display: "block", background: "#000" }}
+              />
+            )}
             {/* «Ручка» изменения размера — левый нижний угол */}
             <div
               onPointerDown={startResize}

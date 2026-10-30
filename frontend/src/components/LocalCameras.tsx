@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CameraWidget } from "./CameraWidget";
 import { CameraStreamImage } from "./CameraStreamImage";
 import { HiddenCamerasModal, useHiddenCameras } from "./HiddenCameras";
+import { usePip } from "../pip";
 import { api } from "../api/client";
 
 // Вкладка «Локальные» страницы «Видеорегистратор»: локальные RTSP-камеры,
@@ -25,9 +26,9 @@ export function LocalCameras() {
   const [cameraSettingsList, setCameraSettingsList] = useState<any[]>([]);
   const [editingCameraId, setEditingCameraId] = useState<string | null>(null);
   // Камеры в режиме «картинка в картинке» (общие с CameraPipOverlay через localStorage)
-  const [pipCameraIds, setPipCameraIds] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem("camera_pip_ids") || "[]"); } catch { return []; }
-  });
+  const { active: pipActive, toggle: togglePip } = usePip();
+  // Ручное обновление кадра по карточкам (кнопка ↻)
+  const [cardRefresh, setCardRefresh] = useState<Record<string, number>>({});
   const [cameraDraft, setCameraDraft] = useState<any | null>(null);
   const openCameraEditor = (cam: any | null) => {
     if (cam) {
@@ -38,13 +39,7 @@ export function LocalCameras() {
       setEditingCameraId("new");
     }
   };
-  const toggleCameraPip = (id: string) => {
-    const next = pipCameraIds.includes(id) ? pipCameraIds.filter(x => x !== id) : [...pipCameraIds, id];
-    setPipCameraIds(next);
-    try { localStorage.setItem("camera_pip_ids", JSON.stringify(next)); } catch {}
-    window.dispatchEvent(new CustomEvent("camera-pip-toggle", { detail: id }));
-  };
-  const [fullscreenCamera, setFullscreenCamera] = useState<{ id: string; label: string } | null>(null);
+  const [watchCamera, setWatchCamera] = useState<{ id: string; label: string } | null>(null);
   const [cameraRefreshKey, setCameraRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -102,11 +97,12 @@ export function LocalCameras() {
             <div key={cam.id} style={cardStyle}>
               <CameraWidget
                 cam={cam}
-                refreshKey={cameraRefreshKey}
+                refreshKey={`${cameraRefreshKey}-${cardRefresh[cam.id] || 0}`}
+                onRefresh={() => setCardRefresh((r) => ({ ...r, [cam.id]: (r[cam.id] || 0) + 1 }))}
                 onEdit={() => openCameraEditor(cam)}
-                pipActive={pipCameraIds.includes(cam.id)}
-                onTogglePip={() => toggleCameraPip(cam.id)}
-                onFullscreen={() => setFullscreenCamera({ id: cam.id, label: cam.label })}
+                pipActive={pipActive(`local:${cam.id}`)}
+                onTogglePip={() => togglePip(`local:${cam.id}`, cam.label || "Видеокамера")}
+                onFullscreen={() => setWatchCamera({ id: cam.id, label: cam.label })}
                 onClose={() => hide(String(cam.id))}
               />
             </div>
@@ -228,12 +224,7 @@ export function LocalCameras() {
                       if (!window.confirm(`Удалить камеру «${cameraDraft.label}»?`)) return;
                       await api.camera.deleteCamera(cameraDraft.id);
                       setCameraSettingsList((list: any[]) => list.filter((c: any) => c.id !== cameraDraft.id));
-                      toggleCameraPip(cameraDraft.id);
-                      setPipCameraIds((prev: string[]) => {
-                        const next = prev.filter((x) => x !== cameraDraft.id);
-                        try { localStorage.setItem("camera_pip_ids", JSON.stringify(next)); } catch {}
-                        return next;
-                      });
+                      if (pipActive(`local:${cameraDraft.id}`)) togglePip(`local:${cameraDraft.id}`);
                       setEditingCameraId(null);
                     } catch {}
                   }}
@@ -276,39 +267,30 @@ export function LocalCameras() {
         </div>
       )}
 
-      {/* Полноэкранный просмотр камеры */}
-      {fullscreenCamera && (
-        <div
-          style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            background: "#000", zIndex: 200,
-            display: "flex", flexDirection: "column",
-          }}
-          onClick={() => setFullscreenCamera(null)}
-        >
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "calc(12px + env(safe-area-inset-top, 0)) 20px 12px", background: "rgba(0,0,0,0.8)",
-          }}>
-            <span style={{ color: "#fff", fontSize: 15, fontWeight: 500 }}>{fullscreenCamera.label}</span>
-            <button
-              onClick={() => setFullscreenCamera(null)}
-              style={{
-                background: "none", border: "none", color: "#fff",
-                fontSize: 20, cursor: "pointer", padding: "4px 8px",
-              }}
-            >
-              ✕
-            </button>
-          </div>
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-            <CameraStreamImage
-              cameraId={fullscreenCamera.id}
-              refreshKey={cameraRefreshKey}
-              alt={fullscreenCamera.label}
-              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-              onClick={(e) => e.stopPropagation()}
-            />
+      {/* Модальный просмотр камеры (открывается двойным кликом по карточке) */}
+      {watchCamera && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}
+          onClick={() => setWatchCamera(null)}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 12, padding: 16, width: "100%", maxWidth: 900 }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+              <div style={{ fontWeight: 600, fontSize: 16 }}>{watchCamera.label}</div>
+              <button onClick={() => setWatchCamera(null)} style={{
+                padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border-color)",
+                background: "var(--bg-card)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer",
+              }}>Закрыть</button>
+            </div>
+            <div style={{ background: "#000", borderRadius: 10, overflow: "hidden" }}>
+              <CameraStreamImage
+                cameraId={watchCamera.id}
+                refreshKey={cameraRefreshKey}
+                alt={watchCamera.label}
+                style={{ width: "100%", maxHeight: "70vh", objectFit: "contain", display: "block" }}
+              />
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
+              MJPEG-поток локальной камеры. Обновление кадра — кнопка ↻ на карточке.
+            </div>
           </div>
         </div>
       )}

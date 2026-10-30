@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type TapoSettingsData } from "./TapoSettings";
 import { H264Player } from "./H264Player";
 import { cameraIconBtnStyle, HiddenCamerasModal, useHiddenCameras } from "./HiddenCameras";
+import { useIsDesktop, usePip } from "../pip";
 
 // Страница «Камеры Tapo» (TP-Link): сетка камер облачного аккаунта TP-Link ID
 // с live-просмотром. По аналогии с HikvisionCameras: только администраторы,
@@ -66,7 +67,16 @@ async function apiFetch(path: string, options?: RequestInit) {
   return res.json();
 }
 
-function CameraCard({ cam, token, onWatch, onHide }: { cam: TapoCamera; token: string; onWatch: () => void; onHide: (index: number) => void }) {
+function CameraCard({ cam, token, isDesktop, pipActive, onTogglePip, onShowHidden, onWatch, onHide }: {
+  cam: TapoCamera;
+  token: string;
+  isDesktop: boolean;
+  pipActive: boolean;
+  onTogglePip: () => void;
+  onShowHidden: () => void;
+  onWatch: () => void;
+  onHide: (index: number) => void;
+}) {
   const [snap, setSnap] = useState<string | null>(null);
   const [snapErr, setSnapErr] = useState(false);
 
@@ -89,6 +99,22 @@ function CameraCard({ cam, token, onWatch, onHide }: { cam: TapoCamera; token: s
             onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
             onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
           >↻</button>
+          {isDesktop && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onTogglePip(); }}
+              title={pipActive ? "Убрать «картинку в картинке»" : "Картинка в картинке"}
+              style={{ ...cameraIconBtnStyle, opacity: pipActive ? 1 : 0.5, color: pipActive ? "#007AFF" : "var(--text-muted)" }}
+              onMouseEnter={(e) => { if (!pipActive) e.currentTarget.style.opacity = "1"; }}
+              onMouseLeave={(e) => { if (!pipActive) e.currentTarget.style.opacity = "0.5"; }}
+            >⤢</button>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onShowHidden(); }}
+            title="Скрытые камеры"
+            style={cameraIconBtnStyle}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+          >⚙</button>
           <button
             onClick={(e) => { e.stopPropagation(); onHide(cam.index); }}
             title="Скрыть камеру"
@@ -98,7 +124,8 @@ function CameraCard({ cam, token, onWatch, onHide }: { cam: TapoCamera; token: s
           >✕</button>
         </span>
       </div>
-      <div style={{ position: "relative", background: "#000", aspectRatio: "16/9", cursor: "pointer", margin: "0 16px 16px", borderRadius: 10, overflow: "hidden" }} onClick={onWatch}>
+      <div style={{ position: "relative", background: "#000", aspectRatio: "16/9", cursor: "pointer", margin: "0 16px 16px", borderRadius: 10, overflow: "hidden" }}
+        onDoubleClick={onWatch} title="Двойной клик — трансляция">
         {snap && !snapErr && (
           <img src={snap} alt={cam.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
             onError={() => setSnapErr(true)} />
@@ -123,16 +150,22 @@ type CloudCamera = { deviceId: string; name: string; model: string; status?: num
 // получен — статус «камера недоступна» вместо постоянной чёрной заглушки.
 const SNAP_MAX_ATTEMPTS = 3;
 
-function CloudCameraCard({ cam, index, snapKey, onLive, onHide }: {
+function CloudCameraCard({ cam, index, snapKey, isDesktop, pipActive, onTogglePip, onShowHidden, onLive, onHide }: {
   cam: CloudCamera;
   index: number;
   snapKey: number;
+  isDesktop: boolean;
+  pipActive: boolean;
+  onTogglePip: () => void;
+  onShowHidden: () => void;
   onLive: () => void;
   onHide: () => void;
 }) {
   const [snapState, setSnapState] = useState<"loading" | "ok" | "fail">("loading");
   const [attempt, setAttempt] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Ручной перезапрос превью (кнопка ↻): меняет URL, сбрасывает счётчик ретраев
+  const [rev, setRev] = useState(0);
   // Старт превью с задержкой по индексу: облако TP-Link держит ~4 потока
   // на аккаунт, все 17+ камер сразу создают очередь и часть падает по таймауту.
   const [go, setGo] = useState(index < 4);
@@ -158,15 +191,45 @@ function CloudCameraCard({ cam, index, snapKey, onLive, onHide }: {
     }
   };
 
+  const manualRetry = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setSnapState("loading");
+    setAttempt(0);
+    setRev(r => r + 1);
+  };
+
   const token = localStorage.getItem("token") || "";
   return (
     <div style={{ ...card, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <div style={{ fontWeight: 500, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={cam.name}>{cam.name}</div>
-        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
           <span style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>облако</span>
           <button
-            onClick={onHide}
+            onClick={(e) => { e.stopPropagation(); manualRetry(); }}
+            title="Обновить превью"
+            style={cameraIconBtnStyle}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+          >↻</button>
+          {isDesktop && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onTogglePip(); }}
+              title={pipActive ? "Убрать «картинку в картинке»" : "Картинка в картинке"}
+              style={{ ...cameraIconBtnStyle, opacity: pipActive ? 1 : 0.5, color: pipActive ? "#007AFF" : "var(--text-muted)" }}
+              onMouseEnter={(e) => { if (!pipActive) e.currentTarget.style.opacity = "1"; }}
+              onMouseLeave={(e) => { if (!pipActive) e.currentTarget.style.opacity = "0.5"; }}
+            >⤢</button>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onShowHidden(); }}
+            title="Скрытые камеры"
+            style={cameraIconBtnStyle}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+          >⚙</button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onHide(); }}
             title="Скрыть камеру"
             style={cameraIconBtnStyle}
             onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
@@ -174,10 +237,10 @@ function CloudCameraCard({ cam, index, snapKey, onLive, onHide }: {
           >✕</button>
         </span>
       </div>
-      <div style={{ position: "relative", background: "#000", aspectRatio: "16/9", cursor: "pointer", margin: "0 16px 16px", borderRadius: 10, overflow: "hidden" }} onClick={onLive} title="Открыть трансляцию">
+      <div style={{ position: "relative", background: "#000", aspectRatio: "16/9", cursor: "pointer", margin: "0 16px 16px", borderRadius: 10, overflow: "hidden" }} onDoubleClick={onLive} title="Двойной клик — трансляция">
         {snapState !== "fail" && go ? (
           <img
-            src={`/api/tapo-plugin/cloud-snapshot/${encodeURIComponent(cam.deviceId)}?token=${encodeURIComponent(token)}&k=${snapKey}-${attempt}`}
+            src={`/api/tapo-plugin/cloud-snapshot/${encodeURIComponent(cam.deviceId)}?token=${encodeURIComponent(token)}&k=${snapKey}-${rev}-${attempt}`}
             alt={cam.name}
             loading="lazy"
             onLoad={() => setSnapState("ok")}
@@ -194,7 +257,7 @@ function CloudCameraCard({ cam, index, snapKey, onLive, onHide }: {
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: 8, gap: 6 }}>
             <span>Камера недоступна — не удалось получить кадр</span>
             <button
-              onClick={(e) => { e.stopPropagation(); setSnapState("loading"); setAttempt(0); }}
+              onClick={(e) => { e.stopPropagation(); manualRetry(); }}
               title="Повторить"
               style={{ ...cameraIconBtnStyle, opacity: 0.8 }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
@@ -207,9 +270,13 @@ function CloudCameraCard({ cam, index, snapKey, onLive, onHide }: {
   );
 }
 
-function CloudCamerasSection({ settings, lanNames, onLive, hidden, onHide }: {
+function CloudCamerasSection({ settings, lanNames, isDesktop, pipActive, onTogglePip, onShowHidden, onLive, hidden, onHide }: {
   settings: TapoSettingsData | null;
   lanNames: Set<string>;
+  isDesktop: boolean;
+  pipActive: (key: string) => boolean;
+  onTogglePip: (key: string, label: string) => void;
+  onShowHidden: () => void;
   onLive: (cam: CloudCamera) => void;
   hidden: string[];
   onHide: (deviceId: string) => void;
@@ -309,6 +376,10 @@ function CloudCamerasSection({ settings, lanNames, onLive, hidden, onHide }: {
             cam={cam}
             index={index}
             snapKey={snapKey}
+            isDesktop={isDesktop}
+            pipActive={pipActive(`tapoc:${cam.deviceId}`)}
+            onTogglePip={() => onTogglePip(`tapoc:${cam.deviceId}`, cam.name)}
+            onShowHidden={onShowHidden}
             onLive={() => onLive(cam)}
             onHide={() => onHide(cam.deviceId)}
           />
@@ -329,6 +400,8 @@ export function TapoCameras() {
   const [liveStreamType, setLiveStreamType] = useState<1 | 2>(1);
   const { hidden, hide, restore, restoreAll } = useHiddenCameras("tapo");
   const [showHidden, setShowHidden] = useState(false);
+  const { active: pipActive, toggle: togglePip } = usePip();
+  const isDesktop = useIsDesktop();
   const token = localStorage.getItem("token") || "";
 
   const load = useCallback(async () => {
@@ -382,7 +455,17 @@ export function TapoCameras() {
       {!!visibleCameras.length && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
           {visibleCameras.map((cam) => (
-            <CameraCard key={cam.index} cam={cam} token={token} onWatch={() => { setLiveCamera(cam); setLiveStreamType(1); }} onHide={(index) => hide(String(index))} />
+            <CameraCard
+              key={cam.index}
+              cam={cam}
+              token={token}
+              isDesktop={isDesktop}
+              pipActive={pipActive(`tapo:${cam.index}`)}
+              onTogglePip={() => togglePip(`tapo:${cam.index}`, cam.name)}
+              onShowHidden={() => setShowHidden(true)}
+              onWatch={() => { setLiveCamera(cam); setLiveStreamType(1); }}
+              onHide={(index) => hide(String(index))}
+            />
           ))}
         </div>
       )}
@@ -391,6 +474,10 @@ export function TapoCameras() {
         <CloudCamerasSection
           settings={settings}
           lanNames={new Set(cameras.map((c) => c.name))}
+          isDesktop={isDesktop}
+          pipActive={pipActive}
+          onTogglePip={togglePip}
+          onShowHidden={() => setShowHidden(true)}
           onLive={(cam) => setLiveCloud(cam)}
           hidden={hidden}
           onHide={(deviceId) => hide(`cloud:${deviceId}`)}

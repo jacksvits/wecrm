@@ -4,7 +4,8 @@ import { CameraStreamImage } from "./CameraStreamImage";
 
 type CameraWidgetProps = {
   cam: any;
-  refreshKey: number;
+  refreshKey: number | string;
+  onRefresh: () => void;
   onEdit: () => void;
   pipActive: boolean;
   onTogglePip: () => void;
@@ -14,7 +15,8 @@ type CameraWidgetProps = {
 
 // Контент виджета камеры на странице «Директор» — вкладка «Камеры».
 // Поток обновляется принудительной сменой key у <img> (refreshKey).
-export const CameraWidget = memo(function CameraWidget({ cam, refreshKey, onEdit, pipActive, onTogglePip, onFullscreen, onClose }: CameraWidgetProps) {
+// Двойной клик по кадру — модальный просмотр; ↻ — обновить кадр.
+export const CameraWidget = memo(function CameraWidget({ cam, refreshKey, onRefresh, onEdit, pipActive, onTogglePip, onFullscreen, onClose }: CameraWidgetProps) {
   // PiP — только десктоп (viewport >= 1024px)
   const [isDesktop, setIsDesktop] = useState<boolean>(() => window.innerWidth >= 1024);
   useEffect(() => {
@@ -35,6 +37,15 @@ export const CameraWidget = memo(function CameraWidget({ cam, refreshKey, onEdit
       <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span>{cam?.label || "Видеокамера"}</span>
         <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); onRefresh(); }}
+            style={iconBtn}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+            title="Обновить кадр"
+          >
+            ↻
+          </button>
           {isDesktop && (
           <button
             onClick={(e) => { e.stopPropagation(); onTogglePip(); }}

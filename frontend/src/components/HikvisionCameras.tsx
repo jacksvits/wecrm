@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { H264Player } from "./H264Player";
 import { cameraIconBtnStyle, HiddenCamerasModal, useHiddenCameras } from "./HiddenCameras";
+import { useIsDesktop, usePip } from "../pip";
 
 // Страница «Камеры Hik-Connect» (плагин облачных камер).
 // Доступна только администраторам и только при включённом плагине (роут в
@@ -46,9 +47,19 @@ async function apiFetch(path: string, options?: RequestInit) {
   return res.json();
 }
 
-// Карточка камеры: ленивое превью-снапшот; при недоступности — заглушка
-function CameraCard({ cam, onOpen, onHide }: { cam: HikCamera; onOpen: () => void; onHide: (index: number) => void }) {
+// Карточка камеры: ленивое превью-снапшот; при недоступности — заглушка.
+// Двойной клик по кадру — live-трансляция в модальном окне.
+function CameraCard({ cam, isDesktop, pipActive, onTogglePip, onShowHidden, onOpen, onHide }: {
+  cam: HikCamera;
+  isDesktop: boolean;
+  pipActive: boolean;
+  onTogglePip: () => void;
+  onShowHidden: () => void;
+  onOpen: () => void;
+  onHide: (index: number) => void;
+}) {
   const [previewOk, setPreviewOk] = useState(true);
+  const [previewTs, setPreviewTs] = useState(0);
   return (
     <div style={{ ...cardStyle, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
@@ -58,22 +69,47 @@ function CameraCard({ cam, onOpen, onHide }: { cam: HikCamera; onOpen: () => voi
             {cam.deviceName} · канал {cam.channelNo}
           </div>
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onHide(cam.index); }}
-          title="Скрыть камеру"
-          style={cameraIconBtnStyle}
-          onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
-          onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
-        >✕</button>
+        <span style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setPreviewOk(true); setPreviewTs(Date.now()); }}
+            title="Обновить превью"
+            style={cameraIconBtnStyle}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+          >↻</button>
+          {isDesktop && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onTogglePip(); }}
+              title={pipActive ? "Убрать «картинку в картинке»" : "Картинка в картинке"}
+              style={{ ...cameraIconBtnStyle, opacity: pipActive ? 1 : 0.5, color: pipActive ? "#007AFF" : "var(--text-muted)" }}
+              onMouseEnter={(e) => { if (!pipActive) e.currentTarget.style.opacity = "1"; }}
+              onMouseLeave={(e) => { if (!pipActive) e.currentTarget.style.opacity = "0.5"; }}
+            >⤢</button>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onShowHidden(); }}
+            title="Скрытые камеры"
+            style={cameraIconBtnStyle}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+          >⚙</button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onHide(cam.index); }}
+            title="Скрыть камеру"
+            style={cameraIconBtnStyle}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+          >✕</button>
+        </span>
       </div>
       <div
         style={{ margin: "0 16px 16px", borderRadius: 10, overflow: "hidden", background: "#000", aspectRatio: "16/10", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-        onClick={onOpen}
-        title="Открыть live-поток"
+        onDoubleClick={onOpen}
+        title="Двойной клик — live-поток"
       >
         {previewOk ? (
           <img
-            src={`/api/hikvision-plugin/snapshot/${cam.index}?token=${encodeURIComponent(getToken())}`}
+            src={`/api/hikvision-plugin/snapshot/${cam.index}?token=${encodeURIComponent(getToken())}${previewTs ? `&ts=${previewTs}` : ""}`}
             alt={cam.name}
             loading="lazy"
             onError={() => setPreviewOk(false)}
@@ -93,6 +129,8 @@ function CameraCard({ cam, onOpen, onHide }: { cam: HikCamera; onOpen: () => voi
 export function HikvisionCameras() {
   const { hidden, hide, restore, restoreAll } = useHiddenCameras("hik");
   const [showHidden, setShowHidden] = useState(false);
+  const { active: pipActive, toggle: togglePip } = usePip();
+  const isDesktop = useIsDesktop();
   const [isActive, setIsActive] = useState(false);
   const [hasLogin, setHasLogin] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -173,7 +211,16 @@ export function HikvisionCameras() {
       {isActive && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
           {cameras.filter((c) => !hidden.includes(String(c.index))).map((cam) => (
-            <CameraCard key={`${cam.deviceSerial}-${cam.channelNo}`} cam={cam} onOpen={() => setLiveCamera(cam)} onHide={(index) => hide(String(index))} />
+            <CameraCard
+              key={`${cam.deviceSerial}-${cam.channelNo}`}
+              cam={cam}
+              isDesktop={isDesktop}
+              pipActive={pipActive(`hik:${cam.index}`)}
+              onTogglePip={() => togglePip(`hik:${cam.index}`, cam.name)}
+              onShowHidden={() => setShowHidden(true)}
+              onOpen={() => setLiveCamera(cam)}
+              onHide={(index) => hide(String(index))}
+            />
           ))}
           {cameras.length === 0 && !camerasLoading && !camerasError && (
             <div style={{ ...cardStyle, color: "var(--text-muted)", fontSize: 14 }}>
@@ -184,39 +231,30 @@ export function HikvisionCameras() {
       )}
 
       {liveCamera && (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 3000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16 }}
-          onClick={() => setLiveCamera(null)}
-        >
-          <div style={{ color: "#fff", fontSize: 15, fontWeight: 500, marginBottom: 10, textAlign: "center" }}>
-            {liveCamera.name} — live
-          </div>
-          {/* Плеер сам следит за потоком и переподключается при обрыве */}
-          <div onClick={(e) => e.stopPropagation()}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}
+          onClick={() => setLiveCamera(null)}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 12, padding: 16, width: "100%", maxWidth: 900 }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+              <div style={{ fontWeight: 600, fontSize: 16 }}>{liveCamera.name} <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 400 }}>через облако Hik-Connect</span></div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <select value={liveStreamType} onChange={(e) => setLiveStreamType(Number(e.target.value) as 1 | 2)}
+                  style={{ ...btnStyle, padding: "6px 10px" }}>
+                  <option value={1}>Основной поток</option>
+                  <option value={2}>Дополнительный (экономия)</option>
+                </select>
+                <button onClick={() => setLiveCamera(null)} style={btnStyle}>Закрыть</button>
+              </div>
+            </div>
+            {/* Плеер сам следит за потоком и переподключается при обрыве */}
             <H264Player
               src={`/api/hikvision-plugin/h264/${liveCamera.index}?streamType=${liveStreamType}`}
               mjpegFallback={`/api/hikvision-plugin/stream/${liveCamera.index}?streamType=${liveStreamType}`}
-              style={{ width: "min(92vw, 1100px)", height: "min(65vh, 600px)" }}
+              style={{ width: "100%", aspectRatio: "16/9", background: "#000" }}
             />
-          </div>
-          <div
-            style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12, flexWrap: "wrap", justifyContent: "center" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <label style={{ color: "rgba(255,255,255,0.85)", fontSize: 13, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              Поток:
-              <select
-                value={liveStreamType}
-                onChange={(e) => setLiveStreamType(Number(e.target.value) as 1 | 2)}
-                style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.3)", background: "#1c1c1e", color: "#fff", fontSize: 13 }}
-              >
-                <option value={1}>Основной (качество)</option>
-                <option value={2}>Дополнительный (экономия трафика)</option>
-              </select>
-            </label>
-            <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 12 }}>
-              Подключение через облако: пробуждение камеры обычно занимает 3–15 с. Нажмите в любое место, чтобы закрыть.
-            </span>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
+              H.264 (fMP4/MSE) через облако Hik-Connect: пробуждение камеры обычно занимает 3–15 с.
+            </div>
           </div>
         </div>
       )}
