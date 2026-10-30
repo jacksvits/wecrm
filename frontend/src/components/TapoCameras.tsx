@@ -301,7 +301,6 @@ function CloudCamerasSection({ settings, lanNames, onLive, hidden, onHide }: {
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Камеры через облако TP-Link</div>
       {msg && <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8 }}>{msg}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
         {visible.map((cam, index) => (
