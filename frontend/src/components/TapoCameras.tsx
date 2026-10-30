@@ -150,7 +150,6 @@ function CloudCameraCard({ cam, snapKey, onLive, onHide }: {
   };
 
   const token = localStorage.getItem("token") || "";
-  const offline = cam.status === 0;
   return (
     <div style={{ ...card, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
@@ -184,7 +183,7 @@ function CloudCameraCard({ cam, snapKey, onLive, onHide }: {
         )}
         {snapState === "fail" && (
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: 8, gap: 6 }}>
-            <span>{offline ? "Камера выключена или вне сети" : "Камера недоступна — не удалось получить кадр"}</span>
+            <span>Камера недоступна — не удалось получить кадр</span>
             <button
               onClick={(e) => { e.stopPropagation(); setSnapState("loading"); setAttempt(0); }}
               title="Повторить"
