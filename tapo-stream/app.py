@@ -25,6 +25,7 @@ import queue
 import re
 import struct
 import subprocess
+import tempfile
 import threading
 import time
 import uuid
@@ -400,7 +401,11 @@ _snapshot_locks: dict = {}
 
 
 def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: float = 25) -> bytes | None:
-    """Один JPEG-кадр из облачной трансляции камеры. None при недоступности."""
+    """Один JPEG-кадр из облачной трансляции камеры. None при недоступности.
+
+    fMP4-чанки складываются во временный файл (без pipe — иначе взаимные
+    блокировки буферов), затем ffmpeg извлекает первый кадр локально.
+    """
     from tapo_cloud_relay import (
         _get_worker, _release_worker, acquire_stream_slot, release_stream_slot,
     )
@@ -411,52 +416,53 @@ def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: 
     sub = None
     try:
         sub = worker.subscribe_native_video()
-        print(f"[snapshot] {device_id}: подписка открыта, worker_err={getattr(worker, 'last_error', None)}", flush=True)
+        print(f"[snapshot] {device_id}: подписка открыта", flush=True)
     except Exception as e:
         print(f"[snapshot] {device_id}: ошибка подписки: {e}", flush=True)
         _release_worker(login, password, device_id)
         release_stream_slot(login, password)
         return None
+    tmp_path = None
     try:
-        proc = subprocess.Popen(
-            ["ffmpeg", "-hide_banner", "-loglevel", "error",
-             "-f", "mp4", "-i", "pipe:0",
-             "-frames:v", "1", "-q:v", "4", "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1"],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-        )
-        last_data = [time.time()]
-        _chunks = [0]
-
-        def _pump():
-            while True:
+        fd, tmp_path = tempfile.mkstemp(suffix=".mp4", prefix="tapo_snap_")
+        chunks = 0
+        total = 0
+        deadline = time.time() + timeout
+        with os.fdopen(fd, "wb") as f:
+            while time.time() < deadline and total < 6_000_000:
+                werr = getattr(worker, "last_error", None)
+                if werr:
+                    print(f"[snapshot] {device_id}: ошибка воркера: {werr}", flush=True)
+                    return None
                 try:
                     chunk = sub.get(timeout=1)
                 except queue.Empty:
-                    if time.time() - last_data[0] > timeout:
-                        break
                     continue
-                if not chunk or not isinstance(chunk, (bytes, bytearray)):
-                    continue
-                last_data[0] = time.time()
-                _chunks[0] += 1
-                try:
-                    proc.stdin.write(bytes(chunk))
-                    proc.stdin.flush()
-                except (BrokenPipeError, OSError, ValueError):
+                if chunk is None:
+                    print(f"[snapshot] {device_id}: подписка вернула None (relay пересоздаётся)", flush=True)
                     break
-
-        th = threading.Thread(target=_pump, daemon=True)
-        th.start()
-        try:
-            out, ferr = proc.communicate(timeout=timeout + 15)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            out, ferr = proc.communicate()
-        print(f"[snapshot] {device_id}: чанков={_chunks[0]} ffmpeg_rc={proc.returncode} jpeg_bytes={len(out or b'')} err={(ferr or b'')[-200:]!r}", flush=True)
+                if not isinstance(chunk, (bytes, bytearray)):
+                    continue
+                f.write(bytes(chunk))
+                chunks += 1
+                total += len(chunk)
+        if chunks == 0:
+            print(f"[snapshot] {device_id}: данных нет", flush=True)
+            return None
+        print(f"[snapshot] {device_id}: собрано чанков={chunks} байт={total}", flush=True)
+        proc = subprocess.Popen(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error",
+             "-i", tmp_path,
+             "-frames:v", "1", "-q:v", "4", "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        out, ferr = proc.communicate(timeout=30)
+        print(f"[snapshot] {device_id}: ffmpeg rc={proc.returncode} jpeg_bytes={len(out or b'')} err={(ferr or b'')[-150:]!r}", flush=True)
         if proc.returncode == 0 and out and out.startswith(b"\xff\xd8"):
             return out
         return None
-    except Exception:
+    except Exception as e:
+        print(f"[snapshot] {device_id}: ИСКЛЮЧЕНИЕ: {e!r}", flush=True)
         return None
     finally:
         try:
@@ -465,6 +471,11 @@ def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: 
             pass
         _release_worker(login, password, device_id)
         release_stream_slot(login, password)
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 @app.get("/cloud/snapshot/<device_id>")
