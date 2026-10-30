@@ -405,12 +405,15 @@ def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: 
         _get_worker, _release_worker, acquire_stream_slot, release_stream_slot,
     )
     if not acquire_stream_slot(login, password):
+        print(f"[snapshot] {device_id}: нет свободного облачного слота", flush=True)
         return None
     worker = _get_worker(login, password, device_id)
     sub = None
     try:
         sub = worker.subscribe_native_video()
-    except Exception:
+        print(f"[snapshot] {device_id}: подписка открыта, worker_err={getattr(worker, 'last_error', None)}", flush=True)
+    except Exception as e:
+        print(f"[snapshot] {device_id}: ошибка подписки: {e}", flush=True)
         _release_worker(login, password, device_id)
         release_stream_slot(login, password)
         return None
@@ -422,6 +425,7 @@ def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: 
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         )
         last_data = [time.time()]
+        _chunks = [0]
 
         def _pump():
             while True:
@@ -434,6 +438,7 @@ def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: 
                 if not chunk or not isinstance(chunk, (bytes, bytearray)):
                     continue
                 last_data[0] = time.time()
+                _chunks[0] += 1
                 try:
                     proc.stdin.write(bytes(chunk))
                     proc.stdin.flush()
@@ -443,11 +448,12 @@ def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: 
         th = threading.Thread(target=_pump, daemon=True)
         th.start()
         try:
-            out, _ = proc.communicate(timeout=timeout + 15)
+            out, ferr = proc.communicate(timeout=timeout + 15)
         except subprocess.TimeoutExpired:
             proc.kill()
-            out = b""
-        if proc.returncode == 0 and out.startswith(b"\xff\xd8"):
+            out, ferr = proc.communicate()
+        print(f"[snapshot] {device_id}: чанков={_chunks[0]} ffmpeg_rc={proc.returncode} jpeg_bytes={len(out or b'')} err={(ferr or b'')[-200:]!r}", flush=True)
+        if proc.returncode == 0 and out and out.startswith(b"\xff\xd8"):
             return out
         return None
     except Exception:
