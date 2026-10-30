@@ -285,10 +285,11 @@ function CloudCamerasSection({ settings, lanNames, isDesktop, pipActive, onToggl
   const [mfa, setMfa] = useState<{ types: number[]; code: string; mfaType: number; busy: boolean; msg: string } | null>(null);
   const [msg, setMsg] = useState("");
 
-  // Обновление превью каждые 2 минуты (серверный кэш снапшота — ~120 с)
+  // Обновление превью каждые 90 с (серверный кэш снапшота ~120 с, новый запрос
+  // при протухшем кэше занимает слот лишь на время захвата одного кадра)
   const [snapKey, setSnapKey] = useState(0);
   useEffect(() => {
-    const interval = setInterval(() => setSnapKey(Date.now()), 120000);
+    const interval = setInterval(() => setSnapKey(Date.now()), 90000);
     return () => clearInterval(interval);
   }, []);
 

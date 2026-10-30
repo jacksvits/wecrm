@@ -62,7 +62,11 @@ function loadPosition(): PipPosition {
 export function CameraPipOverlay() {
   const [pipIds, setPipIds] = useState<string[]>(loadPipIds);
   const [cameras, setCameras] = useState<any[]>([]);
+  // Локальные MJPEG-потоки — пересоздание раз в 60 с (как раньше);
+  // облачные/RTSP-снапшоты — каждые 30 с (кадр закэширован на сервере,
+  // повторный запрос почти бесплатный)
   const [refreshKey, setRefreshKey] = useState(0);
+  const [cloudRefreshKey, setCloudRefreshKey] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [width, setWidth] = useState<number>(loadWidth);
   // Расположение стека окон: справа вверху / по центру / внизу
@@ -114,10 +118,11 @@ export function CameraPipOverlay() {
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  // Обновление снимков потока раз в 60 секунд
+  // Обновление снимков потока: локальные — раз в 60 с, облачные — раз в 30 с
   useEffect(() => {
     const interval = setInterval(() => setRefreshKey(Date.now()), 60000);
-    return () => clearInterval(interval);
+    const intervalCloud = setInterval(() => setCloudRefreshKey(Date.now()), 30000);
+    return () => { clearInterval(interval); clearInterval(intervalCloud); };
   }, []);
 
   // Синхронизация состояния между вкладками и с виджетами
@@ -274,10 +279,10 @@ export function CameraPipOverlay() {
               <img
                 src={
                   w.kind === "tapo"
-                    ? `/api/tapo-plugin/snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&ts=${refreshKey}`
+                    ? `/api/tapo-plugin/snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&ts=${cloudRefreshKey}`
                     : w.kind === "tapoc"
-                      ? `/api/tapo-plugin/cloud-snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&k=${refreshKey}`
-                      : `/api/hikvision-plugin/snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&ts=${refreshKey}`
+                      ? `/api/tapo-plugin/cloud-snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&k=${cloudRefreshKey}`
+                      : `/api/hikvision-plugin/snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&ts=${cloudRefreshKey}`
                 }
                 alt={w.label}
                 onLoad={(e) => {
