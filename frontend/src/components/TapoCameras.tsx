@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type TapoSettingsData } from "./TapoSettings";
 import { H264Player } from "./H264Player";
 import { cameraIconBtnStyle, HiddenCamerasModal, useHiddenCameras } from "./HiddenCameras";
@@ -119,17 +119,38 @@ type CloudCamera = { deviceId: string; name: string; model: string; status?: num
 
 // Карточка облачной камеры с серверным превью (кадр из облачной трансляции,
 // /api/tapo-plugin/cloud-snapshot/:deviceId, кэш на сервисе ~2 мин).
+// Неудачная загрузка — повтор через 8 с (до 3 попыток); если кадр так и не
+// получен — статус «камера недоступна» вместо постоянной чёрной заглушки.
+const SNAP_MAX_ATTEMPTS = 3;
+
 function CloudCameraCard({ cam, snapKey, onLive, onHide }: {
   cam: CloudCamera;
   snapKey: number;
   onLive: () => void;
   onHide: () => void;
 }) {
-  const [snapOk, setSnapOk] = useState(true);
+  const [snapState, setSnapState] = useState<"loading" | "ok" | "fail">("loading");
+  const [attempt, setAttempt] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // При каждом автообновлении (смена snapKey) пробуем загрузить превью заново —
   // иначе одна неудачная попытка оставляла текстовую заглушку до перезагрузки страницы.
-  useEffect(() => { setSnapOk(true); }, [snapKey]);
+  useEffect(() => {
+    setSnapState("loading");
+    setAttempt(0);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [snapKey]);
+
+  const handleError = () => {
+    if (attempt + 1 < SNAP_MAX_ATTEMPTS) {
+      timerRef.current = setTimeout(() => setAttempt(a => a + 1), 8000);
+    } else {
+      setSnapState("fail");
+    }
+  };
+
   const token = localStorage.getItem("token") || "";
+  const offline = cam.status === 0;
   return (
     <div style={{ ...card, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
@@ -146,17 +167,31 @@ function CloudCameraCard({ cam, snapKey, onLive, onHide }: {
         </span>
       </div>
       <div style={{ position: "relative", background: "#000", aspectRatio: "16/9", cursor: "pointer", margin: "0 16px 16px", borderRadius: 10, overflow: "hidden" }} onClick={onLive} title="Открыть трансляцию">
-        {snapOk ? (
+        {snapState !== "fail" ? (
           <img
-            src={`/api/tapo-plugin/cloud-snapshot/${encodeURIComponent(cam.deviceId)}?token=${encodeURIComponent(token)}&k=${snapKey}`}
+            src={`/api/tapo-plugin/cloud-snapshot/${encodeURIComponent(cam.deviceId)}?token=${encodeURIComponent(token)}&k=${snapKey}-${attempt}`}
             alt={cam.name}
             loading="lazy"
-            onError={() => setSnapOk(false)}
+            onLoad={() => setSnapState("ok")}
+            onError={handleError}
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
           />
-        ) : (
+        ) : null}
+        {snapState === "loading" && (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: 8 }}>
-            Прямая трансляция через облако TP-Link (~1–2 с задержки)
+            Загрузка…
+          </div>
+        )}
+        {snapState === "fail" && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: 8, gap: 6 }}>
+            <span>{offline ? "Камера выключена или вне сети" : "Камера недоступна — не удалось получить кадр"}</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); setSnapState("loading"); setAttempt(0); }}
+              title="Повторить"
+              style={{ ...cameraIconBtnStyle, opacity: 0.8 }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = "1"}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = "0.8"}
+            >↻</button>
           </div>
         )}
       </div>

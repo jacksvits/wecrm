@@ -400,30 +400,29 @@ SNAPSHOT_TTL = 120
 _snapshot_locks: dict = {}
 
 
-def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: float = 25) -> bytes | None:
-    """Один JPEG-кадр из облачной трансляции камеры. None при недоступности.
+SLOT_WAIT_TIMEOUT = 35.0  # сколько ждём освобождения облачного слота
+SNAPSHOT_ATTEMPTS = 2     # повтор захвата при сбое воркера (relay пересоздаётся в фоне)
 
-    fMP4-чанки складываются во временный файл (без pipe — иначе взаимные
-    блокировки буферов), затем ffmpeg извлекает первый кадр локально.
-    """
+
+def _grab_cloud_jpeg_once(login: str, password: str, device_id: str, timeout: float) -> tuple[bytes | None, bool]:
+    """Одна попытка захвата: True во втором элементе — повторить (временный сбой)."""
     from tapo_cloud_relay import (
-        _get_worker, _release_worker, acquire_stream_slot, release_stream_slot,
+        _get_worker, _release_worker, release_stream_slot, wait_stream_slot,
     )
-    if not acquire_stream_slot(login, password):
-        print(f"[snapshot] {device_id}: нет свободного облачного слота", flush=True)
-        return None
-    worker = _get_worker(login, password, device_id)
+    if not wait_stream_slot(login, password, SLOT_WAIT_TIMEOUT):
+        print(f"[snapshot] {device_id}: слот не освободился за {SLOT_WAIT_TIMEOUT:.0f} с", flush=True)
+        return None, False
+    worker = None
     sub = None
-    try:
-        sub = worker.subscribe_native_video()
-        print(f"[snapshot] {device_id}: подписка открыта", flush=True)
-    except Exception as e:
-        print(f"[snapshot] {device_id}: ошибка подписки: {e}", flush=True)
-        _release_worker(login, password, device_id)
-        release_stream_slot(login, password)
-        return None
     tmp_path = None
     try:
+        worker = _get_worker(login, password, device_id)
+        try:
+            sub = worker.subscribe_native_video()
+            print(f"[snapshot] {device_id}: подписка открыта", flush=True)
+        except Exception as e:
+            print(f"[snapshot] {device_id}: ошибка подписки: {e}", flush=True)
+            return None, True  # воркер мог умереть — пересоздастся на повторе
         fd, tmp_path = tempfile.mkstemp(suffix=".mp4", prefix="tapo_snap_")
         chunks = 0
         total = 0
@@ -433,14 +432,14 @@ def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: 
                 werr = getattr(worker, "last_error", None)
                 if werr:
                     print(f"[snapshot] {device_id}: ошибка воркера: {werr}", flush=True)
-                    return None
+                    return None, True  # relay пересоздаётся — пробуем заново
                 try:
                     chunk = sub.get(timeout=1)
                 except queue.Empty:
                     continue
                 if chunk is None:
                     print(f"[snapshot] {device_id}: подписка вернула None (relay пересоздаётся)", flush=True)
-                    break
+                    return None, True
                 if not isinstance(chunk, (bytes, bytearray)):
                     continue
                 f.write(bytes(chunk))
@@ -448,7 +447,7 @@ def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: 
                 total += len(chunk)
         if chunks == 0:
             print(f"[snapshot] {device_id}: данных нет", flush=True)
-            return None
+            return None, True
         print(f"[snapshot] {device_id}: собрано чанков={chunks} байт={total}", flush=True)
         proc = subprocess.Popen(
             ["ffmpeg", "-hide_banner", "-loglevel", "error",
@@ -459,23 +458,43 @@ def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: 
         out, ferr = proc.communicate(timeout=30)
         print(f"[snapshot] {device_id}: ffmpeg rc={proc.returncode} jpeg_bytes={len(out or b'')} err={(ferr or b'')[-150:]!r}", flush=True)
         if proc.returncode == 0 and out and out.startswith(b"\xff\xd8"):
-            return out
-        return None
+            return out, False
+        return None, False
     except Exception as e:
         print(f"[snapshot] {device_id}: ИСКЛЮЧЕНИЕ: {e!r}", flush=True)
-        return None
+        return None, True
     finally:
         try:
-            worker.unsubscribe_native_video(sub)
+            if worker is not None and sub is not None:
+                worker.unsubscribe_native_video(sub)
         except Exception:
             pass
-        _release_worker(login, password, device_id)
+        if worker is not None:
+            _release_worker(login, password, device_id)
         release_stream_slot(login, password)
         if tmp_path:
             try:
                 os.unlink(tmp_path)
             except OSError:
                 pass
+
+
+def _capture_cloud_snapshot(login: str, password: str, device_id: str, timeout: float = 25) -> bytes | None:
+    """Один JPEG-кадр из облачной трансляции камеры. None при недоступности.
+
+    fMP4-чанки складываются во временный файл (без pipe — иначе взаимные
+    блокировки буферов), затем ffmpeg извлекает первый кадр локально.
+    Слот ждём (не падаем сразу 502), временные сбои воркера — с повтором.
+    """
+    for attempt in range(1, SNAPSHOT_ATTEMPTS + 1):
+        jpeg, retry = _grab_cloud_jpeg_once(login, password, device_id, timeout)
+        if jpeg:
+            return jpeg
+        if not retry or attempt == SNAPSHOT_ATTEMPTS:
+            return None
+        print(f"[snapshot] {device_id}: повтор {attempt + 1}/{SNAPSHOT_ATTEMPTS} через 3 с", flush=True)
+        time.sleep(3)
+    return None
 
 
 @app.get("/cloud/snapshot/<device_id>")

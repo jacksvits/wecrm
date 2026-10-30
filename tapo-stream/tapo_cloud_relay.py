@@ -154,6 +154,9 @@ def _release_worker(login: str, password: str, device_id: str) -> None:
             pass
 
 
+_slot_cond = threading.Condition(_lock)
+
+
 def acquire_stream_slot(login: str, password: str) -> bool:
     key = _key(login, password)
     with _lock:
@@ -163,10 +166,25 @@ def acquire_stream_slot(login: str, password: str) -> bool:
     return True
 
 
+def wait_stream_slot(login: str, password: str, timeout: float) -> bool:
+    """Блокирующее получение облачного слота; False, если за timeout не освободился."""
+    key = _key(login, password)
+    deadline = time.monotonic() + timeout
+    with _slot_cond:
+        while _cloud_streams.get(key, 0) >= MAX_CLOUD_STREAMS_PER_ACCOUNT:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            _slot_cond.wait(remaining)
+        _cloud_streams[key] = _cloud_streams.get(key, 0) + 1
+    return True
+
+
 def release_stream_slot(login: str, password: str) -> None:
     key = _key(login, password)
-    with _lock:
+    with _slot_cond:
         _cloud_streams[key] = max(0, _cloud_streams.get(key, 1) - 1)
+        _slot_cond.notify()
 
 
 def stream_cloud_fmp4(login: str, password: str, device_id: str,
