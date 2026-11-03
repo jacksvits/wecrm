@@ -111,6 +111,26 @@ function smtpSecure(account: MailAccountRow): boolean {
   return account.secure;
 }
 
+// Поиск папки по specialUse (\\Sent / \\Trash) — по дереву из listTree
+function findSpecial(nodes: any[], specialUse: string): string | null {
+  for (const n of nodes) {
+    if (n.specialUse === specialUse) return n.path;
+    const nested = findSpecial(n.folders || [], specialUse);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+// Резервный поиск папки по имени — у части серверов specialUse не проставлен
+function findByName(nodes: any[], names: string[]): string | null {
+  for (const n of nodes) {
+    if (names.includes(n.name)) return n.path;
+    const nested = findByName(n.folders || [], names);
+    if (nested) return nested;
+  }
+  return null;
+}
+
 // Открывает IMAP-подключение на время операции и гарантированно закрывает его
 async function withImap<T>(account: MailAccountRow, fn: (client: ImapFlow) => Promise<T>): Promise<T> {
   const client = new ImapFlow({
@@ -617,7 +637,7 @@ router.post('/send', upload.array('files', 10), async (req: AuthRequest, res) =>
     });
 
     const files = (req.files as Express.Multer.File[]) || [];
-    await transport.sendMail({
+    const mailOptions = {
       from: account.label ? `"${account.label}" <${account.email}>` : account.email,
       to,
       cc: String(req.body.cc || '').trim() || undefined,
@@ -631,8 +651,36 @@ router.post('/send', upload.array('files', 10), async (req: AuthRequest, res) =>
         content: f.buffer,
         contentType: f.mimetype,
       })),
-    });
+    };
+    await transport.sendMail(mailOptions);
     transport.close();
+
+    // SMTP не сохраняет копию отправленного письма — если её не положить в
+    // IMAP-папку «Отправленные», письмо после отправки теряется из клиента
+    // (ни в одной папке его нет). Копию кладём через IMAP-append; ошибка копии
+    // не роняет ответ: письмо уже отправлено, причина видна в логах бэкенда.
+    try {
+      // Собираем то же письмо в сырой RFC822 через streamTransport
+      // (публичный API nodemailer, без приватных модулей)
+      const streamTransport = nodemailer.createTransport({ streamTransport: true, buffer: true });
+      const info = (await streamTransport.sendMail(mailOptions)) as { message: Buffer };
+      const raw = info.message;
+      streamTransport.close();
+      await withImap(account, async client => {
+        // specialUse есть только в listTree (как в findTrash у удаления)
+        const tree = await client.listTree();
+        const folders = (tree as any)?.folders || [];
+        const sentPath =
+          findSpecial(folders, '\\Sent') ||
+          findByName(folders, ['Sent', 'Sent Items', 'Отправленные', 'Отправлено']);
+        if (sentPath) {
+          // \Seen: отправленные письма не должны светиться непрочитанными
+          await client.append(sentPath, raw, ['\\Seen']);
+        }
+      });
+    } catch (copyErr: any) {
+      console.error('[mail/send] копия в «Отправленные» не сохранена:', copyErr?.message || copyErr);
+    }
     res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
