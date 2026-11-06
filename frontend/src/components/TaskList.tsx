@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../api/client";
 import { useRealtime } from "../hooks/useRealtime";
-import { Task, User, Project, Status } from "../types";
+import { Task, User, Project, Status, Contact } from "../types";
 import { userOptionLabel } from "../lib/userOptionLabel";
 import { formatDateTime, toDateTimeLocalValue, fromDateTimeLocalValue, nowDateTimeLocalValue } from "../lib/formatDate";
 import { TaskCalendar } from "./TaskCalendar";
-import { ContactPicker } from "./ContactPicker";
 import { Avatar } from "./Avatar";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
@@ -107,6 +106,37 @@ export function TaskList() {
     contactId: "",
   });
   const [contactText, setContactText] = useState("");
+  // Поле «Поиск контакта» — как в новой сделке: локальный список + выпадающий выбор
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [showContactDropdown, setShowContactDropdown] = useState(false);
+  const contactDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    api.contacts.list().then(setContacts).catch(() => {});
+  }, []);
+
+  // Закрывать выпадающий список контактов при клике вне него
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (contactDropdownRef.current && !contactDropdownRef.current.contains(event.target as Node)) {
+        setShowContactDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredContacts = contacts.filter((c) => {
+    if (!contactText.trim()) return true;
+    const q = contactText.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      (c.email || "").toLowerCase().includes(q) ||
+      (c.phone || "").toLowerCase().includes(q) ||
+      (c.emails || []).some((e: string) => e.toLowerCase().includes(q)) ||
+      (c.phones || []).some((p: string) => p.toLowerCase().includes(q))
+    );
+  });
   useEffect(() => {
     api.profile
       .get()
@@ -1681,24 +1711,79 @@ export function TaskList() {
                   </option>
                 ))}{" "}
               </select>{" "}
-              <ContactPicker
-                text={contactText}
-                onTextChange={(t) => {
-                  setContactText(t);
-                  if (form.contactId)
-                    setForm({ ...form, contactId: "" });
-                }}
-                selected={
-                  form.contactId
-                    ? { id: form.contactId, name: contactText }
-                    : null
-                }
-                onSelect={(c) => {
-                  if (c) setContactText(c.name);
-                  setForm({ ...form, contactId: c ? c.id : "" });
-                }}
-                placeholder="Поиск контакта..."
-              />{" "}
+              {/* Поле поиска контакта с выпадающим списком — как в новой сделке */}
+              <div ref={contactDropdownRef} style={{ position: "relative" }}>
+                <input
+                  placeholder="Поиск контакта..."
+                  value={contactText}
+                  onChange={(e) => {
+                    setContactText(e.target.value);
+                    setShowContactDropdown(true);
+                    if (!e.target.value) setForm({ ...form, contactId: "" });
+                  }}
+                  onFocus={() => setShowContactDropdown(true)}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border-color)",
+                    width: "100%",
+                    boxSizing: "border-box",
+                  }}
+                />
+                {form.contactId && (
+                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--text-muted)" }}>
+                    Выбрано: {contacts.find((c) => c.id === form.contactId)?.name || "—"}
+                  </div>
+                )}
+                {showContactDropdown && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      left: 0,
+                      right: 0,
+                      background: "var(--bg-card)",
+                      border: "1px solid var(--border-color)",
+                      borderRadius: 12,
+                      maxHeight: 200,
+                      overflow: "auto",
+                      zIndex: 300,
+                      boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                    }}
+                  >
+                    {filteredContacts.length === 0 ? (
+                      <div style={{ padding: 10, fontSize: 13, color: "var(--text-muted)" }}>
+                        Ничего не найдено
+                      </div>
+                    ) : (
+                      filteredContacts.map((c) => (
+                        <div
+                          key={c.id}
+                          onClick={() => {
+                            setForm({ ...form, contactId: c.id });
+                            setContactText(c.name);
+                            setShowContactDropdown(false);
+                          }}
+                          style={{
+                            padding: "8px 10px",
+                            cursor: "pointer",
+                            fontSize: 13,
+                            borderBottom: "1px solid var(--border-color)",
+                            background: form.contactId === c.id ? "rgba(0,0,0,0.05)" : undefined,
+                          }}
+                        >
+                          <div style={{ fontWeight: 500 }}>{c.name}</div>
+                          {(c.phone || c.email) && (
+                            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                              {[c.phone, c.email].filter(Boolean).join(" · ")}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>{" "}
               <select
                 multiple
                 value={form.assigneeIds}
