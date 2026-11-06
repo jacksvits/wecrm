@@ -294,6 +294,7 @@ export async function importMarketItems(): Promise<ImportSummary> {
       summary.errors.push(`${item.title || item.id}: ${err.message}`);
     }
   }
+  await recordSyncResult({ kind: 'import', ...summary });
   return summary;
 }
 
@@ -361,5 +362,148 @@ export async function syncProductsToVk(): Promise<SyncSummary> {
     // пауза между товарами: у VK лимит ~3 запроса/сек на методы маркета
     await new Promise((r) => setTimeout(r, 400));
   }
+  await recordSyncResult({ kind: 'products-to-vk', ...summary });
   return summary;
+}
+
+
+/** Записать результат последней синхронизации в настройки плагина */
+async function recordSyncResult(summary: Record<string, unknown>): Promise<void> {
+  try {
+    const s = await prisma.vkMarketSettings.findFirst({ orderBy: { createdAt: 'asc' } });
+    if (!s) return;
+    await prisma.vkMarketSettings.update({
+      where: { id: s.id },
+      data: { lastSyncAt: new Date(), lastSyncResult: JSON.stringify(summary) },
+    });
+  } catch (err) {
+    console.error('[VK Market] recordSyncResult failed:', err);
+  }
+}
+
+export interface PricesSyncSummary { updated: number; failed: number; errors: string[] }
+
+/** «В ВК»: выгрузить розничные цены товаров с отметкой «ВК» (только цены, без карточек) */
+export async function syncPricesToVk(): Promise<PricesSyncSummary> {
+  const settings = await getVkSettings();
+  if (!settings) throw new Error('ВКонтакте не подключён: нет группы с токеном');
+  const summary: PricesSyncSummary = { updated: 0, failed: 0, errors: [] };
+  const products = await prisma.product.findMany({
+    where: { syncToVk: true, isActive: true, vkItemId: { not: null } },
+    orderBy: { name: 'asc' },
+  });
+  for (const product of products) {
+    try {
+      const price = await getRetailPrice(product.id);
+      await vkApi('market.edit', {
+        owner_id: -settings.groupId,
+        item_id: product.vkItemId!,
+        price: price != null ? String(Math.round(price)) : '0',
+      });
+      summary.updated++;
+    } catch (err: any) {
+      summary.failed++;
+      summary.errors.push(`${product.name}: ${err.message}`);
+    }
+    // пауза между товарами: у VK лимит ~3 запроса/сек на методы маркета
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  await recordSyncResult({ kind: 'prices-to-vk', ...summary });
+  return summary;
+}
+
+/** «С ВК»: прочитать цены из маркета и записать в CRM (вид цен «ВК», иначе розничный) */
+export async function syncPricesFromVk(): Promise<PricesSyncSummary> {
+  const settings = await getVkSettings();
+  if (!settings) throw new Error('ВКонтакте не подключён: нет группы с токеном');
+  const summary: PricesSyncSummary = { updated: 0, failed: 0, errors: [] };
+
+  // market.get возвращает count + items; выкачиваем все страницы
+  const allItems: any[] = [];
+  let offset = 0;
+  for (let page = 0; page < 20; page++) {
+    const data = await vkApi('market.get', {
+      owner_id: -settings.groupId,
+      offset,
+      count: 200,
+      extended: 1,
+    });
+    const items = data.items || [];
+    allItems.push(...items);
+    if (allItems.length >= (data.count || 0) || items.length === 0) break;
+    offset += items.length;
+  }
+
+  // вид цен «ВК» (колонка for_vk), иначе розничный
+  const flaggedVkRows = await prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vk = true AND is_active = true LIMIT 1`) as any[];
+  let priceType = flaggedVkRows[0] ? { id: flaggedVkRows[0].id } : null;
+  if (!priceType) priceType = await prisma.priceType.findFirst({ where: { name: 'retail', isActive: true } });
+  if (!priceType) priceType = await prisma.priceType.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'desc' } });
+  if (!priceType) throw new Error('В CRM нет ни одного активного вида цен');
+
+  for (const item of allItems) {
+    const product = await prisma.product.findFirst({ where: { vkItemId: item.id } });
+    if (!product) continue;
+    const amount: number | null = item.price?.amount != null ? item.price.amount / 100 : null;
+    if (amount == null) continue;
+    try {
+      await prisma.productPrice.upsert({
+        where: { productId_priceTypeId: { productId: product.id, priceTypeId: priceType.id } },
+        update: { price: amount },
+        create: { productId: product.id, priceTypeId: priceType.id, price: amount },
+      });
+      summary.updated++;
+    } catch (err: any) {
+      summary.failed++;
+      summary.errors.push(`${product.name}: ${err.message}`);
+    }
+  }
+  await recordSyncResult({ kind: 'prices-from-vk', ...summary });
+  return summary;
+}
+
+export interface StocksSyncSummary { updated: number; failed: number; errors: string[]; notice?: string }
+
+/**
+ * «В ВК»: API ВК не передаёт числовые остатки — эмулируем доступность:
+ * товары без складского остатка скрываются из маркета (market.edit deleted=1),
+ * с остатком — восстанавливаются. Остаток берём из складского учёта CRM (как у OZON).
+ */
+export async function syncStocksToVk(): Promise<StocksSyncSummary> {
+  const settings = await getVkSettings();
+  if (!settings) throw new Error('ВКонтакте не подключён: нет группы с токеном');
+  const summary: StocksSyncSummary = {
+    updated: 0,
+    failed: 0,
+    errors: [],
+    notice: 'API ВК не передаёт число остатков: товары без остатка скрыты, с остатком — восстановлены',
+  };
+  const products = await prisma.product.findMany({
+    where: { syncToVk: true, isActive: true, vkItemId: { not: null } },
+    include: { stocks: true },
+    orderBy: { name: 'asc' },
+  });
+  for (const product of products) {
+    try {
+      const quantity = (product.stocks || []).reduce((sum: number, s: any) => sum + (Number(s.quantity) || 0), 0);
+      await vkApi('market.edit', {
+        owner_id: -settings.groupId,
+        item_id: product.vkItemId!,
+        deleted: quantity > 0 ? 0 : 1,
+      });
+      summary.updated++;
+    } catch (err: any) {
+      summary.failed++;
+      summary.errors.push(`${product.name}: ${err.message}`);
+    }
+    // пауза между товарами: у VK лимит ~3 запроса/сек на методы маркета
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  await recordSyncResult({ kind: 'stocks-to-vk', ...summary });
+  return summary;
+}
+
+/** «С ВК» недоступно: API ВКонтакте не возвращает остатки товаров */
+export async function syncStocksFromVk(): Promise<StocksSyncSummary> {
+  throw new Error('API ВКонтакте не возвращает остатки товаров — направление «С ВК» для остатков недоступно');
 }

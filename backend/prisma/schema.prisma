@@ -1287,6 +1287,15 @@ model VkMarketSettings {
   marketAppId       Int?     @map("market_app_id")
   marketAppSecret   String?  @map("market_app_secret")
   isActive          Boolean  @default(true) @map("is_active")
+  autoSync          Boolean  @default(true) @map("auto_sync") // фоновая синхронизация по расписанию (worker)
+  productsMode      String   @default("to_vk") @map("products_mode") // 'to_vk' | 'from_vk'
+  pricesMode        String   @default("to_vk") @map("prices_mode")
+  stocksMode        String   @default("to_vk") @map("stocks_mode")
+  productsIntervalMinutes Int @default(60) @map("products_interval_minutes") // 5-1440
+  pricesIntervalMinutes   Int @default(60) @map("prices_interval_minutes")
+  stocksIntervalMinutes   Int @default(60) @map("stocks_interval_minutes")
+  lastSyncAt        DateTime? @map("last_sync_at")
+  lastSyncResult    String?  @map("last_sync_result") // JSON {created, updated, failed, errors}
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 

@@ -9,6 +9,7 @@ import { VkCommunityWorker } from './vk-community/index.js';
 import { prisma } from './lib/prisma.js';
 import { runOneCSync } from './lib/onec-sync.js';
 import { syncProductsToOzon, syncPricesToOzon, syncPricesFromOzon, syncStocksToOzon, syncStocksFromOzon, importOzonProducts } from './lib/ozon.js';
+import { importMarketItems, syncProductsToVk, syncPricesToVk, syncPricesFromVk, syncStocksToVk } from './lib/vk-market.js';
 import { syncProductsToWb, syncPricesToWb, syncPricesFromWb, syncStocksToWb, syncStocksFromWb, importWbProducts } from './lib/wb.js';
 import { listWorkerTenants, withTenant, TenantInfo } from './lib/tenant.js';
 import { runStatusAutoChange } from './lib/status-auto-change.js';
@@ -25,7 +26,7 @@ import { runStatusAutoChange } from './lib/status-auto-change.js';
  * глобальный `prisma` обращается к БД нужной организации.
  */
 
-type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkCommunityWorker; onecTimer?: NodeJS.Timeout; ozonProductsTimer?: NodeJS.Timeout; ozonPricesTimer?: NodeJS.Timeout; ozonStocksTimer?: NodeJS.Timeout; wbProductsTimer?: NodeJS.Timeout; wbPricesTimer?: NodeJS.Timeout; wbStocksTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
+type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkCommunityWorker; onecTimer?: NodeJS.Timeout; ozonProductsTimer?: NodeJS.Timeout; ozonPricesTimer?: NodeJS.Timeout; ozonStocksTimer?: NodeJS.Timeout; vkProductsTimer?: NodeJS.Timeout; vkPricesTimer?: NodeJS.Timeout; vkStocksTimer?: NodeJS.Timeout; wbProductsTimer?: NodeJS.Timeout; wbPricesTimer?: NodeJS.Timeout; wbStocksTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
 
 /** Интервал проверки «Авто смены» статусов */
 const STATUS_AUTO_CHANGE_MS = 60_000;
@@ -45,6 +46,9 @@ function stopBag(key: string, bag: TimerBag) {
   if (bag.ozonProductsTimer) clearInterval(bag.ozonProductsTimer);
   if (bag.ozonPricesTimer) clearInterval(bag.ozonPricesTimer);
   if (bag.ozonStocksTimer) clearInterval(bag.ozonStocksTimer);
+  if (bag.vkProductsTimer) clearInterval(bag.vkProductsTimer);
+  if (bag.vkPricesTimer) clearInterval(bag.vkPricesTimer);
+  if (bag.vkStocksTimer) clearInterval(bag.vkStocksTimer);
   if (bag.wbProductsTimer) clearInterval(bag.wbProductsTimer);
   if (bag.wbPricesTimer) clearInterval(bag.wbPricesTimer);
   if (bag.wbStocksTimer) clearInterval(bag.wbStocksTimer);
@@ -196,6 +200,48 @@ async function syncTenant(t: TenantInfo): Promise<void> {
     if (bag.ozonProductsTimer) { clearInterval(bag.ozonProductsTimer); bag.ozonProductsTimer = undefined; }
     if (bag.ozonPricesTimer) { clearInterval(bag.ozonPricesTimer); bag.ozonPricesTimer = undefined; }
     if (bag.ozonStocksTimer) { clearInterval(bag.ozonStocksTimer); bag.ozonStocksTimer = undefined; }
+  }
+
+  // --- VK Market sync: три независимые задачи (товары, цены, остатки) по своим расписаниям ---
+  // Направление каждой задачи — из режимов синхронизации («В ВК» / «С ВК»).
+  // Остатки «С ВК» недоступны: API ВК не возвращает остатки (только скрытие/восстановление «В ВК»).
+  // Авто-синхронизация запускается только при включённой опции «Авто синхронизация»;
+  // ручной импорт/экспорт из настроек плагина доступен независимо от неё.
+  const vkMarketSettings = await prisma.vkMarketSettings.findFirst();
+  if (vkMarketSettings?.isActive && vkMarketSettings.autoSync) {
+    const runVkJob = (kind: 'products' | 'prices' | 'stocks', job: () => Promise<unknown>) => async () => {
+      try {
+        const summary = await job();
+        console.log(`[Worker] VK ${kind} sync done (${key}):`, JSON.stringify(summary).slice(0, 250));
+      } catch (e: any) {
+        console.error(`[Worker] VK ${kind} sync error (${key}):`, e.message);
+      }
+    };
+    const vkJobFor = (kind: 'products' | 'prices' | 'stocks') =>
+      kind === 'products'
+        ? (vkMarketSettings.productsMode === 'from_vk' ? () => importMarketItems() : () => syncProductsToVk())
+        : kind === 'prices'
+          ? (vkMarketSettings.pricesMode === 'from_vk' ? () => syncPricesFromVk() : () => syncPricesToVk())
+          : () => syncStocksToVk();
+    const vkIntervalFor = (kind: 'products' | 'prices' | 'stocks') =>
+      Math.max(5, (kind === 'products' ? vkMarketSettings.productsIntervalMinutes : kind === 'prices' ? vkMarketSettings.pricesIntervalMinutes : vkMarketSettings.stocksIntervalMinutes) || 60) * 60 * 1000;
+
+    if (!bag.vkProductsTimer) {
+      bag.vkProductsTimer = setInterval(runVkJob('products', vkJobFor('products')), vkIntervalFor('products'));
+      console.log(`[Worker] VK products sync scheduled every ${vkIntervalFor('products') / 60000} min, mode=${vkMarketSettings.productsMode} (${key})`);
+    }
+    if (!bag.vkPricesTimer) {
+      bag.vkPricesTimer = setInterval(runVkJob('prices', vkJobFor('prices')), vkIntervalFor('prices'));
+      console.log(`[Worker] VK prices sync scheduled every ${vkIntervalFor('prices') / 60000} min, mode=${vkMarketSettings.pricesMode} (${key})`);
+    }
+    if (!bag.vkStocksTimer) {
+      bag.vkStocksTimer = setInterval(runVkJob('stocks', vkJobFor('stocks')), vkIntervalFor('stocks'));
+      console.log(`[Worker] VK stocks sync scheduled every ${vkIntervalFor('stocks') / 60000} min (${key})`);
+    }
+  } else {
+    if (bag.vkProductsTimer) { clearInterval(bag.vkProductsTimer); bag.vkProductsTimer = undefined; }
+    if (bag.vkPricesTimer) { clearInterval(bag.vkPricesTimer); bag.vkPricesTimer = undefined; }
+    if (bag.vkStocksTimer) { clearInterval(bag.vkStocksTimer); bag.vkStocksTimer = undefined; }
   }
 
   // --- WB Seller sync: три независимые задачи (товары, цены, остатки) по своим расписаниям ---

@@ -182,7 +182,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     authUrl: () => fetchApi('/api/tochka/auth-url'),
   },
   vkAuthSettings: { get: () => fetchApi('/api/vk-auth-settings'), save: (data: any) => fetchApi('/api/vk-auth-settings', { method: 'POST', body: JSON.stringify(data) }), delete: () => fetchApi('/api/vk-auth-settings', { method: 'DELETE' }), },
-  vkMarketSettings: { get: () => fetchApi('/api/vk-market-settings'), save: (data: any) => fetchApi('/api/vk-market-settings', { method: 'POST', body: JSON.stringify(data) }), delete: () => fetchApi('/api/vk-market-settings', { method: 'DELETE' }), },
+  vkMarketSettings: { get: () => fetchApi('/api/vk-market-settings'), save: (data: any) => fetchApi('/api/vk-market-settings', { method: 'POST', body: JSON.stringify(data) }), delete: () => fetchApi('/api/vk-market-settings', { method: 'DELETE' }), import: () => fetchApi('/api/vk-market-settings/import', { method: 'POST' }), export: () => fetchApi('/api/vk-market-settings/export', { method: 'POST' }), },
   vkCommunitySettings: { get: () => fetchApi('/api/vk-community-settings'), save: (data: any) => fetchApi('/api/vk-community-settings', { method: 'POST', body: JSON.stringify(data) }), delete: () => fetchApi('/api/vk-community-settings', { method: 'DELETE' }), }, camera: {
     getSettings: () => fetchApi('/api/camera/settings'),
     getCamera: (id: string) => fetchApi(`/api/camera/settings/${id}`),
