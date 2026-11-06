@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client';
+import { Contact } from '../types';
 import { useNavigate } from 'react-router-dom';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -758,6 +759,56 @@ export function MailClient() {
   }>({ to: '', subject: '', body: '', files: [], inReplyTo: '', references: '' });
   const [sending, setSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Контакты CRM для подстановки в «Кому» (скрытые типы API уже исключает)
+  const [composeContacts, setComposeContacts] = useState<Contact[]>([]);
+  const [showToDropdown, setShowToDropdown] = useState(false);
+  const toDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Подгружаем контакты при открытии формы письма
+  useEffect(() => {
+    if (!showCompose) return;
+    api.contacts.list()
+      .then((data: any) => setComposeContacts(Array.isArray(data) ? data : (data?.contacts || [])))
+      .catch(() => setComposeContacts([]));
+  }, [showCompose]);
+
+  // Закрывать выпадающий список «Кому» при клике вне него
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (toDropdownRef.current && !toDropdownRef.current.contains(event.target as Node)) {
+        setShowToDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Только контакты с заполненным email
+  const contactEmails = (c: Contact): string[] =>
+    [c.email, ...(c.emails || [])].filter((e): e is string => !!e && !!e.trim());
+  // Фрагмент после последней запятой — текущий запрос поиска
+  const toQuery = compose.to.slice(compose.to.lastIndexOf(',') + 1).trim();
+  const filteredToContacts = composeContacts.filter(c => {
+    if (contactEmails(c).length === 0) return false;
+    if (!toQuery) return true;
+    const q = toQuery.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      contactEmails(c).some(e => e.toLowerCase().includes(q)) ||
+      (c.phone || '').toLowerCase().includes(q) ||
+      (c.phones || []).some(p => p.toLowerCase().includes(q))
+    );
+  });
+
+  // Выбор контакта: подставляем его email в «Кому» вместо набранного фрагмента
+  const pickToContact = (c: Contact) => {
+    const emails = contactEmails(c);
+    if (emails.length === 0) return;
+    const parts = compose.to.split(',').map(p => p.trim()).filter(Boolean);
+    parts.push(emails[0]);
+    setCompose(prev => ({ ...prev, to: parts.join(', ') }));
+    setShowToDropdown(false);
+  };
 
   // HTML подписи аккаунта (пустую/пробельную не подставляем)
   const signatureHtml = (): string => {
@@ -1754,12 +1805,47 @@ export function MailClient() {
             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
               От: <b style={{ color: 'var(--text-primary)' }}>{account ? (account.label ? `${account.label} (${account.email})` : account.email) : ''}</b>
             </div>
-            <input
-              style={inputStyle}
-              placeholder='Кому (email)'
-              value={compose.to}
-              onChange={e => setCompose(prev => ({ ...prev, to: e.target.value }))}
-            />
+            {/* Поле «Кому» с выбором контакта из CRM — как «Поиск контакта» в сделках */}
+            <div ref={toDropdownRef} style={{ position: 'relative' }}>
+              <input
+                style={inputStyle}
+                placeholder='Кому (email)'
+                value={compose.to}
+                onChange={e => { setCompose(prev => ({ ...prev, to: e.target.value })); setShowToDropdown(true); }}
+                onFocus={() => setShowToDropdown(true)}
+              />
+              {showToDropdown && filteredToContacts.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 4px)',
+                  left: 0,
+                  right: 0,
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 12,
+                  maxHeight: 200,
+                  overflow: 'auto',
+                  zIndex: 300,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+                }}>
+                  {filteredToContacts.map(c => (
+                    <div
+                      key={c.id}
+                      onClick={() => pickToContact(c)}
+                      style={{
+                        padding: '8px 10px',
+                        cursor: 'pointer',
+                        fontSize: 13,
+                        borderBottom: '1px solid var(--border-color)'
+                      }}
+                    >
+                      <div style={{ fontWeight: 500 }}>{c.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{contactEmails(c).join(' · ')}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <input
               style={inputStyle}
               placeholder='Тема'
