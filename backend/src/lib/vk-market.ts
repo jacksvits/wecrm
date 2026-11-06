@@ -153,20 +153,36 @@ async function downloadToUploads(url: string): Promise<string | null> {
  * (нужен scope photos в токене маркета).
  */
 async function uploadMarketPhoto(imageUrl: string, groupId: number): Promise<string | null> {
+  // MIME по реальному расширению: VK отдаёт пустой photo, если тип не совпадает с содержимым
+  const mimeByExt: Record<string, string> = {
+    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+    '.gif': 'image/gif', '.bmp': 'image/bmp', '.webp': 'image/webp',
+  };
   try {
-    // 1. URL для загрузки
-    const server = await vkApi('photos.getWallUploadServer', { group_id: groupId });
-    if (!server.upload_url) return null;
-    // 2. Скачиваем локальный файл и шлём multipart
     const fileRes = await fetch(`${process.env.BACKEND_ORIGIN || 'https://welans.cc'}${imageUrl}`);
+    if (!fileRes.ok) throw new Error(`HTTP ${fileRes.status} при скачивании фото`);
     const arrayBuffer = await fileRes.arrayBuffer();
-    const ext = path.extname(imageUrl) || '.jpg';
-    const form = new FormData();
-    form.append('file', new Blob([arrayBuffer], { type: 'image/jpeg' }), `photo${ext}`);
-    const upRes = await fetch(server.upload_url, { method: 'POST', body: form });
-    const upData: any = await upRes.json();
-    if (upData.error || !upData.photo) return null;
-    // 3. Сохраняем
+    const ext = (path.extname(imageUrl) || '.jpg').toLowerCase();
+    const mime = mimeByExt[ext] || 'image/jpeg';
+    // Загрузчики VK нестабильны (405/HTML/пустой photo): до 3 попыток со свежим upload_url
+    let upData: any = null;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        const server = await vkApi('photos.getWallUploadServer', { group_id: groupId });
+        if (!server.upload_url) return null;
+        const form = new FormData();
+        form.append('file', new Blob([arrayBuffer], { type: mime }), `photo${ext}`);
+        const upRes = await fetch(server.upload_url, { method: 'POST', body: form });
+        const parsed: any = await upRes.json().catch(() => null);
+        if (parsed && !parsed.error && parsed.photo) { upData = parsed; break; }
+        console.warn(`[VK Market] photo upload attempt ${attempt}: пустой ответ (${String(JSON.stringify(parsed)).slice(0, 80) || upRes.status})`);
+      } catch (e: any) {
+        console.warn(`[VK Market] photo upload attempt ${attempt} failed:`, e.message);
+      }
+      await new Promise((r) => setTimeout(r, [5000, 15000, 30000, 60000][attempt - 1] || 60000));
+    }
+    if (!upData) return null;
+    // Сохраняем в альбом группы; маркету нужен числовой id фото
     const saved = await vkApi('photos.saveWallPhoto', {
       group_id: groupId,
       photo: upData.photo,
@@ -174,8 +190,8 @@ async function uploadMarketPhoto(imageUrl: string, groupId: number): Promise<str
       hash: upData.hash,
     });
     const photo = Array.isArray(saved) ? saved[0] : saved;
-    if (!photo?.id || !photo?.owner_id) return null;
-    return `${photo.owner_id}_${photo.id}`;
+    if (!photo?.id) return null;
+    return String(photo.id);
   } catch (err) {
     console.error('[VK Market] photo upload failed:', err);
     return null;
@@ -336,11 +352,11 @@ export async function syncProductsToVk(): Promise<SyncSummary> {
         ? await uploadMarketPhoto(product.images[0].url, settings.groupId)
         : null;
       if (photoId) {
-        params.main_photo_id = photoId;
+        params.main_photo_id = parseInt(photoId, 10);
       } else if (!product.vkItemId) {
         // у нового товара в маркете ВК обязательно главное фото
         throw new Error(product.images[0]
-          ? 'фото не загружено в ВК (загрузка фото требует права photos у приложения VK ID — см. Настройки → ВКонтакте)'
+          ? 'фото не загружено в ВК (загрузчик ВК отклоняет файл: временное ограничение на загрузку фото для приложения/аккаунта — попробуйте позже)'
           : 'нет изображения у товара — у маркета ВК обязательно главное фото');
       }
 
