@@ -132,7 +132,9 @@ async function syncTenant(t: TenantInfo): Promise<void> {
   if (vkSettings && vkSettings.isActive) {
     if (!bag.vk) {
       bag.vk = new VkCommunityWorker();
-      await bag.vk.start();
+      // Не блокируем syncTenant: start() → loop() — бесконечный Long Poll,
+      // при await секции 1С/OZON/VK Market/WB ниже никогда не выполнялись бы
+      bag.vk.start().catch((e: any) => console.error(`[Worker] VK Community worker error (${key}):`, e.message));
       console.log(`[Worker] VK Community worker started (${key})`);
     }
   } else if (bag.vk) {
