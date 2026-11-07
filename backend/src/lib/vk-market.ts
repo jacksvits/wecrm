@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { prisma } from './prisma.js';
 import sharp from 'sharp';
 import { generateUniqueArticle } from './article.js';
+import { tenantUploadPrefix, uploadsRoot } from './tenant.js';
 
 const VK_API = 'https://api.vk.com/method';
 const VK_API_VERSION = '5.199';
@@ -132,7 +133,7 @@ async function getRetailPrice(productId: string): Promise<number | null> {
   return price ? price.price : null;
 }
 
-/** Скачать файл по URL в локальное хранилище, вернуть dbPath */
+/** Скачать файл по URL в локальное хранилище, вернуть dbPath (с tenant-префиксом) */
 async function downloadToUploads(url: string): Promise<string | null> {
   try {
     const res = await fetch(url);
@@ -140,8 +141,11 @@ async function downloadToUploads(url: string): Promise<string | null> {
     const buffer = Buffer.from(await res.arrayBuffer());
     const ext = path.extname(new URL(url).pathname).split('?')[0] || '.jpg';
     const filename = `${randomUUID()}${ext}`;
-    fs.writeFileSync(path.join(UPLOAD_ROOT, filename), buffer);
-    return `/uploads/${filename}`;
+    // Корень текущего tenant'а (главная: /app/uploads, tenant'ы: /app/tenants/<slug>)
+    const root = uploadsRoot();
+    if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true });
+    fs.writeFileSync(path.join(root, filename), buffer);
+    return `${tenantUploadPrefix() || '/uploads'}/${filename}`;
   } catch {
     return null;
   }
@@ -290,6 +294,7 @@ export async function importMarketItems(): Promise<ImportSummary> {
       const product = await prisma.product.create({
         data: {
           article: await generateUniqueArticle(),
+          source: 'vk',
           name: title,
           kind: 'product',
           sku: `VK-${vkId}`,
@@ -311,7 +316,7 @@ export async function importMarketItems(): Promise<ImportSummary> {
       if (photoUrl) {
         const dbPath = await downloadToUploads(photoUrl);
         if (dbPath) {
-          const filename = dbPath.replace('/uploads/', '');
+          const filename = dbPath.split('/').pop()!;
           const firstUser = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
           const attachment = await prisma.fileAttachment.create({
             data: {

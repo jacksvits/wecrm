@@ -2,6 +2,9 @@ import { prisma } from './prisma.js';
 import fs from 'fs';
 import path from 'path';
 import { resolveRetailType, writeProductPrice } from './ozon.js';
+import { shopDirFor, shopUrlPrefix } from './shop-dir.js';
+import { generateUniqueArticle } from './article.js';
+import { diskPathForUploadUrl } from './tenant.js';
 
 // Актуальные хосты WB API (suppliers-api.wildberries.ru снят с эксплуатации — NXDOMAIN):
 // контент (карточки, медиа, характеристики) — content-api;
@@ -219,8 +222,8 @@ async function wbBindMedia(offerId: string, product: any): Promise<void> {
   if (!attachmentIds.length) return;
   const attachments = await prisma.fileAttachment.findMany({ where: { id: { in: attachmentIds } } });
   const files = attachments
-    .map((a: any) => path.join(UPLOAD_ROOT, String(a.path || '').replace(/^\/+/, '')))
-    .filter((f: string) => fs.existsSync(f))
+    .map((a: any) => diskPathForUploadUrl(String(a.path || '')))
+    .filter((f: string | null): f is string => !!f && fs.existsSync(f))
     .slice(0, 10);
   if (!files.length) return;
   const uploaded: string[] = [];
@@ -322,9 +325,17 @@ async function attachPhotoByUrl(productId: string, url: string, authorId: string
     if (!mime.startsWith('image/')) return false;
     if (buf.length > 10 * 1024 * 1024) return false;
     const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
-    const rel = `wb/${productId}-${sortOrder}-${Date.now()}.${ext}`;
-    const abs = path.join(UPLOAD_ROOT, rel);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    // Изображения товара — в папке каталога shop/<source>/<article> (см. lib/shop-dir.ts)
+    const prod = await prisma.product.findUnique({ where: { id: productId }, select: { article: true, source: true } });
+    let article = prod?.article;
+    if (!article) {
+      article = await generateUniqueArticle();
+      await prisma.product.update({ where: { id: productId }, data: { article } });
+    }
+    const shopDir = shopDirFor(article, prod?.source || 'system');
+    if (!fs.existsSync(shopDir)) fs.mkdirSync(shopDir, { recursive: true });
+    const rel = `${productId}-${sortOrder}-${Date.now()}.${ext}`;
+    const abs = path.join(shopDir, rel);
     fs.writeFileSync(abs, buf);
     const user = authorId
       ? { id: authorId }
@@ -336,14 +347,14 @@ async function attachPhotoByUrl(productId: string, url: string, authorId: string
         originalName: (path.basename(url).split('?')[0] || `photo-${sortOrder}.${ext}`).slice(0, 250),
         mimeType: mime,
         size: buf.length,
-        path: `/${rel}`,
+        path: `${shopUrlPrefix(article, prod?.source || 'system')}/${rel}`,
         entityType: 'product',
         entityId: productId,
         authorId: user.id,
       },
     });
     await prisma.productImage.create({
-      data: { productId, attachmentId: attachment.id, url: `/uploads/${rel}`, sortOrder },
+      data: { productId, attachmentId: attachment.id, url: `${shopUrlPrefix(article, prod?.source || 'system')}/${rel}`, sortOrder },
     });
     return true;
   } catch {
@@ -412,6 +423,7 @@ export async function importWbProducts(userId?: string): Promise<{ created: numb
           data: {
             name: card.title || vendorCode,
             article: vendorCode,
+            source: 'wb',
             wbProductId: BigInt(Number(card.nmID)),
             syncToWb: true,
             description: fields.description,

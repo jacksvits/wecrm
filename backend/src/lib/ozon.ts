@@ -1,6 +1,8 @@
 import { prisma } from './prisma.js';
 import fs from 'fs';
 import path from 'path';
+import { shopDirFor, shopUrlPrefix } from './shop-dir.js';
+import { generateUniqueArticle } from './article.js';
 
 const OZON_API = 'https://api-seller.ozon.ru';
 // Публичный адрес CRM — картинки товаров отдаются по нему, OZON заберёт их при импорте
@@ -874,6 +876,7 @@ export async function importOzonProducts(authorId?: string): Promise<{ created: 
       const product = await prisma.product.create({
         data: {
           article: offerId,
+          source: 'ozon',
           name,
           kind: 'product',
           categoryId: ozonCatId || ozonCategory.id,
@@ -918,8 +921,17 @@ export async function attachOzonImage(productId: string, url: string, authorId: 
     const buf = Buffer.from(await r.arrayBuffer());
     if (!buf.length || buf.length > 10 * 1024 * 1024) return false;
     const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[mime] || 'jpg';
+    // Изображения товара — в папке каталога shop/<source>/<article> (см. lib/shop-dir.ts)
+    const product = await prisma.product.findUnique({ where: { id: productId }, select: { article: true, source: true } });
+    let article = product?.article;
+    if (!article) {
+      article = await generateUniqueArticle();
+      await prisma.product.update({ where: { id: productId }, data: { article } });
+    }
+    const shopDir = shopDirFor(article, product?.source || 'system');
+    if (!fs.existsSync(shopDir)) fs.mkdirSync(shopDir, { recursive: true });
     const filename = `product-${productId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
-    fs.writeFileSync(path.join(UPLOAD_ROOT, filename), buf);
+    fs.writeFileSync(path.join(shopDir, filename), buf);
     const maxSort = await prisma.productImage.aggregate({ where: { productId }, _max: { sortOrder: true } });
     const attachment = await prisma.fileAttachment.create({
       data: {
@@ -929,7 +941,7 @@ export async function attachOzonImage(productId: string, url: string, authorId: 
         originalName: origName || filename,
         mimeType: mime,
         size: buf.length,
-        path: `/uploads/${filename}`,
+        path: `${shopUrlPrefix(article, product?.source || 'system')}/${filename}`,
         authorId,
       },
     });

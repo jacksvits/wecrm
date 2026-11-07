@@ -232,7 +232,7 @@ async function runOneCSyncInner(): Promise<OneCSyncStats> {
             if (n.barcode && (await prisma.product.findFirst({ where: { barcode: n.barcode }, select: { id: true } }))) {
               createData = { ...createData, barcode: null };
             }
-            const created = await prisma.product.create({ data: { ...createData, article: await generateUniqueArticle() } });
+            const created = await prisma.product.create({ data: { ...createData, article: await generateUniqueArticle(), source: 'system' } });
             claimed.add(created.id);
           }
           stats.products.pulled++;

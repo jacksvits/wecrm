@@ -12,6 +12,7 @@
  * поэтому существующие роуты/воркеры менять не нужно.
  */
 import { AsyncLocalStorage } from 'async_hooks';
+import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { makeClientKeyMiddleware } from './client-key.js';
 import type { Router } from 'express';
@@ -236,6 +237,20 @@ export async function asMainTenant<T>(fn: () => Promise<T>): Promise<T> {
 export function tenantKey(): string {
   const t = currentTenant();
   return t ? (t.isMain ? 'main' : t.slug) : 'main';
+}
+
+/** Абсолютный путь на диске по публичному URL-пути файла.
+ *  /uploads/x → /app/uploads/x; /tenants/<slug>/x → /app/tenants/<slug>/x.
+ *  Пути старого формата /uploads/t-<slug>/x → /app/tenants/<slug>/x (после миграции tenants). */
+export function diskPathForUploadUrl(publicPath: string): string | null {
+  if (!publicPath) return null;
+  if (publicPath.startsWith('/uploads/')) {
+    return path.join('/app/uploads', publicPath.slice('/uploads/'.length));
+  }
+  if (publicPath.startsWith('/tenants/')) {
+    return path.join('/app', publicPath);
+  }
+  return null;
 }
 
 /** Директория данных текущего tenant'а (изоляция файловых интеграций):

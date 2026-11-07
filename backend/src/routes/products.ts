@@ -9,6 +9,7 @@ import { generateUniqueArticle } from '../lib/article.js';
 
 const router = Router();
 import { uploadsRoot, tenantUploadPrefix, tenantContext } from '../lib/tenant.js';
+import { shopDirFor, shopUrlPrefix, moveEntry } from '../lib/shop-dir.js';
 
 // Кэш отправлений OZON для виджета «Самые продаваемые» — выборка из кабинета идёт до 50 запросов, кэшируем на 10 минут.
 // Строго по тенантам: у каждой организации (и у главного домена) свой кабинет OZON и свои отправления.
@@ -813,6 +814,7 @@ router.post('/', async (req, res) => {
     const product = await prisma.product.create({
       data: {
         article,
+        source: 'system',
         name: name.trim(),
         sku: sku?.trim() || null,
         kind: productKind,
@@ -1088,21 +1090,33 @@ router.post('/:id/images', async (req, res) => {
     // каждое следующее — <article>-<n>.<ext> (независимо от исходного имени)
     let url = attachment.path;
     let newFilename = attachment.filename;
-    if (product.article) {
-      const ext = path.extname(attachment.filename) || '';
-      const baseName = count === 0 ? product.article : `${product.article}-${count}`;
-      newFilename = `${baseName}${ext}`;
-      const oldPath = path.join(uploadsRoot(), attachment.filename);
-      const newPath = path.join(uploadsRoot(), newFilename);
-      if (oldPath !== newPath) {
-        if (fs.existsSync(newPath)) fs.unlinkSync(newPath);
-        if (fs.existsSync(oldPath)) fs.renameSync(oldPath, newPath);
-        await prisma.fileAttachment.update({
-          where: { id: attachment.id },
-          data: { filename: newFilename, path: `${tenantUploadPrefix() || '/uploads'}/${newFilename}` },
-        });
-        url = `${tenantUploadPrefix() || '/uploads'}/${newFilename}`;
+    // Генерируем внутренний артикул, если карточка его не имеет
+    let article = product.article;
+    if (!article) {
+      article = await generateUniqueArticle();
+      await prisma.product.update({ where: { id: product.id }, data: { article } });
+    }
+    const ext = path.extname(attachment.filename) || '';
+    const baseName = count === 0 ? article : `${article}-${count}`;
+    newFilename = `${baseName}${ext}`;
+    const shopDir = shopDirFor(article, product.source);
+    if (!fs.existsSync(shopDir)) fs.mkdirSync(shopDir, { recursive: true });
+    const oldPath = path.join(uploadsRoot(), attachment.filename);
+    const newPath = path.join(shopDir, newFilename);
+    if (oldPath !== newPath) {
+      if (fs.existsSync(newPath)) fs.unlinkSync(newPath);
+      if (fs.existsSync(oldPath)) {
+        moveEntry(oldPath, newPath);
+      } else if (!fs.existsSync(newPath)) {
+        // Файл уже не в uploadsRoot (например, лежит в shop) — ищем по старому пути из БД
+        const legacyPath = path.join('/app', attachment.path);
+        if (fs.existsSync(legacyPath)) moveEntry(legacyPath, newPath);
       }
+      await prisma.fileAttachment.update({
+        where: { id: attachment.id },
+        data: { filename: newFilename, path: `${shopUrlPrefix(article, product.source)}/${newFilename}` },
+      });
+      url = `${shopUrlPrefix(article, product.source)}/${newFilename}`;
     }
     const image = await prisma.productImage.create({
       data: {
@@ -1139,8 +1153,16 @@ router.post('/:id/images/url', async (req, res) => {
     if (!buf.length || buf.length > 10 * 1024 * 1024) return res.status(400).json({ error: 'Изображение пустое или больше 10 МБ' });
 
     const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[mime] || 'jpg';
+    // Генерируем внутренний артикул, если карточка его не имеет
+    let article = product.article;
+    if (!article) {
+      article = await generateUniqueArticle();
+      await prisma.product.update({ where: { id: product.id }, data: { article } });
+    }
+    const shopDir = shopDirFor(article, product.source);
+    if (!fs.existsSync(shopDir)) fs.mkdirSync(shopDir, { recursive: true });
     const filename = `product-${product.id}-${Date.now()}.${ext}`;
-    fs.writeFileSync(path.join(uploadsRoot(), filename), buf);
+    fs.writeFileSync(path.join(shopDir, filename), buf);
 
     const attachment = await prisma.fileAttachment.create({
       data: {
@@ -1150,7 +1172,7 @@ router.post('/:id/images/url', async (req, res) => {
         originalName: url.split('/').pop()?.split('?')[0] || filename,
         mimeType: mime,
         size: buf.length,
-        path: `${tenantUploadPrefix() || '/uploads'}/${filename}`,
+        path: `${shopUrlPrefix(article, product.source)}/${filename}`,
         authorId: (req as AuthRequest).user!.id,
       },
     });

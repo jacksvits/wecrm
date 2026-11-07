@@ -1387,6 +1387,9 @@ model Product {
   depth       Float?
   brand       String?  @map("brand") // Бренд товара (единое значение, как тег)
   tnved       String?  @map("tnved") // Код ТН ВЭД (из OZON)
+  // Где создана карточка: system (в CRM) | ozon | wb | vk (импорт из маркетплейса).
+  // Определяет папку изображений: shop/<source>/<article> (для system — shop/<article>)
+  source      String   @default("system") @map("source")
   syncToVk    Boolean  @default(false) @map("sync_to_vk")
   vkItemId    Int?     @unique @map("vk_item_id")
   // «OZON Seller»: выгружать позицию в маркетплейс OZON
