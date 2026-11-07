@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { prisma } from './prisma.js';
+import sharp from 'sharp';
 import { generateUniqueArticle } from './article.js';
 
 const VK_API = 'https://api.vk.com/method';
@@ -162,9 +163,30 @@ async function uploadMarketPhoto(imageUrl: string, groupId: number): Promise<str
   try {
     const fileRes = await fetch(`${process.env.BACKEND_ORIGIN || 'https://welans.cc'}${imageUrl}`);
     if (!fileRes.ok) throw new Error(`HTTP ${fileRes.status} при скачивании фото`);
-    const arrayBuffer = await fileRes.arrayBuffer();
-    const ext = (path.extname(imageUrl) || '.jpg').toLowerCase();
-    const mime = mimeByExt[ext] || 'image/jpeg';
+    let buffer = Buffer.from(await fileRes.arrayBuffer());
+    let ext = (path.extname(imageUrl) || '.jpg').toLowerCase();
+    let mime = mimeByExt[ext] || 'image/jpeg';
+    // VK требует обе стороны от 400 px и принимает JPG/PNG/GIF: мелкие картинки
+    // дорисовываем белым фоном до 400 px, неподдерживаемые форматы конвертируем
+    try {
+      const meta = await sharp(buffer).metadata();
+      const width = meta.width || 0;
+      const height = meta.height || 0;
+      const needsResize = width < 400 || height < 400;
+      const needsConvert = !['jpeg', 'png', 'gif'].includes(meta.format || '');
+      if (needsResize || needsConvert) {
+        let img = sharp(buffer);
+        if (needsResize) {
+          img = img.resize(Math.max(400, width), Math.max(400, height), { fit: 'contain', background: '#ffffff' });
+        }
+        const format: 'jpeg' | 'png' = meta.format === 'jpeg' ? 'jpeg' : 'png';
+        buffer = await img.toFormat(format).toBuffer();
+        ext = format === 'jpeg' ? '.jpg' : '.png';
+        mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+      }
+    } catch {
+      // sharp не смог прочитать файл — отправляем оригинал как есть
+    }
     // Загрузчики VK нестабильны (405/HTML/пустой ответ): до 5 попыток со свежим upload_url
     let upData: any = null;
     for (let attempt = 1; attempt <= 5; attempt++) {
@@ -172,10 +194,15 @@ async function uploadMarketPhoto(imageUrl: string, groupId: number): Promise<str
         const server = await vkApi('market.getProductPhotoUploadServer', { group_id: groupId });
         if (!server.upload_url) return null;
         const form = new FormData();
-        form.append('file', new Blob([arrayBuffer], { type: mime }), `photo${ext}`);
+        form.append('file', new Blob([buffer], { type: mime }), `photo${ext}`);
         const upRes = await fetch(server.upload_url, { method: 'POST', body: form });
         const parsed: any = await upRes.json().catch(() => null);
         if (parsed && parsed.sha && parsed.hash) { upData = parsed; break; }
+        // детерминированная ошибка VK (например 4601 «Wrong image size») — повторы бессмысленны
+        if (parsed?.error_code && parsed.error_code !== 6) {
+          console.warn(`[VK Market] photo upload: VK ${parsed.error_code}: ${parsed.error_msg}`);
+          return null;
+        }
         console.warn(`[VK Market] photo upload attempt ${attempt}: пустой ответ (${String(JSON.stringify(parsed)).slice(0, 80) || upRes.status})`);
       } catch (e: any) {
         console.warn(`[VK Market] photo upload attempt ${attempt} failed:`, e.message);
