@@ -147,10 +147,11 @@ async function downloadToUploads(url: string): Promise<string | null> {
 }
 
 /**
- * Загрузить фото в ВК для маркета, вернуть photo_id (owner_id_id).
- * VK удалил методы загрузки фото маркета (photos.getMarketUploadServer/saveMarketPhoto
- * → Error 3 «Unknown method passed»), поэтому грузим через upload-методы стены
- * (нужен scope photos в токене маркета).
+ * Загрузить фото в ВК для маркета, вернуть числовой photo_id для main_photo_id.
+ * Штатная цепочка VK: market.getProductPhotoUploadServer → multipart на upload_url →
+ * market.saveProductPhoto (параметр upload_response — весь JSON ответа загрузчика).
+ * Старые photos.getMarketUploadServer/saveMarketPhoto VK удалил (Error 3), а фото,
+ * сохранённые через стену (photos.saveWallPhoto), маркет больше не принимает (Error 100).
  */
 async function uploadMarketPhoto(imageUrl: string, groupId: number): Promise<string | null> {
   // MIME по реальному расширению: VK отдаёт пустой photo, если тип не совпадает с содержимым
@@ -164,17 +165,17 @@ async function uploadMarketPhoto(imageUrl: string, groupId: number): Promise<str
     const arrayBuffer = await fileRes.arrayBuffer();
     const ext = (path.extname(imageUrl) || '.jpg').toLowerCase();
     const mime = mimeByExt[ext] || 'image/jpeg';
-    // Загрузчики VK нестабильны (405/HTML/пустой photo): до 3 попыток со свежим upload_url
+    // Загрузчики VK нестабильны (405/HTML/пустой ответ): до 5 попыток со свежим upload_url
     let upData: any = null;
     for (let attempt = 1; attempt <= 5; attempt++) {
       try {
-        const server = await vkApi('photos.getWallUploadServer', { group_id: groupId });
+        const server = await vkApi('market.getProductPhotoUploadServer', { group_id: groupId });
         if (!server.upload_url) return null;
         const form = new FormData();
         form.append('file', new Blob([arrayBuffer], { type: mime }), `photo${ext}`);
         const upRes = await fetch(server.upload_url, { method: 'POST', body: form });
         const parsed: any = await upRes.json().catch(() => null);
-        if (parsed && !parsed.error && parsed.photo) { upData = parsed; break; }
+        if (parsed && parsed.sha && parsed.hash) { upData = parsed; break; }
         console.warn(`[VK Market] photo upload attempt ${attempt}: пустой ответ (${String(JSON.stringify(parsed)).slice(0, 80) || upRes.status})`);
       } catch (e: any) {
         console.warn(`[VK Market] photo upload attempt ${attempt} failed:`, e.message);
@@ -182,16 +183,11 @@ async function uploadMarketPhoto(imageUrl: string, groupId: number): Promise<str
       await new Promise((r) => setTimeout(r, [5000, 15000, 30000, 60000][attempt - 1] || 60000));
     }
     if (!upData) return null;
-    // Сохраняем в альбом группы; маркету нужен числовой id фото
-    const saved = await vkApi('photos.saveWallPhoto', {
-      group_id: groupId,
-      photo: upData.photo,
-      server: upData.server,
-      hash: upData.hash,
-    });
-    const photo = Array.isArray(saved) ? saved[0] : saved;
-    if (!photo?.id) return null;
-    return String(photo.id);
+    // Сохраняем в системном альбоме маркета; маркету нужен числовой id фото
+    const saved = await vkApi('market.saveProductPhoto', { upload_response: JSON.stringify(upData) });
+    const photoId = saved?.photo_id ?? saved?.photo?.id;
+    if (!photoId) return null;
+    return String(photoId);
   } catch (err) {
     console.error('[VK Market] photo upload failed:', err);
     return null;
@@ -321,6 +317,11 @@ export interface SyncSummary {
   errors: string[];
 }
 
+/** VK 1403 — карточки товара нет в маркете (удалена в ВК или создание откатилось) */
+function isVkItemNotFound(err: any): boolean {
+  return /VK 1403/.test(err?.message || '');
+}
+
 /** Выгрузить все позиции с отметкой «ВК» в маркет группы */
 export async function syncProductsToVk(): Promise<SyncSummary> {
   const settings = await getVkSettings();
@@ -361,8 +362,20 @@ export async function syncProductsToVk(): Promise<SyncSummary> {
       }
 
       if (product.vkItemId) {
-        await vkApi('market.edit', { item_id: product.vkItemId, ...params });
-        summary.updated++;
+        try {
+          await vkApi('market.edit', { item_id: product.vkItemId, ...params });
+          summary.updated++;
+        } catch (err: any) {
+          // VK 1403 «Item not found»: карточка удалена в ВК — снимаем привязку и пересоздаём
+          if (!isVkItemNotFound(err)) throw err;
+          await prisma.product.update({ where: { id: product.id }, data: { vkItemId: null } });
+          const created = await vkApi('market.add', params);
+          const newId: number | undefined = created?.market_item_id || created?.item_id;
+          if (newId) {
+            await prisma.product.update({ where: { id: product.id }, data: { vkItemId: newId } });
+          }
+          summary.created++;
+        }
       } else {
         const created = await vkApi('market.add', params);
         const newId: number | undefined = created?.market_item_id || created?.item_id;
@@ -419,7 +432,13 @@ export async function syncPricesToVk(): Promise<PricesSyncSummary> {
       summary.updated++;
     } catch (err: any) {
       summary.failed++;
-      summary.errors.push(`${product.name}: ${err.message}`);
+      if (isVkItemNotFound(err)) {
+        // карточки нет в маркете — снимаем привязку, пересоздаст синхронизация товаров
+        await prisma.product.update({ where: { id: product.id }, data: { vkItemId: null } });
+        summary.errors.push(`${product.name}: нет в маркете ВК — привязка снята, карточку пересоздаст синхронизация товаров`);
+      } else {
+        summary.errors.push(`${product.name}: ${err.message}`);
+      }
     }
     // пауза между товарами: у VK лимит ~3 запроса/сек на методы маркета
     await new Promise((r) => setTimeout(r, 400));
@@ -510,7 +529,13 @@ export async function syncStocksToVk(): Promise<StocksSyncSummary> {
       summary.updated++;
     } catch (err: any) {
       summary.failed++;
-      summary.errors.push(`${product.name}: ${err.message}`);
+      if (isVkItemNotFound(err)) {
+        // карточки нет в маркете — снимаем привязку, пересоздаст синхронизация товаров
+        await prisma.product.update({ where: { id: product.id }, data: { vkItemId: null } });
+        summary.errors.push(`${product.name}: нет в маркете ВК — привязка снята, карточку пересоздаст синхронизация товаров`);
+      } else {
+        summary.errors.push(`${product.name}: ${err.message}`);
+      }
     }
     // пауза между товарами: у VK лимит ~3 запроса/сек на методы маркета
     await new Promise((r) => setTimeout(r, 400));
