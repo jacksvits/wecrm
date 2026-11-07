@@ -19,6 +19,31 @@ import path from 'path';
 import { platformPrisma, listWorkerTenants, withTenant } from '../src/lib/tenant.js';
 import { prisma } from '../src/lib/prisma.js';
 
+/** Перенос файла/папки между mount point'ами: rename, при EXDEV — copy + unlink */
+function moveEntry(src: string, dst: string): void {
+  try {
+    fs.renameSync(src, dst);
+    return;
+  } catch (e: any) {
+    if (e.code !== 'EXDEV') throw e;
+  }
+  const st = fs.statSync(src);
+  if (st.isDirectory()) {
+    fs.mkdirSync(dst, { recursive: true });
+    for (const entry of fs.readdirSync(src)) {
+      moveEntry(path.join(src, entry), path.join(dst, entry));
+    }
+    fs.rmdirSync(src);
+  } else {
+    fs.copyFileSync(src, dst);
+    // Проверка целостности копии перед удалением источника
+    if (fs.statSync(dst).size !== st.size) {
+      throw new Error(`размеры не совпали после копирования: ${src}`);
+    }
+    fs.unlinkSync(src);
+  }
+}
+
 async function migrateTenant(tenant: { slug: string }): Promise<{ moved: number; errors: number }> {
   const stats = { moved: 0, errors: 0 };
   const { slug } = tenant;
@@ -40,7 +65,7 @@ async function migrateTenant(tenant: { slug: string }): Promise<{ moved: number;
           console.log(`[tenants] ${slug}: уже существует, пропуск ${dst}`);
           continue;
         }
-        fs.renameSync(src, dst);
+        moveEntry(src, dst);
         stats.moved++;
       }
       try { fs.rmdirSync(oldUploads); } catch { /* не пуст */ }
@@ -50,13 +75,13 @@ async function migrateTenant(tenant: { slug: string }): Promise<{ moved: number;
     // 3. Данные
     if (fs.existsSync(oldData)) {
       if (!fs.existsSync(newData)) {
-        fs.renameSync(oldData, newData);
+        moveEntry(oldData, newData);
         console.log(`[tenants] ${slug}: data t-${slug} -> tenants/${slug}/data`);
       } else {
         for (const entry of fs.readdirSync(oldData)) {
           const src = path.join(oldData, entry);
           const dst = path.join(newData, entry);
-          if (!fs.existsSync(dst)) fs.renameSync(src, dst);
+          if (!fs.existsSync(dst)) moveEntry(src, dst);
         }
         try { fs.rmdirSync(oldData); } catch { /* не пуст */ }
         console.log(`[tenants] ${slug}: data слита в существующую tenants/${slug}/data`);
