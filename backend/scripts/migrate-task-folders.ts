@@ -28,8 +28,8 @@ async function migrateTenant(): Promise<{ tasks: number; files: number; errors: 
   const prefix = tenantUploadPrefix(); // '' для главной, '/t-<slug>' для tenant'а
   const root = uploadsRoot();
 
+  // ticketNumber обязателен (autoincrement), фильтр на null не нужен
   const tasks = await prisma.task.findMany({
-    where: { ticketNumber: { not: null } },
     select: { id: true, ticketNumber: true, createdAt: true },
     orderBy: { ticketNumber: 'asc' },
   });
