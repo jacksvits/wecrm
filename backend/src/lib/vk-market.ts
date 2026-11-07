@@ -163,7 +163,7 @@ async function uploadMarketPhoto(imageUrl: string, groupId: number): Promise<str
   try {
     const fileRes = await fetch(`${process.env.BACKEND_ORIGIN || 'https://welans.cc'}${imageUrl}`);
     if (!fileRes.ok) throw new Error(`HTTP ${fileRes.status} при скачивании фото`);
-    let buffer = Buffer.from(await fileRes.arrayBuffer());
+    let buffer: Buffer = Buffer.from(await fileRes.arrayBuffer());
     let ext = (path.extname(imageUrl) || '.jpg').toLowerCase();
     let mime = mimeByExt[ext] || 'image/jpeg';
     // VK требует обе стороны от 400 px и принимает JPG/PNG/GIF: мелкие картинки
@@ -198,8 +198,10 @@ async function uploadMarketPhoto(imageUrl: string, groupId: number): Promise<str
         const upRes = await fetch(server.upload_url, { method: 'POST', body: form });
         const parsed: any = await upRes.json().catch(() => null);
         if (parsed && parsed.sha && parsed.hash) { upData = parsed; break; }
-        // детерминированная ошибка VK (например 4601 «Wrong image size») — повторы бессмысленны
-        if (parsed?.error_code && parsed.error_code !== 6) {
+        // детерминированные ошибки VK (4601 «Wrong image size» и т.п.) — повторы бессмысленны;
+        // Error 6 (лимит запросов) и 4603 (сбой загрузчика) — транзиентны, ретраим
+        const transientCodes = [6, 4603];
+        if (parsed?.error_code && !transientCodes.includes(parsed.error_code)) {
           console.warn(`[VK Market] photo upload: VK ${parsed.error_code}: ${parsed.error_msg}`);
           return null;
         }
