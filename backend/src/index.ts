@@ -125,6 +125,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static('/app/uploads'));
 app.use('/uploads/avatars', express.static('/app/uploads/avatars'));
+app.use('/tenants', express.static('/app/tenants'));
 
 app.get('/api/events', authMiddleware, (req, res) => {
   const user = (req as any).user;

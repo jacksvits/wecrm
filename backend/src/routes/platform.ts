@@ -390,7 +390,7 @@ async function getMainFilesSize(): Promise<number> {
 async function getTenantFilesSize(slug: string): Promise<number> {
   const fs = await import('fs/promises');
   const path = await import('path');
-  const root = `/app/uploads/t-${slug}`;
+  const root = `/app/tenants/${slug}`;
   let total = 0;
   async function walk(dir: string): Promise<void> {
     let entries: any[] = [];

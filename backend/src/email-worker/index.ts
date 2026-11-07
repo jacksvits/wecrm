@@ -271,7 +271,7 @@ export class EmailWorker {
               const ext = path.extname(img.filename || '') || `.${(img.contentType || 'png').split('/')[1] || 'png'}`;
               const filename = `${randomUUID()}${ext}`;
               fs.writeFileSync(path.join(IMAGES_DIR, filename), img.content);
-              const dbPath = `/uploads${tenantUploadPrefix()}/comments/${filename}`;
+              const dbPath = `${tenantUploadPrefix() || '/uploads'}/comments/${filename}`;
               inlineImagePaths.set(String(img.contentId).replace(/^<|>$/g, ''), dbPath);
               inlineImageRecords.push({
                 filename,
@@ -419,7 +419,7 @@ export class EmailWorker {
               const filename = `${randomUUID()}${ext}`;
               const filePath = path.join(COMMENTS_DIR, filename);
               fs.writeFileSync(filePath, att.content);
-              const dbPath = `/uploads${tenantUploadPrefix()}/comments/${filename}`;
+              const dbPath = `${tenantUploadPrefix() || '/uploads'}/comments/${filename}`;
 
               const fileAtt = await prisma.fileAttachment.create({
                 data: {

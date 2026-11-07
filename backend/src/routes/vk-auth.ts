@@ -72,7 +72,7 @@ async function downloadVkAvatar(url: string): Promise<string | null> {
     const filepath = path.join(uploadsRoot(), filename);
     fs.writeFileSync(filepath, Buffer.from(buffer));
     console.log('[VK Avatar Download] saved to', filepath);
-    return `/uploads${tenantUploadPrefix()}/${filename}`;
+    return `${tenantUploadPrefix() || '/uploads'}/${filename}`;
   } catch (err) {
     console.error('[VK Avatar Download] Error:', err);
     return null;

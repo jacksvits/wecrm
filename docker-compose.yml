@@ -58,6 +58,7 @@ services:
         condition: service_healthy
     volumes:
       - /mnt/nfs/wecrm-uploads:/app/uploads
+      - /mnt/nfs/wecrm-uploads/tenants:/app/tenants
       - /mnt/nfs/SOFT:/app/files/programs:ro
       - /mnt/nfs/DRIVER:/app/files/drivers:ro
       - /mnt/nfs/BOOK:/app/files/documents:ro
@@ -121,6 +122,7 @@ services:
         condition: service_healthy
     volumes:
       - /mnt/nfs/wecrm-uploads:/app/uploads
+      - /mnt/nfs/wecrm-uploads/tenants:/app/tenants
       - /mnt/nfs/SOFT:/app/files/programs:ro
       - /mnt/nfs/DRIVER:/app/files/drivers:ro
       - /mnt/nfs/BOOK:/app/files/documents:ro

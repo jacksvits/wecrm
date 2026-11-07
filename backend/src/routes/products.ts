@@ -1099,9 +1099,9 @@ router.post('/:id/images', async (req, res) => {
         if (fs.existsSync(oldPath)) fs.renameSync(oldPath, newPath);
         await prisma.fileAttachment.update({
           where: { id: attachment.id },
-          data: { filename: newFilename, path: `/uploads${tenantUploadPrefix()}/${newFilename}` },
+          data: { filename: newFilename, path: `${tenantUploadPrefix() || '/uploads'}/${newFilename}` },
         });
-        url = `/uploads${tenantUploadPrefix()}/${newFilename}`;
+        url = `${tenantUploadPrefix() || '/uploads'}/${newFilename}`;
       }
     }
     const image = await prisma.productImage.create({
@@ -1150,7 +1150,7 @@ router.post('/:id/images/url', async (req, res) => {
         originalName: url.split('/').pop()?.split('?')[0] || filename,
         mimeType: mime,
         size: buf.length,
-        path: `/uploads${tenantUploadPrefix()}/${filename}`,
+        path: `${tenantUploadPrefix() || '/uploads'}/${filename}`,
         authorId: (req as AuthRequest).user!.id,
       },
     });

@@ -57,14 +57,14 @@ async function pwaData() {
   const tenant = currentTenant();
   const title = seo?.title?.trim() || tenant?.name?.trim() || 'WeCRM';
   const v = branding?.updatedAt ? `?v=${branding.updatedAt.getTime()}` : '';
-  const prefix = tenantUploadPrefix(); // '' для главной, '/t-<slug>' для tenant'ов
+  const prefix = tenantUploadPrefix(); // '' для главной, '/tenants/<slug>' для tenant'ов
   return {
     title,
     shortName: title.length > 12 ? title.slice(0, 12).trim() : title,
     description: seo?.description?.trim() || 'CRM для управления задачами, сделками и контактами',
-    appleTouchIcon: branding?.iconPath ? `/uploads${prefix}/branding/apple-touch-icon.png${v}` : null,
-    icon192: branding?.iconPath ? `/uploads${prefix}/branding/icon-192x192.png${v}` : null,
-    icon512: branding?.iconPath ? `/uploads${prefix}/branding/icon-512x512.png${v}` : null,
+    appleTouchIcon: branding?.iconPath ? `${prefix || '/uploads'}/branding/apple-touch-icon.png${v}` : null,
+    icon192: branding?.iconPath ? `${prefix || '/uploads'}/branding/icon-192x192.png${v}` : null,
+    icon512: branding?.iconPath ? `${prefix || '/uploads'}/branding/icon-512x512.png${v}` : null,
   };
 }
 

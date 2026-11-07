@@ -214,15 +214,16 @@ export function pinTenantContext(router: Router): void {
   }
 }
 
-/** Префикс папки для файлов tenant'а в общем томе uploads */
+/** URL-префикс файлов tenant'а: главная — /uploads, tenant'ы — /tenants/<slug> */
 export function tenantUploadPrefix(): string {
   const t = currentTenant();
-  return t && !t.isMain ? `/t-${t.slug}` : '';
+  return t && !t.isMain ? `/tenants/${t.slug}` : '';
 }
 
-/** Корень uploads для текущего tenant'а (изоляция файлов организаций) */
+/** Корень файлов текущего tenant'а: главная — /app/uploads, tenant'ы — /app/tenants/<slug> */
 export function uploadsRoot(): string {
-  return `/app/uploads${tenantUploadPrefix()}`;
+  const t = currentTenant();
+  return t && !t.isMain ? `/app/tenants/${t.slug}` : '/app/uploads';
 }
 
 /** Выполняет fn в контексте главной организации (независимо от текущего)
@@ -237,8 +238,9 @@ export function tenantKey(): string {
   return t ? (t.isMain ? 'main' : t.slug) : 'main';
 }
 
-/** Директория /app/data текущего tenant'а (изоляция файловых интеграций) */
+/** Директория данных текущего tenant'а (изоляция файловых интеграций):
+ * главная — /app/data, tenant'ы — /app/tenants/<slug>/data */
 export function tenantDataDir(): string {
   const t = currentTenant();
-  return t && !t.isMain ? `/app/data/t-${t.slug}` : '/app/data';
+  return t && !t.isMain ? `/app/tenants/${t.slug}/data` : '/app/data';
 }

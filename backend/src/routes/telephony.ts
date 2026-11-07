@@ -1054,7 +1054,7 @@ async function attachCallRecord(
         recordDownloadedAt: new Date(),
       },
     });
-    return { url: `/uploads${tenantUploadPrefix()}/records/${path.basename(localPath)}`, duration };
+    return { url: `${tenantUploadPrefix() || '/uploads'}/records/${path.basename(localPath)}`, duration };
   } catch (err) {
     await release();
     throw err;

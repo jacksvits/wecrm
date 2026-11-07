@@ -121,7 +121,7 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
         fs.renameSync(srcPath, destPath);
         console.log('[uploads] moved to', isVideoNote ? 'video_notes' : 'global_chat', ':', destPath);
       }
-      dbPath = `/uploads${tenantPfx}/global_chat${isVideoNote ? '/video_notes' : ''}/${filename}`;
+      dbPath = `${tenantPfx || '/uploads'}/global_chat${isVideoNote ? '/video_notes' : ''}/${filename}`;
     } else {
       dbPath = `/uploads/${filename}`;
     }

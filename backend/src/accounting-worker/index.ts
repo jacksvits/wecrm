@@ -297,7 +297,7 @@ export class AccountingWorker {
                     originalName: att.filename || 'attachment',
                     mimeType: att.contentType || 'application/octet-stream',
                     size: att.content.length,
-                    path: `/uploads${tenantUploadPrefix()}/accounting/${filename}`,
+                    path: `${tenantUploadPrefix() || '/uploads'}/accounting/${filename}`,
                     entityType: 'finance_document',
                     entityId: doc.id,
                     authorId,

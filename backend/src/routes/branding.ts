@@ -31,7 +31,7 @@ const isAdmin = (req: AuthRequest) => req.user?.role === 'admin';
 
 // Возвращает URL файла брендинга с версией для сброса кэша
 function fileUrl(fileName: string, updatedAt: Date): string {
-  return `/uploads${tenantUploadPrefix()}/branding/${fileName}?v=${updatedAt.getTime()}`;
+  return `${tenantUploadPrefix() || '/uploads'}/branding/${fileName}?v=${updatedAt.getTime()}`;
 }
 
 // GET /api/branding — публичный: текущие иконка и логотип (null — используются дефолтные)

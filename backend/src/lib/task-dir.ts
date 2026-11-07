@@ -25,5 +25,5 @@ export const taskDirFor = (ticketNum: string | number, createdAt?: Date | string
 /** URL-префикс файлов задачи (как хранится в FileAttachment.path и отдаётся наружу) */
 export const taskUploadUrlPrefix = (ticketNum: string | number, createdAt?: Date | string | null): string => {
   const { year, month } = taskYearMonth(createdAt);
-  return `/uploads${tenantUploadPrefix()}/tasks/${year}/${month}/${ticketNum}`;
+  return `${tenantUploadPrefix() || '/uploads'}/tasks/${year}/${month}/${ticketNum}`;
 };

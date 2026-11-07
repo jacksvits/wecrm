@@ -21,7 +21,7 @@ async function getPushIcon(): Promise<string | null> {
     // Статика /uploads отдаётся с диска без учёта Host, поэтому URL обязан
     // содержать префикс tenant'а — как fileUrl() в routes/branding.ts
     entry = {
-      url: branding?.iconPath ? `/uploads${tenantUploadPrefix()}/branding/icon-192x192.png?v=${branding.updatedAt.getTime()}` : null,
+      url: branding?.iconPath ? `${tenantUploadPrefix() || '/uploads'}/branding/icon-192x192.png?v=${branding.updatedAt.getTime()}` : null,
       ts: Date.now(),
     } ;
   } catch {
