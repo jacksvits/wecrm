@@ -93,7 +93,8 @@ async function migrateTenantOrphans(): Promise<{ moved: number; updated: number;
   if (fs.existsSync(tasksRoot)) {
     for (const entry of fs.readdirSync(tasksRoot)) {
       const dir = path.join(tasksRoot, entry);
-      if (!/^\d+$/.test(entry) || !fs.statSync(dir).isDirectory()) continue;
+      // Годовые папки (2026) — часть новой структуры, не трогаем
+      if (!/^\d{1,3}$/.test(entry) || !fs.statSync(dir).isDirectory()) continue;
       const files = fs.readdirSync(dir);
       if (files.length === 0) {
         fs.rmdirSync(dir);
