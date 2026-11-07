@@ -1,5 +1,5 @@
 import { Router } from 'express' ; import { z } from 'zod' ; import { prisma } from '../lib/prisma.js' ;
-import { uploadsRoot, pinTenantContext } from '../lib/tenant.js' ; import { authMiddleware, AuthRequest, guestCreateGuard } from '../middleware/auth.js' ; import { sendPushToTaskAssignees, sendPushToTaskCurators, sendPushToRoleUsers } from '../lib/push.js' ; import { notifyTaskAssignees, notifyTaskCurators, notifyRoleUsers } from '../lib/notifications.js' ; import { broadcast, CHANNELS } from '../lib/events.js' ; import { syncTaskStatusToTicket } from '../lib/support-ticket-tasks.js' ;
+import { uploadsRoot, pinTenantContext } from '../lib/tenant.js' ; import { taskDirFor, taskUploadUrlPrefix } from '../lib/task-dir.js' ; import { authMiddleware, AuthRequest, guestCreateGuard } from '../middleware/auth.js' ; import { sendPushToTaskAssignees, sendPushToTaskCurators, sendPushToRoleUsers } from '../lib/push.js' ; import { notifyTaskAssignees, notifyTaskCurators, notifyRoleUsers } from '../lib/notifications.js' ; import { broadcast, CHANNELS } from '../lib/events.js' ; import { syncTaskStatusToTicket } from '../lib/support-ticket-tasks.js' ;
 import fs from 'fs' ;
 import path from 'path' ;
 import multer from 'multer' ;
@@ -12,17 +12,17 @@ function getCacheKey(userId: string, query: any) {
   return `tasks_${userId}_${JSON.stringify(query)}`;
 }
 
-// Папка задач текущего tenant'а (для tenant'ов — с префиксом /t-<slug>, см. lib/tenant.ts)
-const taskDirFor = (ticketNum: string | number) => path.join(uploadsRoot(), 'tasks', String(ticketNum)) ;
+// Папка задач текущего tenant'а (для tenant'ов — с префиксом /t-<slug>, см. lib/tenant.ts).
+// Структура: tasks/<год>/<месяц>/<номер тикета> — см. lib/task-dir.ts
 
 // Санитизация относительного пути внутри папки задачи (защита от path traversal)
 const safeTaskFilesPath = (value: unknown) => String(value || '')
   .split('/')
   .filter((segment) => segment && segment !== '.' && segment !== '..')
   .join('/');
-const taskFilesDirFor = (ticketNum: string | number, subPath = '') => {
+const taskFilesDirFor = (ticketNum: string | number, subPath = '', createdAt?: Date | string | null) => {
   const safeSubPath = safeTaskFilesPath(subPath);
-  return safeSubPath ? path.join(taskDirFor(ticketNum), safeSubPath) : taskDirFor(ticketNum);
+  return safeSubPath ? path.join(taskDirFor(ticketNum, createdAt), safeSubPath) : taskDirFor(ticketNum, createdAt);
 };
 const taskFileRelPathFor = (subPath: unknown, filename: string) => {
   const safeSubPath = safeTaskFilesPath(subPath);
@@ -33,9 +33,9 @@ const taskFileRelPathFor = (subPath: unknown, filename: string) => {
 const taskFileStorage = multer.diskStorage({
   destination: async (_req, _file, cb) => {
     const taskId = _req.params.id;
-    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { ticketNumber: true } });
+    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { ticketNumber: true, createdAt: true } });
     const ticketNum = task?.ticketNumber ?? taskId;
-    const taskDir = taskFilesDirFor(ticketNum, typeof _req.query.path === 'string' ? _req.query.path : '');
+    const taskDir = taskFilesDirFor(ticketNum, typeof _req.query.path === 'string' ? _req.query.path : '', task?.createdAt);
     if (!fs.existsSync(taskDir)) { fs.mkdirSync(taskDir, { recursive: true }); }
     cb(null, taskDir);
   },
@@ -84,8 +84,8 @@ const canAccessTask = async (taskId: string, userId: string, role: string) => { 
       if (!membership) return res.status(403).json({ error: 'Вы не привязаны к этому проекту' }) ;
     }
     const { assigneeIds, curatorIds, ...rest } = data ; const task = await prisma.task.create({ data: { ...rest, creatorId: req.user!.id, dueDate: rest.dueDate ? new Date(rest.dueDate) : undefined, startDate: rest.startDate ? new Date(rest.startDate) : new Date(), projectId: rest.projectId || undefined, contactId: rest.contactId || undefined, dealId: rest.dealId || undefined, parentId: rest.parentId || undefined, assignees: assigneeIds?.length ? { create: assigneeIds.map(uid => ({ userId: uid })) } : undefined, curators: curatorIds?.length ? { create: curatorIds.map(uid => ({ userId: uid })) } : undefined, }, include: { assignees: { include: { user: { select: { id: true, name: true, avatar: true } } } }, curators: { include: { user: { select: { id: true, name: true, avatar: true } } } }, project: { select: { id: true, name: true } }, parent: { select: { id: true, title: true } }, }, }) ;
-// Create task attachments folder named by ticket number
-const taskDir = taskDirFor(task.ticketNumber);
+// Create task attachments folder: tasks/<год>/<месяц>/<номер тикета>
+const taskDir = taskDirFor(task.ticketNumber, task.createdAt);
 if (!fs.existsSync(taskDir)) { fs.mkdirSync(taskDir, { recursive: true }); }
 await prisma.activity.create({ data: { action: 'created', entity: 'task', entityId: task.id, userId: req.user!.id }, }) ;
 // Обработчик: «Приветствие» в обсуждение новой задачи
@@ -165,9 +165,9 @@ router.get('/:id/files', async (req: AuthRequest, res) => {
   try {
     const hasAccess = await canAccessTask(req.params.id, req.user!.id, req.user!.role);
     if (!hasAccess) return res.status(403).json({ error: 'Доступ запрещен' });
-    const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true } });
+    const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true, createdAt: true } });
     if (!task) return res.status(404).json({ error: 'Задача не найдена' });
-    const taskDir = taskFilesDirFor(task.ticketNumber, typeof req.query.path === 'string' ? req.query.path : '');
+    const taskDir = taskFilesDirFor(task.ticketNumber, typeof req.query.path === 'string' ? req.query.path : '', task.createdAt);
     if (!fs.existsSync(taskDir) || !fs.statSync(taskDir).isDirectory()) return res.json([]);
     const files = fs.readdirSync(taskDir).map(name => {
       const stat = fs.statSync(path.join(taskDir, name));
@@ -189,7 +189,7 @@ router.post('/:id/files', authMiddleware, taskFileUpload.array('files', 10), asy
   try {
     const hasAccess = await canAccessTask(req.params.id, req.user!.id, req.user!.role);
     if (!hasAccess) return res.status(403).json({ error: 'Доступ запрещен' });
-    const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true } });
+    const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true, createdAt: true } });
     if (!task) return res.status(404).json({ error: 'Задача не найдена' });
     const files = (req.files as Express.Multer.File[]) || [];
     const subPath = typeof req.query.path === 'string' ? req.query.path : '';
@@ -199,7 +199,7 @@ router.post('/:id/files', authMiddleware, taskFileUpload.array('files', 10), asy
         name: f.filename,
         originalName: f.originalname,
         size: f.size,
-        path: `/uploads/tasks/${task.ticketNumber}/${relPath.split('/').map(encodeURIComponent).join('/')}`,
+        path: `${taskUploadUrlPrefix(task.ticketNumber, task.createdAt)}/${relPath.split('/').map(encodeURIComponent).join('/')}`,
       };
     });
     res.status(201).json(uploaded);
@@ -213,11 +213,11 @@ router.delete('/:id/files/:filename', async (req: AuthRequest, res) => {
   try {
     const hasAccess = await canAccessTask(req.params.id, req.user!.id, req.user!.role);
     if (!hasAccess) return res.status(403).json({ error: 'Доступ запрещен' });
-    const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true } });
+    const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true, createdAt: true } });
     if (!task) return res.status(404).json({ error: 'Задача не найдена' });
     const relPath = taskFileRelPathFor(req.query.path, req.params.filename);
     if (!relPath) return res.status(400).json({ error: 'Некорректный путь файла' });
-    const filePath = path.join(taskDirFor(task.ticketNumber), relPath);
+    const filePath = path.join(taskDirFor(task.ticketNumber, task.createdAt), relPath);
     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) fs.unlinkSync(filePath);
     res.json({ success: true });
   } catch (err: any) {
@@ -230,11 +230,11 @@ router.get('/:id/files/:filename/download', async (req: AuthRequest, res) => {
   try {
     const hasAccess = await canAccessTask(req.params.id, req.user!.id, req.user!.role);
     if (!hasAccess) return res.status(403).json({ error: 'Доступ запрещен' });
-    const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true } });
+    const task = await prisma.task.findUnique({ where: { id: req.params.id }, select: { ticketNumber: true, createdAt: true } });
     if (!task) return res.status(404).json({ error: 'Задача не найдена' });
     const relPath = taskFileRelPathFor(req.query.path, req.params.filename);
     if (!relPath) return res.status(400).json({ error: 'Некорректный путь файла' });
-    const filePath = path.join(taskDirFor(task.ticketNumber), relPath);
+    const filePath = path.join(taskDirFor(task.ticketNumber, task.createdAt), relPath);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Файл не найден' });
     const filename = relPath.split('/').pop() || relPath;
     const asciiName = filename.replace(/[^ -~]/g, '_');

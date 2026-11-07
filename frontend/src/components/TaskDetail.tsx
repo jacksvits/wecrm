@@ -3270,7 +3270,11 @@ export function TaskDetail() {
                       .sort((a, b) => (Number(b.isDirectory) - Number(a.isDirectory)) || a.name.localeCompare(b.name, 'ru'))
                       .map(file => {
                       const isImage = !file.isDirectory && IMAGE_EXT.test(file.name);
-                      const fileUrl = `${window.location.origin}/uploads/tasks/${task?.ticketNumber}/${taskFilesPath ? taskFilesPath.split('/').map(encodeURIComponent).join('/') + '/' : ''}${encodeURIComponent(file.name)}`;
+                      const taskCreated = task?.createdAt ? new Date(task.createdAt) : null;
+                      const taskYm = taskCreated && !isNaN(taskCreated.getTime())
+                        ? `${taskCreated.getFullYear()}/${String(taskCreated.getMonth() + 1).padStart(2, '0')}`
+                        : '';
+                      const fileUrl = `${window.location.origin}/uploads/tasks/${taskYm ? taskYm + '/' : ''}${task?.ticketNumber}/${taskFilesPath ? taskFilesPath.split('/').map(encodeURIComponent).join('/') + '/' : ''}${encodeURIComponent(file.name)}`;
                       return (
                         <div
                           key={file.name}

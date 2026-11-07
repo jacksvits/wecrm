@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
+import { taskDirFor, taskUploadUrlPrefix } from '../lib/task-dir.js';
 import { processAutoReply } from '../lib/auto-reply.js';
 import { postHandlerGreeting } from '../lib/handler-messages.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
@@ -84,7 +85,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function downloadVkAttachment(
   attachment: any,
-  taskDir: string
+  taskDir: string,
+  urlPrefix: string
 ): Promise<{ filename: string; originalName: string; mimeType: string; size: number; path: string } | null> {
   try {
     let url: string | null = null;
@@ -164,7 +166,7 @@ async function downloadVkAttachment(
     else if (ext === '.mp3') mimeType = 'audio/mpeg';
     else if (ext === '.pdf') mimeType = 'application/pdf';
 
-    return { filename, originalName, mimeType, size, path: `/uploads${tenantUploadPrefix()}/tasks/${path.basename(taskDir)}/${filename}` };
+    return { filename, originalName, mimeType, size, path: `${urlPrefix}/${filename}` };
   } catch (err) {
     console.error('[VK Processor] downloadVkAttachment error:', err);
     return null;
@@ -315,12 +317,12 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
 
     const attachmentIds: string[] = [];
     if (msg.attachments && msg.attachments.length > 0) {
-      const taskDir = path.join(uploadsRoot(), 'tasks', String(latestTask.ticketNumber || latestTask.id));
+      const taskDir = taskDirFor(latestTask.ticketNumber || latestTask.id, latestTask.createdAt);
       if (!fs.existsSync(taskDir)) {
         fs.mkdirSync(taskDir, { recursive: true });
       }
       for (const att of msg.attachments) {
-        const fileInfo = await downloadVkAttachment(att, taskDir);
+        const fileInfo = await downloadVkAttachment(att, taskDir, taskUploadUrlPrefix(latestTask.ticketNumber || latestTask.id, latestTask.createdAt));
         if (fileInfo) {
           const attachment = await prisma.fileAttachment.create({
             data: {
@@ -457,7 +459,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
       });
       console.log(`[VK Processor] First message added to discussion of task ${task.id}`);
 
-      const taskDir = path.join(uploadsRoot(), 'tasks', String(task.ticketNumber || task.id));
+      const taskDir = taskDirFor(task.ticketNumber || task.id, task.createdAt);
       if (!fs.existsSync(taskDir)) {
         fs.mkdirSync(taskDir, { recursive: true });
       }
@@ -465,7 +467,7 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
       if (msg.attachments && msg.attachments.length > 0) {
         const attachmentIds: string[] = [];
         for (const att of msg.attachments) {
-          const fileInfo = await downloadVkAttachment(att, taskDir);
+          const fileInfo = await downloadVkAttachment(att, taskDir, taskUploadUrlPrefix(task.ticketNumber || task.id, task.createdAt));
           if (fileInfo) {
             const attachment = await prisma.fileAttachment.create({
               data: {

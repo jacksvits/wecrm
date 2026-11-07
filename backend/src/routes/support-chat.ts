@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { prisma } from '../lib/prisma.js';
 import { uploadsRoot } from '../lib/tenant.js';
+import { taskDirFor } from '../lib/task-dir.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { sendPushToRoleUsers, sendPushToUser } from '../lib/push.js';
@@ -12,8 +13,7 @@ import { notifyRoleUsers } from '../lib/notifications.js';
 const router = Router();
 router.use(authMiddleware);
 
-// Папка задач текущего tenant'а (с префиксом /t-<slug> для tenant'ов, см. lib/tenant.ts)
-const taskDirFor = (ticketNum: string | number) => path.join(uploadsRoot(), 'tasks', String(ticketNum));
+// Папка задач текущего tenant'а: tasks/<год>/<месяц>/<номер тикета> (см. lib/task-dir.ts)
 
 const createMessageSchema = z.object({
   content: z.string().min(1, 'Сообщение не может быть пустым').max(10000),
@@ -147,8 +147,8 @@ const createTicket = async (userId: string, name: string, content: string) => {
       supportOwnerId: userId,
     },
   });
-  // Папка вложений задачи по номеру тикета (как в routes/tasks.ts)
-  const taskDir = taskDirFor(task.ticketNumber);
+  // Папка вложений задачи: tasks/<год>/<месяц>/<номер тикета> (как в routes/tasks.ts)
+  const taskDir = taskDirFor(task.ticketNumber, task.createdAt);
   if (!fs.existsSync(taskDir)) { fs.mkdirSync(taskDir, { recursive: true }); }
   await prisma.activity.create({ data: { action: 'created', entity: 'task', entityId: task.id, userId } });
   await prisma.taskHistory.create({ data: { taskId: task.id, field: 'task', oldValue: null, newValue: 'Создана задача: ' + task.title, userId } });

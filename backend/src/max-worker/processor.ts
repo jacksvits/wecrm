@@ -5,12 +5,12 @@ import { broadcast, CHANNELS } from '../lib/events.js';
 import { resolveContactAuto } from '../lib/contact-dedup.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers, formatExternalMessageNotifyBody, formatExternalNewTaskNotifyBody } from '../lib/notifications.js';
 import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js';
+import { taskDirFor, taskUploadUrlPrefix } from '../lib/task-dir.js';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 
 const UPLOAD_DIR = '/app/uploads';
-const TASKS_DIR = path.join(UPLOAD_DIR, 'tasks');
 
 // MIME-типы по расширению для вложений MAX (офисные и медиа-форматы)
 const MIME_BY_EXT: Record<string, string> = {
@@ -32,9 +32,7 @@ const MIME_BY_EXT: Record<string, string> = {
 };
 const MAX_API_BASE = 'https://platform-api2.max.ru';
 
-if (!fs.existsSync(TASKS_DIR)) {
-  fs.mkdirSync(TASKS_DIR, { recursive: true });
-}
+// Папки задач создаются по требованию: tasks/<год>/<месяц>/<номер тикета> (см. lib/task-dir.ts)
 
 // Скачивает аватарку пользователя MAX на локальный сервер (в uploads),
 // чтобы контакт не зависел от внешних ссылок MAX CDN
@@ -201,12 +199,12 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
     console.log('[MAX Processor] Adding comment to active task', latestTask.id);
     const attachmentIds: string[] = [];
     if (msg.attachments && msg.attachments.length > 0) {
-      const taskDir = path.join(TASKS_DIR, String(latestTask.ticketNumber || latestTask.id));
+      const taskDir = taskDirFor(latestTask.ticketNumber || latestTask.id, latestTask.createdAt);
       if (!fs.existsSync(taskDir)) {
         fs.mkdirSync(taskDir, { recursive: true });
       }
       for (const att of msg.attachments) {
-        const fileInfo = await downloadMaxAttachment(att, taskDir);
+        const fileInfo = await downloadMaxAttachment(att, taskDir, taskUploadUrlPrefix(latestTask.ticketNumber || latestTask.id, latestTask.createdAt));
         if (fileInfo) {
           const attachment = await prisma.fileAttachment.create({
             data: {
@@ -342,7 +340,7 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
       });
       console.log('[MAX Processor] First message added to discussion of task', task.id);
 
-      const taskDir = path.join(TASKS_DIR, String(task.ticketNumber || task.id));
+      const taskDir = taskDirFor(task.ticketNumber || task.id, task.createdAt);
       if (!fs.existsSync(taskDir)) {
         fs.mkdirSync(taskDir, { recursive: true });
       }
@@ -350,7 +348,7 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
       const firstCommentAttachmentIds: string[] = [];
       if (msg.attachments && msg.attachments.length > 0) {
         for (const att of msg.attachments) {
-          const fileInfo = await downloadMaxAttachment(att, taskDir);
+          const fileInfo = await downloadMaxAttachment(att, taskDir, taskUploadUrlPrefix(task.ticketNumber || task.id, task.createdAt));
           if (fileInfo) {
             const firstAttachment = await prisma.fileAttachment.create({
               data: {
@@ -426,7 +424,7 @@ export async function processMaxMessage(msg: MaxMessage, settings: any) {
   }
 }
 
-async function downloadMaxAttachment(attachment: any, taskDir: string): Promise<{ filename: string; originalName: string; mimeType: string; size: number; path: string } | null> {
+async function downloadMaxAttachment(attachment: any, taskDir: string, urlPrefix: string): Promise<{ filename: string; originalName: string; mimeType: string; size: number; path: string } | null> {
   try {
     let url: string | null = null;
     let originalName = 'max_file';
@@ -490,7 +488,7 @@ async function downloadMaxAttachment(attachment: any, taskDir: string): Promise<
       originalName,
       mimeType,
       size,
-      path: '/uploads/tasks/' + path.basename(taskDir) + '/' + filename,
+      path: urlPrefix + '/' + filename,
     };
   } catch (err) {
     console.error('[MAX Processor] downloadMaxAttachment error:', err);

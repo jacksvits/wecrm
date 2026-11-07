@@ -6,6 +6,7 @@ import fs from 'fs';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { uploadsRoot, tenantUploadPrefix, pinTenantContext } from '../lib/tenant.js';
+import { taskDirFor, taskUploadUrlPrefix } from '../lib/task-dir.js';
 
 const router = Router();
 
@@ -48,7 +49,6 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
     }
     const { entityType, entityId } = req.body;
     const tenantRoot = uploadsRoot();
-    const tasksRoot = path.join(tenantRoot, 'tasks');
     const chatRoot = path.join(tenantRoot, 'global_chat');
     const tenantPfx = tenantUploadPrefix();
     if (!entityType || !entityId) {
@@ -67,6 +67,7 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
         where: { id: entityId },
         select: {
           ticketNumber: true,
+          createdAt: true,
           creatorId: true,
           assignees: { select: { userId: true } },
           curators: { select: { userId: true } },
@@ -86,7 +87,7 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
         return res.status(403).json({ error: 'Доступ запрещен' });
       }
       const ticketNum = task?.ticketNumber ?? entityId;
-      const taskDir = path.join(tasksRoot, String(ticketNum));
+      const taskDir = taskDirFor(ticketNum, task?.createdAt);
       if (!fs.existsSync(taskDir)) {
         fs.mkdirSync(taskDir, { recursive: true });
       }
@@ -104,7 +105,7 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
         fs.renameSync(srcPath, destPath);
         console.log('[uploads] moved to tasks:', destPath);
       }
-      dbPath = `/uploads${tenantPfx}/tasks/${ticketNum}/${finalName}`;
+      dbPath = `${taskUploadUrlPrefix(ticketNum, task?.createdAt)}/${finalName}`;
       filename = finalName;
     } else if (entityType === 'chat') {
       // Видеокружочки (как в Telegram) храним в отдельной подпапке video_notes —
