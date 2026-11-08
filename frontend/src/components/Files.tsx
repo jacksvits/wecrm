@@ -114,19 +114,53 @@ const macFolderIcon = (
   </svg>
 );
 
-const macFileIcon = (
-  <svg width="42" height="52" viewBox="0 0 42 52">
-    <path d="M7 1h18l12 12v36a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2z" fill="#FFFFFF" stroke="#C6CBD4" strokeWidth="1.5" />
-    <path d="M25 1l12 12H27a2 2 0 0 1-2-2V1z" fill="#EDEFF3" stroke="#C6CBD4" strokeWidth="1.5" />
-    <rect x="11" y="24" width="20" height="3.5" rx="1.75" fill="#D5DAE1" />
-    <rect x="11" y="31" width="20" height="3.5" rx="1.75" fill="#D5DAE1" />
-    <rect x="11" y="38" width="13" height="3.5" rx="1.75" fill="#D5DAE1" />
-  </svg>
-);
+// Иконка файла macOS: белый лист со скруглённым углом + значок типа в стиле app-icon (squircle)
+const MAC_FILE_BADGES: Record<string, { color: string; color2: string; text: string; size?: number }> = {
+  pdf: { color: "#FA5151", color2: "#D92B2B", text: "PDF", size: 9 },
+  doc: { color: "#41A5EE", color2: "#185ABD", text: "W" }, docx: { color: "#41A5EE", color2: "#185ABD", text: "W" }, odt: { color: "#41A5EE", color2: "#185ABD", text: "W" }, rtf: { color: "#41A5EE", color2: "#185ABD", text: "W" },
+  xls: { color: "#33C481", color2: "#107C41", text: "X" }, xlsx: { color: "#33C481", color2: "#107C41", text: "X" }, csv: { color: "#33C481", color2: "#107C41", text: "X" }, ods: { color: "#33C481", color2: "#107C41", text: "X" },
+  ppt: { color: "#ED6C47", color2: "#C43E1C", text: "P" }, pptx: { color: "#ED6C47", color2: "#C43E1C", text: "P" },
+  zip: { color: "#B08968", color2: "#8D6E63", text: "ZIP", size: 8 }, rar: { color: "#B08968", color2: "#8D6E63", text: "RAR", size: 8 }, "7z": { color: "#B08968", color2: "#8D6E63", text: "7Z" }, tar: { color: "#B08968", color2: "#8D6E63", text: "TAR", size: 8 }, gz: { color: "#B08968", color2: "#8D6E63", text: "GZ" },
+  mp4: { color: "#BF8CF2", color2: "#7D3FD4", text: "▶" }, avi: { color: "#BF8CF2", color2: "#7D3FD4", text: "▶" }, mov: { color: "#BF8CF2", color2: "#7D3FD4", text: "▶" }, mkv: { color: "#BF8CF2", color2: "#7D3FD4", text: "▶" }, wmv: { color: "#BF8CF2", color2: "#7D3FD4", text: "▶" },
+  mp3: { color: "#4FD1C5", color2: "#0E9384", text: "♪" }, wav: { color: "#4FD1C5", color2: "#0E9384", text: "♪" }, ogg: { color: "#4FD1C5", color2: "#0E9384", text: "♪" }, flac: { color: "#4FD1C5", color2: "#0E9384", text: "♪" }, m4a: { color: "#4FD1C5", color2: "#0E9384", text: "♪" },
+  jpg: { color: "#64B5F6", color2: "#1565C0", text: "🖻" }, jpeg: { color: "#64B5F6", color2: "#1565C0", text: "🖻" }, png: { color: "#64B5F6", color2: "#1565C0", text: "🖻" }, gif: { color: "#64B5F6", color2: "#1565C0", text: "🖻" }, bmp: { color: "#64B5F6", color2: "#1565C0", text: "🖻" }, webp: { color: "#64B5F6", color2: "#1565C0", text: "🖻" },
+  exe: { color: "#90A4AE", color2: "#546E7A", text: "⚙" }, msi: { color: "#90A4AE", color2: "#546E7A", text: "⚙" },
+  html: { color: "#FF9F5A", color2: "#E65100", text: "<>" }, htm: { color: "#FF9F5A", color2: "#E65100", text: "<>" },
+};
+
+const macFileIconFor = (name: string) => {
+  const ext = fileExtension(name);
+  const badge = MAC_FILE_BADGES[ext];
+  const gradId = `macFile-${ext || "blank"}-${Math.random().toString(36).slice(2, 8)}`;
+  return (
+    <svg width="42" height="52" viewBox="0 0 42 52">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={badge ? badge.color : "#E8EBF0"} />
+          <stop offset="1" stopColor={badge ? badge.color2 : "#C6CBD4"} />
+        </linearGradient>
+      </defs>
+      <path d="M7 1h18l12 12v36a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2z" fill="#FFFFFF" stroke="#C6CBD4" strokeWidth="1.5" />
+      <path d="M25 1l12 12H27a2 2 0 0 1-2-2V1z" fill="#EDEFF3" stroke="#C6CBD4" strokeWidth="1.5" />
+      {badge ? (
+        <g>
+          <rect x="8" y="15" width="26" height="26" rx="7" fill={`url(#${gradId})`} />
+          <text x="21" y="32.5" textAnchor="middle" fontFamily="-apple-system, Segoe UI, sans-serif" fontWeight="700" fontSize={badge.size || 13} fill="#FFFFFF">{badge.text}</text>
+        </g>
+      ) : (
+        <g>
+          <rect x="11" y="24" width="20" height="3.5" rx="1.75" fill="#D5DAE1" />
+          <rect x="11" y="31" width="20" height="3.5" rx="1.75" fill="#D5DAE1" />
+          <rect x="11" y="38" width="13" height="3.5" rx="1.75" fill="#D5DAE1" />
+        </g>
+      )}
+    </svg>
+  );
+};
 
 const FILE_THEMES: Record<FileTheme, { label: string; folder: JSX.Element; fileFor: (name: string) => JSX.Element }> = {
   win7: { label: "Windows 7", folder: win7FolderIcon, fileFor: win7FileIconFor },
-  macos: { label: "macOS", folder: macFolderIcon, fileFor: () => macFileIcon },
+  macos: { label: "macOS", folder: macFolderIcon, fileFor: macFileIconFor },
 };
 
 
