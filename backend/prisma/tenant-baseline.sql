@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict NpmxcPJzzajp1GASsq7Ju3HuP44VjRwKHaKnZUJqDxAVUd6qeEho7PkjuUg73bM
+\restrict QvugyQzJHe65iTsqak9mHX9DIOf0FOego4MfcfxSNomIZDuu4QaJvognaAD2DaD
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -486,7 +486,8 @@ CREATE TABLE public.contacts (
     birth_date timestamp(3) without time zone,
     address text,
     telegram_username text,
-    client_key text
+    client_key text,
+    is_spam boolean DEFAULT false NOT NULL
 );
 
 
@@ -642,6 +643,19 @@ CREATE TABLE public.file_attachments (
 
 
 --
+-- Name: file_hide_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.file_hide_settings (
+    id text NOT NULL,
+    names text DEFAULT ''::text NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    theme text DEFAULT 'standard'::text NOT NULL
+);
+
+
+--
 -- Name: file_tab_settings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -785,7 +799,11 @@ CREATE TABLE public.mail_accounts (
     reject_unauthorized boolean DEFAULT false NOT NULL,
     is_default boolean DEFAULT false NOT NULL,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp(3) without time zone NOT NULL
+    updated_at timestamp(3) without time zone NOT NULL,
+    signature text DEFAULT ''::text NOT NULL,
+    sig_on_new boolean DEFAULT true NOT NULL,
+    sig_on_reply boolean DEFAULT true NOT NULL,
+    sig_on_forward boolean DEFAULT true NOT NULL
 );
 
 
@@ -1174,7 +1192,8 @@ CREATE TABLE public.products (
     crm_renew_months integer,
     sync_to_wb boolean DEFAULT false NOT NULL,
     wb_product_id bigint,
-    wb_synced_at timestamp with time zone
+    wb_synced_at timestamp with time zone,
+    source text DEFAULT 'system'::text NOT NULL
 );
 
 
@@ -1631,6 +1650,20 @@ CREATE TABLE public.stock_movements (
 
 
 --
+-- Name: tapo_plugin_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tapo_plugin_settings (
+    id integer DEFAULT 1 NOT NULL,
+    login text DEFAULT ''::text NOT NULL,
+    password text DEFAULT ''::text NOT NULL,
+    is_active boolean DEFAULT false NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    extra_cameras text DEFAULT '[]'::text NOT NULL
+);
+
+
+--
 -- Name: task_assignees; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2037,7 +2070,6 @@ CREATE TABLE public.vk_community_settings (
     group_id integer NOT NULL,
     access_token text NOT NULL,
     default_creator_id text,
-    default_project_id text,
     assignee_ids text[] DEFAULT ARRAY[]::text[] NOT NULL,
     auto_create_contact boolean DEFAULT true NOT NULL,
     auto_reply boolean DEFAULT false NOT NULL,
@@ -2046,7 +2078,8 @@ CREATE TABLE public.vk_community_settings (
     callback_secret text,
     confirmation_string text,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp(3) without time zone NOT NULL
+    updated_at timestamp(3) without time zone NOT NULL,
+    default_project_id text
 );
 
 
@@ -2065,7 +2098,16 @@ CREATE TABLE public.vk_market_settings (
     market_app_secret text,
     is_active boolean DEFAULT true NOT NULL,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp(3) without time zone NOT NULL
+    updated_at timestamp(3) without time zone NOT NULL,
+    auto_sync boolean DEFAULT true NOT NULL,
+    products_mode character varying(20) DEFAULT 'to_vk'::character varying NOT NULL,
+    prices_mode character varying(20) DEFAULT 'to_vk'::character varying NOT NULL,
+    stocks_mode character varying(20) DEFAULT 'to_vk'::character varying NOT NULL,
+    products_interval_minutes integer DEFAULT 60 NOT NULL,
+    prices_interval_minutes integer DEFAULT 60 NOT NULL,
+    stocks_interval_minutes integer DEFAULT 60 NOT NULL,
+    last_sync_at timestamp without time zone,
+    last_sync_result text
 );
 
 
@@ -2441,6 +2483,14 @@ ALTER TABLE ONLY public.email_settings
 
 ALTER TABLE ONLY public.file_attachments
     ADD CONSTRAINT file_attachments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: file_hide_settings file_hide_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.file_hide_settings
+    ADD CONSTRAINT file_hide_settings_pkey PRIMARY KEY (id);
 
 
 --
@@ -2889,6 +2939,14 @@ ALTER TABLE ONLY public.stock_balances
 
 ALTER TABLE ONLY public.stock_movements
     ADD CONSTRAINT stock_movements_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tapo_plugin_settings tapo_plugin_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tapo_plugin_settings
+    ADD CONSTRAINT tapo_plugin_settings_pkey PRIMARY KEY (id);
 
 
 --
@@ -5103,13 +5161,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NpmxcPJzzajp1GASsq7Ju3HuP44VjRwKHaKnZUJqDxAVUd6qeEho7PkjuUg73bM
+\unrestrict QvugyQzJHe65iTsqak9mHX9DIOf0FOego4MfcfxSNomIZDuu4QaJvognaAD2DaD
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict n7NsEVoab2I24m3DJlHuKTJHsPznAMlB3QlNgCzTK0Pq4NgYuUc0D95OQB5B4eC
+\restrict UnTIHvKM7BpOuSuv3pTrC3X3dh7ZHBtHg5oy37W9VceqtoiIG9Ra7fyu94C5He8
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -5291,53 +5349,42 @@ INSERT INTO public._prisma_migrations VALUES ('9f508fdb-3242-46d8-ac48-7c771fe66
 INSERT INTO public._prisma_migrations VALUES ('b5a6fe00-10af-4c94-b15d-d9b2a278ed3d', 'fa5549b7ad4078d35685a5a2d8c0067e67e8896e4eb58f922e53ab1ad1d38a16', '2026-10-16 19:12:38.114981+00', '20261016220000_task_favorites_user', NULL, NULL, '2026-10-16 19:12:38.114981+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('67ed3296-b393-4c23-b7a1-ad08a4d5759e', '63c5e3f8b34804f17937dee9d0db63113e1898a820f3b6454799b4f1d7e9fbdc', '2026-10-16 22:12:31.337225+00', '20261017010500_role_is_system_handler', NULL, NULL, '2026-10-16 22:12:31.33041+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('86af7f6c-83c5-47e1-929c-9a0c231fffa7', '2903da31c71ec49195ad6c84f5f85e4530bc2b49bfce95690685f8e12438db45', '2026-10-18 13:57:30.35164+00', '20261018164500_role_contact_accesses', NULL, NULL, '2026-10-18 13:57:30.343023+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('4be4be18-2220-4993-bcf0-b36be9328d5b', '88f812c5c8ee45533e8ef18634777b61965fd098da246f98f65ef2758d7be15a', '2026-10-21 15:12:14.987548+00', '20261021180000_add_email_mark_as_read', NULL, NULL, '2026-10-21 15:12:14.980711+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('1b55bd4d-d9c6-4a1c-b03c-7fc19e34c82b', '33309f2d26c9ef6e6f9d75b911028acb91c3cee679ed1dbba64d7c71cbcf518f', '2026-10-19 09:11:13.04667+00', '20261019120000_split_vk_group_plugin', NULL, NULL, '2026-10-19 09:11:13.013249+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('bf1ff2cc-8e7c-4c10-be0d-2ab0b0b79870', '089510b658e9f4be923a2fa47d7b8bc8d70d3c08a4bc97326e74c5664d6fcd48', '2026-10-19 12:51:26.487328+00', '20261019160000_ozon_seller_auto_sync', NULL, NULL, '2026-10-19 12:51:26.481517+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('12d42275-917f-494d-ac90-b9a20ae501a7', '0b54ea24c532142930abd0ca0c6ab08e68feec49842efb7abf65f60cbac62d97', '2026-10-20 16:48:58.867582+00', '20261020195000_vk_user_id_bigint', NULL, NULL, '2026-10-20 16:48:58.857494+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('f77086c6-179a-4f9f-bd6c-05a16308a99f', '5bb5f931d811d416234da2b157b1a66aeebae91ef70d1ca9221e2e75f0d2b494', '2026-10-21 18:12:28.424594+00', '20261021190000_client_devices_and_contact_key', NULL, NULL, '2026-10-21 18:12:28.288233+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('15783a93-5e30-4f20-855f-77d7e2d3e430', '88c5c29c37e6b16a9527e2e09d26f552fe4a20f7716717cf326521b020fe7d07', '2026-10-20 17:00:37.046022+00', '20261020196000_vk_peer_id_bigint', NULL, NULL, '2026-10-20 17:00:37.040445+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('889e9906-ae83-46b9-9051-159c59dea9dc', '1b7241d7876616e1836afefe1188867c71e9e18a93b9df4d939d2b26221a8901', '2026-10-20 21:43:27.124818+00', '20261021001000_hikvision_plugin_settings', NULL, NULL, '2026-10-20 21:43:27.108178+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('cbe11479-65e9-47b6-a14a-a6a02a00d8b7', 'f9ecd641ce60a512bcde8f8cc0a9ac1a56e8a60650a1fc10b3d0c5fa0daf64f3', '2026-10-23 21:24:02.209693+00', '20261024002000_ozon_stock_warehouse', NULL, NULL, '2026-10-23 21:24:02.204818+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('f7090923-0c21-4441-879f-bf79a9d17b4a', '7ac0b996be0095be5f4a71d408c93eb78360ee2e2e20024e4489bd8cee5a0893', '2026-10-21 05:55:21.236165+00', '20261021083000_hikvision_validate_code', NULL, NULL, '2026-10-21 05:55:21.229662+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('a0ea9b73-37f5-441f-8226-04caff80b62a', 'ddc1d833fe5f8c14e7109c646ca26f36d66e5811859fddae38c68fca940fb0df', '2026-10-27 06:53:52.070544+00', '20261021160000_user_timezone_and_task_start_date', NULL, NULL, '2026-10-27 06:53:52.060193+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('34df85f0-e170-4f59-8873-b1273dca1c55', '5e5a2b7e81c432fdc4df594fb4c4cd71d1e59ec296d8d363cbd009b54298ae31', '2026-10-27 06:53:52.077399+00', '20261021165000_task_start_date_default_now', NULL, NULL, '2026-10-27 06:53:52.0711+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('0cfad592-e316-41d8-93a7-e03e7f3c38ed', '9fac8e6c8ce8255a887ba17f70f9108d0c0a9b5d8d18bc25698be45900fd5eb7', '2026-10-27 06:53:52.162574+00', '20261024041000_wb_seller_plugin', NULL, NULL, '2026-10-27 06:53:52.153836+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('4007277e-1c43-4e31-9682-b36137b133af', '88f812c5c8ee45533e8ef18634777b61965fd098da246f98f65ef2758d7be15a', '2026-10-27 06:53:52.081069+00', '20261021180000_add_email_mark_as_read', NULL, NULL, '2026-10-27 06:53:52.078193+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('5cb8da28-fb62-41aa-a47f-4e50018c448b', '5bb5f931d811d416234da2b157b1a66aeebae91ef70d1ca9221e2e75f0d2b494', '2026-10-27 06:53:52.099213+00', '20261021190000_client_devices_and_contact_key', NULL, NULL, '2026-10-27 06:53:52.081602+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('eeb2dc40-d074-4906-b29d-647b727015a5', 'dbf3c025606e815cea353427cd41ba9d0153de572c9965b9bed60267b2c38b4c', '2026-10-27 06:53:52.102418+00', '20261021210000_client_devices_updated_at', NULL, NULL, '2026-10-27 06:53:52.099668+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('d74b75d4-e590-476c-a209-115dc313d9a5', '6a0b0232d3bf10773255589ad4a176f1d66afb69e6dc8e4b170534f44a2a7e68', '2026-10-27 06:53:52.108193+00', '20261022190000_system_timezone', NULL, NULL, '2026-10-27 06:53:52.102852+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('9f5c100c-c67e-4abb-8aef-22d07cf682a5', '577ca7db06faf1b5f8f39d05e88584646440f853310c7d83e7291612a750973a', '2026-10-27 06:53:52.129245+00', '20261022233000_vitrine_favorites', NULL, NULL, '2026-10-27 06:53:52.108996+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('54a1f2a2-c467-4a0f-8664-05d9096d790b', '60741646c444b3be8ca7d2e508f6ea52acbd63ebd30318ef9c34f109e38f66fb', '2026-10-27 06:53:52.133229+00', '20261023000500_vitrine_favorite_share_link', NULL, NULL, '2026-10-27 06:53:52.129747+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('6f6388d5-5cec-4a63-9a65-fdd8b40efb59', 'd0aa72a702e7a62268098f7f33e917790e437c4a16d4fdc9b39d3363c676aed2', '2026-10-27 06:53:52.137384+00', '20261023170000_tenant_ticket_task_link', NULL, NULL, '2026-10-27 06:53:52.133711+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('b5a6b71b-cbed-4f13-82ab-bad6afe8c76d', 'a258f63636d75eb98ce9abab9c34000384b5d77e11db1c9a68e0a05afb6e5990', '2026-10-27 06:53:52.140477+00', '20261023235700_price_type_for_ozon', NULL, NULL, '2026-10-27 06:53:52.13785+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('4f234ca7-30a7-41e2-bc0b-bd1c8e3aa2fa', '585984f2646c297f4dcf66dcd75591172a34534550ef73a5741f4b34d456d42b', '2026-10-27 06:53:52.143596+00', '20261023235800_ozon_stock_source', NULL, NULL, '2026-10-27 06:53:52.141202+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('9ca1f995-8f32-4a13-8a3c-f9d0fd59a635', 'f9ecd641ce60a512bcde8f8cc0a9ac1a56e8a60650a1fc10b3d0c5fa0daf64f3', '2026-10-27 06:53:52.14647+00', '20261024002000_ozon_stock_warehouse', NULL, NULL, '2026-10-27 06:53:52.144134+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('795a8ab3-eff8-4539-89d9-1e2eaa875ef3', '45da77eb9d0cc5a05455417cf1e52c06c192727fb76fba719ed0b94ea4025252', '2026-10-27 06:53:52.153352+00', '20261024004000_ozon_modes_and_intervals', NULL, NULL, '2026-10-27 06:53:52.146946+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('583b5d96-210d-4c09-af0d-dd8a63023957', 'd5261ed224983b341b057ac339e8fde7ee72f8d03b20511ba1ed10f99472cdd9', NULL, '20261025110000_vk_community_default_project', 'A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
-
-Migration name: 20261025110000_vk_community_default_project
-
-Database error code: 42701
-
-Database error:
-ERROR: column "default_project_id" of relation "vk_community_settings" already exists
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E42701), message: "column \"default_project_id\" of relation \"vk_community_settings\" already exists", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("tablecmds.c"), line: Some(7356), routine: Some("check_for_column_name_collision") }
-
-   0: sql_schema_connector::apply_migration::apply_script
-           with migration_name="20261025110000_vk_community_default_project"
-             at schema-engine/connectors/sql-schema-connector/src/apply_migration.rs:106
-   1: schema_core::commands::apply_migrations::Applying migration
-           with migration_name="20261025110000_vk_community_default_project"
-             at schema-engine/core/src/commands/apply_migrations.rs:91
-   2: schema_core::state::ApplyMigrations
-             at schema-engine/core/src/state.rs:226', '2026-10-27 06:56:34.266992+00', '2026-10-27 06:56:32.601545+00', 0);
-INSERT INTO public._prisma_migrations VALUES ('cdfdc539-f87b-4092-a988-a21a28eb81c9', 'd5261ed224983b341b057ac339e8fde7ee72f8d03b20511ba1ed10f99472cdd9', '2026-10-27 06:56:34.270258+00', '20261025110000_vk_community_default_project', '', NULL, '2026-10-27 06:56:34.270258+00', 0);
-INSERT INTO public._prisma_migrations VALUES ('7fea2d5b-6eef-474f-9d0f-83db5b627725', '8b2ab19318e144ad689222fa54ea23acf2e5bc10418482fabac4008812fd5470', '2026-10-27 06:56:35.929998+00', '20261025131500_cdek_plugin', NULL, NULL, '2026-10-27 06:56:35.901766+00', 1);
-INSERT INTO public._prisma_migrations VALUES ('a12964cb-235d-4111-b7c5-17883f73e151', 'd74f38884583eea089b332037f32dc1f27fd328426bd2e302c219d89def9f447', '2026-10-27 06:56:35.942816+00', '20261027001500_mail_accounts', NULL, NULL, '2026-10-27 06:56:35.930867+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('00721218-370a-4d0d-9a71-052678be858b', 'dbf3c025606e815cea353427cd41ba9d0153de572c9965b9bed60267b2c38b4c', '2026-10-21 18:16:39.32264+00', '20261021210000_client_devices_updated_at', NULL, NULL, '2026-10-21 18:16:39.316249+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('ace17877-a447-42cf-bedf-2d2c434faa61', 'ddc1d833fe5f8c14e7109c646ca26f36d66e5811859fddae38c68fca940fb0df', '2026-10-21 13:12:00.723164+00', '20261021160000_user_timezone_and_task_start_date', NULL, NULL, '2026-10-21 13:12:00.701765+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('1fbc5544-b04d-4c89-b829-ecfa28c9b458', '5e5a2b7e81c432fdc4df594fb4c4cd71d1e59ec296d8d363cbd009b54298ae31', '2026-10-21 13:31:10.664011+00', '20261021165000_task_start_date_default_now', NULL, NULL, '2026-10-21 13:31:10.626132+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('53323818-abe5-45fa-8631-4f52823c5d82', '6a0b0232d3bf10773255589ad4a176f1d66afb69e6dc8e4b170534f44a2a7e68', '2026-10-22 15:54:44.24779+00', '20261022190000_system_timezone', NULL, NULL, '2026-10-22 15:54:44.228708+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('3d320c8b-1213-4ffe-9a34-64d5a4a2b8fd', '577ca7db06faf1b5f8f39d05e88584646440f853310c7d83e7291612a750973a', '2026-10-22 20:45:38.722362+00', '20261022233000_vitrine_favorites', NULL, NULL, '2026-10-22 20:45:38.691938+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('71263f20-a128-4d70-82a6-587f382dc4bb', '45da77eb9d0cc5a05455417cf1e52c06c192727fb76fba719ed0b94ea4025252', '2026-10-23 21:52:43.414433+00', '20261024004000_ozon_modes_and_intervals', NULL, NULL, '2026-10-23 21:52:43.401178+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('f40cac5a-6d98-4adc-9214-8bdeb590acd8', '60741646c444b3be8ca7d2e508f6ea52acbd63ebd30318ef9c34f109e38f66fb', '2026-10-22 21:11:15.168837+00', '20261023000500_vitrine_favorite_share_link', NULL, NULL, '2026-10-22 21:11:15.158844+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('919120c0-7249-46eb-870b-129584b5938d', 'd0aa72a702e7a62268098f7f33e917790e437c4a16d4fdc9b39d3363c676aed2', '2026-10-23 14:14:49.560952+00', '20261023170000_tenant_ticket_task_link', NULL, NULL, '2026-10-23 14:14:49.549165+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('7dcd96f4-44df-488e-8e92-34f11eaa7954', '7b84101baca0f030c2b660b0c81aac3889148262b7ef6ea0f3816a7315fcd13e', '2026-10-27 21:28:13.868758+00', '20261028001500_mail_account_signature', NULL, NULL, '2026-10-27 21:28:13.856357+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('14358109-3ac8-4765-aa37-84e8dcf0ae33', 'a258f63636d75eb98ce9abab9c34000384b5d77e11db1c9a68e0a05afb6e5990', '2026-10-23 21:08:57.890286+00', '20261023235700_price_type_for_ozon', NULL, NULL, '2026-10-23 21:08:57.874683+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('4faaa23c-e0c8-4827-b490-473656114e51', '9fac8e6c8ce8255a887ba17f70f9108d0c0a9b5d8d18bc25698be45900fd5eb7', '2026-10-24 01:45:42.12622+00', '20261024041000_wb_seller_plugin', NULL, NULL, '2026-10-24 01:45:42.107962+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('23272654-419e-4655-b002-a0ecedfc87ff', '585984f2646c297f4dcf66dcd75591172a34534550ef73a5741f4b34d456d42b', '2026-10-23 21:08:57.894999+00', '20261023235800_ozon_stock_source', NULL, NULL, '2026-10-23 21:08:57.891315+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('aa743037-83ee-4451-ac5b-ae3028456ef8', 'd5261ed224983b341b057ac339e8fde7ee72f8d03b20511ba1ed10f99472cdd9', '2026-10-25 08:28:18.545027+00', '20261025110000_vk_community_default_project', NULL, NULL, '2026-10-25 08:28:18.528225+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('291eaa4a-1b38-4aa3-a9b4-d61878b8b120', '8b2ab19318e144ad689222fa54ea23acf2e5bc10418482fabac4008812fd5470', '2026-10-25 10:36:12.565054+00', '20261025131500_cdek_plugin', NULL, NULL, '2026-10-25 10:36:12.526334+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('83329ef9-f4b6-4c66-95fe-1c8f1e1144db', '5f42aa5e71b65e311b42911982c2b006640e616b702634a17c779a3448615e59', '2026-10-28 10:09:51.088637+00', '20261028130300_contact_is_spam', NULL, NULL, '2026-10-28 10:09:51.077402+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('9f36d9e3-eab2-4046-bee3-feaffa9319b5', 'd74f38884583eea089b332037f32dc1f27fd328426bd2e302c219d89def9f447', '2026-10-26 21:58:08.063154+00', '20261027001500_mail_accounts', NULL, NULL, '2026-10-26 21:58:08.035791+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('c48ba9dc-7772-4e94-ac77-e2549216993c', 'a5a879bdb556d14ce86f01f6ab156e61de9f8ff3abe07e3351d47a8476c82dc7', '2026-10-29 12:55:46.776303+00', '20261029100000_tapo_plugin_settings', NULL, NULL, '2026-10-29 12:55:46.758355+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('8b62df07-b617-4f60-b95a-43dc248527f9', 'baf7e8df8f42e6152c0c3c3eae1c5f32d2c67c1488b6ed39c38d3e54009aaa3f', '2026-10-29 13:56:37.667713+00', '20261029120000_tapo_extra_cameras', NULL, NULL, '2026-10-29 13:56:37.661434+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('887cc3a6-5577-4104-ba32-c444d9f45da4', '70995aa59aa0a31b5469ec313eef8b55d1dea2ce80e1e5e585a97d53dda1da28', '2026-11-06 15:51:06.142192+00', '20261106190000_vk_market_autosync', NULL, NULL, '2026-11-06 15:51:06.127901+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('3bb94dc0-4a5d-477e-b29a-fcb8c2264583', '314d0bf256ee5d6374b08fedffeb3228825213760a622092abc5fb81ec44de6d', '2026-11-07 23:04:18.840875+00', '20261108014000_product_source', NULL, NULL, '2026-11-07 23:04:18.830702+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('697098c7-543b-493e-ba77-6a941ed354cd', '136ccd19f432467cad3d3095899f6bff5dd348f4679c234177cc50c7ca3f381b', '2026-11-08 09:03:27.721974+00', '20261108090000_file_hide_settings', NULL, NULL, '2026-11-08 09:03:27.698717+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('439740c5-91f7-4c7f-ad06-46ecadafb7d0', '41f8c2597da9a22588e99ac35f84e65e0b08062f057c49932b983bb8ce7c67f2', '2026-11-08 16:19:18.729091+00', '20261108120000_files_page_theme', NULL, NULL, '2026-11-08 16:19:18.717762+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict n7NsEVoab2I24m3DJlHuKTJHsPznAMlB3QlNgCzTK0Pq4NgYuUc0D95OQB5B4eC
+\unrestrict UnTIHvKM7BpOuSuv3pTrC3X3dh7ZHBtHg5oy37W9VceqtoiIG9Ra7fyu94C5He8
 
