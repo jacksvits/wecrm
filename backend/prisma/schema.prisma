@@ -2087,6 +2087,18 @@ model AuthEvent {
   @@map("auth_events")
 }
 
+// Глобальные списки IP: white — отметка доверенных, black — запрет авторизации.
+model IpAccessRule {
+  id        String   @id @default(cuid())
+  ipAddress String   @map("ip_address")
+  listType  String   @map("list_type")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([ipAddress, listType])
+  @@index([listType])
+  @@map("ip_access_rules")
+}
+
 // ==== Мультитенантность платформы ====
 // Реестр организаций. Главная организация живёт в основной БД (DATABASE_URL)
 // и в этой таблице не нуждается; каждая запись — отдельная БД wecrm_t_<slug>.

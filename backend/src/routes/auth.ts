@@ -9,6 +9,7 @@ import { ensureGuestUser, GUEST_EMAIL } from '../lib/guest-demo.js';
 import { currentTenant, platformPrisma } from '../lib/tenant.js';
 import { recordAuthEvent } from '../lib/auth-events.js';
 import { rateLimit } from '../lib/security.js';
+import { rejectBlockedIp } from '../lib/ip-access.js';
 
 
 /**
@@ -81,7 +82,7 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
-router.post('/register', rateLimit({ prefix: 'register', windowMs: 60 * 60_000, max: 5 }), async (req, res) => {
+router.post('/register', rejectBlockedIp, rateLimit({ prefix: 'register', windowMs: 60 * 60_000, max: 5 }), async (req, res) => {
   try {
     const data = registerSchema.parse(req.body);
 
@@ -151,7 +152,7 @@ router.post('/register', rateLimit({ prefix: 'register', windowMs: 60 * 60_000, 
   }
 });
 
-router.post('/login', rateLimit({ prefix: 'login', windowMs: 15 * 60_000, max: 12, key: (req) => String(req.body?.login || '').toLowerCase().slice(0, 100) }), async (req, res) => {
+router.post('/login', rejectBlockedIp, rateLimit({ prefix: 'login', windowMs: 15 * 60_000, max: 12, key: (req) => String(req.body?.login || '').toLowerCase().slice(0, 100) }), async (req, res) => {
   try {
     const data = loginSchema.parse(req.body);
 
@@ -219,7 +220,7 @@ router.post('/login', rateLimit({ prefix: 'login', windowMs: 15 * 60_000, max: 1
 
 // Гостевой доступ: вход без регистрации с правами обычного пользователя (роль user).
 // Демо-данные не создаются — гость работает с реальными данными в рамках своих прав.
-router.post('/guest', rateLimit({ prefix: 'guest', windowMs: 15 * 60_000, max: 20 }), async (req, res) => {
+router.post('/guest', rejectBlockedIp, rateLimit({ prefix: 'guest', windowMs: 15 * 60_000, max: 20 }), async (req, res) => {
   try {
     // Гостевой (демо) вход — только на главном домене платформы
     if (!currentTenant()?.isMain) return res.status(403).json({ error: 'Гостевой вход доступен только на основном домене' });

@@ -208,6 +208,9 @@ export function Login() {
   const [guestLoading, setGuestLoading] = useState(false)
   const [showSoundPrompt, setShowSoundPrompt] = useState(false)
   const [pendingRedirect, setPendingRedirect] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
+  const [blockedIp, setBlockedIp] = useState<string | null>(null)
   // Гостевой вход (демо) — только на главном домене платформы
   const isMainLoginHost = ['welans.cc', 'www.welans.cc'].includes(window.location.hostname)
   // Мультитенантность: название организации (tenant'а) и статус активации
@@ -217,6 +220,14 @@ export function Login() {
   const [pay, setPay] = useState<any | null>(null)
   const [paySent, setPaySent] = useState(false)
   const [showPayDetails, setShowPayDetails] = useState(false)
+
+  // Чёрный список применяется до показа формы и повторно проверяется сервером при входе.
+  useEffect(() => {
+    fetch(`${API_URL}/api/security/access-status`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.blocked) setBlockedIp(data.ipAddress || '') })
+      .catch(() => {})
+  }, [])
 
   // Информация об организации (tenant'е) текущего поддомена
   useEffect(() => {
@@ -274,6 +285,7 @@ export function Login() {
         user_info_error: 'Failed to get user info from VK',
         server_error: 'Server error during VK auth',
         invalid_state: 'Сессия входа устарела. Попробуйте ещё раз.',
+        ip_blocked: 'Ваш IP-адрес заблокирован администратором',
         pkce_required: 'PKCE required. Use frontend redirect.',
       }
       setError(messages[vkError] || `VK error: ${vkError}`)
@@ -283,6 +295,9 @@ export function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submittingRef.current) return
+    submittingRef.current = true
+    setSubmitting(true)
     setError('')
     try {
       if (isRegister) {
@@ -295,6 +310,8 @@ export function Login() {
       setPendingRedirect(true)
     } catch (err: any) {
       setError(err.message || 'Auth error')
+      submittingRef.current = false
+      setSubmitting(false)
     }
   }
 
@@ -366,6 +383,24 @@ export function Login() {
       setError(err.message || 'VK auth error')
       setVkLoading(false)
     }
+  }
+
+  if (blockedIp !== null) {
+    return (
+      <div className="login-split">
+        <section className="login-form-side" style={{ width: '100%' }}>
+          <div className="login-form-wrap">
+            <div className="login-form-content" style={{ textAlign: 'center', maxWidth: 460 }}>
+              <h1>Доступ ограничен</h1>
+              <p className="login-subtitle" style={{ lineHeight: 1.6 }}>
+                Ваш IP-адрес заблокирован администратором.<br />
+                {blockedIp && <span style={{ fontFamily: 'monospace' }}>{blockedIp}</span>}
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    )
   }
 
   // Организация зарегистрирована, но ещё не оплачена — доступ закрыт
@@ -535,8 +570,8 @@ export function Login() {
               />
             </div>
             {error && <div className="login-error">{error}</div>}
-            <button type="submit" className="login-btn-primary" style={{ marginTop: 10 }}>
-              {isRegister ? 'Зарегистрироваться' : 'Войти'}
+            <button type="submit" className="login-btn-primary" disabled={submitting} style={{ marginTop: 10, opacity: submitting ? 0.7 : 1, cursor: submitting ? 'default' : 'pointer' }}>
+              {submitting ? (isRegister ? 'Регистрация…' : 'Вход…') : (isRegister ? 'Зарегистрироваться' : 'Войти')}
             </button>
           </form>
 

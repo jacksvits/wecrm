@@ -8,6 +8,7 @@ import { createHash, randomBytes, randomUUID } from 'crypto';
 import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
 import { recordAuthEvent } from '../lib/auth-events.js';
 import { rateLimit } from '../lib/security.js';
+import { rejectBlockedIp } from '../lib/ip-access.js';
 
 // ===== Плагин «ВК авторизация»: вход пользователей в CRM через VK ID =====
 // Публичные эндпоинты остаются на прежних путях /api/vk/* —
@@ -214,7 +215,7 @@ async function completeVkIdAuth(code: string, deviceId: string, state: string, c
  * Старт серверного VK ID OAuth: возвращает URL для редиректа на id.vk.ru.
  * code_verifier хранится на сервере (привязан к state), на устройство не передаётся.
  */
-router.get('/login-url', rateLimit({ prefix: 'vk-login-url', windowMs: 15 * 60_000, max: 30 }), async (_req, res) => {
+router.get('/login-url', rejectBlockedIp, rateLimit({ prefix: 'vk-login-url', windowMs: 15 * 60_000, max: 30 }), async (_req, res) => {
   try {
     const cfg = await getAuthConfig();
     if (!cfg.isActive) return res.status(403).json({ error: 'Вход через VK ID отключён' });
@@ -257,7 +258,7 @@ router.get('/login-url', rateLimit({ prefix: 'vk-login-url', windowMs: 15 * 60_0
  * Legacy-вариант: обмен кода на токен с code_verifier с клиента.
  * Новый клиент ходит через GET /login-url → GET /callback.
  */
-router.post('/id-auth', rateLimit({ prefix: 'vk-id-auth', windowMs: 15 * 60_000, max: 30 }), async (req, res) => {
+router.post('/id-auth', rejectBlockedIp, rateLimit({ prefix: 'vk-id-auth', windowMs: 15 * 60_000, max: 30 }), async (req, res) => {
   try {
     const { code, device_id, state, code_verifier } = req.body;
     if (!code || !device_id || !state || !code_verifier) {
@@ -282,7 +283,7 @@ router.post('/id-auth', rateLimit({ prefix: 'vk-id-auth', windowMs: 15 * 60_000,
   }
 });
 
-router.get('/callback', rateLimit({ prefix: 'vk-callback', windowMs: 15 * 60_000, max: 60 }), async (req: Request, res: Response) => {
+router.get('/callback', rejectBlockedIp, rateLimit({ prefix: 'vk-callback', windowMs: 15 * 60_000, max: 60 }), async (req: Request, res: Response) => {
   try {
     const { code, device_id, state } = req.query;
     if (!code || !device_id || !state) {

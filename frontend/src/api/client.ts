@@ -375,6 +375,13 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
   security: {
     authEvents: (page = 1): Promise<{ items: any[]; total: number; page: number; pageSize: number; totalPages: number }> =>
       fetchApi(`/api/security/auth-events?page=${page}`),
+    ipInfo: (ip: string): Promise<{ ip: string; country: string | null; city: string | null; registrationCountry: string | null; organization: string | null }> =>
+      fetchApi(`/api/security/ip-info?ip=${encodeURIComponent(ip)}`),
+    ipRules: (): Promise<{ items: any[] }> => fetchApi('/api/security/ip-rules'),
+    addIpRule: (ipAddress: string, listType: 'white' | 'black'): Promise<any> =>
+      fetchApi('/api/security/ip-rules', { method: 'POST', body: JSON.stringify({ ipAddress, listType }) }),
+    deleteIpRule: (id: string): Promise<{ ok: boolean }> =>
+      fetchApi(`/api/security/ip-rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   },
   platform: {
     register: (data: { name: string; slug: string; adminName: string; adminEmail: string; adminPassword: string }): Promise<{ ok: boolean; status: string; subdomain: string; message: string }> => fetchApi('/api/platform/register', { method: 'POST', body: JSON.stringify(data) }),

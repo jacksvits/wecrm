@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict kz6jBmrdcUfuplyrzYZbjnNTSBkz04REMOxA4X7rKb4iaRkW3gm2gbKjb8dgG7Z
+\restrict BFocFt6SW64ydy8WRxGUvWWOQhLLqV9xZE0qEvMcSVZCaZAa1Jey8dRFX0APBxe
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -782,6 +782,18 @@ CREATE TABLE public.hikvision_plugin_settings (
     api_base_url text DEFAULT 'https://api.hik-connect.com'::text NOT NULL,
     is_active boolean DEFAULT false NOT NULL,
     updated_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: ip_access_rules; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ip_access_rules (
+    id text NOT NULL,
+    ip_address text NOT NULL,
+    list_type text NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -2533,6 +2545,14 @@ ALTER TABLE ONLY public.hikvision_plugin_settings
 
 
 --
+-- Name: ip_access_rules ip_access_rules_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ip_access_rules
+    ADD CONSTRAINT ip_access_rules_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: legal_documents legal_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3495,6 +3515,20 @@ CREATE INDEX finance_documents_type_idx ON public.finance_documents USING btree 
 --
 
 CREATE UNIQUE INDEX help_articles_slug_key ON public.help_articles USING btree (slug);
+
+
+--
+-- Name: ip_access_rules_ip_address_list_type_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ip_access_rules_ip_address_list_type_key ON public.ip_access_rules USING btree (ip_address, list_type);
+
+
+--
+-- Name: ip_access_rules_list_type_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ip_access_rules_list_type_idx ON public.ip_access_rules USING btree (list_type);
 
 
 --
@@ -5207,13 +5241,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kz6jBmrdcUfuplyrzYZbjnNTSBkz04REMOxA4X7rKb4iaRkW3gm2gbKjb8dgG7Z
+\unrestrict BFocFt6SW64ydy8WRxGUvWWOQhLLqV9xZE0qEvMcSVZCaZAa1Jey8dRFX0APBxe
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict rftW7ZqBwYwmw3EIu4Nl1oFZy0nWGIF0FGXeabxxmi0baAKYnfSTxvY4m30RmjU
+\restrict S09okKSok6qGcX9q7c2OZbCi27hyvZmixtT7BPzFantl92zBLItL77NH62XWsOd
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -5427,11 +5461,12 @@ INSERT INTO public._prisma_migrations VALUES ('d44d182a-eaea-48f5-b0c4-5e0b50267
 INSERT INTO public._prisma_migrations VALUES ('c131e964-ad92-4823-bafe-882bf8a723f7', '9481f37413655bfa8a8219fb96479c1fd4ea0742a442e208ae33db989192268a', '2026-11-08 21:15:45.343545+00', '20261109000000_legal_cookies', '', NULL, '2026-11-08 21:15:45.343545+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('8e9f22e5-ead4-4906-be77-46ece597409d', 'd8bfe1e1ac7e8ab904f24df7b61280656ea31ba83c41fff4d2ddfbf296e38bce', '2026-11-08 21:15:46.735317+00', '20261109010000_auth_events', '', NULL, '2026-11-08 21:15:46.735317+00', 0);
 INSERT INTO public._prisma_migrations VALUES ('d042f37f-fd48-46fc-82e3-8c65422c4cb0', '896e8f660c238d1f53e9dd7e28166d580290868e7dcc9a2f1bfcce541f86b030', '2026-11-08 21:15:48.189295+00', '20261109020000_auth_event_failures', '', NULL, '2026-11-08 21:15:48.189295+00', 0);
+INSERT INTO public._prisma_migrations VALUES ('ef0cef32-ac12-41b9-9742-530a1fe4eeb2', 'b5892629ab4d56151307278442c48582f7b7fb792c26103d4e429ba277be4eac', '2026-11-08 21:56:04.292558+00', '20261109030000_ip_access_rules', NULL, NULL, '2026-11-08 21:56:04.27924+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rftW7ZqBwYwmw3EIu4Nl1oFZy0nWGIF0FGXeabxxmi0baAKYnfSTxvY4m30RmjU
+\unrestrict S09okKSok6qGcX9q7c2OZbCi27hyvZmixtT7BPzFantl92zBLItL77NH62XWsOd
 

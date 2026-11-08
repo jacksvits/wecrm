@@ -1,10 +1,98 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
+import { getClientIp, normalizeIpAddress, rateLimit } from '../lib/security.js';
+import { IP_BLOCKED_MESSAGE, isIpBlacklisted } from '../lib/ip-access.js';
 import { platformPrisma } from '../lib/tenant.js';
 import { requirePlatformAdmin } from './platform.js';
 
 const router = Router();
 const PAGE_SIZE = 50;
+
+type IpInfo = {
+  ip: string;
+  country: string | null;
+  city: string | null;
+  registrationCountry: string | null;
+  organization: string | null;
+};
+
+const ipInfoCache = new Map<string, { data: IpInfo; expires: number }>();
+
+function regionName(value: unknown): string | null {
+  const code = String(value || '').trim();
+  if (!code) return null;
+  if (/^[a-z]{2}$/i.test(code)) {
+    try {
+      return new Intl.DisplayNames(['ru'], { type: 'region' }).of(code.toUpperCase()) || code.toUpperCase();
+    } catch { return code.toUpperCase(); }
+  }
+  return code;
+}
+
+function rdapOrganization(data: any): string | null {
+  const entities = Array.isArray(data?.entities) ? data.entities : [];
+  const preferred = entities.find((entity: any) => Array.isArray(entity?.roles) && entity.roles.includes('registrant')) || entities[0];
+  const vcard = Array.isArray(preferred?.vcardArray?.[1]) ? preferred.vcardArray[1] : [];
+  const name = vcard.find((row: any) => Array.isArray(row) && row[0] === 'fn')?.[3];
+  return typeof name === 'string' && name.trim() ? name.trim() : null;
+}
+
+async function fetchJson(url: string, timeoutMs = 6000): Promise<any> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json', 'User-Agent': 'WeCRM-Security/1.0' },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function lookupIpInfo(value: string): Promise<IpInfo> {
+  const ip = normalizeIpAddress(value);
+  if (!ip) throw new Error('Некорректный IP-адрес');
+  const cached = ipInfoCache.get(ip);
+  if (cached && cached.expires > Date.now()) return cached.data;
+
+  // Геолокация и регистрационные данные запрашиваются независимо: сбой одного
+  // публичного источника не лишает администратора сведений от второго.
+  const [geoResult, rdapResult] = await Promise.allSettled([
+    fetchJson(`https://api.ipapi.is/?q=${encodeURIComponent(ip)}`),
+    fetchJson(`https://rdap.org/ip/${encodeURIComponent(ip)}`),
+  ]);
+  const geo = geoResult.status === 'fulfilled' ? geoResult.value : null;
+  const rdap = rdapResult.status === 'fulfilled' ? rdapResult.value : null;
+  const company = typeof geo?.company === 'string' ? geo?.company : geo?.company?.name;
+  const data: IpInfo = {
+    ip,
+    country: geo?.location?.country || geo?.country || null,
+    city: geo?.location?.city || geo?.city || null,
+    registrationCountry: regionName(geo?.asn?.country || rdap?.country),
+    organization: company || geo?.asn?.org || rdapOrganization(rdap),
+  };
+  const available = Boolean(data.country || data.city || data.registrationCountry || data.organization);
+  ipInfoCache.set(ip, { data, expires: Date.now() + (available ? 6 * 60 * 60_000 : 5 * 60_000) });
+  if (ipInfoCache.size > 1000) {
+    const oldest = ipInfoCache.keys().next().value;
+    if (oldest) ipInfoCache.delete(oldest);
+  }
+  return data;
+}
+
+// Публичный статус нужен странице входа; раскрывается только IP самого клиента.
+router.get('/access-status', rateLimit({ prefix: 'access-status', windowMs: 15 * 60_000, max: 120 }), async (req, res) => {
+  try {
+    const ipAddress = getClientIp(req);
+    res.json({ ipAddress, blocked: await isIpBlacklisted(ipAddress) });
+  } catch (err: any) {
+    console.error('[security] access-status:', err?.message || err);
+    res.status(500).json({ error: 'Не удалось проверить доступ по IP' });
+  }
+});
 
 // Журнал доступен только главному администратору на основном домене.
 router.get('/auth-events', authMiddleware, requirePlatformAdmin, async (req, res) => {
@@ -39,6 +127,55 @@ router.get('/auth-events', authMiddleware, requirePlatformAdmin, async (req, res
   } catch (err: any) {
     console.error('[security] auth-events:', err?.message || err);
     res.status(500).json({ error: 'Не удалось загрузить журнал авторизаций' });
+  }
+});
+
+router.get('/ip-info', authMiddleware, requirePlatformAdmin, async (req, res) => {
+  try {
+    const ip = normalizeIpAddress(req.query.ip);
+    if (!ip) return res.status(400).json({ error: 'Некорректный IP-адрес' });
+    res.json(await lookupIpInfo(ip));
+  } catch (err: any) {
+    console.error('[security] ip-info:', err?.message || err);
+    res.status(502).json({ error: 'Не удалось получить сведения об IP-адресе' });
+  }
+});
+
+router.get('/ip-rules', authMiddleware, requirePlatformAdmin, async (_req, res) => {
+  try {
+    const items = await (platformPrisma as any).ipAccessRule.findMany({
+      orderBy: [{ listType: 'asc' }, { createdAt: 'desc' }],
+    });
+    res.json({ items });
+  } catch (err: any) {
+    console.error('[security] ip-rules list:', err?.message || err);
+    res.status(500).json({ error: 'Не удалось загрузить списки IP-адресов' });
+  }
+});
+
+router.post('/ip-rules', authMiddleware, requirePlatformAdmin, async (req, res) => {
+  try {
+    const ipAddress = normalizeIpAddress(req.body?.ipAddress);
+    const listType = String(req.body?.listType || '');
+    if (!ipAddress) return res.status(400).json({ error: 'Введите корректный IPv4- или IPv6-адрес' });
+    if (!['white', 'black'].includes(listType)) return res.status(400).json({ error: 'Неизвестный тип списка' });
+    const item = await (platformPrisma as any).ipAccessRule.create({ data: { ipAddress, listType } });
+    res.status(201).json(item);
+  } catch (err: any) {
+    if (err?.code === 'P2002') return res.status(409).json({ error: 'Этот IP-адрес уже есть в выбранном списке' });
+    console.error('[security] ip-rules create:', err?.message || err);
+    res.status(500).json({ error: 'Не удалось добавить IP-адрес' });
+  }
+});
+
+router.delete('/ip-rules/:id', authMiddleware, requirePlatformAdmin, async (req, res) => {
+  try {
+    const result = await (platformPrisma as any).ipAccessRule.deleteMany({ where: { id: String(req.params.id) } });
+    if (!result.count) return res.status(404).json({ error: 'Запись не найдена' });
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[security] ip-rules delete:', err?.message || err);
+    res.status(500).json({ error: 'Не удалось удалить IP-адрес' });
   }
 });
 

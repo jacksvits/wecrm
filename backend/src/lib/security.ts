@@ -1,12 +1,32 @@
 import type { Request, Response, NextFunction } from 'express';
 import { isIP } from 'net';
 
+/** Приводит IPv4/IPv6 к единому виду, чтобы списки нельзя было обойти записью другого формата. */
+export function normalizeIpAddress(value: unknown): string | null {
+  let ip = String(value || '').trim();
+  if (ip.startsWith('[') && ip.endsWith(']')) ip = ip.slice(1, -1);
+  if (isIP(ip) === 4) return ip;
+  if (isIP(ip) !== 6) return null;
+  const mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  if (mapped && isIP(mapped[1]) === 4) return mapped[1];
+  try {
+    const normalized = new URL(`http://[${ip}]`).hostname.slice(1, -1).toLowerCase();
+    const mappedHex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (mappedHex) {
+      const value = (Number.parseInt(mappedHex[1], 16) << 16) + Number.parseInt(mappedHex[2], 16);
+      return [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255].join('.');
+    }
+    return normalized;
+  } catch {
+    return null;
+  }
+}
+
 /** Реальный IP передаёт доверенный nginx в X-Real-IP (внешний заголовок он перезаписывает). */
 export function getClientIp(req: Request): string {
   const forwarded = req.headers['x-real-ip'];
-  let ip = (Array.isArray(forwarded) ? forwarded[0] : forwarded) || req.socket.remoteAddress || 'unknown';
-  ip = String(ip).trim().replace(/^::ffff:/, '');
-  return isIP(ip) ? ip.slice(0, 64) : 'unknown';
+  const raw = (Array.isArray(forwarded) ? forwarded[0] : forwarded) || req.socket.remoteAddress || 'unknown';
+  return normalizeIpAddress(raw) || 'unknown';
 }
 
 type Bucket = { count: number; resetAt: number };
