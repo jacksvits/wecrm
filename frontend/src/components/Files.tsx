@@ -44,23 +44,9 @@ const folderIcon = (
   </svg>
 );
 
-const folderIconLarge = (
-  <svg width="64" height="56" viewBox="0 0 64 56" fill="none">
-    <path d="M4 10a6 6 0 0 1 6-6h14l6 8h24a6 6 0 0 1 6 6v2H4V10z" fill="#F5B301"/>
-    <path d="M4 18h56v30a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6V18z" fill="#FFD15C"/>
-    <path d="M4 18h56v4H4v-4z" fill="#FFC940"/>
-  </svg>
-);
-
-const fileIcon = (
-  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#8A94A6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#F1F4F8"></path>
-    <polyline points="14 2 14 8 20 8"></polyline>
-  </svg>
-);
 
 // === Темы иконок страницы «Файлы» ===
-type FileTheme = "standard" | "win7" | "macos" | "ios";
+type FileTheme = "win7" | "macos";
 
 const win7FolderIcon = (
   <svg width="64" height="52" viewBox="0 0 64 52">
@@ -78,15 +64,39 @@ const win7FolderIcon = (
   </svg>
 );
 
-const win7FileIcon = (
-  <svg width="44" height="52" viewBox="0 0 44 52">
-    <path d="M6 2h22l10 10v36a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#FFFFFF" stroke="#9DB2C8" strokeWidth="1.5" />
-    <path d="M28 2l10 10H30a2 2 0 0 1-2-2V2z" fill="#DCE7F2" stroke="#9DB2C8" strokeWidth="1.5" />
-    <rect x="10" y="20" width="24" height="4" rx="2" fill="#7FA6D9" />
-    <rect x="10" y="28" width="24" height="3" rx="1.5" fill="#B9CCE4" />
-    <rect x="10" y="35" width="17" height="3" rx="1.5" fill="#B9CCE4" />
-  </svg>
-);
+// Иконка файла Windows 7: белый лист + цветной значок приложения по расширению
+const WIN7_FILE_BADGES: Record<string, { color: string; text: string; size?: number }> = {
+  pdf: { color: "#C62828", text: "PDF", size: 8 },
+  doc: { color: "#2B579A", text: "W" }, docx: { color: "#2B579A", text: "W" }, odt: { color: "#2B579A", text: "W" }, rtf: { color: "#2B579A", text: "W" },
+  xls: { color: "#1D6F42", text: "X" }, xlsx: { color: "#1D6F42", text: "X" }, csv: { color: "#1D6F42", text: "X" }, ods: { color: "#1D6F42", text: "X" },
+  ppt: { color: "#C43E1C", text: "P" }, pptx: { color: "#C43E1C", text: "P" },
+  zip: { color: "#8D6E63", text: "ZIP", size: 8 }, rar: { color: "#8D6E63", text: "RAR", size: 8 }, "7z": { color: "#8D6E63", text: "7Z" }, tar: { color: "#8D6E63", text: "TAR", size: 8 }, gz: { color: "#8D6E63", text: "GZ" },
+  mp4: { color: "#5E35B1", text: "▶" }, avi: { color: "#5E35B1", text: "▶" }, mov: { color: "#5E35B1", text: "▶" }, mkv: { color: "#5E35B1", text: "▶" }, wmv: { color: "#5E35B1", text: "▶" },
+  mp3: { color: "#00838F", text: "♪" }, wav: { color: "#00838F", text: "♪" }, ogg: { color: "#00838F", text: "♪" }, flac: { color: "#00838F", text: "♪" }, m4a: { color: "#00838F", text: "♪" },
+  jpg: { color: "#0277BD", text: "🖻" }, jpeg: { color: "#0277BD", text: "🖻" }, png: { color: "#0277BD", text: "🖻" }, gif: { color: "#0277BD", text: "🖻" }, bmp: { color: "#0277BD", text: "🖻" }, webp: { color: "#0277BD", text: "🖻" },
+  exe: { color: "#546E7A", text: "⚙" }, msi: { color: "#546E7A", text: "⚙" },
+  html: { color: "#E65100", text: "<>" }, htm: { color: "#E65100", text: "<>" },
+};
+
+const win7FileIconFor = (name: string) => {
+  const badge = WIN7_FILE_BADGES[fileExtension(name)];
+  return (
+    <svg width="44" height="52" viewBox="0 0 44 52">
+      <path d="M6 2h22l10 10v36a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#FFFFFF" stroke="#9DB2C8" strokeWidth="1.5" />
+      <path d="M28 2l10 10H30a2 2 0 0 1-2-2V2z" fill="#DCE7F2" stroke="#9DB2C8" strokeWidth="1.5" />
+      <rect x="10" y="18" width="24" height="3.5" rx="1.75" fill="#C7D6E8" />
+      <rect x="10" y="25" width="24" height="3.5" rx="1.75" fill="#C7D6E8" />
+      {badge ? (
+        <g>
+          <rect x="8" y="32" width="28" height="15" rx="3.5" fill={badge.color} />
+          <text x="22" y="43" textAnchor="middle" fontFamily="Segoe UI, sans-serif" fontWeight="700" fontSize={badge.size || 11} fill="#FFFFFF">{badge.text}</text>
+        </g>
+      ) : (
+        <rect x="10" y="32" width="17" height="3.5" rx="1.75" fill="#C7D6E8" />
+      )}
+    </svg>
+  );
+};
 
 const macFolderIcon = (
   <svg width="64" height="52" viewBox="0 0 64 52">
@@ -114,43 +124,9 @@ const macFileIcon = (
   </svg>
 );
 
-const iosFolderIcon = (
-  <svg width="60" height="60" viewBox="0 0 60 60">
-    <defs>
-      <linearGradient id="iosBg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#3A3F47" /><stop offset="1" stopColor="#23272E" />
-      </linearGradient>
-    </defs>
-    <rect x="2" y="2" width="56" height="56" rx="14" fill="url(#iosBg)" />
-    <rect x="2" y="2" width="56" height="56" rx="14" fill="#FFFFFF" opacity=".06" />
-    <rect x="11" y="12" width="16" height="16" rx="4.5" fill="#E8B23A" />
-    <rect x="32" y="12" width="16" height="16" rx="4.5" fill="#5EA8E8" />
-    <rect x="11" y="33" width="16" height="16" rx="4.5" fill="#7AC47C" />
-    <rect x="32" y="33" width="16" height="16" rx="4.5" fill="#C9CED6" />
-  </svg>
-);
-
-const iosFileIcon = (
-  <svg width="60" height="60" viewBox="0 0 60 60">
-    <defs>
-      <linearGradient id="iosFileBg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#FFFFFF" /><stop offset="1" stopColor="#EEF0F4" />
-      </linearGradient>
-    </defs>
-    <rect x="2" y="2" width="56" height="56" rx="14" fill="url(#iosFileBg)" stroke="#D7DBE2" strokeWidth="1" />
-    <path d="M21 15h11l7 7v20a2 2 0 0 1-2 2H21a2 2 0 0 1-2-2V17a2 2 0 0 1 2-2z" fill="#FFFFFF" stroke="#B9BFC9" strokeWidth="1.4" />
-    <path d="M32 15l7 7h-6a1 1 0 0 1-1-1v-6z" fill="#E4E7EC" stroke="#B9BFC9" strokeWidth="1.4" />
-    <rect x="23" y="28" width="12" height="2.4" rx="1.2" fill="#C9CED6" />
-    <rect x="23" y="33" width="12" height="2.4" rx="1.2" fill="#C9CED6" />
-    <rect x="23" y="38" width="8" height="2.4" rx="1.2" fill="#C9CED6" />
-  </svg>
-);
-
-const FILE_THEMES: Record<FileTheme, { label: string; folder: JSX.Element; file: JSX.Element }> = {
-  standard: { label: "Стандартная", folder: folderIconLarge, file: fileIcon },
-  win7: { label: "Windows 7", folder: win7FolderIcon, file: win7FileIcon },
-  macos: { label: "macOS", folder: macFolderIcon, file: macFileIcon },
-  ios: { label: "iOS", folder: iosFolderIcon, file: iosFileIcon },
+const FILE_THEMES: Record<FileTheme, { label: string; folder: JSX.Element; fileFor: (name: string) => JSX.Element }> = {
+  win7: { label: "Windows 7", folder: win7FolderIcon, fileFor: win7FileIconFor },
+  macos: { label: "macOS", folder: macFolderIcon, fileFor: () => macFileIcon },
 };
 
 
@@ -198,7 +174,7 @@ function FilePreviewThumb({ item, tab, filePath, theme }: { item: any; tab: stri
     return <div style={{ width: 72, height: 72, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{folderIcon}</div>;
   }
   if (!previewable || failed) {
-    return <div style={{ width: 72, height: 72, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{FILE_THEMES[theme].file}</div>;
+    return <div style={{ width: 72, height: 72, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{FILE_THEMES[theme].fileFor(item.name)}</div>;
   }
 
   return (
@@ -246,8 +222,8 @@ export function Files() {
   const [hiddenNames, setHiddenNames] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [hiddenInput, setHiddenInput] = useState("");
-  const [filesTheme, setFilesTheme] = useState<FileTheme>("standard");
-  const [themeInput, setThemeInput] = useState<FileTheme>("standard");
+  const [filesTheme, setFilesTheme] = useState<FileTheme>("win7");
+  const [themeInput, setThemeInput] = useState<FileTheme>("win7");
   const [savingHidden, setSavingHidden] = useState(false);
   const [previewItem, setPreviewItem] = useState<any | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -271,7 +247,7 @@ export function Files() {
       const data = await api.files.hidden();
       setHiddenNames(parseHidden(data.names || ""));
       setHiddenInput(data.names || "");
-      const savedTheme = ((data as any).theme || "standard") as FileTheme;
+      const savedTheme: FileTheme = (data as any).theme === "macos" ? "macos" : "win7";
       setFilesTheme(savedTheme);
       setThemeInput(savedTheme);
     } catch (e) {
@@ -453,64 +429,41 @@ export function Files() {
           {visibleFiles.length === 0 ? (
             <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>Папка пуста</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, 96px)", gap: 4, justifyContent: "start" }}>
               {visibleFiles.map((item: any) => {
                 const filePath = joinPath(currentFolder, item.name);
                 return (
                   <div
                     key={item.name}
                     onClick={() => handleItemClick(item)}
+                    title={item.name}
                     style={{
-                      padding: 12, borderRadius: 12, border: "1px solid var(--border-color)",
-                      background: "var(--bg-color)", display: "flex", alignItems: "center", gap: 12,
-                      cursor: "pointer", transition: "all 0.15s", position: "relative",
+                      padding: "10px 6px 8px", borderRadius: 10, border: "none",
+                      background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                      cursor: "pointer", transition: "background 0.15s", position: "relative",
                     }}
                     onMouseEnter={(e) => {
                       (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-                      (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                      (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
                     }}
                     onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = "var(--bg-color)";
-                      (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-                      (e.currentTarget as HTMLElement).style.boxShadow = "none";
+                      (e.currentTarget as HTMLElement).style.background = "transparent";
                     }}
                   >
-                    {item.isDirectory ? (
-                      <>
-                        <button
-                          onClick={(e) => handleDownloadFolder(e, item)}
-                          title="Скачать папку как ZIP"
-                          style={{ ...iconButtonStyle, width: 26, height: 26, borderRadius: 7, position: "absolute", top: 8, right: 8 }}
-                        >
-                          {downloadIcon}
-                        </button>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%", paddingTop: 10 }}>
-                          {FILE_THEMES[filesTheme].folder}
-                          <div style={{ fontSize: 12, fontWeight: 500, textAlign: "center", width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {item.name}
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <FilePreviewThumb item={item} tab={activeTab} filePath={filePath} theme={filesTheme} />
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {item.name}
-                          </div>
-                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
-                            {formatSize(item.size)}
-                          </div>
-                        </div>
-                        <button
-                          onClick={(e) => handleDownloadFile(e, item)}
-                          title="Скачать"
-                          style={iconButtonStyle}
-                        >
-                          {downloadIcon}
-                        </button>
-                      </>
+                    <button
+                      onClick={(e) => item.isDirectory ? handleDownloadFolder(e, item) : handleDownloadFile(e, item)}
+                      title={item.isDirectory ? "Скачать папку как ZIP" : "Скачать"}
+                      style={{ ...iconButtonStyle, width: 24, height: 24, borderRadius: 7, position: "absolute", top: 4, right: 4, opacity: 0.85 }}
+                    >
+                      {downloadIcon}
+                    </button>
+                    {item.isDirectory ? FILE_THEMES[filesTheme].folder : <FilePreviewThumb item={item} tab={activeTab} filePath={filePath} theme={filesTheme} />}
+                    <div style={{ fontSize: 12, fontWeight: 500, textAlign: "center", width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {item.name}
+                    </div>
+                    {!item.isDirectory && (
+                      <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: -2 }}>
+                        {formatSize(item.size)}
+                      </div>
                     )}
                   </div>
                 );
@@ -585,7 +538,7 @@ export function Files() {
           >
             <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>Настройки отображения</h3>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Тема иконок</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 16 }}>
               {(Object.keys(FILE_THEMES) as FileTheme[]).map((key) => {
                 const selected = themeInput === key;
                 return (
