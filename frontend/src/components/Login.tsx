@@ -605,6 +605,8 @@ export function Login() {
             <a href="/offer">Договор публичной оферты</a>
             <span aria-hidden="true">·</span>
             <a href="/privacy">Политика конфиденциальности</a>
+            <span aria-hidden="true">·</span>
+            <a href="/cookies">Политика использования cookies</a>
           </footer>
           </>)}
         </div>
