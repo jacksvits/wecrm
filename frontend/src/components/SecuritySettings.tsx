@@ -29,12 +29,16 @@ function IpAccessLists() {
   const [adding, setAdding] = useState<IpListType | null>(null);
   const [deletingId, setDeletingId] = useState('');
   const [error, setError] = useState('');
+  const [failureThreshold, setFailureThreshold] = useState(5);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
 
   const load = useCallback(async () => {
     setError('');
     try {
       const result = await api.security.ipRules();
       setRules(result.items);
+      setFailureThreshold(result.autoBlockThreshold);
     } catch (e: any) {
       setError(e?.message || 'Не удалось загрузить списки IP-адресов');
     } finally {
@@ -43,6 +47,22 @@ function IpAccessLists() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const saveSettings = async () => {
+    if (settingsSaving) return;
+    setSettingsSaving(true);
+    setSettingsSaved(false);
+    setError('');
+    try {
+      const result = await api.security.updateIpSettings(failureThreshold);
+      setFailureThreshold(result.failureThreshold);
+      setSettingsSaved(true);
+    } catch (e: any) {
+      setError(e?.message || 'Не удалось сохранить настройку автоблокировки');
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
 
   const add = async (listType: IpListType) => {
     const ipAddress = inputs[listType].trim();
@@ -83,7 +103,7 @@ function IpAccessLists() {
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{items.length}</span>
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45, minHeight: 35, marginBottom: 12 }}>
-          {isBlack ? 'Запрещают открытие страницы входа и авторизацию во всех организациях.' : 'Только отметка доверенных адресов; на доступ не влияет и не отменяет чёрный список.'}
+          {isBlack ? 'Запрещают страницу входа и авторизацию. Добавление удаляет адрес из белого списка.' : 'Исключают автоматическую блокировку. Добавление удаляет адрес из чёрного списка.'}
         </div>
         <form onSubmit={(event) => { event.preventDefault(); add(listType); }} style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
           <input
@@ -120,6 +140,35 @@ function IpAccessLists() {
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Общие списки для главного проекта и всех организаций · поддерживаются IPv4 и IPv6</div>
       </div>
       {error && <div style={{ padding: 12, marginBottom: 12, borderRadius: 10, background: '#fef2f2', color: '#b91c1c', fontSize: 13 }}>{error}</div>}
+      <section style={{ border: '1px solid var(--border-color)', borderRadius: 12, background: 'var(--bg-card)', padding: 16, marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 360px' }}>
+            <h4 style={{ margin: '0 0 5px', fontSize: 14 }}>Автоматическая блокировка по неудачным входам</h4>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              IP попадает в чёрный список после указанного числа неудачных попыток подряд. Успешный вход сбрасывает счётчик; белый список исключает автоблокировку.
+            </div>
+          </div>
+          <form onSubmit={(event) => { event.preventDefault(); saveSettings(); }} style={{ display: 'flex', alignItems: 'end', gap: 8, flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Неудачных попыток подряд
+              <input
+                type="number"
+                min={1}
+                max={1000}
+                step={1}
+                value={failureThreshold}
+                onChange={(event) => { setFailureThreshold(Number(event.target.value)); setSettingsSaved(false); }}
+                required
+                style={{ ...inputStyle, display: 'block', width: 150, marginTop: 6, fontFamily: 'inherit' }}
+              />
+            </label>
+            <button type="submit" disabled={settingsSaving || !Number.isInteger(failureThreshold) || failureThreshold < 1 || failureThreshold > 1000} style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: 'var(--accent-color)', color: '#fff', cursor: settingsSaving ? 'default' : 'pointer', opacity: settingsSaving ? 0.6 : 1 }}>
+              {settingsSaving ? 'Сохранение…' : 'Сохранить'}
+            </button>
+          </form>
+        </div>
+        {settingsSaved && <div style={{ marginTop: 10, fontSize: 12, color: '#16a34a' }}>Настройка сохранена</div>}
+      </section>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
         {renderList('white')}
         {renderList('black')}

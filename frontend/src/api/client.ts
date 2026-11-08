@@ -377,7 +377,9 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
       fetchApi(`/api/security/auth-events?page=${page}`),
     ipInfo: (ip: string): Promise<{ ip: string; country: string | null; city: string | null; registrationCountry: string | null; organization: string | null }> =>
       fetchApi(`/api/security/ip-info?ip=${encodeURIComponent(ip)}`),
-    ipRules: (): Promise<{ items: any[] }> => fetchApi('/api/security/ip-rules'),
+    ipRules: (): Promise<{ items: any[]; autoBlockThreshold: number }> => fetchApi('/api/security/ip-rules'),
+    updateIpSettings: (failureThreshold: number): Promise<{ failureThreshold: number }> =>
+      fetchApi('/api/security/ip-settings', { method: 'PATCH', body: JSON.stringify({ failureThreshold }) }),
     addIpRule: (ipAddress: string, listType: 'white' | 'black'): Promise<any> =>
       fetchApi('/api/security/ip-rules', { method: 'POST', body: JSON.stringify({ ipAddress, listType }) }),
     deleteIpRule: (id: string): Promise<{ ok: boolean }> =>

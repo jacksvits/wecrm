@@ -2099,6 +2099,14 @@ model IpAccessRule {
   @@map("ip_access_rules")
 }
 
+model IpSecuritySettings {
+  id               Int      @id @default(1)
+  failureThreshold Int      @default(5) @map("failure_threshold")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("ip_security_settings")
+}
+
 // ==== Мультитенантность платформы ====
 // Реестр организаций. Главная организация живёт в основной БД (DATABASE_URL)
 // и в этой таблице не нуждается; каждая запись — отдельная БД wecrm_t_<slug>.

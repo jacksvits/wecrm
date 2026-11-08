@@ -6,6 +6,39 @@ type TenantOverride = { id?: string | null; slug: string; name: string; isMain?:
 
 const recentSuccessfulEvents = new Map<string, number>();
 const SUCCESS_EVENT_DEDUPE_MS = 2000;
+const DEFAULT_FAILURE_THRESHOLD = 5;
+
+async function autoBlockAfterConsecutiveFailures(ipAddress: string): Promise<void> {
+  if (ipAddress === 'unknown') return;
+  const db = platformPrisma as any;
+  const settings = await db.ipSecuritySettings.findUnique({ where: { id: 1 } });
+  const threshold = settings?.failureThreshold || DEFAULT_FAILURE_THRESHOLD;
+  const trusted = await db.ipAccessRule.findFirst({
+    where: { ipAddress, listType: 'white' },
+    select: { id: true },
+  });
+  if (trusted) return;
+
+  const events = await db.authEvent.findMany({
+    where: { ipAddress, authMethod: { not: 'blocked-ip' } },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: threshold,
+    select: { success: true },
+  });
+  let failures = 0;
+  for (const event of events) {
+    if (event.success) break;
+    failures += 1;
+  }
+  if (failures < threshold) return;
+
+  await db.ipAccessRule.upsert({
+    where: { ipAddress_listType: { ipAddress, listType: 'black' } },
+    create: { ipAddress, listType: 'black' },
+    update: {},
+  });
+  console.warn(`[security] IP ${ipAddress} автоматически добавлен в чёрный список после ${failures} неудачных входов подряд`);
+}
 
 /** Успешные и неудачные входы всех организаций пишем централизованно в platform DB. */
 export async function recordAuthEvent(
@@ -48,6 +81,14 @@ export async function recordAuthEvent(
         success,
       },
     });
+    if (!success) {
+      try {
+        await autoBlockAfterConsecutiveFailures(getClientIp(req));
+      } catch (err: any) {
+        // Ошибка автоблокировки не должна менять ответ на исходную попытку входа.
+        console.error('[security] Не удалось выполнить автоблокировку IP:', err?.message || err);
+      }
+    }
   } catch (err: any) {
     // Журнал не должен блокировать вход; ошибка остаётся видимой в серверном журнале.
     console.error('[security] Не удалось записать авторизацию:', err?.message || err);

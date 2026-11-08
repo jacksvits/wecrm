@@ -180,10 +180,13 @@ router.get('/ip-info', authMiddleware, requirePlatformAdmin, async (req, res) =>
 
 router.get('/ip-rules', authMiddleware, requirePlatformAdmin, async (_req, res) => {
   try {
-    const items = await (platformPrisma as any).ipAccessRule.findMany({
-      orderBy: [{ listType: 'asc' }, { createdAt: 'desc' }],
-    });
-    res.json({ items });
+    const [items, settings] = await Promise.all([
+      (platformPrisma as any).ipAccessRule.findMany({
+        orderBy: [{ listType: 'asc' }, { createdAt: 'desc' }],
+      }),
+      (platformPrisma as any).ipSecuritySettings.findUnique({ where: { id: 1 } }),
+    ]);
+    res.json({ items, autoBlockThreshold: settings?.failureThreshold || 5 });
   } catch (err: any) {
     console.error('[security] ip-rules list:', err?.message || err);
     res.status(500).json({ error: 'Не удалось загрузить списки IP-адресов' });
@@ -196,12 +199,34 @@ router.post('/ip-rules', authMiddleware, requirePlatformAdmin, async (req, res) 
     const listType = String(req.body?.listType || '');
     if (!ipAddress) return res.status(400).json({ error: 'Введите корректный IPv4- или IPv6-адрес' });
     if (!['white', 'black'].includes(listType)) return res.status(400).json({ error: 'Неизвестный тип списка' });
-    const item = await (platformPrisma as any).ipAccessRule.create({ data: { ipAddress, listType } });
+    const item = await platformPrisma.$transaction(async (tx: any) => {
+      // Адрес находится только в одном списке: добавление переносит его из противоположного.
+      await tx.ipAccessRule.deleteMany({ where: { ipAddress, listType: listType === 'white' ? 'black' : 'white' } });
+      return tx.ipAccessRule.create({ data: { ipAddress, listType } });
+    });
     res.status(201).json(item);
   } catch (err: any) {
     if (err?.code === 'P2002') return res.status(409).json({ error: 'Этот IP-адрес уже есть в выбранном списке' });
     console.error('[security] ip-rules create:', err?.message || err);
     res.status(500).json({ error: 'Не удалось добавить IP-адрес' });
+  }
+});
+
+router.patch('/ip-settings', authMiddleware, requirePlatformAdmin, async (req, res) => {
+  try {
+    const failureThreshold = Number(req.body?.failureThreshold);
+    if (!Number.isInteger(failureThreshold) || failureThreshold < 1 || failureThreshold > 1000) {
+      return res.status(400).json({ error: 'Укажите целое число от 1 до 1000' });
+    }
+    const settings = await (platformPrisma as any).ipSecuritySettings.upsert({
+      where: { id: 1 },
+      create: { id: 1, failureThreshold },
+      update: { failureThreshold },
+    });
+    res.json({ failureThreshold: settings.failureThreshold });
+  } catch (err: any) {
+    console.error('[security] ip-settings update:', err?.message || err);
+    res.status(500).json({ error: 'Не удалось сохранить настройку автоблокировки' });
   }
 });
 
