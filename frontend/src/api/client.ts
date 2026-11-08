@@ -474,8 +474,8 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
 
   // Публичные юридические документы (доступны до авторизации; запись — только admin)
   legal: {
-    get: (slug: 'offer' | 'privacy'): Promise<{ slug: string; title: string; content: string; updatedAt: string | null }> => fetchApi(`/api/legal/${slug}`),
-    save: (slug: 'offer' | 'privacy', content: string) => fetchApi(`/api/legal/${slug}`, { method: 'PUT', body: JSON.stringify({ content }) }),
+    get: (slug: 'offer' | 'privacy' | 'cookies'): Promise<{ slug: string; title: string; content: string; updatedAt: string | null }> => fetchApi(`/api/legal/${slug}`),
+    save: (slug: 'offer' | 'privacy' | 'cookies', content: string) => fetchApi(`/api/legal/${slug}`, { method: 'PUT', body: JSON.stringify({ content }) }),
   },
 
   // Почтовый клиент (страница /mail, только для админов)

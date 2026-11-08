@@ -92,8 +92,9 @@ export function SystemSettings() {
   // === Юридические документы: публичная оферта и политика конфиденциальности ===
   const [legalOffer, setLegalOffer] = useState("");
   const [legalPrivacy, setLegalPrivacy] = useState("");
+  const [legalCookies, setLegalCookies] = useState("");
   const [legalLoading, setLegalLoading] = useState(true);
-  const [legalSaving, setLegalSaving] = useState<"offer" | "privacy" | null>(null);
+  const [legalSaving, setLegalSaving] = useState<"offer" | "privacy" | "cookies" | null>(null);
 
   useEffect(() => {
     Promise.all([api.handlerSettings.get(), api.autoReplySettings.get(), api.users.list()])
@@ -115,10 +116,11 @@ export function SystemSettings() {
   }, []);
 
   useEffect(() => {
-    Promise.all([api.legal.get("offer"), api.legal.get("privacy")])
-      .then(([offer, privacy]) => {
+    Promise.all([api.legal.get("offer"), api.legal.get("privacy"), api.legal.get("cookies")])
+      .then(([offer, privacy, cookies]) => {
         setLegalOffer(offer.content || "");
         setLegalPrivacy(privacy.content || "");
+        setLegalCookies(cookies.content || "");
         setLegalLoading(false);
       })
       .catch(() => setLegalLoading(false));
@@ -1162,9 +1164,9 @@ export function SystemSettings() {
   );
 
   // === Под-вкладка «Документы»: публичная оферта и политика конфиденциальности ===
-  const saveLegal = async (slug: "offer" | "privacy") => {
+  const saveLegal = async (slug: "offer" | "privacy" | "cookies") => {
     setLegalSaving(slug);
-    try { await api.legal.save(slug, slug === "offer" ? legalOffer : legalPrivacy); alert("Сохранено"); }
+    try { await api.legal.save(slug, slug === "offer" ? legalOffer : slug === "privacy" ? legalPrivacy : legalCookies); alert("Сохранено"); }
     catch (e: any) { alert("Ошибка: " + e.message); }
     finally { setLegalSaving(null); }
   };
@@ -1196,6 +1198,11 @@ export function SystemSettings() {
           <h3 style={{ marginTop: 0, marginBottom: 12 }}>Политика конфиденциальности</h3>
           <ReactQuill theme="snow" value={legalPrivacy} onChange={setLegalPrivacy} modules={quillModules} formats={quillFormats} style={editorStyle} />
           <button onClick={() => saveLegal("privacy")} disabled={legalSaving === "privacy"} style={btnLegal}>{legalSaving === "privacy" ? "Сохранение..." : "Сохранить политику"}</button>
+        </div>
+        <div style={cardStyle}>
+          <h3 style={{ marginTop: 0, marginBottom: 12 }}>Политика использования cookies</h3>
+          <ReactQuill theme="snow" value={legalCookies} onChange={setLegalCookies} modules={quillModules} formats={quillFormats} style={editorStyle} />
+          <button onClick={() => saveLegal("cookies")} disabled={legalSaving === "cookies"} style={btnLegal}>{legalSaving === "cookies" ? "Сохранение..." : "Сохранить cookies-политику"}</button>
         </div>
       </div>
     );

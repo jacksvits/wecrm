@@ -1103,6 +1103,18 @@ html, body { overflow-x: hidden; }
 .login-legal-footer { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap; white-space: nowrap; margin-top: 0; padding-top: 14px; border-top: 1px solid #ececf1; font-size: 11.5px; line-height: 1.35; color: #8a8a95; }
 .login-legal-footer a { color: #6aa832; text-decoration: none; font-weight: 600; transition: color 0.2s, opacity 0.2s; }
 .login-legal-footer a:hover { color: #3f8f0f; opacity: 0.9; }
+
+/* Плашка согласия на обработку cookie (только страница авторизации) */
+.cookie-consent { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 3000; width: calc(100% - 32px); max-width: 560px; padding: 20px 24px; background: #fff; color: #1a1a1a; border: 1px solid #e8e8ee; border-radius: 18px; box-shadow: 0 16px 48px rgba(31, 41, 55, 0.18); }
+.cookie-consent-close { position: absolute; top: 8px; right: 12px; width: 30px; height: 30px; border: none; background: transparent; color: #9aa0ab; font-size: 22px; line-height: 1; cursor: pointer; transition: color 0.2s; }
+.cookie-consent-close:hover { color: #1a1a1a; }
+.cookie-consent-text { margin: 0 0 16px; font-size: 15px; line-height: 1.65; }
+.cookie-consent-more { color: #2f7fe0; font-weight: 600; text-decoration: none; }
+.cookie-consent-more:hover { text-decoration: underline; }
+.cookie-consent-btn { display: inline-block; padding: 12px 34px; border: 2px solid #1a1a1a; border-radius: 999px; background: #fff; color: #1a1a1a; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s, color 0.2s; }
+.cookie-consent-btn:hover { background: #1a1a1a; color: #fff; }
+@media (max-width: 640px) { .cookie-consent { bottom: 12px; padding: 16px 18px; border-radius: 14px; } .cookie-consent-text { font-size: 14px; margin-bottom: 14px; } .cookie-consent-btn { width: 100%; padding: 12px 0; } }
+
 .legal-page { min-height: 100vh; padding: 40px 20px 64px; background: #f5f6fa; color: #1a1a1a; }
 .legal-card { width: 100%; max-width: 900px; margin: 0 auto; padding: 34px; background: #fff; border: 1px solid #e8e8ee; border-radius: 22px; box-shadow: 0 18px 50px rgba(31, 41, 55, 0.08); }
 .legal-back { display: inline-flex; margin-bottom: 18px; color: #5eb21f; font-weight: 700; text-decoration: none; }

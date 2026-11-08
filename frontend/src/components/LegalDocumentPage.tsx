@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { seoBaseTitle } from '../lib/seo';
-type LegalSlug = 'offer' | 'privacy';
+type LegalSlug = 'offer' | 'privacy' | 'cookies';
 export function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
   const [doc, setDoc] = useState<{ title: string; content: string; updatedAt: string | null } | null>(null);
   const [error, setError] = useState('');
