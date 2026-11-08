@@ -98,10 +98,8 @@ export function Files() {
   };
 
   const tabLabel = TABS.find((t) => t.key === activeTab)?.label || "Файлы";
-  // Во вкладке «Система» скрытие не применяется — она показывает «сырой» корень хранилища
-  const visibleFiles = activeTab === "system"
-    ? files
-    : files.filter((item) => !hiddenNames.includes(String(item.name).toLowerCase()));
+  // Скрытие по списку применяется во всех вкладках, включая «Система»
+  const visibleFiles = files.filter((item) => !hiddenNames.includes(String(item.name).toLowerCase()));
 
   const handleSaveHidden = async () => {
     setSavingHidden(true);
@@ -256,7 +254,7 @@ export function Files() {
           >
             <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>Настройки отображения</h3>
             <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>
-              Имена файлов и папок через запятую, которые нужно скрывать во вкладках (кроме «Система»).
+              Имена файлов и папок через запятую, которые нужно скрывать во вкладках.
               Например: .DS_Store, Thumbs.db, backup
             </div>
             <textarea
