@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { useAuth } from "../hooks/useAuth";
 
-const TABS = [
+const ALL_TABS = [
+  { key: "system", label: "Система" },
   { key: "programs", label: "Программы" },
   { key: "drivers", label: "Драйвера" },
   { key: "documents", label: "Документы" },
@@ -9,7 +11,11 @@ const TABS = [
 ];
 
 export function Files() {
-  const [activeTab, setActiveTab] = useState("programs");
+  const { user } = useAuth();
+  const isAdmin = (user as any)?.role === "admin";
+  // Вкладка «Система» (корень хранилища) — только для администраторов
+  const TABS = isAdmin ? ALL_TABS : ALL_TABS.filter((t) => t.key !== "system");
+  const [activeTab, setActiveTab] = useState(isAdmin ? "system" : "programs");
   const [settings, setSettings] = useState<Record<string, { url: string; path: string }>>({});
   const [loading, setLoading] = useState(true);
   const [files, setFiles] = useState<any[]>([]);

@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import fs from 'fs';
 import path from 'path';
 import * as archiver from 'archiver';
+import { uploadsRoot } from '../lib/tenant.js';
 
 const router = Router();
 
@@ -15,7 +16,12 @@ const TAB_DIRS: Record<string, string> = {
   games: '/app/files/games',
 };
 
-router.get('/tabs', authMiddleware, async (_req, res) => {
+// Вкладка «Система» — корень хранилища текущего tenant'а
+// (main: /app/uploads, tenant: /app/tenants/<slug>); только для администраторов
+const resolveTabDir = (tabKey: string): string | undefined =>
+  tabKey === 'system' ? uploadsRoot() : TAB_DIRS[tabKey];
+
+router.get('/tabs', authMiddleware, async (req, res) => {
   try {
     const tabs = await prisma.fileTabSetting.findMany();
     const defaults = [
@@ -28,6 +34,9 @@ router.get('/tabs', authMiddleware, async (_req, res) => {
       const found = tabs.find(t => t.tabKey === d.tabKey);
       return { ...d, url: found?.url || '', path: found?.path || d.path, id: found?.id || null };
     });
+    if ((req as any).user?.role === 'admin') {
+      merged.unshift({ tabKey: 'system', label: 'Система', url: '', path: uploadsRoot(), id: null });
+    }
     res.json(merged);
   } catch (e: any) {
     console.error('[Files/Tabs] Error loading tabs:', e?.message || e);
@@ -59,10 +68,13 @@ router.post('/tabs/:tabKey', authMiddleware, async (req, res) => {
 router.get('/browse', authMiddleware, (req, res) => {
   const tabKey = (req.query.tab as string) || '';
   const subPath = (req.query.path as string) || '';
-  const baseDir = TAB_DIRS[tabKey];
+  const baseDir = resolveTabDir(tabKey);
 
   if (!baseDir) {
     return res.status(400).json({ error: 'Неверная вкладка' });
+  }
+  if (tabKey === 'system' && (req as any).user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Доступ запрещен' });
   }
 
   const targetDir = path.join(baseDir, path.normalize(subPath).replace(/^(..(\/|$))+/g, ''));
@@ -98,10 +110,13 @@ router.get('/browse', authMiddleware, (req, res) => {
 router.get('/download', authMiddleware, (req, res) => {
   const tabKey = (req.query.tab as string) || '';
   const filePath = (req.query.path as string) || '';
-  const baseDir = TAB_DIRS[tabKey];
+  const baseDir = resolveTabDir(tabKey);
 
   if (!baseDir) {
     return res.status(400).json({ error: 'Неверная вкладка' });
+  }
+  if (tabKey === 'system' && (req as any).user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Доступ запрещен' });
   }
 
   const targetFile = path.join(baseDir, path.normalize(filePath).replace(/^(..(\/|$))+/g, ''));
@@ -141,10 +156,13 @@ router.get('/download', authMiddleware, (req, res) => {
 router.get('/download-folder', authMiddleware, (req, res) => {
   const tabKey = (req.query.tab as string) || '';
   const folderPath = (req.query.path as string) || '';
-  const baseDir = TAB_DIRS[tabKey];
+  const baseDir = resolveTabDir(tabKey);
 
   if (!baseDir) {
     return res.status(400).json({ error: 'Неверная вкладка' });
+  }
+  if (tabKey === 'system' && (req as any).user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Доступ запрещен' });
   }
 
   const targetDir = path.join(baseDir, path.normalize(folderPath).replace(/^(..(\/|$))+/g, ''));
