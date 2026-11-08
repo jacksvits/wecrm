@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict QvugyQzJHe65iTsqak9mHX9DIOf0FOego4MfcfxSNomIZDuu4QaJvognaAD2DaD
+\restrict ce2luYeRJ0Xq070BiRC3Q5aFtSphM9pO29kYlvaoiqHAK9JN9vqS2Gyyd0MF0mF
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -651,7 +651,7 @@ CREATE TABLE public.file_hide_settings (
     names text DEFAULT ''::text NOT NULL,
     updated_at timestamp(3) without time zone NOT NULL,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    theme text DEFAULT 'standard'::text NOT NULL
+    theme text DEFAULT 'win7'::text NOT NULL
 );
 
 
@@ -5161,13 +5161,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QvugyQzJHe65iTsqak9mHX9DIOf0FOego4MfcfxSNomIZDuu4QaJvognaAD2DaD
+\unrestrict ce2luYeRJ0Xq070BiRC3Q5aFtSphM9pO29kYlvaoiqHAK9JN9vqS2Gyyd0MF0mF
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict UnTIHvKM7BpOuSuv3pTrC3X3dh7ZHBtHg5oy37W9VceqtoiIG9Ra7fyu94C5He8
+\restrict JPd6iEjdSEfSufV8CRFJWS8pkA5jlqf724Tin3RMWLwyXxzTy4iHKlyI943UnYY
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -5380,11 +5380,12 @@ INSERT INTO public._prisma_migrations VALUES ('887cc3a6-5577-4104-ba32-c444d9f45
 INSERT INTO public._prisma_migrations VALUES ('3bb94dc0-4a5d-477e-b29a-fcb8c2264583', '314d0bf256ee5d6374b08fedffeb3228825213760a622092abc5fb81ec44de6d', '2026-11-07 23:04:18.840875+00', '20261108014000_product_source', NULL, NULL, '2026-11-07 23:04:18.830702+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('697098c7-543b-493e-ba77-6a941ed354cd', '136ccd19f432467cad3d3095899f6bff5dd348f4679c234177cc50c7ca3f381b', '2026-11-08 09:03:27.721974+00', '20261108090000_file_hide_settings', NULL, NULL, '2026-11-08 09:03:27.698717+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('439740c5-91f7-4c7f-ad06-46ecadafb7d0', '41f8c2597da9a22588e99ac35f84e65e0b08062f057c49932b983bb8ce7c67f2', '2026-11-08 16:19:18.729091+00', '20261108120000_files_page_theme', NULL, NULL, '2026-11-08 16:19:18.717762+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('0f2551ef-1c83-4dfa-8771-a05975b21e71', '4fc99ef1d24be6137d1d7979ef962fa634bf9b73443cb2d09bb2b9836cf9e9d1', '2026-11-08 16:47:04.147637+00', '20261108133000_files_theme_default_win7', NULL, NULL, '2026-11-08 16:47:04.130001+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict UnTIHvKM7BpOuSuv3pTrC3X3dh7ZHBtHg5oy37W9VceqtoiIG9Ra7fyu94C5He8
+\unrestrict JPd6iEjdSEfSufV8CRFJWS8pkA5jlqf724Tin3RMWLwyXxzTy4iHKlyI943UnYY
 
