@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 
@@ -10,9 +10,163 @@ const ALL_TABS = [
   { key: "games", label: "Игры" },
 ];
 
+const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "svg"]);
+const PDF_EXTENSION = "pdf";
+
 // Разбор списка скрытых имён: через запятую, без пробелов и регистра
 const parseHidden = (value: string): string[] =>
   value.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+const fileExtension = (name: string) => name.split(".").pop()?.toLowerCase() || "";
+const isImageFile = (name: string) => IMAGE_EXTENSIONS.has(fileExtension(name));
+const isPdfFile = (name: string) => fileExtension(name) === PDF_EXTENSION;
+const isPreviewableFile = (name: string) => isImageFile(name) || isPdfFile(name);
+const joinPath = (folder: string, name: string) => (folder ? `${folder}/${name}` : name);
+
+const downloadIcon = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+    <polyline points="7 10 12 15 17 10"></polyline>
+    <line x1="12" y1="15" x2="12" y2="3"></line>
+  </svg>
+);
+
+const closeIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+);
+
+const folderIcon = (
+  <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#007AFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" fill="#D8EBFF"></path>
+  </svg>
+);
+
+const fileIcon = (
+  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#8A94A6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#F1F4F8"></path>
+    <polyline points="14 2 14 8 20 8"></polyline>
+  </svg>
+);
+
+let pdfjsPromise: Promise<any> | null = null;
+
+const loadPdfjs = () => {
+  if (!pdfjsPromise) {
+    pdfjsPromise = Promise.all([
+      import("pdfjs-dist"),
+      import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
+    ]).then(([pdfjs, workerUrl]) => {
+      pdfjs.GlobalWorkerOptions.workerSrc = workerUrl.default;
+      return pdfjs;
+    });
+  }
+  return pdfjsPromise;
+};
+
+const renderPdfPreview = async (blob: Blob): Promise<string> => {
+  const pdfjs = await loadPdfjs();
+  const data = await blob.arrayBuffer();
+  const doc = await pdfjs.getDocument({ data }).promise;
+  try {
+    const page = await doc.getPage(1);
+    const baseViewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(144 / baseViewport.width, 144 / baseViewport.height);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.floor(viewport.width));
+    canvas.height = Math.max(1, Math.floor(viewport.height));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas недоступен");
+    await page.render({ canvasContext: context, viewport }).promise;
+    return canvas.toDataURL("image/png");
+  } finally {
+    await doc.destroy();
+  }
+};
+
+function FilePreviewThumb({ item, tab, filePath }: { item: any; tab: string; filePath: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const previewable = !item.isDirectory && isPreviewableFile(item.name);
+
+  useEffect(() => {
+    if (!previewable) return;
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    const element = ref.current;
+    if (!element) return;
+
+    const load = async () => {
+      try {
+        const blob = await api.files.previewFile(tab, filePath);
+        if (cancelled) return;
+        if (isImageFile(item.name)) {
+          objectUrl = URL.createObjectURL(blob);
+          setSrc(objectUrl);
+        } else {
+          setSrc(await renderPdfPreview(blob));
+        }
+      } catch (e) {
+        console.error("Ошибка загрузки превью:", e);
+        if (!cancelled) setFailed(true);
+      }
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) {
+        observer.disconnect();
+        load();
+      }
+    }, { rootMargin: "120px" });
+    observer.observe(element);
+
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [filePath, item.name, previewable, tab]);
+
+  if (item.isDirectory) {
+    return <div style={{ width: 72, height: 72, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{folderIcon}</div>;
+  }
+  if (!previewable || failed) {
+    return <div style={{ width: 72, height: 72, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{fileIcon}</div>;
+  }
+
+  return (
+    <div
+      ref={ref}
+      title="Открыть превью"
+      style={{
+        width: 72,
+        height: 72,
+        flexShrink: 0,
+        overflow: "hidden",
+        borderRadius: 10,
+        border: "1px solid var(--border-color)",
+        background: "var(--bg-hover)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {src ? (
+        <img
+          src={src}
+          alt={item.name}
+          style={{ width: "100%", height: "100%", objectFit: isPdfFile(item.name) ? "contain" : "cover", display: "block", background: "#fff" }}
+        />
+      ) : (
+        <div style={{ width: "70%", height: "70%", borderRadius: 8, background: "linear-gradient(90deg, #E8EDF3, #F7F9FC, #E8EDF3)" }} />
+      )}
+    </div>
+  );
+}
 
 export function Files() {
   const { user } = useAuth();
@@ -30,6 +184,9 @@ export function Files() {
   const [showSettings, setShowSettings] = useState(false);
   const [hiddenInput, setHiddenInput] = useState("");
   const [savingHidden, setSavingHidden] = useState(false);
+  const [previewItem, setPreviewItem] = useState<any | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const loadSettings = async () => {
     try {
@@ -67,6 +224,43 @@ export function Files() {
       .finally(() => setFilesLoading(false));
   }, [activeTab, currentFolder]);
 
+  useEffect(() => {
+    if (!previewItem) {
+      setPreviewUrl(null);
+      return;
+    }
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setPreviewLoading(true);
+    api.files.previewFile(activeTab, joinPath(currentFolder, previewItem.name))
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      })
+      .catch((e: any) => {
+        if (cancelled) return;
+        alert("Ошибка загрузки превью: " + e.message);
+        setPreviewItem(null);
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [activeTab, currentFolder, previewItem]);
+
+  useEffect(() => {
+    if (!previewItem) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPreviewItem(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewItem]);
+
   const formatSize = (bytes: number) => {
     if (bytes === 0) return "0 B";
     const k = 1024;
@@ -78,16 +272,24 @@ export function Files() {
   const handleItemClick = (item: any) => {
     if (item.isDirectory) {
       setCurrentFolder((prev) => (prev ? prev + "/" + item.name : item.name));
+    } else if (isPreviewableFile(item.name)) {
+      setPreviewItem(item);
     } else {
-      const filePath = currentFolder ? currentFolder + "/" + item.name : item.name;
+      const filePath = joinPath(currentFolder, item.name);
       api.files.downloadFile(activeTab, filePath).catch((e: any) => alert("Ошибка скачивания: " + e.message));
     }
   };
 
+  const handleDownloadFile = (e: React.MouseEvent, item: any) => {
+    e.stopPropagation();
+    const filePath = joinPath(currentFolder, item.name);
+    api.files.downloadFile(activeTab, filePath).catch((err: any) => alert("Ошибка скачивания: " + err.message));
+  };
+
   const handleDownloadFolder = (e: React.MouseEvent, item: any) => {
     e.stopPropagation();
-    const folderPath = currentFolder ? currentFolder + "/" + item.name : item.name;
-    api.files.downloadFolder(activeTab, folderPath).catch((e: any) => alert("Ошибка скачивания: " + e.message));
+    const folderPath = joinPath(currentFolder, item.name);
+    api.files.downloadFolder(activeTab, folderPath).catch((err: any) => alert("Ошибка скачивания: " + err.message));
   };
 
   const handleBack = () => {
@@ -122,7 +324,7 @@ export function Files() {
           {TABS.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => { setActiveTab(tab.key); setCurrentFolder(""); }}
+              onClick={() => { setActiveTab(tab.key); setCurrentFolder(""); setPreviewItem(null); }}
               style={{
                 padding: "10px 16px",
                 border: "none",
@@ -183,56 +385,106 @@ export function Files() {
             <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>Папка пуста</div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
-              {visibleFiles.map((item: any) => (
-                <div
-                  key={item.name}
-                  onClick={() => handleItemClick(item)}
-                  style={{
-                    padding: 16, borderRadius: 12, border: "1px solid var(--border-color)",
-                    background: "var(--bg-color)", display: "flex", alignItems: "center", gap: 12,
-                    cursor: "pointer", transition: "all 0.15s", position: "relative",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-                    (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                    (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "var(--bg-color)";
-                    (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-                    (e.currentTarget as HTMLElement).style.boxShadow = "none";
-                  }}
-                >
-                  <div style={{ fontSize: 32, flexShrink: 0 }}>{item.isDirectory ? "📁" : "📄"}</div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {item.name}
+              {visibleFiles.map((item: any) => {
+                const filePath = joinPath(currentFolder, item.name);
+                return (
+                  <div
+                    key={item.name}
+                    onClick={() => handleItemClick(item)}
+                    style={{
+                      padding: 12, borderRadius: 12, border: "1px solid var(--border-color)",
+                      background: "var(--bg-color)", display: "flex", alignItems: "center", gap: 12,
+                      cursor: "pointer", transition: "all 0.15s", position: "relative",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+                      (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+                      (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "var(--bg-color)";
+                      (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                      (e.currentTarget as HTMLElement).style.boxShadow = "none";
+                    }}
+                  >
+                    <FilePreviewThumb item={item} tab={activeTab} filePath={filePath} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {item.name}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+                        {item.isDirectory ? "Папка" : formatSize(item.size)}
+                      </div>
                     </div>
-                    {!item.isDirectory && (
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{formatSize(item.size)}</div>
+                    {item.isDirectory ? (
+                      <button
+                        onClick={(e) => handleDownloadFolder(e, item)}
+                        title="Скачать папку как ZIP"
+                        style={iconButtonStyle}
+                      >
+                        {downloadIcon}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => handleDownloadFile(e, item)}
+                        title="Скачать"
+                        style={iconButtonStyle}
+                      >
+                        {downloadIcon}
+                      </button>
                     )}
                   </div>
-                  {item.isDirectory && (
-                    <button
-                      onClick={(e) => handleDownloadFolder(e, item)}
-                      title="Скачать папку как ZIP"
-                      style={{
-                        padding: "6px 8px", borderRadius: 6, border: "none", background: "#007AFF",
-                        color: "#fff", cursor: "pointer", fontSize: 12, flexShrink: 0, marginLeft: 4,
-                      }}
-                      onMouseEnter={(e) => e.stopPropagation()}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                      </svg> ZIP
-                    </button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Модальное окно просмотра изображений и PDF */}
+      {previewItem && (
+        <div
+          onClick={() => setPreviewItem(null)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1100,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--bg-color)", borderRadius: 16, width: "min(920px, calc(100vw - 32px))",
+              height: "min(720px, calc(100vh - 32px))", border: "1px solid var(--border-color)",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.28)", display: "flex", flexDirection: "column", overflow: "hidden",
+            }}
+          >
+            <div style={{ minHeight: 52, padding: "0 12px 0 18px", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border-color)" }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {previewItem.name}
+              </div>
+              <button
+                onClick={() => api.files.downloadFile(activeTab, joinPath(currentFolder, previewItem.name)).catch((e: any) => alert("Ошибка скачивания: " + e.message))}
+                title="Скачать"
+                style={iconButtonStyle}
+              >
+                {downloadIcon}
+              </button>
+              <button onClick={() => setPreviewItem(null)} title="Закрыть" style={{ ...iconButtonStyle, color: "var(--text-muted)" }}>
+                {closeIcon}
+              </button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, background: "var(--bg-hover)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+              {previewLoading ? (
+                <div style={{ color: "var(--text-muted)", fontSize: 14 }}>Загрузка превью...</div>
+              ) : previewUrl && isImageFile(previewItem.name) ? (
+                <img src={previewUrl} alt={previewItem.name} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 8, boxShadow: "0 6px 24px rgba(0,0,0,0.14)" }} />
+              ) : previewUrl && isPdfFile(previewItem.name) ? (
+                <iframe src={previewUrl} title={previewItem.name} style={{ width: "100%", height: "100%", border: "none", borderRadius: 8, background: "#fff" }} />
+              ) : (
+                <div style={{ color: "var(--text-muted)", fontSize: 14 }}>Превью недоступно</div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -295,3 +547,18 @@ export function Files() {
     </div>
   );
 }
+
+const iconButtonStyle: React.CSSProperties = {
+  width: 34,
+  height: 34,
+  padding: 0,
+  borderRadius: 8,
+  border: "1px solid var(--border-color)",
+  background: "var(--bg-color)",
+  color: "#007AFF",
+  cursor: "pointer",
+  flexShrink: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};

@@ -135,6 +135,70 @@ router.get('/browse', authMiddleware, (req, res) => {
   }
 });
 
+// Inline preview endpoint for images and PDF files
+const PREVIEW_TYPES: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.ico': 'image/x-icon',
+  '.svg': 'image/svg+xml',
+  '.pdf': 'application/pdf',
+};
+
+router.get('/preview', authMiddleware, (req, res) => {
+  const tabKey = (req.query.tab as string) || '';
+  const filePath = (req.query.path as string) || '';
+  const baseDir = resolveTabDir(tabKey);
+
+  if (!baseDir) {
+    return res.status(400).json({ error: 'Неверная вкладка' });
+  }
+  if (tabKey === 'system' && (req as any).user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Доступ запрещен' });
+  }
+
+  const targetFile = path.join(baseDir, path.normalize(filePath).replace(/^(..(\/|$))+/g, ''));
+  if (!targetFile.startsWith(baseDir)) {
+    return res.status(403).json({ error: 'Доступ запрещен' });
+  }
+
+  const contentType = PREVIEW_TYPES[path.extname(targetFile).toLowerCase()];
+  if (!contentType) {
+    return res.status(415).json({ error: 'Превью для этого типа файла не поддерживается' });
+  }
+
+  try {
+    if (!fs.existsSync(targetFile) || fs.statSync(targetFile).isDirectory()) {
+      return res.status(404).json({ error: 'Файл не найден' });
+    }
+    const filename = path.basename(targetFile);
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    const stream = fs.createReadStream(targetFile);
+    stream.on('error', (err) => {
+      console.error('File preview stream error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Ошибка загрузки превью' });
+      } else if (!res.writableEnded) {
+        res.end();
+      }
+    });
+    res.on('close', () => {
+      stream.destroy();
+    });
+    stream.pipe(res);
+  } catch (e: any) {
+    console.error('File preview error:', e);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Ошибка загрузки превью' });
+    }
+  }
+});
+
 // Universal download endpoint
 router.get('/download', authMiddleware, (req, res) => {
   const tabKey = (req.query.tab as string) || '';
