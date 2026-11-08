@@ -69,12 +69,22 @@ router.post('/tabs/:tabKey', authMiddleware, async (req, res) => {
   }
 });
 
+// Учёт скачивания файла/папки страницы «Файлы» (fire-and-forget)
+const incrementDownloadCount = (tabKey: string, filePath: string) => {
+  prisma.fileDownloadCount.upsert({
+    where: { tabKey_filePath: { tabKey, filePath } },
+    update: { count: { increment: 1 } },
+    create: { tabKey, filePath, count: 1 },
+  }).catch((e: any) => console.error('[Files/DownloadCount] Error:', e?.message || e));
+};
+
 // Список скрываемых файлов/папок (имена через запятую) — общая настройка страницы «Файлы»
 router.get('/hidden', authMiddleware, async (req, res) => {
   try {
     const row = await prisma.fileHideSetting.findFirst();
     const theme = row?.theme === 'macos' ? 'macos' : 'win7';
-    res.json({ names: row?.names || '', theme });
+    const viewMode = row?.viewMode === 'table' ? 'table' : 'icons';
+    res.json({ names: row?.names || '', theme, viewMode });
   } catch (e: any) {
     console.error('[Files/Hidden] Error loading hidden names:', e?.message || e);
     res.status(500).json({ error: 'Ошибка загрузки настроек', detail: e?.message });
@@ -89,12 +99,13 @@ router.post('/hidden', authMiddleware, async (req, res) => {
   const names = typeof req.body?.names === 'string' ? req.body.names.trim() : '';
   const ALLOWED_THEMES = ['win7', 'macos'];
   const theme = ALLOWED_THEMES.includes(req.body?.theme) ? req.body.theme : 'win7';
+  const viewMode = req.body?.viewMode === 'table' ? 'table' : 'icons';
   try {
     const existing = await prisma.fileHideSetting.findFirst();
     const row = existing
-      ? await prisma.fileHideSetting.update({ where: { id: existing.id }, data: { names, theme } })
-      : await prisma.fileHideSetting.create({ data: { names, theme } });
-    res.json({ names: row.names, theme: row.theme });
+      ? await prisma.fileHideSetting.update({ where: { id: existing.id }, data: { names, theme, viewMode } })
+      : await prisma.fileHideSetting.create({ data: { names, theme, viewMode } });
+    res.json({ names: row.names, theme: row.theme, viewMode: row.viewMode });
   } catch (e: any) {
     console.error('[Files/Hidden] Error saving hidden names:', e?.message || e);
     res.status(500).json({ error: 'Ошибка сохранения', detail: e?.message });
@@ -102,7 +113,7 @@ router.post('/hidden', authMiddleware, async (req, res) => {
 });
 
 // Universal browse endpoint for all tabs
-router.get('/browse', authMiddleware, (req, res) => {
+router.get('/browse', authMiddleware, async (req, res) => {
   const tabKey = (req.query.tab as string) || '';
   const subPath = (req.query.path as string) || '';
   const baseDir = resolveTabDir(tabKey);
@@ -136,7 +147,13 @@ router.get('/browse', authMiddleware, (req, res) => {
       if (!a.isDirectory && b.isDirectory) return 1;
       return a.name.localeCompare(b.name, 'ru');
     });
-    res.json({ items, currentPath: subPath });
+    // Количество скачиваний по каждому элементу текущей папки
+    const counts = await prisma.fileDownloadCount.findMany({
+      where: { tabKey, filePath: { in: items.map((it) => (subPath ? `${subPath}/${it.name}` : it.name)) } },
+    });
+    const countMap = new Map(counts.map((c) => [path.basename(c.filePath), c.count]));
+    const itemsWithCounts = items.map((it) => ({ ...it, downloads: countMap.get(it.name) || 0 }));
+    res.json({ items: itemsWithCounts, currentPath: subPath });
   } catch (e: any) {
     console.error('[Files/Browse] Error reading folder:', e?.message || e);
     res.status(500).json({ error: 'Ошибка чтения папки' });
@@ -269,6 +286,7 @@ router.get('/download', authMiddleware, (req, res) => {
       return res.status(404).json({ error: 'Файл не найден' });
     }
     const filename = path.basename(targetFile);
+    incrementDownloadCount(tabKey, filePath);
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.setHeader('Content-Type', 'application/octet-stream');
     const stream = fs.createReadStream(targetFile);
@@ -315,6 +333,7 @@ router.get('/download-folder', authMiddleware, (req, res) => {
       return res.status(404).json({ error: 'Папка не найдена' });
     }
     const folderName = path.basename(targetDir);
+    incrementDownloadCount(tabKey, folderPath);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(folderName)}.zip`);
     const archive = (archiver as any)('zip', { zlib: { level: 6 } });
@@ -391,6 +410,7 @@ router.get('/games/download', authMiddleware, (req, res) => {
       return res.status(404).json({ error: 'Файл не найден' });
     }
     const filename = path.basename(targetFile);
+    incrementDownloadCount(tabKey, filePath);
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.setHeader('Content-Type', 'application/octet-stream');
     const stream = fs.createReadStream(targetFile);
@@ -427,6 +447,7 @@ router.get('/games/download-folder', authMiddleware, (req, res) => {
       return res.status(404).json({ error: 'Папка не найдена' });
     }
     const folderName = path.basename(targetDir);
+    incrementDownloadCount(tabKey, folderPath);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(folderName)}.zip`);
     const archive = (archiver as any)('zip', { zlib: { level: 6 } });

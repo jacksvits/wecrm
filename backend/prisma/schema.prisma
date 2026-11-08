@@ -1354,10 +1354,23 @@ model FileHideSetting {
   id        String   @id @default(cuid())
   names     String   @default("")
   theme     String   @default("win7")
+  viewMode  String   @default("icons") @map("view_mode")
   updatedAt DateTime @updatedAt @map("updated_at")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("file_hide_settings")
+}
+
+model FileDownloadCount {
+  id        String   @id @default(cuid())
+  tabKey    String   @map("tab_key")
+  filePath  String   @map("file_path")
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([tabKey, filePath])
+  @@map("file_download_counts")
 }
 
 model YandexSettings {

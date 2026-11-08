@@ -258,6 +258,8 @@ export function Files() {
   const [hiddenInput, setHiddenInput] = useState("");
   const [filesTheme, setFilesTheme] = useState<FileTheme>("win7");
   const [themeInput, setThemeInput] = useState<FileTheme>("win7");
+  const [viewMode, setViewMode] = useState<"icons" | "table">("icons");
+  const [viewModeInput, setViewModeInput] = useState<"icons" | "table">("icons");
   const [savingHidden, setSavingHidden] = useState(false);
   const [previewItem, setPreviewItem] = useState<any | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -284,6 +286,9 @@ export function Files() {
       const savedTheme: FileTheme = (data as any).theme === "macos" ? "macos" : "win7";
       setFilesTheme(savedTheme);
       setThemeInput(savedTheme);
+      const savedView = (data as any).viewMode === "table" ? "table" : "icons";
+      setViewMode(savedView);
+      setViewModeInput(savedView);
     } catch (e) {
       console.error(e);
     }
@@ -384,9 +389,10 @@ export function Files() {
   const handleSaveHidden = async () => {
     setSavingHidden(true);
     try {
-      const data = await api.files.saveHidden(hiddenInput, themeInput);
+      const data = await api.files.saveHidden(hiddenInput, themeInput, viewModeInput);
       setHiddenNames(parseHidden((data as any)?.names || ""));
       setFilesTheme(themeInput);
+      setViewMode(viewModeInput);
       setShowSettings(false);
     } catch (e: any) {
       alert("Ошибка сохранения: " + e.message);
@@ -422,7 +428,7 @@ export function Files() {
           {/* Кнопка настроек отображения (скрытие файлов/папок) — только для администраторов */}
           {isAdmin && (
             <button
-              onClick={() => { setHiddenInput(hiddenNames.join(", ")); setThemeInput(filesTheme); setShowSettings(true); }}
+              onClick={() => { setHiddenInput(hiddenNames.join(", ")); setThemeInput(filesTheme); setViewModeInput(viewMode); setShowSettings(true); }}
               title="Настройки отображения"
               style={{
                 marginLeft: "auto", alignSelf: "center", padding: 6, border: "none",
@@ -462,6 +468,62 @@ export function Files() {
 
           {visibleFiles.length === 0 ? (
             <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>Папка пуста</div>
+          ) : (
+            viewMode === "table" ? (
+            <div style={{ overflowX: "auto" }}>
+              <div style={{ minWidth: 560, border: "1px solid var(--border-color)", borderRadius: 12, overflow: "hidden" }}>
+                <div style={{
+                  display: "grid", gridTemplateColumns: "minmax(0,1fr) 90px 90px 110px 40px",
+                  padding: "10px 16px", background: "var(--bg-hover)", fontSize: 12,
+                  fontWeight: 600, color: "var(--text-muted)",
+                }}>
+                  <div>Наименование</div>
+                  <div>Размер</div>
+                  <div>Расширение</div>
+                  <div>Скачивания</div>
+                  <div></div>
+                </div>
+                {visibleFiles.map((item: any) => {
+                  const filePath = joinPath(currentFolder, item.name);
+                  return (
+                    <div
+                      key={item.name}
+                      onClick={() => handleItemClick(item)}
+                      title={item.name}
+                      style={{
+                        display: "grid", gridTemplateColumns: "minmax(0,1fr) 90px 90px 110px 40px",
+                        padding: "6px 16px", alignItems: "center", cursor: "pointer",
+                        borderTop: "1px solid var(--border-color)", background: "var(--bg-color)",
+                        fontSize: 13, transition: "background 0.15s",
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-color)"; }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                        <div style={{ width: 26, height: 26, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                          <div style={{ transform: "scale(0.42)", flexShrink: 0 }}>
+                            {item.isDirectory ? FILE_THEMES[filesTheme].folder : FILE_THEMES[filesTheme].fileFor(item.name)}
+                          </div>
+                        </div>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>{item.name}</span>
+                      </div>
+                      <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.isDirectory ? "—" : formatSize(item.size)}</div>
+                      <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.isDirectory ? "Папка" : (fileExtension(item.name) ? fileExtension(item.name).toUpperCase() : "—")}</div>
+                      <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.downloads || 0}</div>
+                      <div>
+                        <button
+                          onClick={(e) => item.isDirectory ? handleDownloadFolder(e, item) : handleDownloadFile(e, item)}
+                          title={item.isDirectory ? "Скачать папку как ZIP" : "Скачать"}
+                          style={{ ...iconButtonStyle, width: 26, height: 26, borderRadius: 7 }}
+                        >
+                          {downloadIcon}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, 96px)", gap: 4, justifyContent: "start" }}>
               {visibleFiles.map((item: any) => {
@@ -503,7 +565,7 @@ export function Files() {
                 );
               })}
             </div>
-          )}
+          ))}
         </div>
       )}
 
@@ -571,6 +633,27 @@ export function Files() {
             }}
           >
             <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>Настройки отображения</h3>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Вид</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              {([["icons", "Иконки"], ["table", "Таблица"]] as const).map(([key, label]) => {
+                const selected = viewModeInput === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setViewModeInput(key)}
+                    style={{
+                      flex: 1, padding: "8px 0", borderRadius: 8, cursor: "pointer", fontSize: 13,
+                      fontWeight: selected ? 600 : 500,
+                      border: selected ? "2px solid #007AFF" : "1px solid var(--border-color)",
+                      background: selected ? "rgba(0,122,255,0.06)" : "var(--bg-hover)",
+                      color: selected ? "#007AFF" : "var(--text-primary)",
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Тема иконок</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 16 }}>
               {(Object.keys(FILE_THEMES) as FileTheme[]).map((key) => {
