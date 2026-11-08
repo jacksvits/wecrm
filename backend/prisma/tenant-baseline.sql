@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ce2luYeRJ0Xq070BiRC3Q5aFtSphM9pO29kYlvaoiqHAK9JN9vqS2Gyyd0MF0mF
+\restrict pr3j0Tp7aOVggELlgSajbDiVDdssClgcvqeKYdZix47iDg8X4Vhiw5NU52JJknj
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -643,6 +643,20 @@ CREATE TABLE public.file_attachments (
 
 
 --
+-- Name: file_download_counts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.file_download_counts (
+    id text NOT NULL,
+    tab_key text NOT NULL,
+    file_path text NOT NULL,
+    count integer DEFAULT 0 NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: file_hide_settings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -651,7 +665,8 @@ CREATE TABLE public.file_hide_settings (
     names text DEFAULT ''::text NOT NULL,
     updated_at timestamp(3) without time zone NOT NULL,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    theme text DEFAULT 'win7'::text NOT NULL
+    theme text DEFAULT 'win7'::text NOT NULL,
+    view_mode text DEFAULT 'icons'::text NOT NULL
 );
 
 
@@ -2486,6 +2501,14 @@ ALTER TABLE ONLY public.file_attachments
 
 
 --
+-- Name: file_download_counts file_download_counts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.file_download_counts
+    ADD CONSTRAINT file_download_counts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: file_hide_settings file_hide_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3439,6 +3462,13 @@ CREATE INDEX email_filters_sort_order_idx ON public.email_filters USING btree (s
 --
 
 CREATE INDEX "file_attachments_entityType_entityId_idx" ON public.file_attachments USING btree ("entityType", "entityId");
+
+
+--
+-- Name: file_download_counts_tab_key_file_path_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX file_download_counts_tab_key_file_path_key ON public.file_download_counts USING btree (tab_key, file_path);
 
 
 --
@@ -5161,13 +5191,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ce2luYeRJ0Xq070BiRC3Q5aFtSphM9pO29kYlvaoiqHAK9JN9vqS2Gyyd0MF0mF
+\unrestrict pr3j0Tp7aOVggELlgSajbDiVDdssClgcvqeKYdZix47iDg8X4Vhiw5NU52JJknj
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict JPd6iEjdSEfSufV8CRFJWS8pkA5jlqf724Tin3RMWLwyXxzTy4iHKlyI943UnYY
+\restrict oZIyRmbQepJD3TI1CPndkfAnRBetVfZP2Eug9p0pOO56DRY7fw2RtogggHQMBfD
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -5381,11 +5411,12 @@ INSERT INTO public._prisma_migrations VALUES ('3bb94dc0-4a5d-477e-b29a-fcb8c2264
 INSERT INTO public._prisma_migrations VALUES ('697098c7-543b-493e-ba77-6a941ed354cd', '136ccd19f432467cad3d3095899f6bff5dd348f4679c234177cc50c7ca3f381b', '2026-11-08 09:03:27.721974+00', '20261108090000_file_hide_settings', NULL, NULL, '2026-11-08 09:03:27.698717+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('439740c5-91f7-4c7f-ad06-46ecadafb7d0', '41f8c2597da9a22588e99ac35f84e65e0b08062f057c49932b983bb8ce7c67f2', '2026-11-08 16:19:18.729091+00', '20261108120000_files_page_theme', NULL, NULL, '2026-11-08 16:19:18.717762+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('0f2551ef-1c83-4dfa-8771-a05975b21e71', '4fc99ef1d24be6137d1d7979ef962fa634bf9b73443cb2d09bb2b9836cf9e9d1', '2026-11-08 16:47:04.147637+00', '20261108133000_files_theme_default_win7', NULL, NULL, '2026-11-08 16:47:04.130001+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('d47ce331-b65c-4f04-bea4-de396c94bdee', 'cdf2b1c43da702d3c01377e38750e8dceb76830f9f7d7005b86328a843ca9c76', '2026-11-08 17:35:25.789494+00', '20261108153000_files_table_view', NULL, NULL, '2026-11-08 17:35:25.765964+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JPd6iEjdSEfSufV8CRFJWS8pkA5jlqf724Tin3RMWLwyXxzTy4iHKlyI943UnYY
+\unrestrict oZIyRmbQepJD3TI1CPndkfAnRBetVfZP2Eug9p0pOO56DRY7fw2RtogggHQMBfD
 
