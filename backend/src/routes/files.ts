@@ -64,6 +64,35 @@ router.post('/tabs/:tabKey', authMiddleware, async (req, res) => {
   }
 });
 
+// Список скрываемых файлов/папок (имена через запятую) — общая настройка страницы «Файлы»
+router.get('/hidden', authMiddleware, async (req, res) => {
+  try {
+    const row = await prisma.fileHideSetting.findFirst();
+    res.json({ names: row?.names || '' });
+  } catch (e: any) {
+    console.error('[Files/Hidden] Error loading hidden names:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка загрузки настроек', detail: e?.message });
+  }
+});
+
+// Сохранение списка — только для администраторов
+router.post('/hidden', authMiddleware, async (req, res) => {
+  if ((req as any).user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Доступ запрещен' });
+  }
+  const names = typeof req.body?.names === 'string' ? req.body.names.trim() : '';
+  try {
+    const existing = await prisma.fileHideSetting.findFirst();
+    const row = existing
+      ? await prisma.fileHideSetting.update({ where: { id: existing.id }, data: { names } })
+      : await prisma.fileHideSetting.create({ data: { names } });
+    res.json({ names: row.names });
+  } catch (e: any) {
+    console.error('[Files/Hidden] Error saving hidden names:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка сохранения', detail: e?.message });
+  }
+});
+
 // Universal browse endpoint for all tabs
 router.get('/browse', authMiddleware, (req, res) => {
   const tabKey = (req.query.tab as string) || '';

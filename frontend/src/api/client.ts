@@ -285,6 +285,8 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     downloadFolder: (tab: string, folderPath: string) => downloadBlob(`/api/files/download-folder?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(folderPath)}`, `${folderPath.split("/").pop() || "folder"}.zip`),
     downloadGameFile: (path: string) => downloadBlob(`/api/files/games/download?path=${encodeURIComponent(path)}`, path.split("/").pop() || "file"),
     downloadGameFolder: (path: string) => downloadBlob(`/api/files/games/download-folder?path=${encodeURIComponent(path)}`, `${path.split("/").pop() || "folder"}.zip`),
+    hidden: (): Promise<{ names: string }> => fetchApi("/api/files/hidden"),
+    saveHidden: (names: string) => fetchApi("/api/files/hidden", { method: "POST", body: JSON.stringify({ names }) }),
   },
   products: {
     list: (params?: string | { q?: string; categoryId?: string; noCategory?: boolean; kind?: string }): Promise<Product[]> => {
