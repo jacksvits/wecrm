@@ -44,6 +44,14 @@ const folderIcon = (
   </svg>
 );
 
+const folderIconLarge = (
+  <svg width="64" height="56" viewBox="0 0 64 56" fill="none">
+    <path d="M4 10a6 6 0 0 1 6-6h14l6 8h24a6 6 0 0 1 6 6v2H4V10z" fill="#F5B301"/>
+    <path d="M4 18h56v30a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6V18z" fill="#FFD15C"/>
+    <path d="M4 18h56v4H4v-4z" fill="#FFC940"/>
+  </svg>
+);
+
 const fileIcon = (
   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#8A94A6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#F1F4F8"></path>
@@ -368,31 +376,41 @@ export function Files() {
                       (e.currentTarget as HTMLElement).style.boxShadow = "none";
                     }}
                   >
-                    <FilePreviewThumb item={item} tab={activeTab} filePath={filePath} />
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.name}
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
-                        {item.isDirectory ? "Папка" : formatSize(item.size)}
-                      </div>
-                    </div>
                     {item.isDirectory ? (
-                      <button
-                        onClick={(e) => handleDownloadFolder(e, item)}
-                        title="Скачать папку как ZIP"
-                        style={iconButtonStyle}
-                      >
-                        {downloadIcon}
-                      </button>
+                      <>
+                        <button
+                          onClick={(e) => handleDownloadFolder(e, item)}
+                          title="Скачать папку как ZIP"
+                          style={{ ...iconButtonStyle, width: 26, height: 26, borderRadius: 7, position: "absolute", top: 8, right: 8 }}
+                        >
+                          {downloadIcon}
+                        </button>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%", paddingTop: 10 }}>
+                          {folderIconLarge}
+                          <div style={{ fontSize: 12, fontWeight: 500, textAlign: "center", width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {item.name}
+                          </div>
+                        </div>
+                      </>
                     ) : (
-                      <button
-                        onClick={(e) => handleDownloadFile(e, item)}
-                        title="Скачать"
-                        style={iconButtonStyle}
-                      >
-                        {downloadIcon}
-                      </button>
+                      <>
+                        <FilePreviewThumb item={item} tab={activeTab} filePath={filePath} />
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {item.name}
+                          </div>
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+                            {formatSize(item.size)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => handleDownloadFile(e, item)}
+                          title="Скачать"
+                          style={iconButtonStyle}
+                        >
+                          {downloadIcon}
+                        </button>
+                      </>
                     )}
                   </div>
                 );
