@@ -493,11 +493,11 @@ export function Files() {
                       style={{
                         display: "grid", gridTemplateColumns: "minmax(0,1fr) 90px 90px 110px 40px",
                         padding: "6px 16px", alignItems: "center", cursor: "pointer",
-                        borderTop: "1px solid var(--border-color)", background: "var(--bg-color)",
+                        borderTop: "1px solid var(--border-color)", background: "var(--bg-card)",
                         fontSize: 13, transition: "background 0.15s",
                       }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-color)"; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-card)"; }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                         <div style={{ width: 26, height: 26, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
@@ -581,7 +581,7 @@ export function Files() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: "var(--bg-color)", borderRadius: 16, width: "min(920px, calc(100vw - 32px))",
+              background: "var(--bg-card)", borderRadius: 16, width: "min(920px, calc(100vw - 32px))",
               height: "min(720px, calc(100vh - 32px))", border: "1px solid var(--border-color)",
               boxShadow: "0 12px 40px rgba(0,0,0,0.28)", display: "flex", flexDirection: "column", overflow: "hidden",
             }}
@@ -628,7 +628,7 @@ export function Files() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: "var(--bg-color)", borderRadius: 16, padding: 24, width: "100%", maxWidth: 480,
+              background: "var(--bg-card)", borderRadius: 16, padding: 24, width: "100%", maxWidth: 480,
               border: "1px solid var(--border-color)", boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
             }}
           >
@@ -728,7 +728,7 @@ const iconButtonStyle: React.CSSProperties = {
   padding: 0,
   borderRadius: 8,
   border: "1px solid var(--border-color)",
-  background: "var(--bg-color)",
+  background: "var(--bg-card)",
   color: "#007AFF",
   cursor: "pointer",
   flexShrink: 0,
