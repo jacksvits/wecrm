@@ -154,8 +154,21 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
       const destPath = path.join(targetDir, filename);
       if (fs.existsSync(srcPath)) moveEntry(srcPath, destPath);
       dbPath = `${tenantPfx || '/uploads'}/news/${ym.year}/${ym.month}/${filename}`;
-    } else {
+    } else if (entityType === 'product') {
+      // Картинки карточек до привязки — в корень хранилища tenant'а
+      // (products.ts при привязке ищет их uploadsRoot()/<filename>)
+      const srcPath = path.join(UPLOAD_DIR, filename);
+      const destPath = path.join(tenantRoot, filename);
+      if (fs.existsSync(srcPath) && srcPath !== destPath) moveEntry(srcPath, destPath);
       dbPath = `${tenantPfx || '/uploads'}/${filename}`;
+    } else {
+      // Прочие рабочие картинки (комментарии/задачи и т.п.) — в other/
+      const otherDir = path.join(tenantRoot, 'other');
+      if (!fs.existsSync(otherDir)) fs.mkdirSync(otherDir, { recursive: true });
+      const srcPath = path.join(UPLOAD_DIR, filename);
+      const destPath = path.join(otherDir, filename);
+      if (fs.existsSync(srcPath)) moveEntry(srcPath, destPath);
+      dbPath = `${tenantPfx || '/uploads'}/other/${filename}`;
     }
 
     const attachment = await prisma.fileAttachment.create({

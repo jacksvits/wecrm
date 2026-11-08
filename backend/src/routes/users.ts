@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -126,13 +127,14 @@ router.post('/avatar', authMiddleware, async (req: AuthRequest, res) => {
     }
     const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
     const base64Data = match[2];
-    const avatarDir = '/app/uploads/avatars';
+    // Аватарки пользователей — в uploadsRoot()/avatars/users (см. структуру NFS)
+    const avatarDir = path.join(uploadsRoot(), 'avatars', 'users');
     if (!fs.existsSync(avatarDir)) {
       fs.mkdirSync(avatarDir, { recursive: true });
     }
     const filePath = path.join(avatarDir, `${req.user!.id}.${ext}`);
     fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
-    const avatarUrl = `/uploads/avatars/${req.user!.id}.${ext}`;
+    const avatarUrl = `${tenantUploadPrefix() || '/uploads'}/avatars/users/${req.user!.id}.${ext}`;
     const user = await prisma.user.update({
       where: { id: req.user!.id },
       data: { avatar: avatarUrl },
