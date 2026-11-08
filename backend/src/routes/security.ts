@@ -28,6 +28,7 @@ router.get('/auth-events', authMiddleware, requirePlatformAdmin, async (req, res
         device: row.device,
         clientType: row.clientType,
         authMethod: row.authMethod,
+        success: row.success,
         createdAt: row.createdAt,
       })),
       total,

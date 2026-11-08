@@ -168,10 +168,16 @@ router.post('/login', rateLimit({ prefix: 'login', windowMs: 15 * 60_000, max: 1
       });
     }
 
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user) {
+      await recordAuthEvent(req, { login: data.login, authMethod: 'password', success: false });
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
     const valid = await bcrypt.compare(data.password, user.password);
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!valid) {
+      await recordAuthEvent(req, { login: data.login, userId: user.id, authMethod: 'password', success: false });
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
     const roleName = user.role?.name || 'user';
     const allowedPages = await applyTenantSubscriptionPages(user.role?.allowedPages || []);

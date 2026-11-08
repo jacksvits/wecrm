@@ -10,6 +10,7 @@ type AuthEvent = {
   device: string;
   clientType: 'mobile' | 'desktop';
   authMethod: string;
+  success: boolean;
   createdAt: string;
 };
 type AuthEventsResponse = { items: AuthEvent[]; total: number; page: number; pageSize: number; totalPages: number };
@@ -44,7 +45,7 @@ export function SecuritySettings() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
         <div>
           <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>Авторизации пользователей</h3>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Успешные входы в главный проект и все организации · по 50 записей</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Успешные и неудачные входы в главный проект и все организации · по 50 записей</div>
         </div>
         <button onClick={() => load(page)} disabled={loading} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: loading ? 'default' : 'pointer' }}>
           {loading ? 'Загрузка…' : 'Обновить'}
@@ -52,21 +53,22 @@ export function SecuritySettings() {
       </div>
       {error && <div style={{ padding: 14, marginBottom: 12, borderRadius: 10, background: '#fef2f2', color: '#b91c1c' }}>{error}</div>}
       <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 12, background: 'var(--bg-card)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 940 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1060 }}>
           <thead><tr>
-            <th style={headStyle}>Организация</th><th style={headStyle}>Логин при авторизации</th><th style={headStyle}>IP-адрес</th><th style={headStyle}>Дата и время</th><th style={headStyle}>Устройство</th><th style={headStyle}>Версия</th>
+            <th style={headStyle}>Организация</th><th style={headStyle}>Логин при авторизации</th><th style={headStyle}>Результат</th><th style={headStyle}>IP-адрес</th><th style={headStyle}>Дата и время</th><th style={headStyle}>Устройство</th><th style={headStyle}>Версия</th>
           </tr></thead>
           <tbody>
             {data?.items.map((item) => <tr key={item.id}>
               <td style={cellStyle}><div style={{ fontWeight: 500 }}>{item.tenantName}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.tenantSlug}</div></td>
               <td style={{ ...cellStyle, wordBreak: 'break-word' }}>{item.login}</td>
+              <td style={cellStyle}><span style={{ display: 'inline-block', padding: '4px 8px', borderRadius: 8, background: item.success ? '#dcfce7' : '#fee2e2', color: item.success ? '#166534' : '#b91c1c', whiteSpace: 'nowrap', fontWeight: 500 }}>{item.success ? 'Успешно' : 'Ошибка'}</span></td>
               <td style={{ ...cellStyle, whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{item.ipAddress}</td>
               <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>{new Date(item.createdAt).toLocaleString('ru-RU')}</td>
               <td style={cellStyle}>{item.device}</td>
               <td style={cellStyle}><span style={{ display: 'inline-block', padding: '4px 8px', borderRadius: 8, background: 'var(--bg-secondary)', whiteSpace: 'nowrap' }}>{item.clientType === 'mobile' ? 'Мобильная' : 'Десктопная'}</span></td>
             </tr>)}
-            {!loading && data?.items.length === 0 && <tr><td colSpan={6} style={{ ...cellStyle, padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Авторизаций пока нет. Новые входы появятся здесь автоматически.</td></tr>}
-            {loading && !data && <tr><td colSpan={6} style={{ ...cellStyle, padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Загрузка журнала…</td></tr>}
+            {!loading && data?.items.length === 0 && <tr><td colSpan={7} style={{ ...cellStyle, padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Попыток входа пока нет. Новые записи появятся здесь автоматически.</td></tr>}
+            {loading && !data && <tr><td colSpan={7} style={{ ...cellStyle, padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Загрузка журнала…</td></tr>}
           </tbody>
         </table>
       </div>

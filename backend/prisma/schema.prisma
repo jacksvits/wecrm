@@ -2079,6 +2079,7 @@ model AuthEvent {
   device     String
   clientType String   @map("client_type")
   authMethod String   @map("auth_method")
+  success    Boolean  @default(true)
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([createdAt])

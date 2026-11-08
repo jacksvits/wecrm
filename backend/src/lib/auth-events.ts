@@ -4,10 +4,10 @@ import { describeClient, getClientIp } from './security.js';
 
 type TenantOverride = { id?: string | null; slug: string; name: string; isMain?: boolean };
 
-/** Успешные входы всех организаций пишем централизованно в platform DB. */
+/** Успешные и неудачные входы всех организаций пишем централизованно в platform DB. */
 export async function recordAuthEvent(
   req: Request,
-  data: { login: string; userId?: string | null; authMethod: string },
+  data: { login: string; userId?: string | null; authMethod: string; success?: boolean },
   tenantOverride?: TenantOverride,
 ): Promise<void> {
   try {
@@ -29,6 +29,7 @@ export async function recordAuthEvent(
         device: client.device,
         clientType: client.clientType,
         authMethod: data.authMethod,
+        success: data.success !== false,
       },
     });
   } catch (err: any) {
