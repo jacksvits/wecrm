@@ -477,9 +477,9 @@ export function Login() {
               </h2>
             </div>
           )}
-          <p className="login-subtitle">
-            {isRegister ? 'Создайте аккаунт за пару минут' : 'С возвращением! Введите свои данные'}
-          </p>
+          {isRegister && (
+            <p className="login-subtitle">Создайте аккаунт за пару минут</p>
+          )}
 
           <form onSubmit={handleSubmit}>
             {isRegister && (
@@ -553,24 +553,26 @@ export function Login() {
             <div className="login-vk-hint">VK ID не настроен</div>
           )}
 
-          {/* Гостевой вход — только на главном домене платформы (демо welans.cc) */}
-          {isMainLoginHost && (
-            <>
-              <button onClick={handleGuestLogin} disabled={guestLoading} className="login-btn-guest">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
-                {guestLoading ? 'Вход...' : 'Войти как гость'}
-              </button>
-              <p className="login-guest-hint">Демо-режим: данные сбрасываются при каждом входе</p>
-            </>
+          {/* Кнопка «Регистрация» — в стиле бывшей кнопки «Войти как гость» */}
+          {!isRegister && (
+            <button type="button" onClick={() => { setIsRegister(true); setError('') }} className="login-btn-guest">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+              Регистрация
+            </button>
           )}
 
-          <p className="login-register">
-            {isRegister ? (
-              <>Уже есть аккаунт? <button type="button" onClick={() => { setIsRegister(false); setError('') }}>Войти</button></>
-            ) : (
-              <>Нет аккаунта? <button type="button" onClick={() => { setIsRegister(true); setError('') }}>Регистрация</button></>
-            )}
-          </p>
+          {/* Гостевой вход — зелёная текстовая ссылка (как раньше «Регистрация»);
+              только на главном домене платформы (демо welans.cc) */}
+          {isMainLoginHost && (
+            <p className="login-register" style={{ marginTop: 14 }}>
+              <button type="button" onClick={handleGuestLogin} disabled={guestLoading}>{guestLoading ? 'Вход...' : 'Войти как гость'}</button>
+            </p>
+          )}
+          {isRegister && (
+            <p className="login-register">
+              Уже есть аккаунт? <button type="button" onClick={() => { setIsRegister(false); setError('') }}>Войти</button>
+            </p>
+          )}
           {tenantInfo?.isMain && (
             <>
               {/* Разделитель */}
@@ -584,21 +586,15 @@ export function Login() {
               </a>
             </>
           )}
-          {tenantInfo?.isMain && (
-            <p className="login-register" style={{ marginTop: 8 }}>
-              Хотите свою CRM для организации? <a href="/register">Регистрация организации</a>
-            </p>
-          )}
-          {tenantInfo?.isMain && (
-            <p className="login-register" style={{ marginTop: 8 }}>
-              Что умеет система? <a href="/presentation">Презентация</a>
-            </p>
-          )}
           </div>
 
           {showCatalogHint && (<>
-          <p className="login-catalog-hint">
-            Ознакомиться с нашими продуктами вы можете без регистрации по гостевому доступу в разделе <a href="https://welans.cc/vitrine" className="login-catalog-link"><strong>«Каталог»</strong></a>
+          <p className="login-quick-links">
+            <a href="/presentation">Презентация</a>
+            <span aria-hidden="true">·</span>
+            <a href="https://welans.cc/vitrine">Каталог</a>
+            <span aria-hidden="true">·</span>
+            <a href="https://welans.cc/welans/">О компании</a>
           </p>
 
           <footer className="login-legal-footer" aria-label="Юридические документы">
