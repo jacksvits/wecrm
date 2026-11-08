@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { BlockList, isIP } from 'net';
 import { authMiddleware } from '../middleware/auth.js';
 import { getClientIp, normalizeIpAddress, rateLimit } from '../lib/security.js';
 import { IP_BLOCKED_MESSAGE, isIpBlacklisted } from '../lib/ip-access.js';
@@ -17,6 +18,7 @@ type IpInfo = {
 };
 
 const ipInfoCache = new Map<string, { data: IpInfo; expires: number }>();
+const rdapBootstrapCache = new Map<string, { services: any[]; expires: number }>();
 
 function regionName(value: unknown): string | null {
   const code = String(value || '').trim();
@@ -29,12 +31,47 @@ function regionName(value: unknown): string | null {
   return code;
 }
 
-function rdapOrganization(data: any): string | null {
+function preferredRdapEntity(data: any): any {
   const entities = Array.isArray(data?.entities) ? data.entities : [];
-  const preferred = entities.find((entity: any) => Array.isArray(entity?.roles) && entity.roles.includes('registrant')) || entities[0];
-  const vcard = Array.isArray(preferred?.vcardArray?.[1]) ? preferred.vcardArray[1] : [];
+  return entities.find((entity: any) => Array.isArray(entity?.roles) && entity.roles.includes('registrant') && entity?.vcardArray) || entities[0];
+}
+
+function rdapOrganization(data: any): string | null {
+  const vcard = Array.isArray(preferredRdapEntity(data)?.vcardArray?.[1]) ? preferredRdapEntity(data).vcardArray[1] : [];
   const name = vcard.find((row: any) => Array.isArray(row) && row[0] === 'fn')?.[3];
   return typeof name === 'string' && name.trim() ? name.trim() : null;
+}
+
+function rdapRegistrationCountry(data: any): string | null {
+  if (data?.country) return regionName(data.country);
+  const vcard = Array.isArray(preferredRdapEntity(data)?.vcardArray?.[1]) ? preferredRdapEntity(data).vcardArray[1] : [];
+  const label = vcard.find((row: any) => Array.isArray(row) && row[0] === 'adr')?.[1]?.label;
+  if (typeof label !== 'string') return null;
+  const lines = label.split(/\r?\n/).map((line: string) => line.trim()).filter(Boolean);
+  return lines.length ? regionName(lines[lines.length - 1]) : null;
+}
+
+async function lookupRdap(ip: string): Promise<any> {
+  const family = isIP(ip) === 4 ? 'ipv4' : 'ipv6';
+  let cached = rdapBootstrapCache.get(family);
+  if (!cached || cached.expires <= Date.now()) {
+    const bootstrap = await fetchJson(`https://data.iana.org/rdap/${family}.json`);
+    cached = { services: bootstrap.services || [], expires: Date.now() + 24 * 60 * 60_000 };
+    rdapBootstrapCache.set(family, cached);
+  }
+  for (const service of cached.services) {
+    const prefixes = Array.isArray(service?.[0]) ? service[0] : [];
+    const urls = Array.isArray(service?.[1]) ? service[1] : [];
+    const base = urls.find((url: unknown) => typeof url === 'string' && url.startsWith('https://'));
+    if (!base) continue;
+    const block = new BlockList();
+    for (const prefix of prefixes) {
+      const [address, mask] = String(prefix).split('/');
+      block.addSubnet(address, Number(mask), isIP(address) === 4 ? 'ipv4' : 'ipv6');
+    }
+    if (block.check(ip, family)) return fetchJson(`${base.replace(/\/$/, '')}/ip/${encodeURIComponent(ip)}`);
+  }
+  throw new Error('RDAP-реестр не найден');
 }
 
 async function fetchJson(url: string, timeoutMs = 6000): Promise<any> {
@@ -62,7 +99,7 @@ async function lookupIpInfo(value: string): Promise<IpInfo> {
   // публичного источника не лишает администратора сведений от второго.
   const [geoResult, rdapResult] = await Promise.allSettled([
     fetchJson(`https://api.ipapi.is/?q=${encodeURIComponent(ip)}`),
-    fetchJson(`https://rdap.org/ip/${encodeURIComponent(ip)}`),
+    lookupRdap(ip),
   ]);
   const geo = geoResult.status === 'fulfilled' ? geoResult.value : null;
   const rdap = rdapResult.status === 'fulfilled' ? rdapResult.value : null;
@@ -71,7 +108,7 @@ async function lookupIpInfo(value: string): Promise<IpInfo> {
     ip,
     country: geo?.location?.country || geo?.country || null,
     city: geo?.location?.city || geo?.city || null,
-    registrationCountry: regionName(geo?.asn?.country || rdap?.country),
+    registrationCountry: regionName(geo?.asn?.country) || rdapRegistrationCountry(rdap),
     organization: company || geo?.asn?.org || rdapOrganization(rdap),
   };
   const available = Boolean(data.country || data.city || data.registrationCountry || data.organization);
