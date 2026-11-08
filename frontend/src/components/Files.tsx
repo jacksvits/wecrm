@@ -3,11 +3,11 @@ import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 
 const ALL_TABS = [
-  { key: "system", label: "Система" },
-  { key: "programs", label: "Программы" },
-  { key: "drivers", label: "Драйвера" },
-  { key: "documents", label: "Документы" },
-  { key: "games", label: "Игры" },
+  { key: "system", label: "Система", short: "Система", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="6" rx="1.5" /><rect x="2" y="14" width="20" height="6" rx="1.5" /></svg> },
+  { key: "programs", label: "Программы", short: "Прогр.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg> },
+  { key: "drivers", label: "Драйвера", short: "Драйв.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="5" width="14" height="14" rx="2" /><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" /></svg> },
+  { key: "documents", label: "Документы", short: "Докум.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg> },
+  { key: "games", label: "Игры", short: "Игры", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 11h4M8 9v4M15 12h.01M17 10h.01M17.32 5H6.68a4 4 0 0 0-3.98 3.6L2 15a3 3 0 0 0 3 3c.9 0 1.7-.4 2.25-1.03L8.5 15.5h7l1.25 1.47A2.9 2.9 0 0 0 19 18a3 3 0 0 0 3-3l-.7-6.4A4 4 0 0 0 17.32 5z" /></svg> },
 ];
 
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "svg"]);
@@ -48,19 +48,22 @@ const folderIcon = (
 // === Темы иконок страницы «Файлы» ===
 type FileTheme = "win7" | "macos";
 
+// Папка Windows 7 — в цвете акцента системы (--accent-color), градиенты-шейдеры поверх для объёма
 const win7FolderIcon = (
   <svg width="64" height="52" viewBox="0 0 64 52">
     <defs>
-      <linearGradient id="w7body" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#FFE38A" /><stop offset=".45" stopColor="#FBC93F" /><stop offset="1" stopColor="#E8A81C" />
+      <linearGradient id="w7bodyShade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.35" /><stop offset=".45" stopColor="#FFFFFF" stopOpacity="0.05" /><stop offset="1" stopColor="#000000" stopOpacity="0.18" />
       </linearGradient>
-      <linearGradient id="w7tab" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#FBD45C" /><stop offset="1" stopColor="#EBAF24" />
+      <linearGradient id="w7tabShade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.45" /><stop offset="1" stopColor="#FFFFFF" stopOpacity="0.1" />
       </linearGradient>
     </defs>
-    <path d="M3 8a5 5 0 0 1 5-5h14l6 7h28a5 5 0 0 1 5 5v2H3V8z" fill="url(#w7tab)" stroke="#C8901A" strokeWidth="1" />
-    <rect x="3" y="15" width="58" height="34" rx="5" fill="url(#w7body)" stroke="#C8901A" strokeWidth="1" />
-    <rect x="6" y="18" width="52" height="12" rx="3" fill="#FFF3C4" opacity=".55" />
+    <path d="M3 8a5 5 0 0 1 5-5h14l6 7h28a5 5 0 0 1 5 5v2H3V8z" fill="var(--accent-color)" stroke="var(--accent-color)" strokeWidth="1" />
+    <path d="M3 8a5 5 0 0 1 5-5h14l6 7h28a5 5 0 0 1 5 5v2H3V8z" fill="url(#w7tabShade)" />
+    <rect x="3" y="15" width="58" height="34" rx="5" fill="var(--accent-color)" stroke="var(--accent-color)" strokeWidth="1" />
+    <rect x="3" y="15" width="58" height="34" rx="5" fill="url(#w7bodyShade)" />
+    <rect x="6" y="18" width="52" height="12" rx="3" fill="#FFFFFF" opacity=".3" />
   </svg>
 );
 
@@ -258,8 +261,19 @@ export function Files() {
   const [hiddenInput, setHiddenInput] = useState("");
   const [filesTheme, setFilesTheme] = useState<FileTheme>("win7");
   const [themeInput, setThemeInput] = useState<FileTheme>("win7");
-  const [viewMode, setViewMode] = useState<"icons" | "table">("icons");
-  const [viewModeInput, setViewModeInput] = useState<"icons" | "table">("icons");
+  // Вид (иконки/таблица) — личная настройка пользователя, хранится в localStorage.
+  // По умолчанию: мобильная версия — таблица, десктопная — иконки.
+  const viewPrefKey = `filesViewMode_${(user as any)?.id || "anon"}`;
+  const [viewMode, setViewModeState] = useState<"icons" | "table">(() => {
+    const saved = localStorage.getItem(viewPrefKey);
+    if (saved === "table" || saved === "icons") return saved;
+    return window.innerWidth < 768 ? "table" : "icons";
+  });
+  const setViewMode = (mode: "icons" | "table") => {
+    setViewModeState(mode);
+    try { localStorage.setItem(viewPrefKey, mode); } catch {}
+  };
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [savingHidden, setSavingHidden] = useState(false);
   const [previewItem, setPreviewItem] = useState<any | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -286,9 +300,6 @@ export function Files() {
       const savedTheme: FileTheme = (data as any).theme === "macos" ? "macos" : "win7";
       setFilesTheme(savedTheme);
       setThemeInput(savedTheme);
-      const savedView = (data as any).viewMode === "table" ? "table" : "icons";
-      setViewMode(savedView);
-      setViewModeInput(savedView);
     } catch (e) {
       console.error(e);
     }
@@ -297,6 +308,9 @@ export function Files() {
   useEffect(() => {
     loadSettings();
     loadHidden();
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   useEffect(() => {
@@ -389,10 +403,9 @@ export function Files() {
   const handleSaveHidden = async () => {
     setSavingHidden(true);
     try {
-      const data = await api.files.saveHidden(hiddenInput, themeInput, viewModeInput);
+      const data = await api.files.saveHidden(hiddenInput, themeInput, viewMode);
       setHiddenNames(parseHidden((data as any)?.names || ""));
       setFilesTheme(themeInput);
-      setViewMode(viewModeInput);
       setShowSettings(false);
     } catch (e: any) {
       alert("Ошибка сохранения: " + e.message);
@@ -410,8 +423,9 @@ export function Files() {
             <button
               key={tab.key}
               onClick={() => { setActiveTab(tab.key); setCurrentFolder(""); setPreviewItem(null); }}
+              title={isMobile ? tab.label : undefined}
               style={{
-                padding: "10px 16px",
+                padding: isMobile ? "8px 10px 6px" : "10px 16px",
                 border: "none",
                 background: activeTab === tab.key ? "var(--bg-hover)" : "transparent",
                 color: activeTab === tab.key ? "#007AFF" : "var(--text-primary)",
@@ -422,16 +436,50 @@ export function Files() {
                 borderRadius: "8px 8px 0 0",
               }}
             >
-              {tab.label}
+              {isMobile ? (
+                <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                  {tab.icon}
+                  <span style={{ fontSize: 9, lineHeight: 1 }}>{tab.short}</span>
+                </span>
+              ) : (
+                tab.label
+              )}
             </button>
           ))}
+          {/* Переключатель вида (иконки/таблица) — личная настройка, виден всем */}
+          <div style={{ marginLeft: "auto", alignSelf: "center", display: "inline-flex", background: "var(--bg-hover)", borderRadius: 9, padding: 2, gap: 2 }}>
+            <button
+              onClick={() => setViewMode("icons")}
+              title="Вид: иконки"
+              style={{
+                border: "none", cursor: "pointer", padding: "5px 9px", borderRadius: 7, display: "flex",
+                background: viewMode === "icons" ? "var(--bg-card)" : "transparent",
+                color: viewMode === "icons" ? "#007AFF" : "var(--text-muted)",
+                boxShadow: viewMode === "icons" ? "0 1px 3px rgba(0,0,0,0.15)" : "none",
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
+            </button>
+            <button
+              onClick={() => setViewMode("table")}
+              title="Вид: таблица"
+              style={{
+                border: "none", cursor: "pointer", padding: "5px 9px", borderRadius: 7, display: "flex",
+                background: viewMode === "table" ? "var(--bg-card)" : "transparent",
+                color: viewMode === "table" ? "#007AFF" : "var(--text-muted)",
+                boxShadow: viewMode === "table" ? "0 1px 3px rgba(0,0,0,0.15)" : "none",
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+          </div>
           {/* Кнопка настроек отображения (скрытие файлов/папок) — только для администраторов */}
           {isAdmin && (
             <button
-              onClick={() => { setHiddenInput(hiddenNames.join(", ")); setThemeInput(filesTheme); setViewModeInput(viewMode); setShowSettings(true); }}
+              onClick={() => { setHiddenInput(hiddenNames.join(", ")); setThemeInput(filesTheme); setShowSettings(true); }}
               title="Настройки отображения"
               style={{
-                marginLeft: "auto", alignSelf: "center", padding: 6, border: "none",
+                alignSelf: "center", padding: 6, border: "none",
                 background: "transparent", color: "var(--text-muted)", cursor: "pointer",
                 borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
               }}
@@ -633,27 +681,6 @@ export function Files() {
             }}
           >
             <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>Настройки отображения</h3>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Вид</div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-              {([["icons", "Иконки"], ["table", "Таблица"]] as const).map(([key, label]) => {
-                const selected = viewModeInput === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setViewModeInput(key)}
-                    style={{
-                      flex: 1, padding: "8px 0", borderRadius: 8, cursor: "pointer", fontSize: 13,
-                      fontWeight: selected ? 600 : 500,
-                      border: selected ? "2px solid #007AFF" : "1px solid var(--border-color)",
-                      background: selected ? "rgba(0,122,255,0.06)" : "var(--bg-hover)",
-                      color: selected ? "#007AFF" : "var(--text-primary)",
-                    }}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Тема иконок</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 16 }}>
               {(Object.keys(FILE_THEMES) as FileTheme[]).map((key) => {
