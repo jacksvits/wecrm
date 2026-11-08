@@ -12,7 +12,7 @@ router.use(authMiddleware);
 
 const createSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8).max(100),
   name: z.string().min(2),
   username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/, 'Username must be alphanumeric with underscores').optional(),
   roleId: z.string().optional(),
@@ -88,7 +88,7 @@ router.patch('/:id', adminOnly, async (req: AuthRequest, res) => {
 
 // Администратор меняет пароль пользователя без ввода текущего пароля
 const resetPasswordSchema = z.object({
-  password: z.string().min(6),
+  password: z.string().min(8).max(100),
 });
 
 router.post('/:id/reset-password', adminOnly, async (req: AuthRequest, res) => {

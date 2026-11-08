@@ -218,7 +218,15 @@ export function VkMarketSettings() {
         />
         <button
           type="button"
-          onClick={() => window.open('/api/vk/market-auth', '_blank')}
+          onClick={async () => {
+            try {
+              const token = localStorage.getItem('token');
+              const response = await fetch('/api/vk/market-auth', { method: 'POST', headers: { ...(token ? { 'X-Auth-Token': token } : {}) } });
+              const data = await response.json();
+              if (!response.ok) throw new Error(data.error || 'Не удалось начать авторизацию ВК');
+              window.open(data.url, '_blank');
+            } catch (e: any) { alert(e?.message || 'Не удалось начать авторизацию ВК'); }
+          }}
           style={{ ...btnSecondary, width: '100%', marginTop: 12 }}
         >
           🔑 Получить токен маркета (авторизация ВК)

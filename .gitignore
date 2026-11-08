@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
@@ -61,3 +60,6 @@ agent/windows/__pycache__/
 # WeAGENT.exe — бинарный установщик (сборка кросс-компиляцией Go)
 agent/windows/WeAGENT.exe
 agent/windows/installer/files/
+
+# Случайный lock в корне не используется; фиксируем только backend/frontend.
+/package-lock.json

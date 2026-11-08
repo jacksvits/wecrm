@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: crm
-      POSTGRES_PASSWORD: crm_secret_2026
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: wecrm
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -25,28 +25,28 @@ services:
     ports:
       - "127.0.0.1:4000:4000"
     environment:
-      DATABASE_URL: postgresql://crm:crm_secret_2026@db:5432/wecrm?schema=public
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      VAPID_PUBLIC_KEY: BBDb3f-KC_ZFFEP6fu2eQ6mNPBVUtn-O1IZme1ZX7Ug8W9JXHFiwzlXeyDEt4n2I7f2NWIII4QLyAJZ7ESZdzSs
-      VAPID_PRIVATE_KEY: duhNuxTRJLTYidASQ8jDpR1OQb7U3zUATxACkV855sA
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@db:5432/wecrm?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:?VAPID_PUBLIC_KEY is required}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:?VAPID_PRIVATE_KEY is required}
       VAPID_SUBJECT: mailto:admin@welans.cc
       PORT: 4000
       NODE_ENV: production
       NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt
       VK_CLIENT_ID: "54736647"
-      VK_CLIENT_SECRET: "l7d4RoIFcqdzmgLzt3nf"
+      VK_CLIENT_SECRET: ${VK_CLIENT_SECRET:?VK_CLIENT_SECRET is required}
       VK_REDIRECT_URI: "https://welans.cc/api/vk/callback"
       BEGET_LOGIN: "softboeg"
       NAS_DSM_URL: "http://192.168.8.3:5000"
       NAS_DSM_USER: "jack"
-      NAS_DSM_PASSWORD: "16Fhuevtyn_"
+      NAS_DSM_PASSWORD: ${NAS_DSM_PASSWORD:?NAS_DSM_PASSWORD is required}
       NAS_BACKEND_HOST: "192.168.8.145"
       NAS_BACKEND_PORT: 80
       # Базовый домен поддоменов организаций и email для Let's Encrypt на NAS
       NAS_BASE_DOMAIN: "welans.cc"
-      BEGET_PASSWORD: "nyBNQofDm96"
+      BEGET_PASSWORD: ${BEGET_PASSWORD:?BEGET_PASSWORD is required}
       TOCHKA_CLIENT_ID: "4146da5f3ccc42d6a2e725a08062d8e7"
-      TOCHKA_CLIENT_SECRET: "e90a2e242aad441596da65e889d96dad"
+      TOCHKA_CLIENT_SECRET: ${TOCHKA_CLIENT_SECRET:?TOCHKA_CLIENT_SECRET is required}
       TOCHKA_REDIRECT_URI: "https://welans.cc/api/tochka/auth-url"
       TOCHKA_ACCESS_TOKEN: ""
       FRONTEND_URL: "https://welans.cc"
@@ -110,10 +110,10 @@ services:
     image: wecrm-backend:multitenant
     command: sh -c "npx prisma generate && npx tsx src/worker.ts"
     environment:
-      DATABASE_URL: postgresql://crm:crm_secret_2026@db:5432/wecrm?schema=public
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      VAPID_PUBLIC_KEY: BBDb3f-KC_ZFFEP6fu2eQ6mNPBVUtn-O1IZme1ZX7Ug8W9JXHFiwzlXeyDEt4n2I7f2NWIII4QLyAJZ7ESZdzSs
-      VAPID_PRIVATE_KEY: duhNuxTRJLTYidASQ8jDpR1OQb7U3zUATxACkV855sA
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@db:5432/wecrm?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:?VAPID_PUBLIC_KEY is required}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:?VAPID_PRIVATE_KEY is required}
       VAPID_SUBJECT: mailto:admin@welans.cc
       NODE_ENV: production
       NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt

@@ -8,6 +8,7 @@ import { NewsComments } from './NewsComments';
 import { stripHtml } from '../lib/stripHtml';
 import { useBrandNewsCover } from '../lib/branding';
 import { useAuth } from '../hooks/useAuth';
+import { safeHtml } from '../lib/safeHtml';
 
 export function NewsDetail() {
   const { id } = useParams();
@@ -221,7 +222,7 @@ export function NewsDetail() {
           }}>
             <div
               className="rich-text"
-              dangerouslySetInnerHTML={{ __html: news.content }}
+              dangerouslySetInnerHTML={{ __html: safeHtml(news.content) }}
             />
           </div>
         )}

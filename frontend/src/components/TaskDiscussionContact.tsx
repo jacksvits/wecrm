@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ReactQuill from "react-quill";
-import "react-quill/dist/quill.snow.css";
+import ReactQuill from "react-quill-new";
+import "react-quill-new/dist/quill.snow.css";
 import { Contact, ContactAccess, ContactAccessDirection, ClientDevice, Deal, Status } from "../types";
 import { Avatar } from "./Avatar";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { stripHtml } from "../lib/stripHtml";
+import { safeHtml } from '../lib/safeHtml';
 
 // Контакт с подгруженными связями (эндпоинт GET /api/contacts/:id)
 export type DiscussionContact = Contact & {
@@ -700,7 +701,7 @@ export function TaskDiscussionContact({
               <div
                 className="rich-text"
                 style={{ fontSize: 14, color: "var(--text-primary)", wordBreak: "break-word" }}
-                dangerouslySetInnerHTML={{ __html: contact.notes }}
+                dangerouslySetInnerHTML={{ __html: safeHtml(contact.notes) }}
               />
             ) : (
               <span style={infoValueStyle}>{contact.notes}</span>

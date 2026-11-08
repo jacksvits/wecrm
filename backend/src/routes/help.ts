@@ -97,7 +97,7 @@ router.post('/articles', authMiddleware, requirePlatformAdmin, async (req: AuthR
     });
     res.json(mapOut(row));
   } catch (err: any) {
-    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.errors?.[0]?.message || err.message });
+    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.issues?.[0]?.message || err.message });
   }
 });
 
@@ -118,7 +118,7 @@ router.put('/articles/:slug', authMiddleware, requirePlatformAdmin, async (req: 
     });
     res.json(mapOut(row));
   } catch (err: any) {
-    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.errors?.[0]?.message || err.message });
+    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.issues?.[0]?.message || err.message });
   }
 });
 

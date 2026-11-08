@@ -1,5 +1,6 @@
 import http from 'http';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../lib/jwt.js';
 import { WebSocketServer, WebSocket } from 'ws';
 import { pushRelay } from '../lib/push.js';
 
@@ -8,7 +9,7 @@ import { pushRelay } from '../lib/push.js';
 // сюда те же payload, что уходят в Web Push (VAPID), а нативный foreground-сервис
 // показывает системные уведомления. Аутентификация — JWT из ?token= (тот же ключ,
 // что и в auth middleware; payload { id }).
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+
 
 export function setupPushWs(server: http.Server) {
   const wss = new WebSocketServer({ noServer: true });

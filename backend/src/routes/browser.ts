@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { ProxyAgent } from 'undici';
 import { Readable } from 'stream';
 import crypto from 'crypto';
+import { isIP } from 'net';
+import { lookup } from 'dns/promises';
 import { authMiddleware } from '../middleware/auth.js';
 
 // === Прокси-браузер ===
@@ -43,6 +45,41 @@ const DROP_RESPONSE_HEADERS = [
 ];
 
 const JAR_PREFIX = 'wecrm_b_';
+
+function ipv4Number(ip: string): number {
+  return ip.split('.').reduce((n, part) => (n * 256 + Number(part)) >>> 0, 0);
+}
+function isPublicIp(ip: string): boolean {
+  const normalized = ip.replace(/^\[|\]$/g, '').toLowerCase();
+  if (normalized.startsWith('::ffff:') && isIP(normalized.slice(7)) === 4) return isPublicIp(normalized.slice(7));
+  if (isIP(normalized) === 4) {
+    const n = ipv4Number(normalized);
+    const inRange = (base: string, bits: number) => {
+      const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
+      return (n & mask) === (ipv4Number(base) & mask);
+    };
+    return !['0.0.0.0/8','10.0.0.0/8','100.64.0.0/10','127.0.0.0/8','169.254.0.0/16','172.16.0.0/12','192.0.0.0/24','192.0.2.0/24','192.168.0.0/16','198.18.0.0/15','198.51.100.0/24','203.0.113.0/24','224.0.0.0/4','240.0.0.0/4']
+      .some(cidr => { const [base,bits] = cidr.split('/'); return inRange(base, Number(bits)); });
+  }
+  if (isIP(normalized) === 6) {
+    if (normalized === '::' || normalized === '::1') return false;
+    if (/^(fc|fd|fe8|fe9|fea|feb|ff)/i.test(normalized)) return false;
+    if (normalized.startsWith('2001:db8:')) return false;
+    return true;
+  }
+  return false;
+}
+async function assertPublicTarget(target: URL): Promise<string | null> {
+  if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password) return 'Некорректный или небезопасный URL';
+  const host = target.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (!host || host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) return 'Доступ к локальным адресам запрещён';
+  try {
+    const addresses = isIP(host) ? [{ address: host }] : await lookup(host, { all: true, verbatim: true });
+    if (!addresses.length || addresses.some(a => !isPublicIp(a.address))) return 'Доступ к локальным и служебным адресам запрещён';
+    return null;
+  } catch { return 'Не удалось проверить адрес назначения'; }
+}
+
 
 // Короткий хэш домена — изолирует cookie разных сайтов друг от друга
 function hostHash(hostname: string): string {
@@ -245,11 +282,9 @@ router.all('/proxy', browserAuth, async (req: any, res) => {
     }
   }
 
-  // Запрет обращения к внутренней сети и localhost через прокси
-  const host = target.hostname.toLowerCase();
-  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local') || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) {
-    return res.status(403).json({ error: 'Доступ к локальным адресам запрещён' });
-  }
+  if (req.user?.isGuest) return res.status(403).json({ error: 'Гостевому пользователю прокси-браузер недоступен' });
+  const targetError = await assertPublicTarget(target);
+  if (targetError) return res.status(403).json({ error: targetError });
 
   // Тело запроса: парсеры json/urlencoded уже могли его прочитать — восстанавливаем,
   // иначе передаём поток как есть (raw-типы)

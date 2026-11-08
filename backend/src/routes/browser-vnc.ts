@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import httpProxy from 'http-proxy';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../lib/jwt.js';
 import fs from 'fs';
 import path from 'path';
 import { authMiddleware } from '../middleware/auth.js';
@@ -33,7 +34,7 @@ const START_URL = process.env.VNC_START_URL || 'https://google.com';
 const SESSION_LIMIT = Number(process.env.VNC_SESSION_LIMIT || 10);
 const READY_TIMEOUT = 120_000;
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+
 
 interface VncSession { id: string; ip: string }
 const sessions = new Map<string, VncSession>(); // userId -> {containerId, ip}

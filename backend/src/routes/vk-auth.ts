@@ -1,17 +1,20 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../lib/jwt.js';
 import { prisma } from '../lib/prisma.js';
 import fs from 'fs';
 import path from 'path';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
+import { recordAuthEvent } from '../lib/auth-events.js';
+import { rateLimit } from '../lib/security.js';
 
 // ===== Плагин «ВК авторизация»: вход пользователей в CRM через VK ID =====
 // Публичные эндпоинты остаются на прежних путях /api/vk/* —
 // redirect URI задан в настройках приложения VK ID и не должен меняться.
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+
 
 /** Настройки плагина: из БД, с фолбэком на переменные окружения (как раньше) */
 async function getAuthConfig() {
@@ -62,12 +65,15 @@ router.get('/config', async (_req, res) => {
 async function downloadVkAvatar(url: string): Promise<string | null> {
   try {
     const res = await fetch(url);
-    if (!res.ok) {
+    const declaredSize = Number(res.headers.get('content-length') || 0);
+    if (!res.ok || declaredSize > 5 * 1024 * 1024 || !(res.headers.get('content-type') || '').startsWith('image/')) {
       console.error('[VK Avatar Download] HTTP', res.status, url);
       return null;
     }
     const buffer = await res.arrayBuffer();
-    const ext = path.extname(new URL(url).pathname) || '.jpg';
+    if (buffer.byteLength > 5 * 1024 * 1024) return null;
+    const rawExt = path.extname(new URL(url).pathname).toLowerCase();
+    const ext = ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(rawExt) ? rawExt : '.jpg';
     const filename = `${randomUUID()}${ext}`;
     const filepath = path.join(uploadsRoot(), filename);
     fs.writeFileSync(filepath, Buffer.from(buffer));
@@ -86,6 +92,7 @@ async function downloadVkAvatar(url: string): Promise<string | null> {
  */
 async function completeVkIdAuth(code: string, deviceId: string, state: string, codeVerifier: string) {
   const cfg = await getAuthConfig();
+  if (!cfg.isActive) return { ok: false as const, errorKey: 'disabled' as const, message: 'Вход через VK ID отключён администратором' };
   const tokenController = new AbortController();
   const tokenTimeout = setTimeout(() => tokenController.abort(), 20000);
   const tokenRes = await fetch('https://id.vk.ru/oauth2/auth', {
@@ -127,7 +134,7 @@ async function completeVkIdAuth(code: string, deviceId: string, state: string, c
   });
   clearTimeout(userTimeout);
   const userData: any = await userRes.json();
-  console.log('[VK ID Auth] userData:', JSON.stringify(userData));
+  // Не пишем персональные данные VK в серверный журнал.
 
   if (userData.error) {
     console.error('[VK ID Auth] User info error:', userData);
@@ -205,9 +212,10 @@ async function completeVkIdAuth(code: string, deviceId: string, state: string, c
  * Старт серверного VK ID OAuth: возвращает URL для редиректа на id.vk.ru.
  * code_verifier хранится на сервере (привязан к state), на устройство не передаётся.
  */
-router.get('/login-url', async (_req, res) => {
+router.get('/login-url', rateLimit({ prefix: 'vk-login-url', windowMs: 15 * 60_000, max: 30 }), async (_req, res) => {
   try {
     const cfg = await getAuthConfig();
+    if (!cfg.isActive) return res.status(403).json({ error: 'Вход через VK ID отключён' });
     if (!cfg.appId) {
       return res.status(400).json({ error: 'VK ID not configured' });
     }
@@ -247,7 +255,7 @@ router.get('/login-url', async (_req, res) => {
  * Legacy-вариант: обмен кода на токен с code_verifier с клиента.
  * Новый клиент ходит через GET /login-url → GET /callback.
  */
-router.post('/id-auth', async (req, res) => {
+router.post('/id-auth', rateLimit({ prefix: 'vk-id-auth', windowMs: 15 * 60_000, max: 30 }), async (req, res) => {
   try {
     const { code, device_id, state, code_verifier } = req.body;
     if (!code || !device_id || !state || !code_verifier) {
@@ -258,6 +266,7 @@ router.post('/id-auth', async (req, res) => {
     if (!result.ok) {
       return res.status(400).json({ error: result.message });
     }
+    await recordAuthEvent(req, { login: result.user.email, userId: result.user.id, authMethod: 'vk-id' });
     res.json({ token: result.token, user: result.user });
   } catch (err: any) {
     console.error('[VK ID Auth Error]', err);
@@ -271,7 +280,7 @@ router.post('/id-auth', async (req, res) => {
   }
 });
 
-router.get('/callback', async (req: Request, res: Response) => {
+router.get('/callback', rateLimit({ prefix: 'vk-callback', windowMs: 15 * 60_000, max: 60 }), async (req: Request, res: Response) => {
   try {
     const { code, device_id, state } = req.query;
     if (!code || !device_id || !state) {
@@ -293,6 +302,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     if (!result.ok) {
       return res.redirect(`/?vk_error=${result.errorKey}`);
     }
+    await recordAuthEvent(req, { login: result.user.email, userId: result.user.id, authMethod: 'vk-id' });
     // JWT в fragment (#), чтобы он не попадал в access-логи nginx.
     // Fragment не отправляется на сервер — фронтенд заберёт его из location.hash.
     return res.redirect(`/#vk_token=${result.token}`);

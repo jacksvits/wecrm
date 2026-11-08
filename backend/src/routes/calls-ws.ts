@@ -1,5 +1,6 @@
 import http from 'http';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../lib/jwt.js';
 import { WebSocketServer, WebSocket } from 'ws';
 import { addCallSocket, removeCallSocket, getCallPeer, sendCallEvent } from '../lib/call-hub.js';
 
@@ -7,7 +8,7 @@ import { addCallSocket, removeCallSocket, getCallPeer, sendCallEvent } from '../
 // Аутентификация — тот же JWT, что и в auth middleware (payload { id }).
 // Клиенты шлют { type: 'signal', callId, data } — сервер ретранслирует data
 // второму участнику звонка (проверка участия через in-memory room).
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+
 
 export function setupCallsWs(server: http.Server) {
   const wss = new WebSocketServer({ noServer: true });

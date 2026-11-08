@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../lib/jwt.js';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { ensureGuestUser, GUEST_EMAIL } from '../lib/guest-demo.js';
 import { currentTenant, platformPrisma } from '../lib/tenant.js';
+import { recordAuthEvent } from '../lib/auth-events.js';
+import { rateLimit } from '../lib/security.js';
 
 
 /**
@@ -64,11 +67,11 @@ async function applyTenantSubscriptionPages(pages: string[]): Promise<string[]> 
   } catch { return pages; }
 }
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8).max(100),
   name: z.string().min(2),
   username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/, 'Username must be alphanumeric with underscores').optional(),
 });
@@ -78,7 +81,7 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
-router.post('/register', async (req, res) => {
+router.post('/register', rateLimit({ prefix: 'register', windowMs: 60 * 60_000, max: 5 }), async (req, res) => {
   try {
     const data = registerSchema.parse(req.body);
 
@@ -119,6 +122,7 @@ router.post('/register', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    await recordAuthEvent(req, { login: data.email, userId: user.id, authMethod: 'register' });
     res.json({
       user: {
         id: user.id,
@@ -147,7 +151,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', rateLimit({ prefix: 'login', windowMs: 15 * 60_000, max: 12, key: (req) => String(req.body?.login || '').toLowerCase().slice(0, 100) }), async (req, res) => {
   try {
     const data = loginSchema.parse(req.body);
 
@@ -178,6 +182,7 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    await recordAuthEvent(req, { login: data.login, userId: user.id, authMethod: 'password' });
     res.json({
       user: {
         id: user.id,
@@ -208,7 +213,7 @@ router.post('/login', async (req, res) => {
 
 // Гостевой доступ: вход без регистрации с правами обычного пользователя (роль user).
 // Демо-данные не создаются — гость работает с реальными данными в рамках своих прав.
-router.post('/guest', async (req, res) => {
+router.post('/guest', rateLimit({ prefix: 'guest', windowMs: 15 * 60_000, max: 20 }), async (req, res) => {
   try {
     // Гостевой (демо) вход — только на главном домене платформы
     if (!currentTenant()?.isMain) return res.status(403).json({ error: 'Гостевой вход доступен только на основном домене' });
@@ -221,6 +226,7 @@ router.post('/guest', async (req, res) => {
     if (!user) return res.status(500).json({ error: 'Guest user not found' });
 
     const { token, roleName, allowedPages } = issueToken(user);
+    await recordAuthEvent(req, { login: user.email, userId: user.id, authMethod: 'guest' });
     res.json({ user: publicUser(user, roleName, allowedPages), token });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -366,6 +372,7 @@ router.post('/impersonate', authMiddleware, adminOnly, async (req: AuthRequest, 
         userId: req.user!.id,
       },
     });
+    await recordAuthEvent(req, { login: target.email, userId: target.id, authMethod: 'impersonate' });
     res.json({ user: publicUser(target, roleName, allowedPages), token });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -392,6 +399,7 @@ router.post('/stop-impersonation', authMiddleware, async (req: AuthRequest, res)
         userId: admin.id,
       },
     });
+    await recordAuthEvent(req, { login: admin.email, userId: admin.id, authMethod: 'impersonate-end' });
     res.json({ user: publicUser(admin, roleName, allowedPages), token });
   } catch (err: any) {
     res.status(400).json({ error: err.message });

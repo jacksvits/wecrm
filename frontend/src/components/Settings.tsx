@@ -33,8 +33,9 @@ import { HikvisionSettings } from "./HikvisionSettings";
 import { TapoSettings } from "./TapoSettings";
 import { SystemSettings } from "./SystemSettings";
 import { ScheduleSettings } from "./ScheduleSettings";
+import { SecuritySettings } from "./SecuritySettings";
 
-type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "schedule" | "integrations" | "system";
+type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "schedule" | "integrations" | "security" | "system";
 type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "wb" | "vpn" | "hikvision" | "cdek" | "tapo";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
@@ -195,6 +196,14 @@ export function Settings() {
   }, [helpSlug]);
 
   const { user: stUser } = useAuth() ;
+  const [isMainPlatform, setIsMainPlatform] = useState(false);
+  useEffect(() => {
+    api.platform.me().then((info) => setIsMainPlatform(info.isMain === true)).catch(() => setIsMainPlatform(false));
+  }, []);
+  const isPlatformAdmin = stUser?.role === "admin" && isMainPlatform;
+  useEffect(() => {
+    if (activeTab === "security" && !isPlatformAdmin) setActiveTab("system");
+  }, [activeTab, isPlatformAdmin]);
 
   // Возврат из OAuth банка: сразу открываем интеграции
   useEffect(() => {
@@ -252,6 +261,8 @@ export function Settings() {
         return <ScheduleSettings />;
       case "integrations":
         return renderIntegrations();
+      case "security":
+        return isPlatformAdmin ? <SecuritySettings /> : null;
       case "system":
         return <SystemSettings />;
       default:
@@ -587,6 +598,9 @@ export function Settings() {
         <button style={tabStyle(activeTab === "integrations")} onClick={() => setActiveTab("integrations")}>
           Интеграции
         </button>
+        {isPlatformAdmin && <button style={tabStyle(activeTab === "security")} onClick={() => setActiveTab("security")}>
+          Безопасность
+        </button>}
       </div>
       {renderContent()}
     </div>

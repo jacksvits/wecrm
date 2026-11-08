@@ -8,16 +8,18 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../lib/jwt.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { currentTenant, platformPrisma, invalidateTenantCache, getTenantPrisma, asMainTenant } from '../lib/tenant.js';
 import { dbNameForSlug, provisionTenantDb, dropTenantDb, slugTaken, SLUG_PATTERN } from '../lib/tenant-provision.js';
 import { createTenantProxyRule, deleteTenantProxyRule } from '../lib/nas-proxy.js';
 import { createTenantPaymentLink } from './tochka-acquiring.js';
+import { recordAuthEvent } from '../lib/auth-events.js';
 
 const router = Router();
 
 // Тот же секрет, что и в auth.ts — токен тенанта проверяется его authMiddleware на поддомене
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+
 
 const registerSchema = z.object({
   name: z.string().trim().min(2, 'Название организации — минимум 2 символа').max(100),
@@ -579,6 +581,7 @@ router.post('/tenants/:id/impersonate', authMiddleware, requirePlatformAdmin, as
     // Поддомен организации на базовом домене текущего запроса (как при регистрации)
     const baseDomain = (req.headers.host || 'welans.cc').split(':')[0].replace(/^www\./, '');
     const url = `https://${tenant.slug}.${baseDomain}`;
+    await recordAuthEvent(req, { login: admin.email, userId: admin.id, authMethod: 'platform-impersonate' }, { id: tenant.id, slug: tenant.slug, name: tenant.name, isMain: false });
     res.json({ url, token, tenantName: tenant.name, adminName: admin.name || admin.email });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -7,11 +7,24 @@ import os from 'os';
 import { randomUUID } from 'crypto';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import * as archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import sharp from 'sharp';
 import { uploadsRoot } from '../lib/tenant.js';
 
 const router = Router();
+
+function resolveInside(baseDir: string, requestedPath: string): string | null {
+  const base = path.resolve(baseDir);
+  const target = path.resolve(base, requestedPath || '.');
+  if (target !== base && !target.startsWith(base + path.sep)) return null;
+  try {
+    const realBase = fs.realpathSync(base);
+    const realTarget = fs.realpathSync(target);
+    if (realTarget !== realBase && !realTarget.startsWith(realBase + path.sep)) return null;
+  } catch { /* отсутствие обрабатывается вызывающим маршрутом */ }
+  return target;
+}
+
 
 // Map tab keys to local directories inside Docker container
 const TAB_DIRS: Record<string, string> = {
@@ -50,6 +63,7 @@ router.get('/tabs', authMiddleware, async (req, res) => {
 });
 
 router.post('/tabs/:tabKey', authMiddleware, async (req, res) => {
+  if ((req as any).user?.role !== 'admin') return res.status(403).json({ error: 'Доступ запрещен' });
   const { tabKey } = req.params;
   const { url, path: tabPath } = req.body;
   const allowed = ['programs', 'drivers', 'documents', 'games'];
@@ -125,8 +139,8 @@ router.get('/browse', authMiddleware, async (req, res) => {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
 
-  const targetDir = path.join(baseDir, path.normalize(subPath).replace(/^(..(\/|$))+/g, ''));
-  if (!targetDir.startsWith(baseDir)) {
+  const targetDir = resolveInside(baseDir, subPath);
+  if (!targetDir) {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
 
@@ -213,8 +227,8 @@ router.get('/preview', authMiddleware, async (req, res) => {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
 
-  const targetFile = path.join(baseDir, path.normalize(filePath).replace(/^(..(\/|$))+/g, ''));
-  if (!targetFile.startsWith(baseDir)) {
+  const targetFile = resolveInside(baseDir, filePath);
+  if (!targetFile) {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
 
@@ -276,8 +290,8 @@ router.get('/download', authMiddleware, (req, res) => {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
 
-  const targetFile = path.join(baseDir, path.normalize(filePath).replace(/^(..(\/|$))+/g, ''));
-  if (!targetFile.startsWith(baseDir)) {
+  const targetFile = resolveInside(baseDir, filePath);
+  if (!targetFile) {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
 
@@ -323,8 +337,8 @@ router.get('/download-folder', authMiddleware, (req, res) => {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
 
-  const targetDir = path.join(baseDir, path.normalize(folderPath).replace(/^(..(\/|$))+/g, ''));
-  if (!targetDir.startsWith(baseDir)) {
+  const targetDir = resolveInside(baseDir, folderPath);
+  if (!targetDir) {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
 
@@ -336,7 +350,7 @@ router.get('/download-folder', authMiddleware, (req, res) => {
     incrementDownloadCount(tabKey, folderPath);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(folderName)}.zip`);
-    const archive = (archiver as any)('zip', { zlib: { level: 6 } });
+    const archive = new ZipArchive({ zlib: { level: 6 } });
     archive.on('error', (err: any) => {
       console.error('Archiver error:', err);
       if (!res.headersSent) {
@@ -369,8 +383,8 @@ router.get('/games', authMiddleware, (req, res) => {
   const tabKey = 'games';
   const subPath = (req.query.path as string) || '';
   const baseDir = TAB_DIRS[tabKey];
-  const targetDir = path.join(baseDir, path.normalize(subPath).replace(/^(..(\/|$))+/g, ''));
-  if (!targetDir.startsWith(baseDir)) {
+  const targetDir = resolveInside(baseDir, subPath);
+  if (!targetDir) {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
   try {
@@ -401,8 +415,8 @@ router.get('/games/download', authMiddleware, (req, res) => {
   const tabKey = 'games';
   const filePath = (req.query.path as string) || '';
   const baseDir = TAB_DIRS[tabKey];
-  const targetFile = path.join(baseDir, path.normalize(filePath).replace(/^(..(\/|$))+/g, ''));
-  if (!targetFile.startsWith(baseDir)) {
+  const targetFile = resolveInside(baseDir, filePath);
+  if (!targetFile) {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
   try {
@@ -438,8 +452,8 @@ router.get('/games/download-folder', authMiddleware, (req, res) => {
   const tabKey = 'games';
   const folderPath = (req.query.path as string) || '';
   const baseDir = TAB_DIRS[tabKey];
-  const targetDir = path.join(baseDir, path.normalize(folderPath).replace(/^(..(\/|$))+/g, ''));
-  if (!targetDir.startsWith(baseDir)) {
+  const targetDir = resolveInside(baseDir, folderPath);
+  if (!targetDir) {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
   try {
@@ -450,7 +464,7 @@ router.get('/games/download-folder', authMiddleware, (req, res) => {
     incrementDownloadCount(tabKey, folderPath);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(folderName)}.zip`);
-    const archive = (archiver as any)('zip', { zlib: { level: 6 } });
+    const archive = new ZipArchive({ zlib: { level: 6 } });
     archive.on('error', (err: any) => {
       console.error('Archiver error:', err);
       if (!res.headersSent) {

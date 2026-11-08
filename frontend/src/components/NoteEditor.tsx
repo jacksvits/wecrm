@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
 import { linkifyTaskTagsHtml, useTaskHashtagClick } from '../lib/taskHashtags';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
+import { safeHtml } from '../lib/safeHtml';
 
 const quillModules = {
   toolbar: [
@@ -174,7 +175,7 @@ export function NoteEditor() {
               color: textColor,
             }}
             onClick={onTagClick}
-            dangerouslySetInnerHTML={{ __html: linkifyTaskTagsHtml(content) }}
+            dangerouslySetInnerHTML={{ __html: safeHtml(linkifyTaskTagsHtml(content)) }}
           />
         </div>
       </div>

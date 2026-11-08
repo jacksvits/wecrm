@@ -56,7 +56,7 @@ router.get('/', authMiddleware, async (_req, res) => {
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const parsed = saveSchema.safeParse(req.body ?? {});
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Некорректные данные' });
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Некорректные данные' });
     const d = parsed.data;
     const existing = await prisma.cdekSettings.findUnique({ where: { id: 1 } });
     const credentialsChanged =

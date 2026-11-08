@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import { api } from '../api/client';
 import { ClientDevice } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { formatDateTime } from '../lib/formatDate';
+import { safeHtml } from '../lib/safeHtml';
 
 const quillModules = {
   toolbar: [[{ header: [false, 3, 4] }], ['bold', 'italic', 'underline', 'strike'], [{ list: 'ordered' }, { list: 'bullet' }], ['link'], ['clean']],
@@ -174,7 +175,7 @@ export function ContactDevices({ contactId }: { contactId: string }) {
               ) : (
                 <div>
                   {d.comment
-                    ? <div dangerouslySetInnerHTML={{ __html: d.comment }} />
+                    ? <div dangerouslySetInnerHTML={{ __html: safeHtml(d.comment) }} />
                     : <span style={{ color: 'var(--text-muted)' }}>Нет комментария</span>}
                   {canEdit && (
                     <button onClick={() => { setEditingComment(d.id); setCommentDraft(d.comment || ''); }} style={{ marginTop: 6, padding: '5px 12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>

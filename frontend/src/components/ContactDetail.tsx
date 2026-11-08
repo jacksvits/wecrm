@@ -8,6 +8,7 @@ import { formatDateTime } from '../lib/formatDate';
 import { linkifyTaskTagsHtml, useTaskHashtagClick } from '../lib/taskHashtags';
 import { ContactAccesses } from './ContactAccesses';
 import { ContactDevices } from './ContactDevices';
+import { safeHtml } from '../lib/safeHtml';
 
 interface ContactType {
   id: string;
@@ -233,7 +234,7 @@ export function ContactDetail() {
           {contact.notes && (
             <div style={{ marginTop: 8, padding: 16, background: 'var(--bg-body)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
               <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>Примечания</div>
-              <div className="rich-text" onClick={onTagClick} dangerouslySetInnerHTML={{ __html: linkifyTaskTagsHtml(contact.notes) }} />
+              <div className="rich-text" onClick={onTagClick} dangerouslySetInnerHTML={{ __html: safeHtml(linkifyTaskTagsHtml(contact.notes)) }} />
             </div>
           )}
           {contact.description && (

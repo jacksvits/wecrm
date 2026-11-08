@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react' ;
 import { useNavigate, useParams } from 'react-router-dom' ;
-import ReactQuill from 'react-quill' ;
-import 'react-quill/dist/quill.snow.css' ;
+import ReactQuill from 'react-quill-new' ;
+import 'react-quill-new/dist/quill.snow.css' ;
 import { useAuth } from '../hooks/useAuth' ;
 import { api } from '../api/client' ;
 import { HelpBlock } from '../lib/helpContent' ;

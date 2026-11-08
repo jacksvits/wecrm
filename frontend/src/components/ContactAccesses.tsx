@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { ContactAccess, ContactAccessDirection } from '../types';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
+import { safeHtml } from '../lib/safeHtml';
 
 const quillModules = {
   toolbar: [
@@ -207,13 +208,13 @@ export function ContactAccesses({ contactId, canEdit, canDelete }: Props) {
               {access.description && (
                 <div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>Описание</div>
-                  <div className="rich-text" dangerouslySetInnerHTML={{ __html: access.description }} />
+                  <div className="rich-text" dangerouslySetInnerHTML={{ __html: safeHtml(access.description) }} />
                 </div>
               )}
               {access.comment && (
                 <div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>Комментарий</div>
-                  <div className="rich-text" dangerouslySetInnerHTML={{ __html: access.comment }} />
+                  <div className="rich-text" dangerouslySetInnerHTML={{ __html: safeHtml(access.comment) }} />
                 </div>
               )}
               {access.url && (

@@ -29,7 +29,7 @@ const storage = multer.diskStorage({
   filename: (_req, file, cb) => {
     const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
     const sanitized = originalName.replace(/[<>:"\/\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, ' ').trim();
-    cb(null, sanitized || `${randomUUID()}${path.extname(originalName)}`);
+    cb(null, `${randomUUID()}_${sanitized || 'file'}`);
   },
 });
 
@@ -42,7 +42,10 @@ const upload = multer({
 });
 
 // Upload file
-router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest, res) => {
+router.post('/', authMiddleware, (req: AuthRequest, res, next) => {
+  if (req.user?.isGuest) return res.status(403).json({ error: 'Гостевой доступ: загрузка файлов недоступна' });
+  next();
+}, upload.single('file'), async (req: AuthRequest, res) => {
   console.log('[uploads] POST hit — req.file:', req.file?.originalname, 'body:', req.body);
   try {
     if (!req.file) {
@@ -50,11 +53,23 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
       return res.status(400).json({ error: 'Файл не загружен' });
     }
     const { entityType, entityId } = req.body;
+    const privilegedUpload = ['promo-block', 'login-slide'].includes(String(entityType));
+    const newsUpload = entityType === 'news';
+    const productUpload = entityType === 'product';
+    const allowed = privilegedUpload ? req.user?.role === 'admin'
+      : newsUpload ? !!(req.user?.canCreateNews || req.user?.canEditNews || req.user?.role === 'admin')
+      : productUpload ? !!(req.user?.stockAccess || req.user?.role === 'admin')
+      : true;
+    if (!allowed) {
+      if (req.file?.path) fs.rmSync(req.file.path, { force: true });
+      return res.status(403).json({ error: 'Недостаточно прав для загрузки этого типа файла' });
+    }
     const tenantRoot = uploadsRoot();
     const chatRoot = path.join(tenantRoot, 'global_chat');
     const tenantPfx = tenantUploadPrefix();
     if (!entityType || !entityId) {
       console.log('[uploads] missing entityType or entityId');
+      fs.rmSync(req.file.path, { force: true });
       return res.status(400).json({ error: 'entityType и entityId обязательны' });
     }
 
@@ -189,13 +204,14 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
     console.log('[uploads] success:', attachment.id, 'path:', dbPath);
     res.status(201).json(attachment);
   } catch (err: any) {
+    if (req.file?.path) fs.rmSync(req.file.path, { force: true });
     console.error('[uploads] CRASH:', err.message, err.stack);
     res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 
 // Get attachments by entity
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   const { entityType, entityId } = req.query;
   if (!entityType || !entityId) {
     return res.status(400).json({ error: 'entityType и entityId обязательны' });
@@ -242,7 +258,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
 });
 
 // Download file by ID
-router.get('/:id/download', async (req, res) => {
+router.get('/:id/download', authMiddleware, async (req, res) => {
   try {
     const attachment = await prisma.fileAttachment.findUnique({
       where: { id: req.params.id },

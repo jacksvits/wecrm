@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { seoBaseTitle } from '../lib/seo';
+import { safeHtml } from '../lib/safeHtml';
 type LegalSlug = 'offer' | 'privacy' | 'cookies';
 export function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
   const [doc, setDoc] = useState<{ title: string; content: string; updatedAt: string | null } | null>(null);
@@ -8,5 +9,5 @@ export function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
   // Название сайта в title берём из SEO-настроек тенанта (seoBaseTitle),
   // чтобы вкладка соответствовала полю «Title» в настройках
   useEffect(() => { document.title = doc ? `${doc.title} — ${seoBaseTitle()}` : seoBaseTitle(); }, [doc]);
-  return <div className="legal-page"><div className="legal-card"><a className="legal-back" href="/">← На страницу входа</a>{error && <div className="legal-error">{error}</div>}{!doc && !error && <div className="legal-loading">Загрузка документа...</div>}{doc && <><h1>{doc.title}</h1>{doc.updatedAt && <div className="legal-updated">Обновлено: {new Date(doc.updatedAt).toLocaleDateString('ru-RU')}</div>}<div className="legal-content" dangerouslySetInnerHTML={{ __html: doc.content }} /></>}</div></div>;
+  return <div className="legal-page"><div className="legal-card"><a className="legal-back" href="/">← На страницу входа</a>{error && <div className="legal-error">{error}</div>}{!doc && !error && <div className="legal-loading">Загрузка документа...</div>}{doc && <><h1>{doc.title}</h1>{doc.updatedAt && <div className="legal-updated">Обновлено: {new Date(doc.updatedAt).toLocaleDateString('ru-RU')}</div>}<div className="legal-content" dangerouslySetInnerHTML={{ __html: safeHtml(doc.content) }} /></>}</div></div>;
 }

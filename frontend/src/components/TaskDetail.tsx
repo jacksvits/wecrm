@@ -25,8 +25,9 @@ import { Avatar } from "./Avatar";
 import { ContactPicker } from "./ContactPicker";
 import { TaskDiscussionContact, DiscussionContact } from "./TaskDiscussionContact";
 import { Vitrine } from "./Vitrine";
-import ReactQuill from "react-quill";
-import "react-quill/dist/quill.snow.css";
+import ReactQuill from "react-quill-new";
+import "react-quill-new/dist/quill.snow.css";
+import { safeHtml } from '../lib/safeHtml';
 const priorityLabels: Record<string, string> = {
   low: "Низкий",
   medium: "Средний",
@@ -1623,10 +1624,10 @@ export function TaskDetail() {
                   style={{ marginBottom: 16 }}
                   onClick={onTagClick}
                   dangerouslySetInnerHTML={{
-                    __html: linkifyTaskTagsHtml(
+                    __html: safeHtml(linkifyTaskTagsHtml(
                       task.description ||
                       "<em style=&#34;color: var(--text-muted)&#34;>Нет описания</em>"
-                    ),
+                    )),
                   }}
                 />{" "}
                 <div
@@ -2035,7 +2036,7 @@ export function TaskDetail() {
                               style={{ fontSize: "inherit", lineHeight: "inherit", color: "inherit" }}
                               onClick={onTagClick}
                               dangerouslySetInnerHTML={{
-                                __html: linkifyTaskTagsHtml(pinnedComment.content),
+                                __html: safeHtml(linkifyTaskTagsHtml(pinnedComment.content)),
                               }}
                             />
                           ) : (
@@ -2194,7 +2195,7 @@ export function TaskDetail() {
                                   }}
                                   onClick={onTagClick}
                                   dangerouslySetInnerHTML={{
-                                    __html: linkifyTaskTagsHtml(c.content),
+                                    __html: safeHtml(linkifyTaskTagsHtml(c.content)),
                                   }}
                                 />
                               ) : (
@@ -2277,7 +2278,7 @@ export function TaskDetail() {
                                 const fileUrl = a.path.startsWith("http")
                                   ? a.path
                                   : `${origin}${a.path}`;
-                                const downloadUrl = `${origin}/api/uploads/${a.id}/download`;
+                                const downloadUrl = `${origin}/api/uploads/${a.id}/download?token=${encodeURIComponent(localStorage.getItem('token') || '')}`;
                                 const isImage =
                                   a.mimeType?.startsWith("image/");
                                 const isVideo =
@@ -3159,7 +3160,7 @@ export function TaskDetail() {
                             }}
                             onClick={onTagClick}
                             dangerouslySetInnerHTML={{
-                              __html: linkifyTaskTagsHtml(tx.description),
+                              __html: safeHtml(linkifyTaskTagsHtml(tx.description)),
                             }}
                           />
                         )}

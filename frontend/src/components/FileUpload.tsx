@@ -59,7 +59,7 @@ export function AttachmentList({ attachments, onDelete, isDark }: { attachments:
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
       {attachments.map(a => {
-        const previewUrl = a.path.startsWith('http') ? a.path : `${origin}${a.path}`; const downloadUrl = `${origin}/api/uploads/${a.id}/download`;
+        const previewUrl = a.path.startsWith('http') ? a.path : `${origin}${a.path}`; const downloadUrl = `${origin}/api/uploads/${a.id}/download?token=${encodeURIComponent(localStorage.getItem('token') || '')}`;
         const isImage = a.mimeType?.startsWith('image/');
         return (
           <a

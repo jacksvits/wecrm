@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -41,6 +41,10 @@ router.get('/text', async (req, res) => {
 });
 
 router.use(authMiddleware);
+router.use((req: AuthRequest, res, next) => {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
+  next();
+});
 
 /**
  * PUT /api/login-slides/text

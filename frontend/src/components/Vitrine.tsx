@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { Product, ProductCategory, PromoBlock } from '../types';
 import { useBrandProductDefaultImage, useBrandProductCardStyle } from '../lib/branding';
+import { safeHtml } from '../lib/safeHtml';
 
 const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
 const fmtQty = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
@@ -1126,7 +1127,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
                   {d.description && (
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>Описание</div>
-                      <div className="rich-text" style={{ fontSize: 14, color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: d.description }} />
+                      <div className="rich-text" style={{ fontSize: 14, color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: safeHtml(d.description) }} />
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 4, flexWrap: 'nowrap', alignItems: 'center' }}>

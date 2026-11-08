@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import { api } from '../api/client';
 import { NewsComment } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useRealtime } from '../hooks/useRealtime';
+import { safeHtml } from '../lib/safeHtml';
 
 const QUILL_MODULES = {
   toolbar: [
@@ -162,7 +163,7 @@ export function NewsComments({ newsId }: { newsId: string }) {
               <div
                 className="rich-text"
                 style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text-primary)', wordBreak: 'break-word' }}
-                dangerouslySetInnerHTML={{ __html: comment.content }}
+                dangerouslySetInnerHTML={{ __html: safeHtml(comment.content) }}
               />
             </div>
           ))}

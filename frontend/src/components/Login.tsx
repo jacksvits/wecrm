@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useBrandLogo } from '../lib/branding';
 import { LoginSlide } from '../types'
+import { safeHtml } from '../lib/safeHtml';
 
 const API_URL = ''
 
@@ -36,11 +37,11 @@ function LoginBrandText() {
   return (
     <>
       <h2 className="login-brand-title">
-        <span dangerouslySetInnerHTML={{ __html: title }} />
+        <span dangerouslySetInnerHTML={{ __html: safeHtml(title) }} />
         <br />
-        <span className="accent" dangerouslySetInnerHTML={{ __html: accent }} />
+        <span className="accent" dangerouslySetInnerHTML={{ __html: safeHtml(accent) }} />
       </h2>
-      <p className="login-brand-sub" dangerouslySetInnerHTML={{ __html: subtitle }} />
+      <p className="login-brand-sub" dangerouslySetInnerHTML={{ __html: safeHtml(subtitle) }} />
     </>
   )
 }
@@ -98,7 +99,7 @@ function LoginBrandSlider() {
               {sl.description && (
                 <div
                   className="login-slider-desc"
-                  dangerouslySetInnerHTML={{ __html: sl.description }}
+                  dangerouslySetInnerHTML={{ __html: safeHtml(sl.description) }}
                 />
               )}
             </div>

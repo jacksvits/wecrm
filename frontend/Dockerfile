@@ -1,7 +1,7 @@
 FROM node:20-slim AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 COPY . .
 RUN rm -rf node_modules/.vite dist && npm run build
 

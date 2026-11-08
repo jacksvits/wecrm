@@ -110,7 +110,7 @@ const createSchema = z.object({
 router.post('/shipments', authMiddleware, async (req, res) => {
   try {
     const parsed = createSchema.safeParse(req.body ?? {});
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Некорректные данные' });
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Некорректные данные' });
     const d = parsed.data;
 
     const settings = await getCdekSettings();

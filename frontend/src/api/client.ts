@@ -372,6 +372,10 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     end: (id: string): Promise<WebCall> => fetchApi(`/api/calls/${id}/end`, { method: 'POST' }),
   },
   // === Мультитенантность платформы (организации) ===
+  security: {
+    authEvents: (page = 1): Promise<{ items: any[]; total: number; page: number; pageSize: number; totalPages: number }> =>
+      fetchApi(`/api/security/auth-events?page=${page}`),
+  },
   platform: {
     register: (data: { name: string; slug: string; adminName: string; adminEmail: string; adminPassword: string }): Promise<{ ok: boolean; status: string; subdomain: string; message: string }> => fetchApi('/api/platform/register', { method: 'POST', body: JSON.stringify(data) }),
     me: (): Promise<{ name: string; slug: string; isMain: boolean; status: string }> => fetchApi('/api/platform/me'),

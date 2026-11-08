@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:22-slim
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ RUN apt-get update -qq && apt-get install -y -qq openssl wget ffmpeg ca-certific
 RUN wget -q https://gu-st.ru/content/Other/doc/russian_trusted_root_ca.cer -O /usr/local/share/ca-certificates/russian_trusted_root_ca.crt &&     wget -q https://gu-st.ru/content/Other/doc/russian_trusted_sub_ca.cer -O /usr/local/share/ca-certificates/russian_trusted_sub_ca.crt &&     update-ca-certificates
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 RUN mkdir -p /app/uploads

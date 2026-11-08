@@ -82,6 +82,7 @@ import seoSettingsRoutes from './routes/seo-settings.js';
 import pwaRoutes from './routes/pwa.js';
 import autoReplySettingsRoutes from './routes/auto-reply-settings.js';
 import legalRoutes from './routes/legal.js';
+import securityRoutes from './routes/security.js';
 import publicFeedbackRoutes from './routes/public-feedback.js';
 import browserRoutes from './routes/browser.js';
 import vncRoutes, { handleVncUpgrade, isVncUpgradePath } from './routes/browser-vnc.js';
@@ -94,8 +95,17 @@ import { runTenantLoops } from './lib/tenant-loop.js';
 dotenv.config();
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = process.env.PORT || 4000;
 
+// Базовые security-заголовки для API и отдаваемых файлов.
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
+  next();
+});
 app.use(compression());
 // CORS: основной домен, все поддомены платформы (*.welans.cc) и локальные адреса для разработки
 const allowedOrigins = ['https://welans.cc', 'http://localhost:3000', 'http://localhost:5173'];
@@ -123,9 +133,17 @@ app.use('/api', (_req, res, next) => {
 app.use('/api/tochka-acquiring/webhook', express.text({ type: () => true, limit: '64kb' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use('/uploads', express.static('/app/uploads'));
-app.use('/uploads/avatars', express.static('/app/uploads/avatars'));
-app.use('/tenants', express.static('/app/tenants'));
+// NFS смонтирован целиком: каталог backup содержит SQL-дампы и не должен
+// попадать в публичную статическую раздачу ни под каким URL.
+const denyPrivateStorage = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  let pathname = req.path;
+  try { pathname = decodeURIComponent(pathname); } catch { return res.status(400).end(); }
+  if (/(^|\/)backup(?:\/|$)/i.test(pathname)) return res.status(404).end();
+  next();
+};
+app.use('/uploads', denyPrivateStorage, express.static('/app/uploads'));
+app.use('/uploads/avatars', denyPrivateStorage, express.static('/app/uploads/avatars'));
+app.use('/tenants', denyPrivateStorage, express.static('/app/tenants'));
 
 app.get('/api/events', authMiddleware, (req, res) => {
   const user = (req as any).user;
@@ -236,6 +254,7 @@ app.use(['/pwa-index', '/manifest.json'], tenantMiddleware);
 app.use(pwaRoutes);
 app.use('/api/auto-reply-settings', autoReplySettingsRoutes);
 app.use('/api/legal', legalRoutes);
+app.use('/api/security', securityRoutes);
 app.use('/api/public/feedback', publicFeedbackRoutes); // Публичная форма лендинга: заявка с сайта -> новая задача
 app.use('/api/browser/vnc', vncRoutes);
 app.use('/api/browser', browserRoutes);

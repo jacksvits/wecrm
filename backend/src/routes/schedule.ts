@@ -237,7 +237,7 @@ router.post('/rooms', async (req: AuthRequest, res) => {
     const room = await (prisma as any).scheduleRoom.create({ data });
     res.json(room);
   } catch (err: any) {
-    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.errors?.[0]?.message || err.message });
+    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.issues?.[0]?.message || err.message });
   }
 });
 
@@ -248,7 +248,7 @@ router.put('/rooms/:id', async (req: AuthRequest, res) => {
     const room = await (prisma as any).scheduleRoom.update({ where: { id: req.params.id }, data });
     res.json(room);
   } catch (err: any) {
-    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.errors?.[0]?.message || err.message });
+    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.issues?.[0]?.message || err.message });
   }
 });
 
@@ -287,7 +287,7 @@ router.post('/templates', async (req: AuthRequest, res) => {
     );
     res.json(created);
   } catch (err: any) {
-    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.errors?.[0]?.message || err.message });
+    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.issues?.[0]?.message || err.message });
   }
 });
 
@@ -306,7 +306,7 @@ router.put('/templates/:id', async (req: AuthRequest, res) => {
     });
     res.json(tpl);
   } catch (err: any) {
-    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.errors?.[0]?.message || err.message });
+    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.issues?.[0]?.message || err.message });
   }
 });
 
@@ -339,7 +339,7 @@ router.post('/shifts', async (req: AuthRequest, res) => {
     });
     res.json({ ...shift, generated: false });
   } catch (err: any) {
-    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.errors?.[0]?.message || err.message });
+    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.issues?.[0]?.message || err.message });
   }
 });
 
@@ -379,7 +379,7 @@ router.put('/shifts/:id', async (req: AuthRequest, res) => {
     });
     res.json({ ...shift, generated: false });
   } catch (err: any) {
-    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.errors?.[0]?.message || err.message });
+    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.issues?.[0]?.message || err.message });
   }
 });
 
@@ -443,7 +443,7 @@ router.post('/appointments', async (req: AuthRequest, res) => {
     const shifts = await effectiveShifts(data.date, data.date);
     res.json(mapAppointment(appt, shifts, markConflicts([appt])));
   } catch (err: any) {
-    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.errors?.[0]?.message || err.message });
+    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.issues?.[0]?.message || err.message });
   }
 });
 
@@ -463,7 +463,7 @@ router.put('/appointments/:id', async (req: AuthRequest, res) => {
     const sameDay = await (prisma as any).scheduleAppointment.findMany({ where: { date: appt.date, userId: appt.userId } });
     res.json(mapAppointment(appt, shifts, markConflicts(sameDay)));
   } catch (err: any) {
-    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.errors?.[0]?.message || err.message });
+    res.status(err.name === 'ZodError' ? 400 : 500).json({ error: err.issues?.[0]?.message || err.message });
   }
 });
 

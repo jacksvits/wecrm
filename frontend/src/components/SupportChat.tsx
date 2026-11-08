@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { Task, FileAttachment } from '../types';
 import { Avatar } from './Avatar';
 import { FileUpload, AttachmentList } from './FileUpload';
+import { safeHtml } from '../lib/safeHtml';
 
 const stripHtml = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -304,7 +305,7 @@ export function SupportChat() {
                       <div style={{ position: 'relative', zIndex: 1 }}>
                         <div style={{ marginBottom: 4 }}>
                           {/<[a-z][\s\S]*>/i.test(msg.content)
-                            ? <div className="rich-text" style={{ color: 'inherit' }} dangerouslySetInnerHTML={{ __html: msg.content }} />
+                            ? <div className="rich-text" style={{ color: 'inherit' }} dangerouslySetInnerHTML={{ __html: safeHtml(msg.content) }} />
                             : msg.content}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>

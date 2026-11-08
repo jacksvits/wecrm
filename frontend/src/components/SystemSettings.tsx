@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import ReactQuill from "react-quill";
-import "react-quill/dist/quill.snow.css";
+import ReactQuill from "react-quill-new";
+import "react-quill-new/dist/quill.snow.css";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { loadBranding } from "../lib/branding";
@@ -12,6 +12,7 @@ import PromoBlocks from "./PromoBlocks";
 import LoginSlides from "./LoginSlides";
 import { CallHistory } from "./CallHistory";
 import { SeoSettings } from "./SeoSettings";
+import { safeHtml } from '../lib/safeHtml';
 
 // WYSIWYG-редактор — та же конфигурация, что и в остальных текстовых полях проекта
 const quillModules = {
@@ -1544,7 +1545,7 @@ export function SystemSettings() {
                   ) : (
                     <div
                       style={{ fontSize: 13, color: "var(--text-secondary)" }}
-                      dangerouslySetInnerHTML={{ __html: t.answer }}
+                      dangerouslySetInnerHTML={{ __html: safeHtml(t.answer) }}
                     />
                   )}
                 </div>

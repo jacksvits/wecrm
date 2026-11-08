@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { createHash, randomBytes, randomUUID } from 'crypto';
+import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 // ===== Плагин «ВК товары»: OAuth токена маркета (VK ID) =====
 // Публичные пути остаются прежними (/api/vk/market-auth, /api/vk/market-callback) —
@@ -24,7 +25,8 @@ function marketErrorPage(title: string, detail: string): string {
  * GET /api/vk/market-auth
  * Старт серверного VK ID OAuth: редирект на id.vk.ru/authorize (PKCE, response_type=code)
  */
-router.get('/market-auth', async (_req, res) => {
+router.post('/market-auth', authMiddleware, async (req: AuthRequest, res) => {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
   try {
     const s = await prisma.vkMarketSettings.findFirst({ orderBy: { createdAt: 'asc' } });
     if (!s?.marketAppId) {
@@ -53,7 +55,7 @@ router.get('/market-auth', async (_req, res) => {
       // уже авторизованного пользователя при повторном запросе (страница обновляется бесконечно)
       prompt: 'consent',
     });
-    res.redirect(`https://id.vk.ru/authorize?${params.toString()}`);
+    res.json({ url: `https://id.vk.ru/authorize?${params.toString()}` });
   } catch (err: any) {
     res.status(500).send(marketErrorPage('Ошибка', err.message));
   }

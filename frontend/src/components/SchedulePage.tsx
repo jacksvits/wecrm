@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { CalendarMonth, toISODate, MONTH_NAMES } from './calendar/CalendarMonth';
@@ -8,6 +8,7 @@ import { DayTimeline, minToTime, TimelineBand, TimelineColumn, TimelineItem } fr
 import { DayAgenda, AgendaSection } from './calendar/DayAgenda';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { ContactPicker } from './ContactPicker';
+import { safeHtml } from '../lib/safeHtml';
 
 /**
  * Расписание (календарь): кабинеты, смены сотрудников, записи клиентов.
@@ -571,7 +572,7 @@ function ReadonlyAppt({ appt }: { appt: ApptForm }) {
       {appt.comment && stripHtml(appt.comment) && (
         <div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Комментарий</div>
-          <div style={{ fontSize: 14, lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: appt.comment }} />
+          <div style={{ fontSize: 14, lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: safeHtml(appt.comment) }} />
         </div>
       )}
     </div>

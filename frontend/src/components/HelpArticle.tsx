@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth' ;
 import { api } from '../api/client' ;
 import { HELP_ARTICLES, HelpBlock, HelpArticle as HelpArticleData } from '../lib/helpContent' ;
 import { isMainPlatformHost } from './TenantSwitcher' ;
+import { safeHtml } from '../lib/safeHtml';
 
 // === Страница одной статьи справки ===
 // Контент из API (един для всех доменов); при сбое — встроенная копия.
@@ -16,7 +17,7 @@ export function Block({ block }: { block: HelpBlock }) {
       return (
         <div
           style={{ fontSize: 14, lineHeight: 1.65, margin: '0 0 12px', color: 'var(--text-primary)' }}
-          dangerouslySetInnerHTML={{ __html: block.text }}
+          dangerouslySetInnerHTML={{ __html: safeHtml(block.text) }}
         />
       ) ;
     case 'steps':
@@ -39,7 +40,7 @@ export function Block({ block }: { block: HelpBlock }) {
           fontSize: 13, lineHeight: 1.55, color: 'var(--text-primary)',
         }}>
           <img src="/mascot/mascot_point.png" alt="" style={{ width: 26, height: 26, objectFit: 'contain', flexShrink: 0 }} />
-          <div dangerouslySetInnerHTML={{ __html: block.text }} />
+          <div dangerouslySetInnerHTML={{ __html: safeHtml(block.text) }} />
         </div>
       ) ;
   }

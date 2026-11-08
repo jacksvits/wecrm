@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import { api } from '../../api/client';
 import { Contact, Deal, FileAttachment, FinanceDocument, Task } from '../../types';
 import {
@@ -434,7 +434,7 @@ export function FinanceDocumentModal({ documentId, initialTaskId, onClose, onSav
                         >
                           <span style={{ fontSize: 14 }}>{a.mimeType?.startsWith('image/') ? '🖼' : '📎'}</span>
                           <a
-                            href={`${origin}/api/uploads/${a.id}/download`}
+                            href={`${origin}/api/uploads/${a.id}/download?token=${encodeURIComponent(localStorage.getItem('token') || '')}`}
                             download={a.originalName}
                             target="_blank"
                             rel="noopener noreferrer"

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../lib/jwt.js';
 import { prisma } from '../lib/prisma.js';
 import { GUEST_EMAIL } from '../lib/guest-demo.js';
 
@@ -29,7 +30,7 @@ export interface AuthRequest extends Request {
   };
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+
 
 export async function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   let token: string | undefined;

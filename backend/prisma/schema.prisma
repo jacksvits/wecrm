@@ -2066,6 +2066,26 @@ model TochkaAcquiringPayment {
 }
 
 
+// Централизованный журнал успешных авторизаций (записи всех tenant'ов — в platform DB)
+model AuthEvent {
+  id         String   @id @default(cuid())
+  tenantId   String?  @map("tenant_id")
+  tenantSlug String   @map("tenant_slug")
+  tenantName String   @map("tenant_name")
+  userId     String?  @map("user_id")
+  login      String
+  ipAddress  String   @map("ip_address")
+  userAgent  String   @map("user_agent")
+  device     String
+  clientType String   @map("client_type")
+  authMethod String   @map("auth_method")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([tenantSlug, createdAt])
+  @@map("auth_events")
+}
+
 // ==== Мультитенантность платформы ====
 // Реестр организаций. Главная организация живёт в основной БД (DATABASE_URL)
 // и в этой таблице не нуждается; каждая запись — отдельная БД wecrm_t_<slug>.
