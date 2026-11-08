@@ -3,7 +3,12 @@ import { authMiddleware } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import { randomUUID } from 'crypto';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import * as archiver from 'archiver';
+import sharp from 'sharp';
 import { uploadsRoot } from '../lib/tenant.js';
 
 const router = Router();
@@ -136,6 +141,34 @@ router.get('/browse', authMiddleware, (req, res) => {
 });
 
 // Inline preview endpoint for images and PDF files
+const execFileAsync = promisify(execFile);
+const PREVIEW_THUMB_SIZE = 144;
+
+const createImageThumbnail = async (targetFile: string): Promise<Buffer> =>
+  sharp(targetFile)
+    .rotate()
+    .resize(PREVIEW_THUMB_SIZE, PREVIEW_THUMB_SIZE, { fit: 'cover', withoutEnlargement: true })
+    .jpeg({ quality: 72 })
+    .toBuffer();
+
+const createPdfThumbnail = async (targetFile: string): Promise<Buffer> => {
+  const outputBase = path.join(os.tmpdir(), `wecrm-file-preview-${process.pid}-${randomUUID()}`);
+  try {
+    await execFileAsync('pdftoppm', [
+      '-f', '1',
+      '-singlefile',
+      '-jpeg',
+      '-jpegopt', 'quality=72',
+      '-scale-to', String(PREVIEW_THUMB_SIZE),
+      targetFile,
+      outputBase,
+    ], { timeout: 15000, maxBuffer: 1024 * 1024 });
+    return await fs.promises.readFile(`${outputBase}.jpg`);
+  } finally {
+    await fs.promises.rm(`${outputBase}.jpg`, { force: true }).catch(() => undefined);
+  }
+};
+
 const PREVIEW_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -148,7 +181,7 @@ const PREVIEW_TYPES: Record<string, string> = {
   '.pdf': 'application/pdf',
 };
 
-router.get('/preview', authMiddleware, (req, res) => {
+router.get('/preview', authMiddleware, async (req, res) => {
   const tabKey = (req.query.tab as string) || '';
   const filePath = (req.query.path as string) || '';
   const baseDir = resolveTabDir(tabKey);
@@ -175,6 +208,17 @@ router.get('/preview', authMiddleware, (req, res) => {
       return res.status(404).json({ error: 'Файл не найден' });
     }
     const filename = path.basename(targetFile);
+    const ext = path.extname(targetFile).toLowerCase();
+    if (req.query.thumb === '1' && ((contentType.startsWith('image/') && ext !== '.svg') || ext === '.pdf')) {
+      const thumbnail = ext === '.pdf'
+        ? await createPdfThumbnail(targetFile)
+        : await createImageThumbnail(targetFile);
+      res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(filename)}.jpg`);
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'private, max-age=300');
+      return res.send(thumbnail);
+    }
+
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'private, max-age=60');

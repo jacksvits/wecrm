@@ -51,41 +51,6 @@ const fileIcon = (
   </svg>
 );
 
-let pdfjsPromise: Promise<any> | null = null;
-
-const loadPdfjs = () => {
-  if (!pdfjsPromise) {
-    pdfjsPromise = Promise.all([
-      import("pdfjs-dist"),
-      import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
-    ]).then(([pdfjs, workerUrl]) => {
-      pdfjs.GlobalWorkerOptions.workerSrc = workerUrl.default;
-      return pdfjs;
-    });
-  }
-  return pdfjsPromise;
-};
-
-const renderPdfPreview = async (blob: Blob): Promise<string> => {
-  const pdfjs = await loadPdfjs();
-  const data = await blob.arrayBuffer();
-  const doc = await pdfjs.getDocument({ data }).promise;
-  try {
-    const page = await doc.getPage(1);
-    const baseViewport = page.getViewport({ scale: 1 });
-    const scale = Math.min(144 / baseViewport.width, 144 / baseViewport.height);
-    const viewport = page.getViewport({ scale });
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.floor(viewport.width));
-    canvas.height = Math.max(1, Math.floor(viewport.height));
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Canvas недоступен");
-    await page.render({ canvasContext: context, viewport }).promise;
-    return canvas.toDataURL("image/png");
-  } finally {
-    await doc.destroy();
-  }
-};
 
 function FilePreviewThumb({ item, tab, filePath }: { item: any; tab: string; filePath: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -102,14 +67,10 @@ function FilePreviewThumb({ item, tab, filePath }: { item: any; tab: string; fil
 
     const load = async () => {
       try {
-        const blob = await api.files.previewFile(tab, filePath);
+        const blob = await api.files.previewFile(tab, filePath, true);
         if (cancelled) return;
-        if (isImageFile(item.name)) {
-          objectUrl = URL.createObjectURL(blob);
-          setSrc(objectUrl);
-        } else {
-          setSrc(await renderPdfPreview(blob));
-        }
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
       } catch (e) {
         console.error("Ошибка загрузки превью:", e);
         if (!cancelled) setFailed(true);

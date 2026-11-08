@@ -281,7 +281,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     tabs: () => fetchApi("/api/files/tabs"),
     updateTab: (tabKey: string, url: string, path: string) => fetchApi(`/api/files/tabs/${tabKey}`, { method: "POST", body: JSON.stringify({ url, path }) }),
     browse: (tab: string, filePath: string) => fetchApi(`/api/files/browse?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(filePath)}`),
-    previewFile: (tab: string, filePath: string): Promise<Blob> => fetchBlob(`/api/files/preview?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(filePath)}`),
+    previewFile: (tab: string, filePath: string, thumbnail = false): Promise<Blob> => fetchBlob(`/api/files/preview?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(filePath)}${thumbnail ? "&thumb=1" : ""}`),
     downloadFile: (tab: string, filePath: string) => downloadBlob(`/api/files/download?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(filePath)}`, filePath.split("/").pop() || "file"),
     downloadFolder: (tab: string, folderPath: string) => downloadBlob(`/api/files/download-folder?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(folderPath)}`, `${folderPath.split("/").pop() || "folder"}.zip`),
     downloadGameFile: (path: string) => downloadBlob(`/api/files/games/download?path=${encodeURIComponent(path)}`, path.split("/").pop() || "file"),
