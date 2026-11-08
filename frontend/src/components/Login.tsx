@@ -598,7 +598,7 @@ export function Login() {
 
           {showCatalogHint && (<>
           <p className="login-catalog-hint">
-            Ознакомиться с нашими продуктами вы можете без регистрации по гостевому доступу в разделе <strong>«Каталог»</strong>
+            Ознакомиться с нашими продуктами вы можете без регистрации по гостевому доступу в разделе <a href="https://welans.cc/vitrine" className="login-catalog-link"><strong>«Каталог»</strong></a>
           </p>
 
           <footer className="login-legal-footer" aria-label="Юридические документы">
