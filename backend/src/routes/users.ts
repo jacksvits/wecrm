@@ -132,6 +132,10 @@ router.post('/avatar', authMiddleware, async (req: AuthRequest, res) => {
     if (!fs.existsSync(avatarDir)) {
       fs.mkdirSync(avatarDir, { recursive: true });
     }
+    // Убираем старые аватарки с другими расширениями, чтобы не копить файлы-сироты
+    for (const old of fs.readdirSync(avatarDir).filter(f => f.startsWith(req.user!.id + '.') && f !== `${req.user!.id}.${ext}`)) {
+      try { fs.unlinkSync(path.join(avatarDir, old)); } catch { /* ignore */ }
+    }
     const filePath = path.join(avatarDir, `${req.user!.id}.${ext}`);
     fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
     const avatarUrl = `${tenantUploadPrefix() || '/uploads'}/avatars/users/${req.user!.id}.${ext}`;
@@ -149,11 +153,13 @@ router.post('/avatar', authMiddleware, async (req: AuthRequest, res) => {
 
 router.delete('/avatar', authMiddleware, async (req: AuthRequest, res) => {
   try {
-    // Delete avatar file if exists
-    const avatarDir = '/app/uploads/avatars';
-    const files = fs.readdirSync(avatarDir).filter(f => f.startsWith(req.user!.id + '.'));
-    for (const file of files) {
-      fs.unlinkSync(path.join(avatarDir, file));
+    // Delete avatar file if exists (та же папка, что и при загрузке: uploadsRoot()/avatars/users)
+    const avatarDir = path.join(uploadsRoot(), 'avatars', 'users');
+    if (fs.existsSync(avatarDir)) {
+      const files = fs.readdirSync(avatarDir).filter(f => f.startsWith(req.user!.id + '.'));
+      for (const file of files) {
+        fs.unlinkSync(path.join(avatarDir, file));
+      }
     }
     const user = await prisma.user.update({
       where: { id: req.user!.id },

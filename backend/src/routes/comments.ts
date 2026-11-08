@@ -446,14 +446,22 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
     // ======================================================
 
     // Real-time broadcast for new comment
-    broadcast(CHANNELS.COMMENTS, { action: 'new_comment', entity: 'task', id: taskId, comment });
+    // Вложения прикрепляем к комментарию сразу, чтобы у автора и у остальных
+    // пользователей файлы отображались без перезагрузки страницы
+    const newCommentAttachments = await prisma.fileAttachment.findMany({
+      where: { entityType: 'comment', entityId: comment.id },
+      select: { id: true, originalName: true, mimeType: true, size: true, path: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const commentWithAttachments = { ...comment, attachments: newCommentAttachments };
+    broadcast(CHANNELS.COMMENTS, { action: 'new_comment', entity: 'task', id: taskId, comment: commentWithAttachments });
 
     // Автоответчик: проверка триггеров по тексту комментария (не для внутренних)
     if (!comment.isInternal) {
       processAutoReply(taskId, content);
     }
 
-    res.json(comment);
+    res.json(commentWithAttachments);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -474,7 +482,14 @@ router.get('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =>
       },
       orderBy: { createdAt: 'asc' },
     });
-    res.json(comments);
+    // Прикрепляем вложения к каждому комментарию (как в GET /api/tasks/:id)
+    const commentIds = comments.map((c) => c.id);
+    const commentAttachments = await prisma.fileAttachment.findMany({
+      where: { entityType: 'comment', entityId: { in: commentIds } },
+      select: { id: true, originalName: true, mimeType: true, size: true, path: true, createdAt: true, entityId: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json(comments.map((c) => ({ ...c, attachments: commentAttachments.filter((a) => a.entityId === c.id) })));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
