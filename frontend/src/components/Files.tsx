@@ -418,7 +418,7 @@ export function Files() {
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: "0 0 12px", fontSize: 18 }}>Файлы</h2>
-        <div style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border-color)" }}>
+        <div style={{ display: "flex", gap: isMobile ? 2 : 8, borderBottom: "1px solid var(--border-color)" }}>
           {TABS.map((tab) => (
             <button
               key={tab.key}
@@ -447,12 +447,12 @@ export function Files() {
             </button>
           ))}
           {/* Переключатель вида (иконки/таблица) — личная настройка, виден всем */}
-          <div style={{ marginLeft: "auto", alignSelf: "center", display: "inline-flex", background: "var(--bg-hover)", borderRadius: 9, padding: 2, gap: 2 }}>
+          <div style={{ marginLeft: "auto", alignSelf: "center", display: "inline-flex", background: "var(--bg-hover)", borderRadius: 9, padding: 2, gap: 2, flexShrink: 0 }}>
             <button
               onClick={() => setViewMode("icons")}
               title="Вид: иконки"
               style={{
-                border: "none", cursor: "pointer", padding: "5px 9px", borderRadius: 7, display: "flex",
+                border: "none", cursor: "pointer", padding: isMobile ? "5px 7px" : "5px 9px", borderRadius: 7, display: "flex",
                 background: viewMode === "icons" ? "var(--bg-card)" : "transparent",
                 color: viewMode === "icons" ? "#007AFF" : "var(--text-muted)",
                 boxShadow: viewMode === "icons" ? "0 1px 3px rgba(0,0,0,0.15)" : "none",
@@ -464,7 +464,7 @@ export function Files() {
               onClick={() => setViewMode("table")}
               title="Вид: таблица"
               style={{
-                border: "none", cursor: "pointer", padding: "5px 9px", borderRadius: 7, display: "flex",
+                border: "none", cursor: "pointer", padding: isMobile ? "5px 7px" : "5px 9px", borderRadius: 7, display: "flex",
                 background: viewMode === "table" ? "var(--bg-card)" : "transparent",
                 color: viewMode === "table" ? "#007AFF" : "var(--text-muted)",
                 boxShadow: viewMode === "table" ? "0 1px 3px rgba(0,0,0,0.15)" : "none",
@@ -479,7 +479,7 @@ export function Files() {
               onClick={() => { setHiddenInput(hiddenNames.join(", ")); setThemeInput(filesTheme); setShowSettings(true); }}
               title="Настройки отображения"
               style={{
-                alignSelf: "center", padding: 6, border: "none",
+                alignSelf: "center", padding: 6, border: "none", flexShrink: 0,
                 background: "transparent", color: "var(--text-muted)", cursor: "pointer",
                 borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
               }}
