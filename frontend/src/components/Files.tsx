@@ -59,8 +59,102 @@ const fileIcon = (
   </svg>
 );
 
+// === Темы иконок страницы «Файлы» ===
+type FileTheme = "standard" | "win7" | "macos" | "ios";
 
-function FilePreviewThumb({ item, tab, filePath }: { item: any; tab: string; filePath: string }) {
+const win7FolderIcon = (
+  <svg width="64" height="52" viewBox="0 0 64 52">
+    <defs>
+      <linearGradient id="w7body" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#FFE38A" /><stop offset=".45" stopColor="#FBC93F" /><stop offset="1" stopColor="#E8A81C" />
+      </linearGradient>
+      <linearGradient id="w7tab" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#FBD45C" /><stop offset="1" stopColor="#EBAF24" />
+      </linearGradient>
+    </defs>
+    <path d="M3 8a5 5 0 0 1 5-5h14l6 7h28a5 5 0 0 1 5 5v2H3V8z" fill="url(#w7tab)" stroke="#C8901A" strokeWidth="1" />
+    <rect x="3" y="15" width="58" height="34" rx="5" fill="url(#w7body)" stroke="#C8901A" strokeWidth="1" />
+    <rect x="6" y="18" width="52" height="12" rx="3" fill="#FFF3C4" opacity=".55" />
+  </svg>
+);
+
+const win7FileIcon = (
+  <svg width="44" height="52" viewBox="0 0 44 52">
+    <path d="M6 2h22l10 10v36a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#FFFFFF" stroke="#9DB2C8" strokeWidth="1.5" />
+    <path d="M28 2l10 10H30a2 2 0 0 1-2-2V2z" fill="#DCE7F2" stroke="#9DB2C8" strokeWidth="1.5" />
+    <rect x="10" y="20" width="24" height="4" rx="2" fill="#7FA6D9" />
+    <rect x="10" y="28" width="24" height="3" rx="1.5" fill="#B9CCE4" />
+    <rect x="10" y="35" width="17" height="3" rx="1.5" fill="#B9CCE4" />
+  </svg>
+);
+
+const macFolderIcon = (
+  <svg width="64" height="52" viewBox="0 0 64 52">
+    <defs>
+      <linearGradient id="macBody" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#7FC4F5" /><stop offset="1" stopColor="#3E9BE8" />
+      </linearGradient>
+      <linearGradient id="macTab" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#A5D6F8" /><stop offset="1" stopColor="#6FB9EF" />
+      </linearGradient>
+    </defs>
+    <path d="M3 9a6 6 0 0 1 6-6h13l6 7h27a6 6 0 0 1 6 6v33a6 6 0 0 1-6 6H9a6 6 0 0 1-6-6V9z" fill="url(#macTab)" />
+    <path d="M3 16h58v33a6 6 0 0 1-6 6H9a6 6 0 0 1-6-6V16z" fill="url(#macBody)" />
+    <rect x="3" y="16" width="58" height="3" fill="#9FD2F6" opacity=".7" />
+  </svg>
+);
+
+const macFileIcon = (
+  <svg width="42" height="52" viewBox="0 0 42 52">
+    <path d="M7 1h18l12 12v36a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2z" fill="#FFFFFF" stroke="#C6CBD4" strokeWidth="1.5" />
+    <path d="M25 1l12 12H27a2 2 0 0 1-2-2V1z" fill="#EDEFF3" stroke="#C6CBD4" strokeWidth="1.5" />
+    <rect x="11" y="24" width="20" height="3.5" rx="1.75" fill="#D5DAE1" />
+    <rect x="11" y="31" width="20" height="3.5" rx="1.75" fill="#D5DAE1" />
+    <rect x="11" y="38" width="13" height="3.5" rx="1.75" fill="#D5DAE1" />
+  </svg>
+);
+
+const iosFolderIcon = (
+  <svg width="60" height="60" viewBox="0 0 60 60">
+    <defs>
+      <linearGradient id="iosBg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#3A3F47" /><stop offset="1" stopColor="#23272E" />
+      </linearGradient>
+    </defs>
+    <rect x="2" y="2" width="56" height="56" rx="14" fill="url(#iosBg)" />
+    <rect x="2" y="2" width="56" height="56" rx="14" fill="#FFFFFF" opacity=".06" />
+    <rect x="11" y="12" width="16" height="16" rx="4.5" fill="#E8B23A" />
+    <rect x="32" y="12" width="16" height="16" rx="4.5" fill="#5EA8E8" />
+    <rect x="11" y="33" width="16" height="16" rx="4.5" fill="#7AC47C" />
+    <rect x="32" y="33" width="16" height="16" rx="4.5" fill="#C9CED6" />
+  </svg>
+);
+
+const iosFileIcon = (
+  <svg width="60" height="60" viewBox="0 0 60 60">
+    <defs>
+      <linearGradient id="iosFileBg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#FFFFFF" /><stop offset="1" stopColor="#EEF0F4" />
+      </linearGradient>
+    </defs>
+    <rect x="2" y="2" width="56" height="56" rx="14" fill="url(#iosFileBg)" stroke="#D7DBE2" strokeWidth="1" />
+    <path d="M21 15h11l7 7v20a2 2 0 0 1-2 2H21a2 2 0 0 1-2-2V17a2 2 0 0 1 2-2z" fill="#FFFFFF" stroke="#B9BFC9" strokeWidth="1.4" />
+    <path d="M32 15l7 7h-6a1 1 0 0 1-1-1v-6z" fill="#E4E7EC" stroke="#B9BFC9" strokeWidth="1.4" />
+    <rect x="23" y="28" width="12" height="2.4" rx="1.2" fill="#C9CED6" />
+    <rect x="23" y="33" width="12" height="2.4" rx="1.2" fill="#C9CED6" />
+    <rect x="23" y="38" width="8" height="2.4" rx="1.2" fill="#C9CED6" />
+  </svg>
+);
+
+const FILE_THEMES: Record<FileTheme, { label: string; folder: JSX.Element; file: JSX.Element }> = {
+  standard: { label: "Стандартная", folder: folderIconLarge, file: fileIcon },
+  win7: { label: "Windows 7", folder: win7FolderIcon, file: win7FileIcon },
+  macos: { label: "macOS", folder: macFolderIcon, file: macFileIcon },
+  ios: { label: "iOS", folder: iosFolderIcon, file: iosFileIcon },
+};
+
+
+function FilePreviewThumb({ item, tab, filePath, theme }: { item: any; tab: string; filePath: string; theme: FileTheme }) {
   const ref = useRef<HTMLDivElement>(null);
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -104,7 +198,7 @@ function FilePreviewThumb({ item, tab, filePath }: { item: any; tab: string; fil
     return <div style={{ width: 72, height: 72, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{folderIcon}</div>;
   }
   if (!previewable || failed) {
-    return <div style={{ width: 72, height: 72, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{fileIcon}</div>;
+    return <div style={{ width: 72, height: 72, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{FILE_THEMES[theme].file}</div>;
   }
 
   return (
@@ -152,6 +246,8 @@ export function Files() {
   const [hiddenNames, setHiddenNames] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [hiddenInput, setHiddenInput] = useState("");
+  const [filesTheme, setFilesTheme] = useState<FileTheme>("standard");
+  const [themeInput, setThemeInput] = useState<FileTheme>("standard");
   const [savingHidden, setSavingHidden] = useState(false);
   const [previewItem, setPreviewItem] = useState<any | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -175,6 +271,9 @@ export function Files() {
       const data = await api.files.hidden();
       setHiddenNames(parseHidden(data.names || ""));
       setHiddenInput(data.names || "");
+      const savedTheme = ((data as any).theme || "standard") as FileTheme;
+      setFilesTheme(savedTheme);
+      setThemeInput(savedTheme);
     } catch (e) {
       console.error(e);
     }
@@ -275,8 +374,9 @@ export function Files() {
   const handleSaveHidden = async () => {
     setSavingHidden(true);
     try {
-      const data = await api.files.saveHidden(hiddenInput);
+      const data = await api.files.saveHidden(hiddenInput, themeInput);
       setHiddenNames(parseHidden((data as any)?.names || ""));
+      setFilesTheme(themeInput);
       setShowSettings(false);
     } catch (e: any) {
       alert("Ошибка сохранения: " + e.message);
@@ -312,7 +412,7 @@ export function Files() {
           {/* Кнопка настроек отображения (скрытие файлов/папок) — только для администраторов */}
           {isAdmin && (
             <button
-              onClick={() => { setHiddenInput(hiddenNames.join(", ")); setShowSettings(true); }}
+              onClick={() => { setHiddenInput(hiddenNames.join(", ")); setThemeInput(filesTheme); setShowSettings(true); }}
               title="Настройки отображения"
               style={{
                 marginLeft: "auto", alignSelf: "center", padding: 6, border: "none",
@@ -386,7 +486,7 @@ export function Files() {
                           {downloadIcon}
                         </button>
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%", paddingTop: 10 }}>
-                          {folderIconLarge}
+                          {FILE_THEMES[filesTheme].folder}
                           <div style={{ fontSize: 12, fontWeight: 500, textAlign: "center", width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {item.name}
                           </div>
@@ -394,7 +494,7 @@ export function Files() {
                       </>
                     ) : (
                       <>
-                        <FilePreviewThumb item={item} tab={activeTab} filePath={filePath} />
+                        <FilePreviewThumb item={item} tab={activeTab} filePath={filePath} theme={filesTheme} />
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {item.name}
@@ -484,6 +584,31 @@ export function Files() {
             }}
           >
             <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>Настройки отображения</h3>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Тема иконок</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+              {(Object.keys(FILE_THEMES) as FileTheme[]).map((key) => {
+                const selected = themeInput === key;
+                return (
+                  <div
+                    key={key}
+                    onClick={() => setThemeInput(key)}
+                    style={{
+                      border: selected ? "2px solid #007AFF" : "1px solid var(--border-color)",
+                      borderRadius: 10, padding: "8px 4px 6px", cursor: "pointer",
+                      background: selected ? "rgba(0,122,255,0.06)" : "var(--bg-hover)",
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                    }}
+                  >
+                    <div style={{ transform: "scale(0.62)", transformOrigin: "center", height: 38, display: "flex", alignItems: "center" }}>
+                      {FILE_THEMES[key].folder}
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: selected ? 600 : 500, color: selected ? "#007AFF" : "var(--text-primary)", textAlign: "center" }}>
+                      {FILE_THEMES[key].label}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
             <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>
               Имена файлов и папок через запятую, которые нужно скрывать во вкладках.
               Например: .DS_Store, Thumbs.db, backup

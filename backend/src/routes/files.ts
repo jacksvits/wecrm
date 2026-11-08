@@ -73,7 +73,7 @@ router.post('/tabs/:tabKey', authMiddleware, async (req, res) => {
 router.get('/hidden', authMiddleware, async (req, res) => {
   try {
     const row = await prisma.fileHideSetting.findFirst();
-    res.json({ names: row?.names || '' });
+    res.json({ names: row?.names || '', theme: row?.theme || 'standard' });
   } catch (e: any) {
     console.error('[Files/Hidden] Error loading hidden names:', e?.message || e);
     res.status(500).json({ error: 'Ошибка загрузки настроек', detail: e?.message });
@@ -86,12 +86,14 @@ router.post('/hidden', authMiddleware, async (req, res) => {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
   const names = typeof req.body?.names === 'string' ? req.body.names.trim() : '';
+  const ALLOWED_THEMES = ['standard', 'win7', 'macos', 'ios'];
+  const theme = ALLOWED_THEMES.includes(req.body?.theme) ? req.body.theme : 'standard';
   try {
     const existing = await prisma.fileHideSetting.findFirst();
     const row = existing
-      ? await prisma.fileHideSetting.update({ where: { id: existing.id }, data: { names } })
-      : await prisma.fileHideSetting.create({ data: { names } });
-    res.json({ names: row.names });
+      ? await prisma.fileHideSetting.update({ where: { id: existing.id }, data: { names, theme } })
+      : await prisma.fileHideSetting.create({ data: { names, theme } });
+    res.json({ names: row.names, theme: row.theme });
   } catch (e: any) {
     console.error('[Files/Hidden] Error saving hidden names:', e?.message || e);
     res.status(500).json({ error: 'Ошибка сохранения', detail: e?.message });

@@ -1353,6 +1353,7 @@ model FileTabSetting {
 model FileHideSetting {
   id        String   @id @default(cuid())
   names     String   @default("")
+  theme     String   @default("standard")
   updatedAt DateTime @updatedAt @map("updated_at")
   createdAt DateTime @default(now()) @map("created_at")
 
