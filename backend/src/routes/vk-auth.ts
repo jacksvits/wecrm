@@ -75,10 +75,12 @@ async function downloadVkAvatar(url: string): Promise<string | null> {
     const rawExt = path.extname(new URL(url).pathname).toLowerCase();
     const ext = ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(rawExt) ? rawExt : '.jpg';
     const filename = `${randomUUID()}${ext}`;
-    const filepath = path.join(uploadsRoot(), filename);
+    const avatarsDir = path.join(uploadsRoot(), 'avatars', 'users');
+    fs.mkdirSync(avatarsDir, { recursive: true });
+    const filepath = path.join(avatarsDir, filename);
     fs.writeFileSync(filepath, Buffer.from(buffer));
     console.log('[VK Avatar Download] saved to', filepath);
-    return `${tenantUploadPrefix() || '/uploads'}/${filename}`;
+    return `${tenantUploadPrefix() || '/uploads'}/avatars/users/${filename}`;
   } catch (err) {
     console.error('[VK Avatar Download] Error:', err);
     return null;
