@@ -98,18 +98,21 @@ async function migrateOrg(): Promise<{ moved: number; missing: number; updated: 
       // 3-4. Изображения товара
       const images = await prisma.productImage.findMany({
         where: { productId: p.id },
-        include: { attachment: true },
         orderBy: { sortOrder: 'asc' },
       });
       if (!images.length) continue;
+      const attachments = await prisma.fileAttachment.findMany({
+        where: { id: { in: images.map((i) => i.attachmentId).filter(Boolean) as string[] } },
+      });
+      const attById = new Map(attachments.map((a) => [a.id, a]));
 
       const shopDir = shopDirFor(article, src);
       if (!fs.existsSync(shopDir)) fs.mkdirSync(shopDir, { recursive: true });
       const urlBase = shopUrlPrefix(article, src);
 
       for (const img of images) {
-        const att = img.attachment;
-        const newName = att.filename || path.basename(img.url);
+        const att = img.attachmentId ? attById.get(img.attachmentId) : undefined;
+        const newName = att?.filename || path.basename(img.url);
         const newDisk = path.join(shopDir, newName);
         const newUrl = `${urlBase}/${newName}`;
 

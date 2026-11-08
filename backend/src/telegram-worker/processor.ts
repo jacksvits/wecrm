@@ -1,4 +1,4 @@
-import { prisma } from '../lib/prisma.js' ; import { telegramFetch, TELEGRAM_API_BASE } from '../lib/telegram-api.js' ; import { processAutoReply } from '../lib/auto-reply.js' ; import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers, formatExternalMessageNotifyBody, formatExternalNewTaskNotifyBody } from '../lib/notifications.js' ; import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js' ; import { taskDirFor, taskUploadUrlPrefix } from '../lib/task-dir.js' ; import { broadcast, CHANNELS } from '../lib/events.js' ; import { postHandlerGreeting } from '../lib/handler-messages.js' ; import fs from 'fs' ; import path from 'path' ; import { randomUUID } from 'crypto' ; const UPLOAD_DIR = '/app/uploads' ; export interface TelegramMessage { id: string ; chat_id: string ; user_id: string ; text: string ; sender_name?: string ; sender_username?: string ; sender_avatar?: string ; sender_description?: string ; attachments?: TelegramAttachment[] ; } export interface TelegramAttachment { type: 'photo' | 'document' | 'voice' | 'video' | 'audio' | 'sticker' ; file_id: string ; file_name?: string ; mime_type?: string ; } // Скачивание аватарки профиля Telegram в /app/uploads/avatars (общий NFS-том,
+import { prisma } from '../lib/prisma.js' ; import { telegramFetch, TELEGRAM_API_BASE } from '../lib/telegram-api.js' ; import { processAutoReply } from '../lib/auto-reply.js' ; import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers, formatExternalMessageNotifyBody, formatExternalNewTaskNotifyBody } from '../lib/notifications.js' ; import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js' ; import { taskDirFor, taskUploadUrlPrefix } from '../lib/task-dir.js' ; import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js' ; import { broadcast, CHANNELS } from '../lib/events.js' ; import { postHandlerGreeting } from '../lib/handler-messages.js' ; import fs from 'fs' ; import path from 'path' ; import { randomUUID } from 'crypto' ; const UPLOAD_DIR = '/app/uploads' ; export interface TelegramMessage { id: string ; chat_id: string ; user_id: string ; text: string ; sender_name?: string ; sender_username?: string ; sender_avatar?: string ; sender_description?: string ; attachments?: TelegramAttachment[] ; } export interface TelegramAttachment { type: 'photo' | 'document' | 'voice' | 'video' | 'audio' | 'sticker' ; file_id: string ; file_name?: string ; mime_type?: string ; } // Скачивание аватарки профиля Telegram в /app/uploads/avatars (общий NFS-том,
 // отдаётся статикой как /uploads/avatars/<file>)
 async function fetchTelegramAvatar(botToken: string, telegramUserId: string): Promise<string | null> {
   try {
@@ -15,11 +15,7 @@ async function fetchTelegramAvatar(botToken: string, telegramUserId: string): Pr
     if (!imgRes.ok) return null ;
     const buf = Buffer.from(await imgRes.arrayBuffer()) ;
     if (!buf.length) return null ;
-    const dir = '/app/uploads/avatars' ;
-    fs.mkdirSync(dir, { recursive: true }) ;
-    const fileName = `tg_${telegramUserId}.jpg` ;
-    fs.writeFileSync(path.join(dir, fileName), buf) ;
-    return `/uploads/avatars/${fileName}` ;
+    const dir = path.join(uploadsRoot(), 'avatars', 'contacts') ; fs.mkdirSync(dir, { recursive: true }) ; const fileName = `tg_${telegramUserId}.jpg` ; fs.writeFileSync(path.join(dir, fileName), buf) ; return `${tenantUploadPrefix() || '/uploads'}/avatars/contacts/${fileName}` ;
   } catch (err: any) { console.log('[Telegram Processor] Avatar fetch error:', err.message) ; return null }
 }
 

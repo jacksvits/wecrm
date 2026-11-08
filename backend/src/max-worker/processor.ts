@@ -6,6 +6,7 @@ import { resolveContactAuto } from '../lib/contact-dedup.js';
 import { notifyTaskAssignees, notifyTaskCurators, notifyTaskCreator, notifyRoleUsers, formatExternalMessageNotifyBody, formatExternalNewTaskNotifyBody } from '../lib/notifications.js';
 import { getDefaultTaskAssigneeIds, getDefaultTaskCuratorIds } from '../lib/task-defaults.js';
 import { taskDirFor, taskUploadUrlPrefix } from '../lib/task-dir.js';
+import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
@@ -46,10 +47,12 @@ async function downloadMaxAvatar(url: string): Promise<string | null> {
     const buffer = await res.arrayBuffer();
     const ext = path.extname(new URL(url).pathname) || '.jpg';
     const filename = `${randomUUID()}${ext}`;
-    const filepath = path.join(UPLOAD_DIR, filename);
+    const avatarDir = path.join(uploadsRoot(), 'avatars', 'contacts');
+    fs.mkdirSync(avatarDir, { recursive: true });
+    const filepath = path.join(avatarDir, filename);
     fs.writeFileSync(filepath, Buffer.from(buffer));
     console.log('[MAX Processor] Avatar saved to', filepath);
-    return `/uploads/${filename}`;
+    return `${tenantUploadPrefix() || '/uploads'}/avatars/contacts/${filename}`;
   } catch (err) {
     console.error('[MAX Processor] Avatar download error:', err);
     return null;

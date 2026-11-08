@@ -71,10 +71,12 @@ async function downloadVkAvatar(url: string): Promise<string | null> {
     const buffer = await res.arrayBuffer();
     const ext = path.extname(new URL(url).pathname) || '.jpg';
     const filename = `${randomUUID()}${ext}`;
-    const filepath = path.join(uploadsRoot(), filename);
+    const dir = path.join(uploadsRoot(), 'avatars', 'contacts');
+    fs.mkdirSync(dir, { recursive: true });
+    const filepath = path.join(dir, filename);
     fs.writeFileSync(filepath, Buffer.from(buffer));
     console.log('[VK Processor] Avatar saved to', filepath);
-    return `${tenantUploadPrefix() || '/uploads'}/${filename}`;
+    return `${tenantUploadPrefix() || '/uploads'}/avatars/contacts/${filename}`;
   } catch (err) {
     console.error('[VK Processor] Avatar download error:', err);
     return null;
