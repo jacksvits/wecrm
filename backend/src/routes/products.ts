@@ -422,7 +422,7 @@ router.get('/meta/stats/top', async (req, res) => {
         ozonPostingsCache.set(cacheKey, cached);
       } catch {
         ozonPostingsCache.delete(cacheKey);
-        cached = null;
+        cached = undefined;
       }
     }
     const ozonPostings = cached?.items || [];

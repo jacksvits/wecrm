@@ -110,9 +110,9 @@ router.get('/', async (req, res) => {
 router.post('/by-emails', async (req, res) => {
   try {
     const raw = Array.isArray(req.body?.emails) ? req.body.emails : [];
-    const emails = [...new Set(
+    const emails: string[] = Array.from(new Set<string>(
       raw.map((e: unknown) => String(e).trim().toLowerCase()).filter((e: string) => e.includes('@'))
-    )].slice(0, 100);
+    )).slice(0, 100);
     if (emails.length === 0) return res.json({});
     // Точное совпадение по основному email (регистронезависимо) или по массиву доп. emails
     const contacts = await prisma.contact.findMany({

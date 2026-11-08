@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -230,7 +231,7 @@ router.post('/shipments/import', authMiddleware, async (req, res) => {
     const existing = await prisma.cdekShipment.findFirst({
       where: { OR: [{ uuid: String(entity.uuid) }, { cdekNumber: String(entity.cdek_number ?? cdekNumber) }] },
     });
-    const fields: Record<string, any> = {
+    const fields: Prisma.CdekShipmentUncheckedCreateInput = {
       uuid: String(entity.uuid),
       cdekNumber: String(entity.cdek_number ?? cdekNumber),
       imNumber: entity.number ? String(entity.number) : `CDEK-${cdekNumber}`,
