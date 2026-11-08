@@ -7,6 +7,8 @@ import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { uploadsRoot, tenantUploadPrefix, pinTenantContext } from '../lib/tenant.js';
 import { taskDirFor, taskUploadUrlPrefix } from '../lib/task-dir.js';
+import { taskYearMonth } from '../lib/task-dir.js';
+import { moveEntry } from '../lib/shop-dir.js';
 
 const router = Router();
 
@@ -102,7 +104,7 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
       }
       const destPath = path.join(taskDir, finalName);
       if (fs.existsSync(srcPath)) {
-        fs.renameSync(srcPath, destPath);
+        moveEntry(srcPath, destPath);
         console.log('[uploads] moved to tasks:', destPath);
       }
       dbPath = `${taskUploadUrlPrefix(ticketNum, task?.createdAt)}/${finalName}`;
@@ -118,12 +120,42 @@ router.post('/', authMiddleware, upload.single('file'), async (req: AuthRequest,
       const srcPath = path.join(UPLOAD_DIR, filename);
       const destPath = path.join(targetDir, filename);
       if (fs.existsSync(srcPath)) {
-        fs.renameSync(srcPath, destPath);
+        moveEntry(srcPath, destPath);
         console.log('[uploads] moved to', isVideoNote ? 'video_notes' : 'global_chat', ':', destPath);
       }
       dbPath = `${tenantPfx || '/uploads'}/global_chat${isVideoNote ? '/video_notes' : ''}/${filename}`;
+    } else if (entityType === 'promo-block') {
+      // Промо-блоки: shop/promo (см. структуру NFS)
+      const targetDir = path.join(tenantRoot, 'shop', 'promo');
+      if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+      const srcPath = path.join(UPLOAD_DIR, filename);
+      const destPath = path.join(targetDir, filename);
+      if (fs.existsSync(srcPath)) moveEntry(srcPath, destPath);
+      dbPath = `${tenantPfx || '/uploads'}/shop/promo/${filename}`;
+    } else if (entityType === 'login-slide') {
+      // Слайдеры авторизации: slide
+      const targetDir = path.join(tenantRoot, 'slide');
+      if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+      const srcPath = path.join(UPLOAD_DIR, filename);
+      const destPath = path.join(targetDir, filename);
+      if (fs.existsSync(srcPath)) moveEntry(srcPath, destPath);
+      dbPath = `${tenantPfx || '/uploads'}/slide/${filename}`;
+    } else if (entityType === 'news') {
+      // Новости: news/<год>/<месяц> (из даты новости, иначе текущие)
+      let newsDate = new Date();
+      if (entityId && !String(entityId).startsWith('draft')) {
+        const newsItem = await prisma.news.findUnique({ where: { id: String(entityId) }, select: { publishedAt: true, createdAt: true } });
+        if (newsItem) newsDate = newsItem.publishedAt || newsItem.createdAt;
+      }
+      const ym = taskYearMonth(newsDate);
+      const targetDir = path.join(tenantRoot, 'news', ym.year, ym.month);
+      if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+      const srcPath = path.join(UPLOAD_DIR, filename);
+      const destPath = path.join(targetDir, filename);
+      if (fs.existsSync(srcPath)) moveEntry(srcPath, destPath);
+      dbPath = `${tenantPfx || '/uploads'}/news/${ym.year}/${ym.month}/${filename}`;
     } else {
-      dbPath = `/uploads/${filename}`;
+      dbPath = `${tenantPfx || '/uploads'}/${filename}`;
     }
 
     const attachment = await prisma.fileAttachment.create({
