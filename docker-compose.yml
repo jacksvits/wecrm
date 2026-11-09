@@ -162,7 +162,7 @@ services:
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-softboeg_wp16}
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-softboeg_wp16}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:?WORDPRESS_DB_PASSWORD is required}
-      POSTGRES_URL: postgresql://crm:${POSTGRES_PASSWORD}@db:5432/wecrm?schema=public
+      POSTGRES_URL: postgresql://crm:${POSTGRES_PASSWORD}@db:5432/wecrm
       OLD_SITE_DB_HOST: old-site-db
       OLD_SITE_DB_NAME: old_site
       OLD_SITE_DB_USER: old_site
