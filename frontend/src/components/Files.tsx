@@ -244,7 +244,7 @@ function FilePreviewThumb({ item, tab, filePath, theme }: { item: any; tab: stri
   );
 }
 
-export function Files() {
+export function Files({ publicMode = false }: { publicMode?: boolean }) {
   const { user } = useAuth();
   const isAdmin = (user as any)?.role === "admin";
   // Вкладка «Система» (корень хранилища) — только для администраторов
@@ -267,6 +267,8 @@ export function Files() {
   const [viewMode, setViewModeState] = useState<"icons" | "table">(() => {
     const saved = localStorage.getItem(viewPrefKey);
     if (saved === "table" || saved === "icons") return saved;
+    // В публичном режиме (welans.click) вид по умолчанию — таблица
+    if (publicMode) return "table";
     return window.innerWidth < 768 ? "table" : "icons";
   });
   const setViewMode = (mode: "icons" | "table") => {
@@ -414,10 +416,15 @@ export function Files() {
     }
   };
 
+  // На мобильном в публичном режиме — компактная таблица без колонок «Расширение» и «Скачивания»,
+  // чтобы страница помещалась на экран телефона без горизонтальной прокрутки
+  const compactTable = publicMode && isMobile;
+  const tableGridCols = compactTable ? "minmax(0,1fr) 70px 34px" : "minmax(0,1fr) 90px 90px 110px 40px";
+
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: "0 0 12px", fontSize: 18 }}>Файлы</h2>
+        {!publicMode && <h2 style={{ margin: "0 0 12px", fontSize: 18 }}>Файлы</h2>}
         <div style={{ display: "flex", gap: isMobile ? 2 : 8, borderBottom: "1px solid var(--border-color)" }}>
           {TABS.map((tab) => (
             <button
@@ -518,17 +525,17 @@ export function Files() {
             <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>Папка пуста</div>
           ) : (
             viewMode === "table" ? (
-            <div style={{ overflowX: "auto" }}>
-              <div style={{ minWidth: 560, border: "1px solid var(--border-color)", borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ overflowX: compactTable ? "hidden" : "auto" }}>
+              <div style={{ minWidth: compactTable ? 0 : 560, border: "1px solid var(--border-color)", borderRadius: 12, overflow: "hidden" }}>
                 <div style={{
-                  display: "grid", gridTemplateColumns: "minmax(0,1fr) 90px 90px 110px 40px",
-                  padding: "10px 16px", background: "var(--bg-hover)", fontSize: 12,
+                  display: "grid", gridTemplateColumns: tableGridCols,
+                  padding: compactTable ? "8px 12px" : "10px 16px", background: "var(--bg-hover)", fontSize: 12,
                   fontWeight: 600, color: "var(--text-muted)",
                 }}>
                   <div>Наименование</div>
                   <div>Размер</div>
-                  <div>Расширение</div>
-                  <div>Скачивания</div>
+                  {!compactTable && <div>Расширение</div>}
+                  {!compactTable && <div>Скачивания</div>}
                   <div></div>
                 </div>
                 {visibleFiles.map((item: any) => {
@@ -539,8 +546,8 @@ export function Files() {
                       onClick={() => handleItemClick(item)}
                       title={item.name}
                       style={{
-                        display: "grid", gridTemplateColumns: "minmax(0,1fr) 90px 90px 110px 40px",
-                        padding: "6px 16px", alignItems: "center", cursor: "pointer",
+                        display: "grid", gridTemplateColumns: tableGridCols,
+                        padding: compactTable ? "6px 12px" : "6px 16px", alignItems: "center", cursor: "pointer",
                         borderTop: "1px solid var(--border-color)", background: "var(--bg-card)",
                         fontSize: 13, transition: "background 0.15s",
                       }}
@@ -556,8 +563,8 @@ export function Files() {
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>{item.name}</span>
                       </div>
                       <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.isDirectory ? "—" : formatSize(item.size)}</div>
-                      <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.isDirectory ? "Папка" : (fileExtension(item.name) ? fileExtension(item.name).toUpperCase() : "—")}</div>
-                      <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.downloads || 0}</div>
+                      {!compactTable && <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.isDirectory ? "Папка" : (fileExtension(item.name) ? fileExtension(item.name).toUpperCase() : "—")}</div>}
+                      {!compactTable && <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.downloads || 0}</div>}
                       <div>
                         <button
                           onClick={(e) => item.isDirectory ? handleDownloadFolder(e, item) : handleDownloadFile(e, item)}
