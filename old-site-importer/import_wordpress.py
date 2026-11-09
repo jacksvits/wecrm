@@ -109,9 +109,9 @@ def prepare_crm(pg) -> str:
         if not author:
             raise RuntimeError("В основной базе WeCRM не найден администратор")
         cur.execute("""
-            INSERT INTO news_categories (id,name,slug,color,"sortOrder","createdAt","updatedAt")
-            VALUES (%s,%s,%s,'#007AFF',50,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
-            ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, "updatedAt"=CURRENT_TIMESTAMP
+            INSERT INTO news_categories (id,name,slug,color,"sortOrder")
+            VALUES (%s,%s,%s,'#007AFF',50)
+            ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name
         """, (CATEGORY_ID, CATEGORY_NAME, CATEGORY_SLUG))
         cur.execute("SELECT id FROM news_categories WHERE slug=%s", (CATEGORY_SLUG,))
         category_id = cur.fetchone()[0]
