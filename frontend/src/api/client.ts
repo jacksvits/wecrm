@@ -373,7 +373,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
   },
   // === Мультитенантность платформы (организации) ===
   security: {
-    authEvents: (page = 1, ipList: 'all' | 'white' | 'black' = 'all'): Promise<{ items: any[]; total: number; page: number; pageSize: number; totalPages: number }> =>
+    authEvents: (page = 1, ipList: 'new' | 'all' | 'white' | 'black' = 'all'): Promise<{ items: any[]; total: number; page: number; pageSize: number; totalPages: number }> =>
       fetchApi(`/api/security/auth-events?page=${page}${ipList === 'all' ? '' : `&ipList=${ipList}`}`),
     ipInfo: (ip: string): Promise<{ ip: string; country: string | null; city: string | null; registrationCountry: string | null; organization: string | null }> =>
       fetchApi(`/api/security/ip-info?ip=${encodeURIComponent(ip)}`),

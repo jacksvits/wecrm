@@ -136,10 +136,11 @@ router.get('/auth-events', authMiddleware, requirePlatformAdmin, async (req, res
   try {
     const page = Math.max(1, Math.min(1_000_000, Number.parseInt(String(req.query.page || '1'), 10) || 1));
     const ipList = String(req.query.ipList || '');
-    if (ipList === 'white' || ipList === 'black') {
+    if (ipList === 'white' || ipList === 'black' || ipList === 'new') {
       // Фильтр по списку: IP записи должен точно совпадать с правилом или попадать в его подсеть/диапазон.
+      // «new» — наоборот: записи, чей IP не входит ни в один из списков.
       const rules = await (platformPrisma as any).ipAccessRule.findMany({
-        where: { listType: ipList },
+        where: ipList === 'new' ? {} : { listType: ipList },
         select: { ipAddress: true },
       });
       const patterns = rules.map((rule: { ipAddress: string }) => rule.ipAddress);
@@ -151,7 +152,10 @@ router.get('/auth-events', authMiddleware, requirePlatformAdmin, async (req, res
           skip,
           take: CHUNK,
         });
-        for (const row of rows) if (ipMatchesRules(row.ipAddress, patterns)) matched.push(row);
+        for (const row of rows) {
+          const listed = ipMatchesRules(row.ipAddress, patterns);
+          if (ipList === 'new' ? !listed : listed) matched.push(row);
+        }
         if (rows.length < CHUNK) break;
       }
       const total = matched.length;

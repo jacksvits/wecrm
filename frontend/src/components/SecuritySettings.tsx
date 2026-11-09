@@ -180,7 +180,7 @@ function IpAccessLists() {
 export function SecuritySettings() {
   const [data, setData] = useState<AuthEventsResponse | null>(null);
   const [page, setPage] = useState(1);
-  const [ipListFilter, setIpListFilter] = useState<'all' | 'white' | 'black'>('all');
+  const [ipListFilter, setIpListFilter] = useState<'new' | 'all' | 'white' | 'black'>('new');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedIp, setSelectedIp] = useState('');
@@ -205,7 +205,7 @@ export function SecuritySettings() {
 
   useEffect(() => { load(page); }, [load, page]);
 
-  const changeIpListFilter = (value: 'all' | 'white' | 'black') => {
+  const changeIpListFilter = (value: 'new' | 'all' | 'white' | 'black') => {
     if (value === ipListFilter) return;
     setPage(1);
     setIpListFilter(value);
@@ -259,14 +259,14 @@ export function SecuritySettings() {
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Успешные и неудачные входы в главный проект и все организации · по 50 записей</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {([['all', 'Все'], ['white', 'Белые'], ['black', 'Чёрные']] as const).map(([value, label]) => {
+          {([['new', 'Новые'], ['all', 'Все'], ['white', 'Белые'], ['black', 'Чёрные']] as const).map(([value, label]) => {
             const active = ipListFilter === value;
             return (
               <button
                 key={value}
                 type="button"
                 onClick={() => changeIpListFilter(value)}
-                title={value === 'all' ? 'Весь журнал авторизаций' : value === 'white' ? 'Только IP из белого списка (точно или в диапазоне)' : 'Только IP из чёрного списка (точно или в диапазоне)'}
+                title={value === 'new' ? 'Записи, чей IP не входит ни в белый, ни в чёрный список' : value === 'all' ? 'Весь журнал авторизаций' : value === 'white' ? 'Только IP из белого списка (точно или в диапазоне)' : 'Только IP из чёрного списка (точно или в диапазоне)'}
                 style={{
                   padding: '8px 14px',
                   borderRadius: 10,
