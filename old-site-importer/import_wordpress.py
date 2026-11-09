@@ -197,6 +197,14 @@ def http_session() -> requests.Session:
     return session
 
 
+def normalize_image_url(url: str) -> str:
+    """Исправляет ошибочно склеенный CDN-адрес, встречающийся в ленте 3DNews."""
+    malformed = "https://3dnews.ruhttps//cdn.3dnews.ru/"
+    if url.startswith(malformed):
+        return "https://cdn.3dnews.ru/" + url[len(malformed):]
+    return url
+
+
 def url_hash(url: str) -> str:
     return hashlib.sha256(url.encode("utf-8")).hexdigest()
 
@@ -328,11 +336,11 @@ def process_batch(source, mysql, pg, posts: list[dict[str, Any]], author_id: str
         post_id = post["ID"]
         soup = BeautifulSoup(post.get("post_content") or "", "html.parser")
         parsed_content[post_id] = soup
-        enclosure = (metadata.get(post_id, {}).get("wprss_item_enclosure") or "").strip()
+        enclosure = normalize_image_url((metadata.get(post_id, {}).get("wprss_item_enclosure") or "").strip())
         if enclosure.startswith(("http://", "https://")):
             url_owners.setdefault(enclosure, (post_id, dates[post_id]))
         for image in soup.find_all("img"):
-            url = (image.get("src") or image.get("data-src") or image.get("data-original") or "").strip()
+            url = normalize_image_url((image.get("src") or image.get("data-src") or image.get("data-original") or "").strip())
             if url.startswith(("http://", "https://")):
                 url_owners.setdefault(url, (post_id, dates[post_id]))
 
@@ -359,15 +367,19 @@ def process_batch(source, mysql, pg, posts: list[dict[str, Any]], author_id: str
 
         soup = parsed_content[post_id]
         for image in soup.find_all("img"):
-            source_url = (image.get("src") or image.get("data-src") or image.get("data-original") or "").strip()
+            original_image_url = (image.get("src") or image.get("data-src") or image.get("data-original") or "").strip()
+            source_url = normalize_image_url(original_image_url)
             local_url = image_map.get(source_url)
+            if source_url != original_image_url:
+                image["src"] = source_url
             if local_url:
                 image["src"] = local_url
                 image.attrs.pop("data-src", None)
                 image.attrs.pop("data-original", None)
         content = str(soup)
         source_cover = (meta.get("wprss_item_enclosure") or "").strip() or None
-        cover = image_map.get(source_cover or "") or source_cover
+        cover_source = normalize_image_url(source_cover or "")
+        cover = image_map.get(cover_source) or cover_source or None
         source_url = (meta.get("wprss_item_permalink") or "").strip() or None
         summary = summary_for(post)
         original_url = f"https://welans.ru/{original_slug}/"
