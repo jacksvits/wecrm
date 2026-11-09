@@ -69,7 +69,7 @@ export function currentTenant(): TenantInfo | undefined {
 
 /** Домены главной организации (платформа). Всё остальное — поддомены tenant'ов */
 const MAIN_DOMAINS = new Set(
-  (process.env.PLATFORM_DOMAINS || 'welans.cc,www.welans.cc,crm.welans.org,localhost,127.0.0.1')
+  (process.env.PLATFORM_DOMAINS || 'welans.cc,www.welans.cc,crm.welans.org,welans.click,www.welans.click,welans.org,www.welans.org,welans.ru,www.welans.ru,localhost,127.0.0.1')
     .split(',')
     .map((d) => d.trim().toLowerCase())
     .filter(Boolean),
