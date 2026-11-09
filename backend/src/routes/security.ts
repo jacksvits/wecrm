@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { BlockList, isIP } from 'net';
 import { authMiddleware } from '../middleware/auth.js';
-import { getClientIp, normalizeIpAddress, rateLimit } from '../lib/security.js';
+import { getClientIp, normalizeIpAddress, normalizeIpRule, rateLimit } from '../lib/security.js';
 import { IP_BLOCKED_MESSAGE, isIpBlacklisted } from '../lib/ip-access.js';
 import { platformPrisma } from '../lib/tenant.js';
 import { requirePlatformAdmin } from './platform.js';
@@ -195,9 +195,9 @@ router.get('/ip-rules', authMiddleware, requirePlatformAdmin, async (_req, res) 
 
 router.post('/ip-rules', authMiddleware, requirePlatformAdmin, async (req, res) => {
   try {
-    const ipAddress = normalizeIpAddress(req.body?.ipAddress);
+    const ipAddress = normalizeIpRule(req.body?.ipAddress);
     const listType = String(req.body?.listType || '');
-    if (!ipAddress) return res.status(400).json({ error: 'Введите корректный IPv4- или IPv6-адрес' });
+    if (!ipAddress) return res.status(400).json({ error: 'Введите корректный IP-адрес, подсеть (203.0.113.0/24) или диапазон (203.0.113.10-203.0.113.50)' });
     if (!['white', 'black'].includes(listType)) return res.status(400).json({ error: 'Неизвестный тип списка' });
     const item = await platformPrisma.$transaction(async (tx: any) => {
       // Адрес находится только в одном списке: добавление переносит его из противоположного.
@@ -206,7 +206,7 @@ router.post('/ip-rules', authMiddleware, requirePlatformAdmin, async (req, res) 
     });
     res.status(201).json(item);
   } catch (err: any) {
-    if (err?.code === 'P2002') return res.status(409).json({ error: 'Этот IP-адрес уже есть в выбранном списке' });
+    if (err?.code === 'P2002') return res.status(409).json({ error: 'Этот адрес или диапазон уже есть в выбранном списке' });
     console.error('[security] ip-rules create:', err?.message || err);
     res.status(500).json({ error: 'Не удалось добавить IP-адрес' });
   }

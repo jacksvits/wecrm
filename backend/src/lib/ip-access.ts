@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { recordAuthEvent } from './auth-events.js';
-import { getClientIp, normalizeIpAddress } from './security.js';
+import { getClientIp, ipMatchesRules, normalizeIpAddress } from './security.js';
 import { platformPrisma } from './tenant.js';
 
 export const IP_BLOCKED_MESSAGE = 'Ваш IP-адрес заблокирован администратором';
@@ -8,11 +8,12 @@ export const IP_BLOCKED_MESSAGE = 'Ваш IP-адрес заблокирован
 export async function isIpBlacklisted(value: string): Promise<boolean> {
   const ip = normalizeIpAddress(value);
   if (!ip) return false;
-  const rule = await (platformPrisma as any).ipAccessRule.findFirst({
-    where: { ipAddress: ip, listType: 'black' },
-    select: { id: true },
+  // Правила могут быть одиночными адресами, подсетями CIDR или диапазонами.
+  const rules = await (platformPrisma as any).ipAccessRule.findMany({
+    where: { listType: 'black' },
+    select: { ipAddress: true },
   });
-  return Boolean(rule);
+  return ipMatchesRules(ip, rules.map((rule: { ipAddress: string }) => rule.ipAddress));
 }
 
 /** Блокирует публичные auth-endpoint'ы; белый список намеренно не отменяет чёрный. */

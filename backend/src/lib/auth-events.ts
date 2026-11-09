@@ -1,6 +1,6 @@
 import type { Request } from 'express';
 import { currentTenant, platformPrisma } from './tenant.js';
-import { describeClient, getClientIp } from './security.js';
+import { describeClient, getClientIp, ipMatchesRules } from './security.js';
 
 type TenantOverride = { id?: string | null; slug: string; name: string; isMain?: boolean };
 
@@ -13,11 +13,12 @@ async function autoBlockAfterConsecutiveFailures(ipAddress: string): Promise<voi
   const db = platformPrisma as any;
   const settings = await db.ipSecuritySettings.findUnique({ where: { id: 1 } });
   const threshold = settings?.failureThreshold || DEFAULT_FAILURE_THRESHOLD;
-  const trusted = await db.ipAccessRule.findFirst({
-    where: { ipAddress, listType: 'white' },
-    select: { id: true },
+  // Доверенными считаются и диапазоны белого списка, а не только точные адреса.
+  const whiteRules = await db.ipAccessRule.findMany({
+    where: { listType: 'white' },
+    select: { ipAddress: true },
   });
-  if (trusted) return;
+  if (ipMatchesRules(ipAddress, whiteRules.map((rule: { ipAddress: string }) => rule.ipAddress))) return;
 
   const events = await db.authEvent.findMany({
     where: { ipAddress, authMethod: { not: 'blocked-ip' } },

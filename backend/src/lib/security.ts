@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { isIP } from 'net';
+import { BlockList, isIP } from 'net';
 
 /** Приводит IPv4/IPv6 к единому виду, чтобы списки нельзя было обойти записью другого формата. */
 export function normalizeIpAddress(value: unknown): string | null {
@@ -19,6 +19,74 @@ export function normalizeIpAddress(value: unknown): string | null {
     return normalized;
   } catch {
     return null;
+  }
+}
+
+
+/** Одно правило списка доступа: одиночный IP, подсеть CIDR (203.0.113.0/24) или диапазон «от-до» (203.0.113.10-203.0.113.50). */
+export function normalizeIpRule(value: unknown): string | null {
+  const raw = String(value || '').trim();
+  if (!raw || raw.length > 100) return null;
+
+  const cidr = raw.match(/^([^/]+)\/(\d{1,3})$/);
+  if (cidr) {
+    const address = normalizeIpAddress(cidr[1]);
+    if (!address) return null;
+    const prefix = Number(cidr[2]);
+    const maxPrefix = isIP(address) === 4 ? 32 : 128;
+    if (!Number.isInteger(prefix) || prefix < 0 || prefix > maxPrefix) return null;
+    return `${address}/${prefix}`;
+  }
+
+  const range = raw.match(/^([^-]+)-([^-]+)$/);
+  if (range) {
+    const start = normalizeIpAddress(range[1]);
+    const end = normalizeIpAddress(range[2]);
+    if (!start || !end || isIP(start) !== isIP(end)) return null;
+    try {
+      // BlockList отклоняет диапазон, у которого начало больше конца.
+      const probe = new BlockList();
+      probe.addRange(start, end, isIP(start) === 4 ? 'ipv4' : 'ipv6');
+    } catch {
+      return null;
+    }
+    return `${start}-${end}`;
+  }
+
+  return normalizeIpAddress(raw);
+}
+
+/** Попадает ли IP хотя бы под одно правило списка (одиночный адрес, CIDR или диапазон). */
+export function ipMatchesRules(value: string, rules: string[]): boolean {
+  const ip = normalizeIpAddress(value);
+  if (!ip) return false;
+  const family = isIP(ip) === 6 ? 'ipv6' : 'ipv4';
+  const blocks = new BlockList();
+  for (const rule of rules) {
+    try {
+      const cidr = rule.match(/^([^/]+)\/(\d{1,3})$/);
+      if (cidr) {
+        const address = normalizeIpAddress(cidr[1]);
+        if (address) blocks.addSubnet(address, Number(cidr[2]), isIP(address) === 4 ? 'ipv4' : 'ipv6');
+        continue;
+      }
+      const range = rule.match(/^([^-]+)-([^-]+)$/);
+      if (range) {
+        const start = normalizeIpAddress(range[1]);
+        const end = normalizeIpAddress(range[2]);
+        if (start && end) blocks.addRange(start, end, isIP(start) === 4 ? 'ipv4' : 'ipv6');
+        continue;
+      }
+      const single = normalizeIpAddress(rule);
+      if (single) blocks.addAddress(single, isIP(single) === 4 ? 'ipv4' : 'ipv6');
+    } catch {
+      // Повреждённая запись не должна ломать проверку остального списка.
+    }
+  }
+  try {
+    return blocks.check(ip, family);
+  } catch {
+    return false;
   }
 }
 

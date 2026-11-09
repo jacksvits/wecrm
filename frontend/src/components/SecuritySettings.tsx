@@ -103,13 +103,13 @@ function IpAccessLists() {
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{items.length}</span>
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45, minHeight: 35, marginBottom: 12 }}>
-          {isBlack ? 'Запрещают страницу входа и авторизацию. Добавление удаляет адрес из белого списка.' : 'Исключают автоматическую блокировку. Добавление удаляет адрес из чёрного списка.'}
+          {isBlack ? 'Запрещают страницу входа и авторизацию. Можно указать IP, подсеть CIDR или диапазон. Добавление удаляет запись из белого списка.' : 'Исключают автоматическую блокировку. Можно указать IP, подсеть CIDR или диапазон. Добавление удаляет запись из чёрного списка.'}
         </div>
         <form onSubmit={(event) => { event.preventDefault(); add(listType); }} style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
           <input
             value={inputs[listType]}
             onChange={(event) => setInputs((current) => ({ ...current, [listType]: event.target.value }))}
-            placeholder="Например, 203.0.113.10"
+            placeholder="IP, 203.0.113.0/24 или 203.0.113.10-203.0.113.50"
             aria-label={`Добавить IP в ${isBlack ? 'чёрный' : 'белый'} список`}
             style={{ ...inputStyle, flex: 1, minWidth: 0 }}
           />
