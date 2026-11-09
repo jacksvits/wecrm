@@ -31,6 +31,7 @@ CATEGORY_ID = "old_site_korotko_o_svezhem"
 CATEGORY_SLUG = "korotko-o-svezhem"
 CATEGORY_NAME = "Коротко о свежем"
 _thread_local = threading.local()
+_failed_attempted: set[str] = set()
 
 
 def env(name: str, default: str | None = None) -> str:
@@ -273,12 +274,16 @@ def resolve_images(mysql, urls: set[str], post_id: int, published: datetime) -> 
     mapping: dict[str, str | None] = {}
     pending: list[str] = []
     for url in urls:
-        row = known.get(url_hash(url))
+        digest = url_hash(url)
+        row = known.get(digest)
         if row and row["status"] == "ok" and row["local_path"]:
             disk_path = UPLOADS_ROOT / row["local_path"].removeprefix("/uploads/")
             if disk_path.is_file():
                 mapping[url] = row["local_path"]
                 continue
+        if row and row["status"] == "failed" and digest in _failed_attempted:
+            mapping[url] = None
+            continue
         pending.append(url)
         mapping[url] = None
     if pending:
@@ -288,6 +293,8 @@ def resolve_images(mysql, urls: set[str], post_id: int, published: datetime) -> 
         for row in results:
             if row["status"] == "ok":
                 mapping[row["source_url"]] = row["local_path"]
+            else:
+                _failed_attempted.add(row["url_hash"])
     return mapping
 
 
