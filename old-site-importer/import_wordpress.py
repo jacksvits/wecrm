@@ -49,6 +49,42 @@ def source_connection():
     )
 
 
+class SourceDatabase:
+    """Держит соединение с Beget и повторяет запрос после сетевого обрыва."""
+
+    def __init__(self) -> None:
+        self.connection = None
+
+    def fetchall(self, query: str, params: Any = None) -> list[dict[str, Any]]:
+        for attempt in range(6):
+            try:
+                if self.connection is None:
+                    self.connection = source_connection()
+                with self.connection.cursor() as cur:
+                    cur.execute(query, params)
+                    return cur.fetchall()
+            except (pymysql.err.OperationalError, pymysql.err.InterfaceError) as exc:
+                self.close()
+                if attempt == 5:
+                    raise
+                delay = min(30, 2 ** attempt)
+                print(f"Соединение с WordPress MySQL потеряно: {exc}; повтор через {delay} с", flush=True)
+                time.sleep(delay)
+        raise RuntimeError("Недостижимая ветка повторного подключения")
+
+    def fetchone(self, query: str, params: Any = None) -> dict[str, Any] | None:
+        rows = self.fetchall(query, params)
+        return rows[0] if rows else None
+
+    def close(self) -> None:
+        if self.connection is not None:
+            try:
+                self.connection.close()
+            except Exception:
+                pass
+            self.connection = None
+
+
 def archive_connection():
     return pymysql.connect(
         host=env("OLD_SITE_DB_HOST", "old-site-db"), database=env("OLD_SITE_DB_NAME", "old_site"),
@@ -263,15 +299,14 @@ def process_batch(source, mysql, pg, posts: list[dict[str, Any]], author_id: str
                   category_id: str, used_slugs: dict[str, int | None]) -> int:
     ids = [post["ID"] for post in posts]
     placeholders = ",".join(["%s"] * len(ids))
-    with source.cursor() as cur:
-        cur.execute(f"""
-            SELECT post_id,meta_key,meta_value FROM wp_postmeta
-            WHERE post_id IN ({placeholders})
-              AND meta_key IN ('wprss_item_permalink','wprss_item_enclosure','wprss_item_date')
-        """, ids)
-        metadata: dict[int, dict[str, str]] = {}
-        for row in cur.fetchall():
-            metadata.setdefault(row["post_id"], {})[row["meta_key"]] = row["meta_value"]
+    metadata_rows = source.fetchall(f"""
+        SELECT post_id,meta_key,meta_value FROM wp_postmeta
+        WHERE post_id IN ({placeholders})
+          AND meta_key IN ('wprss_item_permalink','wprss_item_enclosure','wprss_item_date')
+    """, ids)
+    metadata: dict[int, dict[str, str]] = {}
+    for row in metadata_rows:
+        metadata.setdefault(row["post_id"], {})[row["meta_key"]] = row["meta_value"]
 
     dates = {post["ID"]: parse_published(
         metadata.get(post["ID"], {}).get("wprss_item_date"), post["post_date_gmt"]
@@ -372,30 +407,28 @@ def process_batch(source, mysql, pg, posts: list[dict[str, Any]], author_id: str
 
 def main() -> None:
     started = time.time()
-    source = source_connection()
+    source = SourceDatabase()
     mysql = archive_connection()
     pg = psycopg.connect(env("POSTGRES_URL"), connect_timeout=25, autocommit=False)
     try:
         prepare_archive(mysql)
         author_id, category_id, used_slugs = prepare_crm(pg)
-        with source.cursor() as cur:
-            cur.execute("SELECT COUNT(*) AS n FROM wp_posts WHERE post_type='post' AND post_status='publish'")
-            source_total = cur.fetchone()["n"]
+        source_total = source.fetchone(
+            "SELECT COUNT(*) AS n FROM wp_posts WHERE post_type='post' AND post_status='publish'"
+        )["n"]
         target_total = min(source_total, IMPORT_LIMIT) if IMPORT_LIMIT else source_total
         print(f"Найдено опубликованных новостей WordPress: {source_total}; к обработке: {target_total}", flush=True)
         last_id = 0
         processed = 0
         while processed < target_total:
             size = min(BATCH_SIZE, target_total - processed)
-            with source.cursor() as cur:
-                cur.execute("""
-                    SELECT ID,post_name,post_title,post_content,post_excerpt,post_date_gmt,
-                        post_modified,post_modified_gmt,guid
-                    FROM wp_posts
-                    WHERE post_type='post' AND post_status='publish' AND ID>%s
-                    ORDER BY ID ASC LIMIT %s
-                """, (last_id, size))
-                posts = cur.fetchall()
+            posts = source.fetchall("""
+                SELECT ID,post_name,post_title,post_content,post_excerpt,post_date_gmt,
+                    post_modified,post_modified_gmt,guid
+                FROM wp_posts
+                WHERE post_type='post' AND post_status='publish' AND ID>%s
+                ORDER BY ID ASC LIMIT %s
+            """, (last_id, size))
             if not posts:
                 break
             process_batch(source, mysql, pg, posts, author_id, category_id, used_slugs)
