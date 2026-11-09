@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { BlockList, isIP } from 'net';
 import { authMiddleware } from '../middleware/auth.js';
-import { getClientIp, normalizeIpAddress, normalizeIpRule, rateLimit } from '../lib/security.js';
+import { getClientIp, ipMatchesRules, normalizeIpAddress, normalizeIpRule, rateLimit } from '../lib/security.js';
 import { IP_BLOCKED_MESSAGE, isIpBlacklisted } from '../lib/ip-access.js';
 import { platformPrisma } from '../lib/tenant.js';
 import { requirePlatformAdmin } from './platform.js';
@@ -135,6 +135,46 @@ router.get('/access-status', rateLimit({ prefix: 'access-status', windowMs: 15 *
 router.get('/auth-events', authMiddleware, requirePlatformAdmin, async (req, res) => {
   try {
     const page = Math.max(1, Math.min(1_000_000, Number.parseInt(String(req.query.page || '1'), 10) || 1));
+    const ipList = String(req.query.ipList || '');
+    if (ipList === 'white' || ipList === 'black') {
+      // Фильтр по списку: IP записи должен точно совпадать с правилом или попадать в его подсеть/диапазон.
+      const rules = await (platformPrisma as any).ipAccessRule.findMany({
+        where: { listType: ipList },
+        select: { ipAddress: true },
+      });
+      const patterns = rules.map((rule: { ipAddress: string }) => rule.ipAddress);
+      const matched: any[] = [];
+      const CHUNK = 1000;
+      for (let skip = 0; ; skip += CHUNK) {
+        const rows = await (platformPrisma as any).authEvent.findMany({
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          skip,
+          take: CHUNK,
+        });
+        for (const row of rows) if (ipMatchesRules(row.ipAddress, patterns)) matched.push(row);
+        if (rows.length < CHUNK) break;
+      }
+      const total = matched.length;
+      const items = matched.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+      return res.json({
+        items: items.map((row: any) => ({
+          id: row.id,
+          tenantSlug: row.tenantSlug,
+          tenantName: row.tenantName,
+          login: row.login,
+          ipAddress: row.ipAddress,
+          device: row.device,
+          clientType: row.clientType,
+          authMethod: row.authMethod,
+          success: row.success,
+          createdAt: row.createdAt,
+        })),
+        total,
+        page,
+        pageSize: PAGE_SIZE,
+        totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+      });
+    }
     const [total, items] = await Promise.all([
       (platformPrisma as any).authEvent.count(),
       (platformPrisma as any).authEvent.findMany({

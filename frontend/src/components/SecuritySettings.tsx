@@ -180,6 +180,7 @@ function IpAccessLists() {
 export function SecuritySettings() {
   const [data, setData] = useState<AuthEventsResponse | null>(null);
   const [page, setPage] = useState(1);
+  const [ipListFilter, setIpListFilter] = useState<'all' | 'white' | 'black'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedIp, setSelectedIp] = useState('');
@@ -192,7 +193,7 @@ export function SecuritySettings() {
     setLoading(true);
     setError('');
     try {
-      const result = await api.security.authEvents(targetPage);
+      const result = await api.security.authEvents(targetPage, ipListFilter);
       setData(result);
       if (targetPage > result.totalPages) setPage(result.totalPages);
     } catch (e: any) {
@@ -200,9 +201,15 @@ export function SecuritySettings() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ipListFilter]);
 
   useEffect(() => { load(page); }, [load, page]);
+
+  const changeIpListFilter = (value: 'all' | 'white' | 'black') => {
+    if (value === ipListFilter) return;
+    setPage(1);
+    setIpListFilter(value);
+  };
 
   const closeIpInfo = useCallback(() => {
     infoRequest.current += 1;
@@ -251,9 +258,33 @@ export function SecuritySettings() {
           <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>Авторизации пользователей</h3>
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Успешные и неудачные входы в главный проект и все организации · по 50 записей</div>
         </div>
-        <button onClick={() => load(page)} disabled={loading} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: loading ? 'default' : 'pointer' }}>
-          {loading ? 'Загрузка…' : 'Обновить'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {([['all', 'Все'], ['white', 'Белые'], ['black', 'Чёрные']] as const).map(([value, label]) => {
+            const active = ipListFilter === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => changeIpListFilter(value)}
+                title={value === 'all' ? 'Весь журнал авторизаций' : value === 'white' ? 'Только IP из белого списка (точно или в диапазоне)' : 'Только IP из чёрного списка (точно или в диапазоне)'}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 10,
+                  border: active ? '1px solid var(--text-primary)' : '1px solid var(--border-color)',
+                  background: active ? 'var(--text-primary)' : 'var(--bg-card)',
+                  color: active ? 'var(--bg-card)' : 'var(--text-primary)',
+                  cursor: 'pointer',
+                  fontWeight: active ? 600 : 400,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+          <button onClick={() => load(page)} disabled={loading} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: loading ? 'default' : 'pointer' }}>
+            {loading ? 'Загрузка…' : 'Обновить'}
+          </button>
+        </div>
       </div>
       {error && <div style={{ padding: 14, marginBottom: 12, borderRadius: 10, background: '#fef2f2', color: '#b91c1c' }}>{error}</div>}
       <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 12, background: 'var(--bg-card)' }}>
