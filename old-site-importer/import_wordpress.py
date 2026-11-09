@@ -202,6 +202,9 @@ def normalize_image_url(url: str) -> str:
     malformed = "https://3dnews.ruhttps//cdn.3dnews.ru/"
     if url.startswith(malformed):
         return "https://cdn.3dnews.ru/" + url[len(malformed):]
+    missing_slash = "https://3dnews.ruassets/"
+    if url.startswith(missing_slash):
+        return "https://3dnews.ru/assets/" + url[len(missing_slash):]
     return url
 
 
