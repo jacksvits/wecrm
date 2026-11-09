@@ -61,7 +61,9 @@ router.post('/', async (req, res) => {
     if (!creator) creator = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
     if (!creator) return res.status(500).json({ error: 'Не удалось создать заявку' });
 
+    // Тема задачи — всегда «Запрос на обратную связь», контакты — в описании
     const contact = [
+      'Ф.И.О: ' + data.name,
       data.phone && 'Телефон: ' + data.phone,
       data.email && 'Email: ' + data.email,
     ].filter(Boolean).join('\n');
@@ -69,7 +71,7 @@ router.post('/', async (req, res) => {
 
     const task = await prisma.task.create({
       data: {
-        title: 'Заявка с сайта: ' + data.name,
+        title: 'Запрос на обратную связь',
         description,
         status: 'open',
         priority: 'medium',
@@ -82,7 +84,7 @@ router.post('/', async (req, res) => {
     await prisma.taskHistory.create({ data: { taskId: task.id, field: 'task', oldValue: null, newValue: 'Создана задача: ' + task.title, userId: creator.id } });
 
     const payload = {
-      title: 'Новая заявка с сайта',
+      title: 'Новый запрос на обратную связь',
       body: data.name + ' оставил заявку: ' + task.title,
       url: '/tasks/' + task.id,
     };
