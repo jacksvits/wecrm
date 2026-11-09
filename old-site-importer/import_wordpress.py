@@ -70,6 +70,10 @@ class SourceDatabase:
                 delay = min(30, 2 ** attempt)
                 print(f"Соединение с WordPress MySQL потеряно: {exc}; повтор через {delay} с", flush=True)
                 time.sleep(delay)
+            finally:
+                # Между запросами могут идти долгие загрузки изображений: не держим
+                # исходное соединение открытым, чтобы Beget не разрывал его по idle-таймауту.
+                self.close()
         raise RuntimeError("Недостижимая ветка повторного подключения")
 
     def fetchone(self, query: str, params: Any = None) -> dict[str, Any] | None:
