@@ -2,29 +2,39 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8" />
+<meta name="robots" content="noindex" />
 <title>WeCRM Auth Bridge</title>
 </head>
 <body>
 <script>
-// Мост авторизации WeCRM: страница открывается в невидимом iframe на домене welans.cc
-// (например, с лендинга welans.ru), читает токен из localStorage этого домена
-// и передаёт профиль пользователя на страницу-родителя через postMessage.
+// Мост авторизации WeCRM (редирект-вариант).
+// Лендинг welans.ru не может читать localStorage домена welans.cc из-за изоляции
+// хранилищ в современных браузерах, поэтому при первом визите страница welans.ru
+// перенаправляет сюда (welans.cc — first-party, токен доступен), а мост возвращает
+// обратно в адресной строке хэш с профилем (#wecrm-user=...) или #wecrm-guest.
 (function () {
-  function reply(data) {
-    try {
-      var parentOrigin = document.referrer ? new URL(document.referrer).origin : '';
-      if (parentOrigin === 'https://welans.ru' || parentOrigin === 'https://www.welans.ru') {
-        parent.postMessage(data, parentOrigin);
-      }
-    } catch (e) {}
+  var back = 'https://welans.ru/';
+  try {
+    var q = new URLSearchParams(location.search).get('back') || '';
+    // возврат разрешён только на страницы welans.ru
+    if (/^https:\/\/(www\.)?welans\.ru\//.test(q)) back = q;
+  } catch (e) {}
+  function done(hash) {
+    location.replace(back.split('#')[0] + hash);
   }
   var token = null;
   try { token = localStorage.getItem('token'); } catch (e) {}
-  if (!token) { reply({ type: 'wecrm-auth', user: null }); return; }
+  if (!token) { done('#wecrm-guest'); return; }
   fetch('/api/auth/me', { headers: { 'X-Auth-Token': token } })
     .then(function (r) { if (!r.ok) throw new Error('unauthorized'); return r.json(); })
-    .then(function (u) { reply({ type: 'wecrm-auth', user: { name: u.name || '', avatar: u.avatar || '' } }); })
-    .catch(function () { reply({ type: 'wecrm-auth', user: null }); });
+    .then(function (u) {
+      var payload;
+      try {
+        payload = btoa(unescape(encodeURIComponent(JSON.stringify({ name: u.name || '', avatar: u.avatar || '' }))));
+      } catch (e) { done('#wecrm-guest'); return; }
+      done('#wecrm-user=' + payload);
+    })
+    .catch(function () { done('#wecrm-guest'); });
 })();
 </script>
 </body>
