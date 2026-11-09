@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>WeCRM Auth Bridge</title>
+</head>
+<body>
+<script>
+// Мост авторизации WeCRM: страница открывается в невидимом iframe на домене welans.cc
+// (например, с лендинга welans.ru), читает токен из localStorage этого домена
+// и передаёт профиль пользователя на страницу-родителя через postMessage.
+(function () {
+  function reply(data) {
+    try {
+      var parentOrigin = document.referrer ? new URL(document.referrer).origin : '';
+      if (parentOrigin === 'https://welans.ru' || parentOrigin === 'https://www.welans.ru') {
+        parent.postMessage(data, parentOrigin);
+      }
+    } catch (e) {}
+  }
+  var token = null;
+  try { token = localStorage.getItem('token'); } catch (e) {}
+  if (!token) { reply({ type: 'wecrm-auth', user: null }); return; }
+  fetch('/api/auth/me', { headers: { 'X-Auth-Token': token } })
+    .then(function (r) { if (!r.ok) throw new Error('unauthorized'); return r.json(); })
+    .then(function (u) { reply({ type: 'wecrm-auth', user: { name: u.name || '', avatar: u.avatar || '' } }); })
+    .catch(function () { reply({ type: 'wecrm-auth', user: null }); });
+})();
+</script>
+</body>
+</html>
