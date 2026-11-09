@@ -10,6 +10,7 @@ type SeoData = {
   lang?: string;
   viewport?: string;
   keywords?: string;
+  yandexMetrika?: string;
 };
 
 // Базовый заголовок вкладки с учётом SEO-настроек (используется в appBadge.ts)
@@ -28,6 +29,31 @@ export function seoBaseTitle(): string {
   const seo = window.__SEO_BASE_TITLE__;
   if (seo) return seo;
   return (document.title || "WeCRM").replace(/^\(\d+\)\s+/, "") || "WeCRM";
+}
+
+// Вставка кода счётчика Яндекс Метрики: скрипты — в начало <head>, чтобы счётчик
+// загружался раньше и успевал отправить просмотр даже при быстром закрытии страницы.
+// Скрипты пересоздаются программно — вставленные через innerHTML не выполняются.
+function injectYandexMetrika(code: string) {
+  if (!code.trim()) return;
+  if (document.querySelector("script[data-ym-counter]")) return; // защита от повторной вставки
+  const tpl = document.createElement("template");
+  tpl.innerHTML = code;
+  for (const node of Array.from(tpl.content.childNodes)) {
+    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+    const el = node as HTMLElement;
+    if (el.tagName === "SCRIPT") {
+      const s = document.createElement("script");
+      for (const a of Array.from(el.attributes)) s.setAttribute(a.name, a.value);
+      s.text = el.textContent || "";
+      s.setAttribute("data-ym-counter", "1");
+      document.head.insertBefore(s, document.head.firstChild);
+    } else {
+      // <noscript> и прочая разметка — в начало <body> (если уже есть), иначе в <head>
+      const target = document.body || document.head;
+      target.insertBefore(el.cloneNode(true), target.firstChild);
+    }
+  }
 }
 
 function setMeta(attr: "name", key: string, content: string) {
@@ -63,6 +89,7 @@ function applySeo(s: SeoData) {
     }
     link.setAttribute("href", s.canonical);
   }
+  if (s.yandexMetrika) injectYandexMetrika(s.yandexMetrika);
 }
 
 // Запускается до первого рендера в main.tsx; ошибки сети игнорируем —

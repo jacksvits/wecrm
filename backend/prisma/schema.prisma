@@ -1746,6 +1746,8 @@ model SeoSettings {
   lang        String   @default("")
   viewport    String   @default("")
   keywords    String   @default("")
+  // Код счётчика Яндекс Метрики (вставляется целиком, как выдаёт Метрика)
+  yandexMetrika String  @default("")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

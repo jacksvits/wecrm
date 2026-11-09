@@ -24,6 +24,7 @@ router.get('/', async (_req, res) => {
     lang: settings?.lang || '',
     viewport: settings?.viewport || '',
     keywords: settings?.keywords || '',
+    yandexMetrika: settings?.yandexMetrika || '',
   });
 });
 
@@ -35,6 +36,7 @@ const settingsSchema = z.object({
   lang: z.string().max(20).optional(),
   viewport: z.string().max(300).optional(),
   keywords: z.string().max(2000).optional(),
+  yandexMetrika: z.string().max(10000).optional(),
 });
 
 router.put('/', authMiddleware, adminOnly, async (req, res) => {
@@ -49,6 +51,7 @@ router.put('/', authMiddleware, adminOnly, async (req, res) => {
       lang: data.lang ?? '',
       viewport: data.viewport ?? '',
       keywords: data.keywords ?? '',
+      yandexMetrika: data.yandexMetrika ?? '',
     };
     let settings;
     if (existing) {
@@ -64,6 +67,7 @@ router.put('/', authMiddleware, adminOnly, async (req, res) => {
       lang: settings.lang,
       viewport: settings.viewport,
       keywords: settings.keywords,
+      yandexMetrika: settings.yandexMetrika,
     });
   } catch (err: any) {
     res.status(400).json({ error: err.message });

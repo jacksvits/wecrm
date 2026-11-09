@@ -12,6 +12,7 @@ export function SeoSettings() {
     lang: "",
     viewport: "",
     keywords: "",
+    yandexMetrika: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,6 +33,7 @@ export function SeoSettings() {
         lang: s.lang || "",
         viewport: s.viewport || "",
         keywords: s.keywords || "",
+        yandexMetrika: s.yandexMetrika || "",
       });
     } catch (e) {
       console.error("Failed to load SEO settings:", e);
@@ -54,6 +56,7 @@ export function SeoSettings() {
         lang: res.lang || "",
         viewport: res.viewport || "",
         keywords: res.keywords || "",
+        yandexMetrika: res.yandexMetrika || "",
       });
       setMsg("SEO-настройки сохранены");
       setTimeout(() => setMsg(""), 3000);
@@ -131,6 +134,24 @@ export function SeoSettings() {
         {field("lang", "Lang", "Язык документа (атрибут html lang).", false, "ru")}
         {field("viewport", "Viewport", "Мета- viewport. Пустое поле — значение из index.html.", false, "width=device-width, initial-scale=1.0")}
         {field("keywords", "Keywords", "Ключевые слова (meta name=\"keywords\"), через запятую.", true)}
+        <div>
+          <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>
+            Яндекс Метрика
+          </label>
+          <textarea
+            value={form.yandexMetrika}
+            placeholder={'<!-- Yandex.Metrika counter -->\n<script type="text/javascript">\n   ...\n</script>\n<noscript>...</noscript>\n<!-- /Yandex.Metrika counter -->'}
+            onChange={(e) => setForm({ ...form, yandexMetrika: e.target.value })}
+            rows={8}
+            style={{ ...inputStyle, resize: "vertical", fontFamily: "monospace", fontSize: 12, lineHeight: 1.5 }}
+          />
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+            Вставьте код счётчика целиком, как его выдаёт Метрика. Код будет размещён на всех страницах
+            в пределах тегов {"<head></head>"} как можно ближе к началу страницы: так он будет раньше
+            загружаться и сможет отправить данные о просмотре в Метрику, даже если посетитель почти сразу
+            же закроет страницу. Пустое поле — счётчик не подключается.
+          </div>
+        </div>
         <button
           type="submit"
           disabled={saving}
