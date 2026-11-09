@@ -61,7 +61,7 @@ export function PublicNews() {
       canonical.rel = 'canonical';
       document.head.appendChild(canonical);
     }
-    canonical.href = `https://welans.ru/${encodeURIComponent(news.slug)}/`;
+    canonical.href = `${window.location.origin}/${encodeURIComponent(news.slug)}/`;
     return () => {
       document.title = previousTitle;
       if (meta) {
