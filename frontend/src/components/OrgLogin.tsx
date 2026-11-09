@@ -7,7 +7,9 @@ import { useBrandLogo } from '../lib/branding'
  */
 export function OrgLogin() {
   const brandLogo = useBrandLogo(false)
-  const baseHost = window.location.hostname.replace(/^www\./, '')
+  // Поддомены организаций живут только на welans.cc — базовый домен фиксированный,
+  // независимо от того, на каком домене открыта страница (welans.org, welans.click и т.п.)
+  const baseHost = 'welans.cc'
   const [slug, setSlug] = useState('')
   const [info, setInfo] = useState<{ exists: boolean; name?: string; status?: string } | null>(null)
   const [checking, setChecking] = useState(false)
@@ -80,7 +82,7 @@ export function OrgLogin() {
               Перейти ко входу
             </button>
             <p style={{ textAlign: 'center', fontSize: 13, marginTop: 16 }}>
-              <a href="/">← На страницу входа</a>
+              <a href="https://welans.cc/">← На страницу входа</a>
             </p>
           </div>
         </div>

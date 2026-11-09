@@ -9,7 +9,9 @@ import { useBrandLogo } from '../lib/branding'
 export function Register() {
   const brandLogo = useBrandLogo(false)
   const mainHost = window.location.hostname === 'welans.cc' || window.location.hostname === 'www.welans.cc'
-  const baseHost = window.location.hostname.replace(/^www\./, '')
+  // Поддомены организаций живут только на welans.cc — базовый домен фиксированный,
+  // независимо от того, на каком домене открыта страница (welans.org, welans.click и т.п.)
+  const baseHost = 'welans.cc'
 
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')

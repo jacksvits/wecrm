@@ -83,7 +83,9 @@ export function TenantsAdmin() {
   const [editPlan, setEditPlan] = useState('')
   const [editDate, setEditDate] = useState('')
   const [editPaymentInfo, setEditPaymentInfo] = useState('')
-  const baseHost = window.location.hostname.replace(/^www\./, '')
+  // Поддомены организаций живут только на welans.cc — базовый домен фиксированный,
+  // независимо от того, на каком домене открыта страница (welans.org, welans.click и т.п.)
+  const baseHost = 'welans.cc'
 
   const load = () => {
     setLoading(true)
