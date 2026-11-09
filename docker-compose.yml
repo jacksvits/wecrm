@@ -123,8 +123,8 @@ services:
       - /mnt/nfs/wecrm-uploads:/usr/share/nginx/html/uploads:ro
       # Общий том с backend: копия собранного dist для /pwa-index (tenant-aware index.html)
       - fe-dist:/fe-dist
-    # Копируем dist в общий том перед стартом nginx (backend читает index.html оттуда)
-    command: sh -c "mkdir -p /fe-dist && cp -rf /usr/share/nginx/html/. /fe-dist/ && exec nginx -g 'daemon off;'"
+    # Копируем только dist в общий том: uploads — большая NFS-папка, её дублировать нельзя.
+    command: sh -c "mkdir -p /fe-dist && rm -rf /fe-dist/uploads && tar --exclude='./uploads' -C /usr/share/nginx/html -cf - . | tar -C /fe-dist -xf - && exec nginx -g 'daemon off;'"
     restart: unless-stopped
 
   email-worker:
