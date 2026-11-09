@@ -1116,6 +1116,8 @@ model News {
   summary       String?
   content       String
   coverImage    String?  @map("cover_image")
+  sourceUrl     String?  @map("source_url")
+  externalId    Int?     @unique @map("external_id")
   isPublished   Boolean  @default(false) @map("is_published")
   pinnedToHome  Boolean  @default(false) @map("pinned_to_home")
   publishedAt   DateTime? @map("published_at")

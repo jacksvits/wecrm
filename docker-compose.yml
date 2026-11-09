@@ -14,6 +14,28 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Архив новостей старого сайта. Порт доступен только на localhost;
+  # для удалённого подключения используется SSH-туннель.
+  old-site-db:
+    image: mysql:8.4
+    container_name: wecrm-old-site-db-1
+    environment:
+      MYSQL_DATABASE: old_site
+      MYSQL_USER: old_site
+      MYSQL_PASSWORD: ${OLD_SITE_DB_PASSWORD:?OLD_SITE_DB_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${OLD_SITE_DB_ROOT_PASSWORD:?OLD_SITE_DB_ROOT_PASSWORD is required}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - old_site_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
   backend:
     build: ./backend
     image: wecrm-backend:latest
@@ -131,6 +153,32 @@ services:
       - ./backend/prisma:/app/prisma:ro
     restart: unless-stopped
 
+  # Одноразовый/повторный импорт WordPress: docker compose run --rm old-site-importer
+  old-site-importer:
+    build: ./old-site-importer
+    profiles: ["tools"]
+    environment:
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST:-softboeg.beget.tech}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-softboeg_wp16}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-softboeg_wp16}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:?WORDPRESS_DB_PASSWORD is required}
+      POSTGRES_URL: postgresql://crm:${POSTGRES_PASSWORD}@db:5432/wecrm?schema=public
+      OLD_SITE_DB_HOST: old-site-db
+      OLD_SITE_DB_NAME: old_site
+      OLD_SITE_DB_USER: old_site
+      OLD_SITE_DB_PASSWORD: ${OLD_SITE_DB_PASSWORD}
+      UPLOADS_ROOT: /uploads
+      IMPORT_BATCH_SIZE: ${IMPORT_BATCH_SIZE:-200}
+      IMPORT_WORKERS: ${IMPORT_WORKERS:-20}
+      IMPORT_LIMIT: ${IMPORT_LIMIT:-0}
+    depends_on:
+      db:
+        condition: service_healthy
+      old-site-db:
+        condition: service_healthy
+    volumes:
+      - /mnt/nfs/wecrm-uploads:/uploads
+
   # Локальный прокси с VPN-подпиской — для трафика Telegram API, когда прямой
   # доступ к api.telegram.org с сервера заблокирован. Конфиг config.json
   # перезаписывается бэкендом (плагин «Прокси через VPN»), run.sh следит за
@@ -205,4 +253,5 @@ services:
 volumes:
   pgdata:
   fe-dist:
+  old_site_mysql:
 

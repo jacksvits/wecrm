@@ -8,6 +8,7 @@ import { WebPhoneWidget } from './components/WebPhoneWidget' ;
 import { FloatingGlobalChat } from './components/FloatingGlobalChat' ;
 import { CameraPipOverlay } from './components/CameraPipOverlay' ;
 import { VideoRecorder } from './components/VideoRecorder' ;
+import { PublicNews } from './components/PublicNews' ;
 
 function CallOverlay() {
   const { info } = useCall() ;
@@ -21,6 +22,7 @@ import { initSoundUnlock } from './lib/sound' ;
 // welans.click — публичная страница «Файлы»: автоматический гостевой вход
 // (тот же механизм, что у кнопки «Войти как гость»), затем отдельная публичная страница PublicFiles
 const FILES_HOSTS = ['welans.click', 'www.welans.click'];
+const WELANS_RU_HOSTS = ['welans.ru', 'www.welans.ru'];
 function AutoGuestLogin() {
   const { guestLogin } = useAuth() ;
   const [failed, setFailed] = useState(false) ;
@@ -71,6 +73,10 @@ function App() { const { user, loading } = useAuth() ; const location = useLocat
   if (loading) { return ( <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}> <div>Загрузка...</div> </div> ) ; } const legalSlug = location.pathname === '/offer' ? 'offer' : location.pathname === '/privacy' ? 'privacy' : location.pathname === '/cookies' ? 'cookies' : null; if (legalSlug) { return ( <><InstallAppBanner /><LegalDocumentPage slug={legalSlug} /></> ) ; } // welans.org: корень домена — страница входа организации (как /org-login), адрес не меняется
   if (['welans.org', 'www.welans.org'].includes(window.location.hostname) && location.pathname === '/') { return ( <><InstallAppBanner /><OrgLogin /></> ) ; }
   if (location.pathname === '/org-login') { return ( <><InstallAppBanner /><OrgLogin /></> ) ; } if (location.pathname === '/register') { return ( <><InstallAppBanner /><Register /></> ) ; } if (location.pathname === '/presentation') { return ( <><InstallAppBanner /><Presentation /></> ) ; } if (location.pathname === '/shop') { return ( <PublicVitrine /> ) ; } if (location.pathname === '/vitrine') { return <Navigate to='/shop' replace /> ; } // welans.click: без сессии — авто-вход гостем; с сессией корень домена — сразу «Файлы»
+  // Перенесённые новости WordPress открываются без входа по прежнему адресу /<slug>/.
+  if (WELANS_RU_HOSTS.includes(window.location.hostname) && /^\/[^/]+\/?$/.test(location.pathname)) {
+    return <PublicNews /> ;
+  }
   if (FILES_HOSTS.includes(window.location.hostname)) {
     if (!user) { return ( <><InstallAppBanner /><AutoGuestLogin /></> ) ; }
     // Публичная страница «Файлы» — отдельный вид без Layout/сайдбара (по макету),

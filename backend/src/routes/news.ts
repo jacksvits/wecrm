@@ -4,6 +4,38 @@ import { authMiddleware } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 
 const router = Router();
+
+// Публичные страницы перенесённых новостей на прежних адресах welans.ru/<slug>/.
+// Доступны только записи из импортированной категории, остальные новости CRM не раскрываются.
+router.get('/public/:slug', async (req, res) => {
+  try {
+    const news = await prisma.news.findFirst({
+      where: {
+        slug: req.params.slug,
+        isPublished: true,
+        externalId: { not: null },
+        category: { slug: 'korotko-o-svezhem' },
+      },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        summary: true,
+        content: true,
+        coverImage: true,
+        sourceUrl: true,
+        publishedAt: true,
+        category: { select: { id: true, name: true, slug: true, color: true } },
+      },
+    });
+    if (!news) return res.status(404).json({ error: 'Новость не найдена' });
+    res.json(news);
+  } catch (err: any) {
+    console.error('[news:public]', err);
+    res.status(500).json({ error: 'Не удалось загрузить новость' });
+  }
+});
+
 router.use(authMiddleware);
 
 /**

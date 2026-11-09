@@ -227,7 +227,16 @@ export function NewsDetail() {
           </div>
         )}
 
-        {/* Дата создания, теги, метки — под описанием */}
+        {news.sourceUrl && (
+          <div style={{ margin: '0 0 18px', fontSize: 14 }}>
+            Источник:{' '}
+            <a href={news.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#007AFF', wordBreak: 'break-all' }}>
+              {news.sourceUrl}
+            </a>
+          </div>
+        )}
+
+        {/* Дата публикации, теги, метки — под описанием */}
         <div style={{
           display: 'flex',
           gap: 16,
@@ -239,7 +248,7 @@ export function NewsDetail() {
           paddingTop: 14,
         }}>
           <span>
-            {new Date(news.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+            {new Date(news.publishedAt || news.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
           </span>
           {news.category && (
             <span style={{

@@ -1,6 +1,7 @@
 #!/bin/bash
-# WeCRM PostgreSQL Backup Script (мультитенантный)
-# - Бэкапит платформенную БД (wecrm) и каждую БД организации (wecrm_t_*)
+# WeCRM Backup Script (мультитенантный)
+# - Бэкапит платформенную БД PostgreSQL (wecrm) и каждую БД организации (wecrm_t_*)
+# - Если запущен архив old_site, дополнительно бэкапит его MySQL-дамп
 # - Ротация: base — 7 дней, download — 30 дней
 # Использование: backup.sh [base|download]   (по умолчанию base)
 
@@ -40,6 +41,24 @@ TENANT_DBS=$(docker exec "${CONTAINER}" psql -U "${DB_USER}" -d "${MAIN_DB}" -tA
 for db in ${TENANT_DBS}; do
   dump_db "${db}" || echo "[$(date)] WARNING: бэкап ${db} не выполнен"
 done
+
+# Архив новостей старого сайта (MySQL). Пароль root читается внутри контейнера
+# и не появляется в аргументах mysqldump/логах хоста.
+OLD_SITE_CONTAINER="wecrm-old-site-db-1"
+if docker ps --format '{{.Names}}' | grep -qx "${OLD_SITE_CONTAINER}"; then
+  OLD_SITE_FILE="${BACKUP_DIR}/old_site_backup_$(date +%Y%m%d_%H%M%S).sql"
+  echo "[$(date)] Backup old_site (MySQL)..."
+  if docker exec "${OLD_SITE_CONTAINER}" sh -c \
+    'exec mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction --quick --routines --triggers old_site' \
+    > "${OLD_SITE_FILE}" 2>/dev/null; then
+    gzip "${OLD_SITE_FILE}"
+    echo "[$(date)] OK: ${OLD_SITE_FILE}.gz"
+  else
+    echo "[$(date)] FAILED: old_site"
+    rm -f "${OLD_SITE_FILE}"
+    exit 1
+  fi
+fi
 
 # Ротация
 echo "[$(date)] Cleaning up backups older than ${RETENTION_DAYS} days..."
