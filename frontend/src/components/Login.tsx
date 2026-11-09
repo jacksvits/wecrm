@@ -632,7 +632,7 @@ export function Login() {
           <p className="login-quick-links">
             <a href="/presentation">Презентация</a>
             <span aria-hidden="true">·</span>
-            <a href="https://welans.cc/vitrine">Каталог</a>
+            <a href="https://welans.cc/shop">Каталог</a>
             <span aria-hidden="true">·</span>
             <a href="https://welans.click">Файлы</a>
             <span aria-hidden="true">·</span>
