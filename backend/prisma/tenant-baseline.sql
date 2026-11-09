@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict q649Xh0Dd7XdPFX22QOvub7ImQzQA8z8tjqxB2vplre5dgsqvXR1rfNzLPPEUUe
+\restrict F2TEBmfpyNhNLW5tJOKTum1DEKQZSPZCFVwH525Y3x74sZQiVgHJd93cPyUY3Ko
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -925,7 +925,9 @@ CREATE TABLE public.news (
     "subcategoryId" text,
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone NOT NULL,
-    pinned_to_home boolean DEFAULT false NOT NULL
+    pinned_to_home boolean DEFAULT false NOT NULL,
+    source_url text,
+    external_id integer
 );
 
 
@@ -3668,6 +3670,13 @@ CREATE INDEX news_comments_news_id_created_at_idx ON public.news_comments USING 
 
 
 --
+-- Name: news_external_id_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX news_external_id_key ON public.news USING btree (external_id);
+
+
+--
 -- Name: news_history_news_id_createdAt_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5289,13 +5298,13 @@ ALTER TABLE ONLY public.web_calls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict q649Xh0Dd7XdPFX22QOvub7ImQzQA8z8tjqxB2vplre5dgsqvXR1rfNzLPPEUUe
+\unrestrict F2TEBmfpyNhNLW5tJOKTum1DEKQZSPZCFVwH525Y3x74sZQiVgHJd93cPyUY3Ko
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict kQDu9vHMD0ERP5r8S272PzPrb0UTT7jlse0QwcpVaeVZDO6PuReB618E0N1B4Ga
+\restrict UfYPcTOeflO81B1FQFISggHVBiIdPTl4BGInVKDaMfLpdlNfOvdQkPDRx7XIJkJ
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -5517,11 +5526,12 @@ INSERT INTO public._prisma_migrations VALUES ('dbec5440-4cd0-4ca4-afa6-f4b29119a
 INSERT INTO public._prisma_migrations VALUES ('6dfb49b6-8052-4904-b422-e263be7ce89f', 'd8bfe1e1ac7e8ab904f24df7b61280656ea31ba83c41fff4d2ddfbf296e38bce', '2026-11-08 20:56:55.163631+00', '20261109010000_auth_events', NULL, NULL, '2026-11-08 20:56:55.13353+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('972f8618-bb28-44ec-ac2a-a11523af5355', '6d69615cfbf40a957c02b4846ff0a46bce1cf9e40526d2edd9e920ed75f35a70', '2026-11-08 23:22:25.04589+00', '20261109050000_tenant_task_numbering', NULL, NULL, '2026-11-08 23:22:24.875745+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('9f124072-5108-4620-a62b-3afe8f682417', '6be59fa9d6517b6bbd2edf61445078eec83ffd763ffbd535661f5d9e11fb9578', '2026-11-09 14:39:40.024844+00', '20261109120000_seo_yandex_metrika', NULL, NULL, '2026-11-09 14:39:40.01575+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('7c4b1040-4fec-4d9c-a94d-362584e12be5', '2d00e2c73a13186b03a79de88f61f0232b0ff834f48e165fdcfcffcf7ae96aad', '2026-11-09 22:02:24.902836+00', '20261110000000_add_wordpress_news_source', NULL, NULL, '2026-11-09 22:02:24.890336+00', 1);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kQDu9vHMD0ERP5r8S272PzPrb0UTT7jlse0QwcpVaeVZDO6PuReB618E0N1B4Ga
+\unrestrict UfYPcTOeflO81B1FQFISggHVBiIdPTl4BGInVKDaMfLpdlNfOvdQkPDRx7XIJkJ
 
