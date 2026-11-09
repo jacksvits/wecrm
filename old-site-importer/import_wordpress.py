@@ -336,7 +336,7 @@ def process_batch(source, mysql, pg, posts: list[dict[str, Any]], author_id: str
         })
         crm_rows.append((
             f"old_site_{post_id}", post["post_title"], slug, summary, content, cover,
-            source_url, post_id, True, published, published, author_id, category_id,
+            source_url, post_id, True, published, author_id, category_id, published,
         ))
 
     with mysql.cursor() as cur:
