@@ -39,7 +39,7 @@ git pull origin master
 
 # 2. Clean host node_modules to prevent container conflicts
 echo "Cleaning host node_modules to prevent Docker volume conflicts..."
-rm -rf backend/node_modules frontend/node_modules
+rm -rf backend/node_modules frontend/node_modules || echo "WARNING: node_modules cleanup incomplete, deploy continues"
 
 # 3. Stop and rebuild containers
 echo "Stopping containers..."
