@@ -12,6 +12,22 @@ const router = Router();
 // и токен к IP не привязан.
 const WALL_REDIRECT_URI = 'https://welans.cc/api/vk-community-settings/wall-callback';
 
+router.get('/wall-callback', async (req, res) => {
+  try {
+    const { code, state, error, error_description } = req.query as any;
+    const s = await prisma.vkCommunitySettings.findFirst();
+    if (!s) return res.status(500).send('Плагин «ВК сообщество» не настроен');
+    if (error) return res.status(400).send('Авторизация отменена: ' + String(error_description || error));
+    if (!code || typeof code !== 'string') return res.status(400).send('Нет параметра code');
+    if (!s.wallOAuthState || state !== s.wallOAuthState) return res.status(403).send('Неверный state — повторите подключение');
+    const qs = new URLSearchParams({
+      client_id: s.wallAppId!,
+      client_secret: s.wallAppSecret!,
+      redirect_uri: WALL_REDIRECT_URI,
+      code,
+      v: '5.199',
+    });
+
 router.use(authMiddleware);
 
 const adminOnly = (req: AuthRequest, res: any, next: any) => {
@@ -102,21 +118,7 @@ router.get('/wall-auth-url', async (req, res) => {
   }
 });
 
-router.get('/wall-callback', async (req, res) => {
-  try {
-    const { code, state, error, error_description } = req.query as any;
-    const s = await prisma.vkCommunitySettings.findFirst();
-    if (!s) return res.status(500).send('Плагин «ВК сообщество» не настроен');
-    if (error) return res.status(400).send('Авторизация отменена: ' + String(error_description || error));
-    if (!code || typeof code !== 'string') return res.status(400).send('Нет параметра code');
-    if (!s.wallOAuthState || state !== s.wallOAuthState) return res.status(403).send('Неверный state — повторите подключение');
-    const qs = new URLSearchParams({
-      client_id: s.wallAppId!,
-      client_secret: s.wallAppSecret!,
-      redirect_uri: WALL_REDIRECT_URI,
-      code,
-      v: '5.199',
-    });
+
     const r = await fetch('https://oauth.vk.com/access_token?' + qs.toString());
     const j: any = await r.json();
     if (!j.access_token) return res.status(502).send('ВК не выдал токен: ' + JSON.stringify(j).slice(0, 300));
