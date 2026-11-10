@@ -32,6 +32,13 @@ router.get('/public/:slug', async (req, res) => {
       },
     });
     if (!news) return res.status(404).json({ error: 'Новость не найдена' });
+
+    // Просмотр учитывается, как на странице новости в CRM
+    await prisma.news.update({
+      where: { id: news.id },
+      data: { views: { increment: 1 } },
+    });
+
     const reactionCounts = await prisma.newsReaction.groupBy({
       by: ['type'],
       where: { newsId: news.id },
@@ -39,6 +46,7 @@ router.get('/public/:slug', async (req, res) => {
     });
     res.json({
       ...news,
+      views: (news.views ?? 0) + 1,
       likes: reactionCounts.find((c) => c.type === 'like')?._count._all || 0,
       dislikes: reactionCounts.find((c) => c.type === 'dislike')?._count._all || 0,
     });

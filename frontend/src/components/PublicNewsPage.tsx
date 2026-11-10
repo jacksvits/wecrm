@@ -23,8 +23,8 @@ const selectStyle: React.CSSProperties = {
   maxWidth: 200,
 };
 
-function PublicNewsHeader({ query, onSearch }: { query: string; onSearch: (q: string) => void }) {
-  const logoUrl = useBrandLogo(true);
+function PublicNewsHeader({ query, onSearch, onSubmit }: { query: string; onSearch: (q: string) => void; onSubmit?: (q: string) => void }) {
+  const logoUrl = useBrandLogo(false);
   return (
     <header style={{
       position: 'sticky', top: 0, zIndex: 50,
@@ -33,7 +33,7 @@ function PublicNewsHeader({ query, onSearch }: { query: string; onSearch: (q: st
       display: 'flex', alignItems: 'center', gap: 16,
       padding: '10px 24px',
     }}>
-      <a href="/news" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'var(--text-primary)' }}>
+      <a href="/news" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'var(--text-primary)', flexShrink: 0 }}>
         {logoUrl
           ? <img src={logoUrl} alt="WeLANS" style={{ height: 28 }} />
           : <span style={{ fontSize: 20, fontWeight: 700 }}>WeLANS</span>}
@@ -41,9 +41,14 @@ function PublicNewsHeader({ query, onSearch }: { query: string; onSearch: (q: st
       <input
         value={query}
         onChange={(e) => onSearch(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && onSubmit) {
+            onSubmit((e.target as HTMLInputElement).value);
+          }
+        }}
         placeholder="Поиск по названию, описанию, темам, меткам…"
         style={{
-          flex: 1, maxWidth: 520,
+          flex: 1, width: '100%',
           padding: '8px 14px', borderRadius: 10,
           border: '1px solid var(--border-color)',
           background: 'var(--bg-input)', color: 'var(--text-primary)',
@@ -137,12 +142,14 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
 
 function PublicNewsList() {
   const navigate = useNavigate();
+  const location = useLocation();
   const defaultCover = useBrandNewsCover();
+  const initialQ = new URLSearchParams(location.search).get('q') ?? '';
   const [items, setItems] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [qInput, setQInput] = useState('');
-  const [q, setQ] = useState('');
+  const [qInput, setQInput] = useState(initialQ);
+  const [q, setQ] = useState(initialQ);
   const [category, setCategory] = useState('');
   const [subcategory, setSubcategory] = useState('');
   const [tag, setTag] = useState('');
@@ -176,7 +183,11 @@ function PublicNewsList() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-      <PublicNewsHeader query={qInput} onSearch={setQInput} />
+      <PublicNewsHeader
+        query={qInput}
+        onSearch={setQInput}
+        onSubmit={(value) => { setQ(value); setPage(1); }}
+      />
       <div style={{ padding: '16px 24px 40px', maxWidth: 1400, margin: '0 auto' }}>
         {/* Фильтры */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
@@ -280,10 +291,12 @@ export function PublicNewsDetail({ id, slug }: { id?: string; slug?: string }) {
     }
   }, [news?.id]);
 
+  const [searchQ, setSearchQ] = useState('');
+
   if (notFound) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-        <PublicNewsHeader query="" onSearch={() => {}} />
+        <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} />
         <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
           Новость не найдена. <a href="/news" style={{ color: '#005BFF' }}>Ко всем новостям</a>
         </div>
@@ -293,7 +306,7 @@ export function PublicNewsDetail({ id, slug }: { id?: string; slug?: string }) {
   if (!news) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
-        <PublicNewsHeader query="" onSearch={() => {}} />
+        <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} />
         <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>Загрузка…</div>
       </div>
     );
@@ -303,7 +316,7 @@ export function PublicNewsDetail({ id, slug }: { id?: string; slug?: string }) {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-      <PublicNewsHeader query="" onSearch={() => {}} />
+      <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} />
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '20px 24px 60px' }}>
         <button
           onClick={() => navigate('/news')}
