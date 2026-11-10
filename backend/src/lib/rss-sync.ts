@@ -85,6 +85,63 @@ function crmNewsUrl(id: string): string {
   return `${origin}/news/${id}`;
 }
 
+/** Кодировка из XML-объявления ленты (\<?xml encoding="..."?\>), по умолчанию utf-8 */
+function detectXmlEncoding(buf: Buffer): string {
+  const head = buf.subarray(0, 300).toString('latin1');
+  const m = head.match(/encoding=["']([a-zA-Z0-9._-]+)["']/i);
+  return m ? m[1].toLowerCase() : 'utf-8';
+}
+
+/**
+ * Скачивает ленту и возвращает её текст в UTF-8.
+ * rss-parser сам кодировки XML не учитывает (4pda отдаёт windows-1251 и без
+ * перекодировки кириллица превращалась в U+FFFD), поэтому качаем буфером,
+ * декодируем по объявленной кодировке и только потом отдаём парсеру.
+ */
+async function fetchFeedXml(url: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: { 'User-Agent': FEED_USER_AGENT, Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*' },
+    signal: AbortSignal.timeout(30_000),
+    redirect: 'follow',
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const enc = detectXmlEncoding(buf);
+  try {
+    return new TextDecoder(enc).decode(buf);
+  } catch {
+    return buf.toString('utf-8');
+  }
+}
+
+/**
+ * Обложка (og:image) со страницы самой статьи.
+ * У ленты 4pda в RSS нет ни enclosure, ни картинок в контенте — как и старый
+ * сайт, берём первую картинку страницы материала. Best-effort: любая ошибка
+ * (таймаут, нет meta) просто оставляет новость без обложки.
+ */
+async function fetchArticleOgImage(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': FEED_USER_AGENT, Accept: 'text/html,application/xhtml+xml,*/*;q=0.8' },
+      signal: AbortSignal.timeout(15_000),
+      redirect: 'follow',
+    });
+    if (!res.ok) return null;
+    const html = (await res.text()).slice(0, 500_000);
+    const m =
+      html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
+      html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+    if (!m) return null;
+    const src = m[1].trim();
+    if (!/^https?:\/\//i.test(src)) return null;
+    return src;
+  } catch {
+    return null;
+  }
+}
+
 /** Обновляет зеркало источников в old_site.rss_feeds */
 async function mirrorFeedsToArchive(feeds: { id: string; name: string; url: string; siteUrl: string | null; feedImage: string | null; isActive: boolean; sortOrder: number }[]): Promise<void> {
   const db = oldSitePool();
@@ -166,15 +223,12 @@ export async function syncRssFeeds(): Promise<RssSyncSummary> {
       : null;
     if (!author) throw new Error('В CRM не найден администратор — автор новостей не определён');
 
-    const parser = new Parser({
-      timeout: 30_000,
-      headers: { 'User-Agent': FEED_USER_AGENT, Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*' },
-    });
+    const parser = new Parser({ timeout: 30_000 });
 
     for (const source of sources) {
       let feed;
       try {
-        feed = await parser.parseURL(source.url);
+        feed = await parser.parseString(await fetchFeedXml(source.url));
       } catch (e: any) {
         summary.failed += 1;
         summary.errors.push(`${source.name}: ${e?.message || e}`);
@@ -207,7 +261,12 @@ export async function syncRssFeeds(): Promise<RssSyncSummary> {
 
         const rawContent = String((item as any)['content:encoded'] || item.content || item.contentSnippet || '');
         const content = sanitizeHtml(rawContent, CONTENT_SANITIZE_OPTIONS);
-        const enclosureUrl = item.enclosure?.url?.trim() || firstImageFromHtml(content) || null;
+        const firstImg = firstImageFromHtml(content);
+        // Обложка: enclosure ленты → первая картинка текста → og:image страницы статьи
+        let enclosureUrl = item.enclosure?.url?.trim() || firstImg || null;
+        if (!enclosureUrl && permalink) {
+          enclosureUrl = await fetchArticleOgImage(permalink);
+        }
         const summaryText = stripHtml(content).replace(/\s+/g, ' ').trim().slice(0, 500) || null;
         const authorName = item.creator || (item as any).author || null;
         const publishedAt = parseFeedDate(item.isoDate || (item as any).pubDate || (item as any).dc?.date);
