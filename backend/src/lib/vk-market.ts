@@ -40,7 +40,7 @@ const MARKET_TOKEN_REFRESH_AHEAD_MS = 5 * 60 * 1000;
  * Пользовательский токен маркета с автообновлением по refresh_token (VK ID).
  * force=true — принудительный рефреш (после VK Error 5 «User authorization failed»).
  */
-async function getFreshMarketToken(force = false): Promise<string | null> {
+export async function getFreshMarketToken(force = false): Promise<string | null> {
   const settings = await prisma.vkMarketSettings.findFirst({ orderBy: { createdAt: 'asc' } });
   if (!settings?.marketToken) return null;
   const expiresAt = settings.marketTokenExpiresAt?.getTime() || 0;
