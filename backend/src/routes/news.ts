@@ -3,11 +3,49 @@ import { prisma } from '../lib/prisma.js';
 import { authMiddleware, optionalAuthMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { publishNewsToVk } from '../lib/vk-wall.js';
+import { htmlToText } from '../lib/html-to-text.js';
 
 const router = Router();
 
 // Публичные страницы перенесённых новостей на прежних адресах welans.ru/<slug>/.
 // Доступны только записи из импортированной категории, остальные новости CRM не раскрываются.
+// Публичная мини-страница новости с OpenGraph-тегами: ВК (и другие парсеры) по
+// этому URL рисуют превью с обложкой, когда постим на стену токеном сообщества
+// (фото-вложения этому токену недоступны, VK Error 27)
+router.get('/:id/cover-page', async (req, res) => {
+  try {
+    const news = await prisma.news.findUnique({ where: { id: req.params.id } });
+    if (!news || !news.isPublished || !news.coverImage) {
+      return res.status(404).send('Not found');
+    }
+    const cover = /^https?:\/\//i.test(news.coverImage)
+      ? news.coverImage
+      : 'https://welans.cc' + news.coverImage;
+    const summary = htmlToText(news.summary).slice(0, 200);
+    const isPublic = (news.externalId != null || news.id.startsWith('rss_')) && news.slug;
+    const target = isPublic
+      ? `https://welans.ru/${news.slug}/`
+      : 'https://welans.cc/news/' + news.id;
+    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    res.send(`<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>${esc(news.title)}</title>
+<meta property="og:type" content="article">
+<meta property="og:title" content="${esc(news.title)}">
+<meta property="og:description" content="${esc(summary)}">
+<meta property="og:image" content="${esc(cover)}">
+<meta http-equiv="refresh" content="0; url=${target}">
+</head>
+<body>Перенаправление… <a href="${target}">${esc(news.title)}</a></body>
+</html>`);
+  } catch (err) {
+    console.error('[news:cover-page]', err);
+    res.status(500).send('Error');
+  }
+});
+
 router.get('/public/:slug', async (req, res) => {
   try {
     const news = await prisma.news.findFirst({
