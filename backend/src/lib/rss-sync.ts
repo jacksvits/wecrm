@@ -194,6 +194,17 @@ export async function syncRssFeeds(): Promise<RssSyncSummary> {
         const normTitle = normalizeTitle(title);
         if (uniqueTitles && knownTitles.has(normTitle)) { summary.skipped += 1; continue; }
 
+        // Дедупликация против всей CRM: материал мог попасть раньше другим путём
+        // (старой импорт WP переносил посты, которые wprss_feed собрал из этих же лент)
+        const sourceUrlVariants = permalink.endsWith('/')
+          ? [permalink, permalink.slice(0, -1)]
+          : [permalink, permalink + '/'];
+        const alreadyInCrm = await prisma.news.findFirst({
+          where: { sourceUrl: { in: sourceUrlVariants } },
+          select: { id: true },
+        });
+        if (alreadyInCrm) { summary.skipped += 1; continue; }
+
         const rawContent = String((item as any)['content:encoded'] || item.content || item.contentSnippet || '');
         const content = sanitizeHtml(rawContent, CONTENT_SANITIZE_OPTIONS);
         const enclosureUrl = item.enclosure?.url?.trim() || firstImageFromHtml(content) || null;
