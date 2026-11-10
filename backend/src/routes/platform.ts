@@ -305,31 +305,33 @@ export function requirePlatformAdmin(req: AuthRequest, res: any, next: any) {
 /** Список организаций платформы */
 router.get('/tenants', authMiddleware, requirePlatformAdmin, async (_req, res) => {
   const tenants = await (platformPrisma as any).tenant.findMany({ orderBy: { createdAt: 'desc' } });
-  // Обогащаем: число пользователей в БД организации и размер базы
-  const out: any[] = [];
-  for (const t of tenants) {
+  // Размеры файлов — из кэша (host-cron scripts/file-sizes.sh пишет file-sizes.json раз в 10 минут);
+  // живой обход NFS (~170k файлов) на каждый запрос делал страницу «Платформа» очень медленной
+  const fileSizes = await getCachedFileSizes();
+  // Размеры всех БД организаций — одним запросом вместо N отдельных
+  let dbSizes = new Map<string, number>();
+  try {
+    const rows: any[] = await platformPrisma.$queryRawUnsafe("SELECT datname, pg_database_size(datname) AS size FROM pg_database WHERE datname LIKE 'wecrm\\_t\\_%'");
+    dbSizes = new Map(rows.map((r: any) => [r.datname as string, Number(r.size)]));
+  } catch { /* ignore */ }
+  // Обогащаем параллельно: число пользователей в БД организации и размер базы
+  const out: any[] = await Promise.all(tenants.map(async (t: any) => {
     let usersCount: number | null = null;
-    let dbSizeBytes: number | null = null;
     try {
       const client = getTenantPrisma(t.dbName);
       usersCount = await client.user.count();
     } catch { usersCount = null; }
-    try {
-      const rows: any[] = await platformPrisma.$queryRawUnsafe('SELECT pg_database_size($1) AS size', t.dbName);
-      dbSizeBytes = Number(rows[0]?.size ?? 0);
-    } catch { dbSizeBytes = null; }
-    let filesSizeBytes: number | null = null;
-    try { filesSizeBytes = await getTenantFilesSize(t.slug); } catch { filesSizeBytes = null; }
-    out.push({ ...t, usersCount, dbSizeBytes, filesSizeBytes });
-  }
+    const dbSizeBytes = dbSizes.get(t.dbName) ?? null;
+    const filesSizeBytes = fileSizes.tenants[t.slug] ?? null;
+    return { ...t, usersCount, dbSizeBytes, filesSizeBytes };
+  }));
   const mainUsers = await platformPrisma.user.count();
   let mainDb: number | null = null;
   try {
     const mrows: any[] = await platformPrisma.$queryRawUnsafe('SELECT pg_database_size(current_database()) AS size');
     mainDb = Number(mrows[0]?.size ?? 0);
   } catch { mainDb = null; }
-  let mainFiles: number | null = null;
-  try { mainFiles = await getMainFilesSize(); } catch { mainFiles = null; }
+  const mainFiles = fileSizes.main;
   let system: any = null;
   try { system = await getSystemInfo(); } catch { system = null; }
   try {
@@ -369,42 +371,20 @@ async function getSystemInfo(): Promise<any> {
   };
 }
 
-/** Размер файлов главной организации (/app/uploads без папок tenant'ов t-*) */
-async function getMainFilesSize(): Promise<number> {
-  const fs = await import('fs/promises');
-  const path = await import('path');
-  const root = '/app/uploads';
-  let total = 0;
-  async function walk(dir: string): Promise<void> {
-    let entries: any[] = [];
-    try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      if (e.isDirectory() && e.name.startsWith('t-')) continue;
-      const full = path.join(dir, e.name);
-      if (e.isDirectory()) await walk(full);
-      else { try { total += (await fs.stat(full)).size; } catch { /* ignore */ } }
-    }
-  }
-  await walk(root);
-  return total;
-}
-/** Размер файлов организации в общем томе uploads (рекурсивно) */
-async function getTenantFilesSize(slug: string): Promise<number> {
-  const fs = await import('fs/promises');
-  const path = await import('path');
-  const root = `/app/tenants/${slug}`;
-  let total = 0;
-  async function walk(dir: string): Promise<void> {
-    let entries: any[] = [];
-    try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      const full = path.join(dir, e.name);
-      if (e.isDirectory()) await walk(full);
-      else { try { total += (await fs.stat(full)).size; } catch { /* ignore */ } }
-    }
-  }
-  await walk(root);
-  return total;
+/**
+ * Размеры файловых томов из кэша (/app/data/file-sizes.json).
+ * Пишется host-cron'ом scripts/file-sizes.sh (du по NFS занимает ~минуту, поэтому не в запросе).
+ * При отсутствии/битом файле — null, страница показывает «—» до первого прогона cron.
+ */
+async function getCachedFileSizes(): Promise<{ main: number | null; tenants: Record<string, number> }> {
+  try {
+    const fs = await import('fs/promises');
+    const raw = JSON.parse(await fs.readFile('/app/data/file-sizes.json', 'utf-8'));
+    return {
+      main: typeof raw.mainFilesBytes === 'number' ? raw.mainFilesBytes : null,
+      tenants: raw.tenants && typeof raw.tenants === 'object' ? raw.tenants : {},
+    };
+  } catch { return { main: null, tenants: {} }; }
 }
 
 /** Запуск очистки Docker (host-скрипт по cron раз в минуту) */
