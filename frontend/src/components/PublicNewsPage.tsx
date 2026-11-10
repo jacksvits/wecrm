@@ -29,14 +29,14 @@ function PublicNewsHeader({ query, onSearch, onSubmit, consent = true }: { query
   return (
     <header style={{
       position: 'sticky', top: 0, zIndex: 50,
-      background: 'var(--bg-primary)',
-      borderBottom: '1px solid var(--border-color)',
-      display: 'flex', alignItems: 'center', gap: 16,
-      padding: '10px 24px',
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '10px 16px',
+      borderBottom: '1px solid var(--border-color, #e0e0e0)',
+      background: 'var(--bg-secondary, #fff)',
     }}>
-      <a href="/news" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'var(--text-primary)', flexShrink: 0 }}>
+      <a href="https://welans.ru" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} aria-label="WeLANS — на главную">
         {logoUrl
-          ? <img src={logoUrl} alt="WeLANS" style={{ height: 28 }} />
+          ? <img src={logoUrl} alt="WeLANS" style={{ height: 34, maxWidth: 140, objectFit: 'contain' }} />
           : <span style={{ fontSize: 20, fontWeight: 700 }}>WeLANS</span>}
       </a>
       <input
@@ -50,9 +50,9 @@ function PublicNewsHeader({ query, onSearch, onSubmit, consent = true }: { query
         placeholder="Поиск по названию, описанию, темам, меткам…"
         style={{
           flex: 1, width: '100%',
-          padding: '8px 14px', borderRadius: 10,
-          border: '1px solid var(--border-color)',
-          background: 'var(--bg-input)', color: 'var(--text-primary)',
+          padding: '10px 14px', borderRadius: 12,
+          border: '1px solid var(--border-color, #e0e0e0)',
+          background: 'var(--bg-input, #f5f5f7)', color: 'var(--text-primary)',
           fontSize: 14, outline: 'none',
         }}
       />

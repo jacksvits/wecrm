@@ -24,7 +24,7 @@ export default function PublicFiles() {
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-color, #f5f5f7)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: isMobile ? '8px 12px' : '10px 16px', borderBottom: '1px solid var(--border-color, #e0e0e0)', background: 'var(--bg-secondary, #fff)' }}>
-        <a href="https://welans.cc/" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} aria-label="На главную">
+        <a href="https://welans.ru" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} aria-label="WeLANS — на главную">
           <img src={brandLogo} alt="WeLANS" style={{ height: isMobile ? 28 : 34, maxWidth: 140, objectFit: 'contain' }} />
         </a>
         <div style={{ flex: 1, minWidth: 0 }} />

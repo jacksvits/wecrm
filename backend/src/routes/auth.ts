@@ -220,24 +220,9 @@ router.post('/login', rejectBlockedIp, rateLimit({ prefix: 'login', windowMs: 15
 
 // Гостевой доступ: вход без регистрации с правами обычного пользователя (роль user).
 // Демо-данные не создаются — гость работает с реальными данными в рамках своих прав.
-router.post('/guest', rejectBlockedIp, rateLimit({ prefix: 'guest', windowMs: 15 * 60_000, max: 20 }), async (req, res) => {
-  try {
-    // Гостевой (демо) вход — только на главном домене платформы
-    if (!currentTenant()?.isMain) return res.status(403).json({ error: 'Гостевой вход доступен только на основном домене' });
-    const guest = await ensureGuestUser();
-
-    const user = await prisma.user.findUnique({
-      where: { id: guest.id },
-      include: { role: { select: { name: true, allowedPages: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, showCalendarMetric: true, canReadContactAccesses: true, canEditContactAccesses: true, canDeleteContactAccesses: true } } },
-    });
-    if (!user) return res.status(500).json({ error: 'Guest user not found' });
-
-    const { token, roleName, allowedPages } = issueToken(user);
-    await recordAuthEvent(req, { login: user.email, userId: user.id, authMethod: 'guest' });
-    res.json({ user: publicUser(user, roleName, allowedPages), token });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+// Гостевой вход отключён (пользователь Гость удалён, welans.click -> страница входа)
+router.post('/guest', (_req, res) => {
+  res.status(410).json({ error: 'Гостевой вход отключён' });
 });
 
 router.get('/me', async (req, res) => {

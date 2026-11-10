@@ -20,7 +20,7 @@ export default function PublicVitrine() {
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-color, #f5f5f7)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border-color, #e0e0e0)', background: 'var(--bg-secondary, #fff)' }}>
-        <a href="/" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} aria-label="На главную">
+        <a href="https://welans.ru" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} aria-label="WeLANS — на главную">
           <img src={brandLogo} alt="WeCRM" style={{ height: 34, maxWidth: 140, objectFit: 'contain' }} />
         </a>
         <input

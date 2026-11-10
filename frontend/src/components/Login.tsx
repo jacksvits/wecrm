@@ -163,7 +163,7 @@ function LoginBrandSplash() {
 
 
 export function Login() {
-  const { login, register, guestLogin } = useAuth()
+  const { login, register } = useAuth()
   const [isRegister, setIsRegister] = useState(false)
   const [loginInput, setLoginInput] = useState('')
   const [password, setPassword] = useState('')
@@ -173,7 +173,6 @@ export function Login() {
   const [vkConfig, setVkConfig] = useState<{ appId: number; redirectUri: string; active?: boolean } | null>(null)
   const brandLogo = useBrandLogo(true)
   const [vkLoading, setVkLoading] = useState(false)
-  const [guestLoading, setGuestLoading] = useState(false)
   const [showSoundPrompt, setShowSoundPrompt] = useState(false)
   const [pendingRedirect, setPendingRedirect] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -284,19 +283,6 @@ export function Login() {
   }
 
   // Гостевой вход: демо-режим с правами обычного пользователя
-  const handleGuestLogin = async () => {
-    setGuestLoading(true)
-    setError('')
-    try {
-      await guestLogin()
-      // После успешного входа показываем запрос на разрешение звуков
-      setShowSoundPrompt(true)
-      setPendingRedirect(true)
-    } catch (err: any) {
-      setError(err.message || 'Guest auth error')
-      setGuestLoading(false)
-    }
-  }
 
   const enableSound = async () => {
     // Разблокировать AudioContext через user gesture
@@ -565,13 +551,6 @@ export function Login() {
             </button>
           )}
 
-          {/* Гостевой вход — зелёная текстовая ссылка (как раньше «Регистрация»);
-              только на главном домене платформы (демо welans.cc) */}
-          {isMainLoginHost && (
-            <p className="login-register" style={{ marginTop: 14 }}>
-              <button type="button" onClick={handleGuestLogin} disabled={guestLoading}>{guestLoading ? 'Вход...' : 'Войти как гость'}</button>
-            </p>
-          )}
           {isRegister && (
             <p className="login-register">
               Уже есть аккаунт? <button type="button" onClick={() => { setIsRegister(false); setError('') }}>Войти</button>
