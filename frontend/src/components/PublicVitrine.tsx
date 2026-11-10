@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Vitrine } from './Vitrine';
 import { useBrandLogo } from '../lib/branding';
+import { CookieConsent } from './CookieConsent';
 
 // Публичная страница витрины (каталог) — доступна без авторизации.
 // Открывается по адресу /vitrine, в т.ч. по ссылке «Каталог» с лендинга /welans/.
@@ -31,6 +32,7 @@ export default function PublicVitrine() {
         <a href="/" style={loginBtnStyle}>Войти</a>
       </div>
       <Vitrine search={q} />
+      <CookieConsent />
     </div>
   );
 }

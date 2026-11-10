@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { safeHtml } from '../lib/safeHtml';
 import { useBrandLogo, useBrandNewsCover } from '../lib/branding';
+import { CookieConsent } from './CookieConsent';
 
 function stripHtml(html: string): string {
   const div = document.createElement('div');
@@ -23,7 +24,7 @@ const selectStyle: React.CSSProperties = {
   maxWidth: 200,
 };
 
-function PublicNewsHeader({ query, onSearch, onSubmit }: { query: string; onSearch: (q: string) => void; onSubmit?: (q: string) => void }) {
+function PublicNewsHeader({ query, onSearch, onSubmit, consent = true }: { query: string; onSearch: (q: string) => void; onSubmit?: (q: string) => void; consent?: boolean }) {
   const logoUrl = useBrandLogo(false);
   return (
     <header style={{
@@ -66,6 +67,7 @@ function PublicNewsHeader({ query, onSearch, onSubmit }: { query: string; onSear
       >
         Войти
       </a>
+      {consent && <CookieConsent />}
     </header>
   );
 }
@@ -140,7 +142,7 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
   );
 }
 
-function PublicNewsList() {
+function PublicNewsList({ consent = true }: { consent?: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
   const defaultCover = useBrandNewsCover();
@@ -187,6 +189,7 @@ function PublicNewsList() {
         query={qInput}
         onSearch={setQInput}
         onSubmit={(value) => { setQ(value); setPage(1); }}
+        consent={consent}
       />
       <div style={{ padding: '16px 24px 40px', maxWidth: 1400, margin: '0 auto' }}>
         {/* Фильтры */}
@@ -264,7 +267,7 @@ function PublicNewsList() {
   );
 }
 
-export function PublicNewsDetail({ id, slug }: { id?: string; slug?: string }) {
+export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; slug?: string; consent?: boolean }) {
   const navigate = useNavigate();
   const defaultCover = useBrandNewsCover();
   const [news, setNews] = useState<any>(null);
@@ -296,7 +299,7 @@ export function PublicNewsDetail({ id, slug }: { id?: string; slug?: string }) {
   if (notFound) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-        <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} />
+        <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} consent={consent} />
         <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
           Новость не найдена. <a href="/news" style={{ color: '#005BFF' }}>Ко всем новостям</a>
         </div>
@@ -306,7 +309,7 @@ export function PublicNewsDetail({ id, slug }: { id?: string; slug?: string }) {
   if (!news) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
-        <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} />
+        <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} consent={consent} />
         <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>Загрузка…</div>
       </div>
     );
@@ -316,7 +319,7 @@ export function PublicNewsDetail({ id, slug }: { id?: string; slug?: string }) {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-      <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} />
+      <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} consent={consent} />
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '20px 24px 60px' }}>
         <button
           onClick={() => navigate('/news')}
@@ -420,11 +423,11 @@ export function PublicNewsDetail({ id, slug }: { id?: string; slug?: string }) {
 }
 
 /** Публичная страница новостей для гостей: /news — список, /news/:id — детальная */
-export function PublicNewsPage() {
+export function PublicNewsPage({ consent = true }: { consent?: boolean }) {
   const { pathname } = useLocation();
   const detailMatch = pathname.match(/^\/news\/([^/]+)$/);
   if (detailMatch) {
-    return <PublicNewsDetail id={detailMatch[1]} />;
+    return <PublicNewsDetail id={detailMatch[1]} consent={consent} />;
   }
-  return <PublicNewsList />;
+  return <PublicNewsList consent={consent} />;
 }

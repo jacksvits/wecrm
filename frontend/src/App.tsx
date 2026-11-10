@@ -83,14 +83,14 @@ function App() { const { user, loading } = useAuth() ; const location = useLocat
   // Публичные новости на welans.ru: лента /news, детальная /news/:id и старые ссылки /<slug>/
   if (WELANS_RU_HOSTS.includes(window.location.hostname)) {
     if (/^\/news\/?$/.test(location.pathname)) {
-      return <PublicNewsPage /> ;
+      return <PublicNewsPage consent={!user} /> ;
     }
     const newsIdMatch = location.pathname.match(/^\/news\/(?!public(?:\/|$))([^/]+)$/);
     if (newsIdMatch) {
-      return <PublicNewsDetail id={newsIdMatch[1]} /> ;
+      return <PublicNewsDetail id={newsIdMatch[1]} consent={!user} /> ;
     }
     if (/^\/[^/]+\/?$/.test(location.pathname)) {
-      return <PublicNewsDetail slug={location.pathname.split('/')[1]} /> ;
+      return <PublicNewsDetail slug={location.pathname.split('/')[1]} consent={!user} /> ;
     }
   }
   if (!user) { return ( <><InstallAppBanner /><Login /></> ) ; } return ( <CallProvider><CallOverlay /><Layout> <InstallAppBanner /> <Routes> <Route path='/' element={<Dashboard />} /> <Route path='/tasks' element={<RequireRole path='/tasks'><TaskList /></RequireRole>} /> <Route path='/tasks/:id' element={<RequireRole path='/tasks'><TaskDetail /></RequireRole>} /> <Route path='/mail' element={<RequireRole path='/mail'><MailClient /></RequireRole>} /> <Route path='/schedule' element={<RequireRole path='/schedule'><SchedulePage /></RequireRole>} /> <Route path='/deals' element={<RequireRole path='/deals'><DealBoard /></RequireRole>} /> <Route path='/products' element={<RequireRole path='/products'><Products /></RequireRole>} />
