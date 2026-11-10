@@ -5,7 +5,7 @@ import { useBrandLogo } from '../lib/branding';
 // Публичная страница «Файлы» для welans.click — без интерфейса CRM (сайдбара и меню).
 // Простая шапка: логотип слева (ссылка на welans.cc), кнопка «Войти» справа.
 export default function PublicFiles() {
-  const brandLogo = useBrandLogo(true);
+  const brandLogo = useBrandLogo(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);

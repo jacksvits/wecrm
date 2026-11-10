@@ -604,6 +604,8 @@ export function Login() {
             <span aria-hidden="true">·</span>
             <a href="https://welans.click">Файлы</a>
             <span aria-hidden="true">·</span>
+            <a href="https://welans.ru/news" target="_blank" rel="noopener noreferrer">Новости</a>
+            <span aria-hidden="true">·</span>
             <a href="https://welans.cc/welans/">О компании</a>
           </p>
 

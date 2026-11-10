@@ -59,10 +59,13 @@ function PublicNewsHeader({ query, onSearch, onSubmit, consent = true }: { query
       <a
         href="/"
         style={{
-          marginLeft: 'auto',
-          padding: '8px 18px', borderRadius: 10,
-          background: '#005BFF', color: '#fff',
-          textDecoration: 'none', fontSize: 14, fontWeight: 600,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginLeft: 'auto', flexShrink: 0,
+          padding: '10px 20px', borderRadius: 12, whiteSpace: 'nowrap',
+          border: '1px solid rgba(120,180,255,0.40)',
+          background: 'linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%)',
+          color: '#fff', fontSize: 14, fontWeight: 600, textDecoration: 'none',
+          boxShadow: '0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)',
         }}
       >
         Войти

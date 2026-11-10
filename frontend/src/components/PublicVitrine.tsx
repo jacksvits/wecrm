@@ -7,7 +7,7 @@ import { CookieConsent } from './CookieConsent';
 // Открывается по адресу /vitrine, в т.ч. по ссылке «Каталог» с лендинга /welans/.
 export default function PublicVitrine() {
   const [q, setQ] = useState('');
-  const brandLogo = useBrandLogo(true);
+  const brandLogo = useBrandLogo(false);
   // Кнопка «Войти» — в стиле кнопки «Корзина» из шапки страницы «Товары»
   const loginBtnStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
