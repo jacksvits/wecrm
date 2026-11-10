@@ -1311,6 +1311,9 @@ model VkCommunitySettings {
   id                String   @id @default(cuid())
   groupId           Int      @map("group_id")
   accessToken       String   @map("access_token")
+  // классический пользовательский токен (vk1.a, Standalone, scope wall+photos) — фото обложки прикрепляется к посту;
+  // без него пост токеном сообщества: обложка ссылкой-превью, пост отложенный (+2 мин)
+  wallAccessToken   String?  @map("wall_access_token")
   defaultCreatorId  String?  @map("default_creator_id")
   defaultCreator    User?    @relation(fields: [defaultCreatorId], references: [id])
   defaultProjectId  String?  @map("default_project_id")

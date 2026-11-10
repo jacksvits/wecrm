@@ -15,6 +15,8 @@ interface VkCommunitySettingsData {
   callbackSecret: string;
   confirmationString: string;
   hasToken?: boolean;
+  wallAccessToken: string;
+  hasWallToken?: boolean;
 }
 
 export function VkCommunitySettings() {
@@ -22,6 +24,7 @@ export function VkCommunitySettings() {
     isActive: true,
     groupId: "",
     accessToken: "",
+    wallAccessToken: "",
     defaultCreatorId: null,
     defaultProjectId: null,
     assigneeIds: [],
@@ -42,6 +45,8 @@ export function VkCommunitySettings() {
           isActive: s.isActive ?? false,
           groupId: s.groupId?.toString() || "",
           accessToken: "",
+          wallAccessToken: "",
+          hasWallToken: s.hasWallToken,
           defaultCreatorId: s.defaultCreatorId || null,
           defaultProjectId: s.defaultProjectId || null,
           assigneeIds: s.assigneeIds || [],
@@ -107,6 +112,20 @@ export function VkCommunitySettings() {
         onChange={(e) => setForm({ ...form, accessToken: e.target.value })}
         placeholder={form.hasToken ? "Сохранён — введите новый, чтобы заменить" : "Введите токен"}
       />
+      <label style={labelStyle}>Токен публикации на стене (пользовательский vk1.a)</label>
+      <input
+        style={inputStyle}
+        type="password"
+        value={form.wallAccessToken}
+        onChange={(e) => setForm({ ...form, wallAccessToken: e.target.value })}
+        placeholder={form.hasWallToken ? "Сохранён — введите новый, чтобы заменить" : "Вставьте access_token"}
+      />
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.5 }}>
+        С этим токеном фото обложки прикрепляется к посту сразу (без ссылки и задержки). Как получить (один раз, без срока действия):
+        1) создайте Standalone-приложение на vk.com/dev и скопируйте его ID;
+        2) откройте: <code>https://oauth.vk.com/authorize?client_id=ВАШ_ID&amp;redirect_uri=https://oauth.vk.com/blank.html&amp;scope=wall,photos&amp;response_type=token&amp;v=5.199</code>;
+        3) подтвердите доступ и скопируйте access_token из адресной строки. Если ВК пишет «application is disabled» — включите Standalone-платформу в разделе «Разработка» приложения.
+      </div>
       <label style={labelStyle}>Callback Secret (для VK Callback API)</label>
       <input
         style={inputStyle}
