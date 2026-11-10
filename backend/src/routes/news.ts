@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, optionalAuthMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 
 const router = Router();
@@ -36,7 +36,15 @@ router.get('/public/:slug', async (req, res) => {
   }
 });
 
-router.use(authMiddleware);
+router.use(optionalAuthMiddleware);
+
+// Публичная страница новостей: чтение доступно гостям, изменения — только авторизованным
+const requireUser = (req: AuthRequest, res: any, next: any) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Требуется авторизация' });
+  }
+  next();
+};
 
 /**
  * GET /api/news
@@ -135,7 +143,7 @@ router.get('/', async (req, res) => {
  * GET /api/news/drafts
  * Получить черновики текущего пользователя
  */
-router.get('/drafts', async (req, res) => {
+router.get('/drafts', requireUser, async (req, res) => {
   try {
     const user = (req as any).user;
     const news = await prisma.news.findMany({
@@ -186,7 +194,7 @@ router.get('/:id', async (req, res) => {
   try {
     // Историю изменений видят только те, кто может редактировать новости
     const user = (req as any).user;
-    const canSeeHistory = !user || user.role === 'admin' || user.canEditNews !== false;
+    const canSeeHistory = !!user && (user.role === 'admin' || user.canEditNews !== false);
     const news = await prisma.news.findUnique({
       where: { id: req.params.id },
       include: {
@@ -222,6 +230,11 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Новость не найдена' });
     }
 
+    // Гостю (публичная страница /news) недоступны неопубликованные новости
+    if (!user && !news.isPublished) {
+      return res.status(404).json({ error: 'Новость не найдена' });
+    }
+
     // Увеличиваем счётчик просмотров
     await prisma.news.update({
       where: { id: req.params.id },
@@ -236,7 +249,7 @@ router.get('/:id', async (req, res) => {
         _count: { _all: true },
       }),
       prisma.newsReaction.findUnique({
-        where: { newsId_userId: { newsId: req.params.id, userId: user.id } },
+        where: { newsId_userId: { newsId: req.params.id, userId: user?.id ?? '' } },
         select: { type: true },
       }),
     ]);
@@ -257,7 +270,7 @@ router.get('/:id', async (req, res) => {
  * POST /api/news
  * Создать новую новость
  */
-router.post('/', async (req, res) => {
+router.post('/', requireUser, async (req, res) => {
   try {
     const user = (req as any).user;
     if (user.role !== 'admin' && user.canCreateNews === false) {
@@ -342,7 +355,7 @@ router.post('/', async (req, res) => {
  * PATCH /api/news/:id
  * Обновить новость + записать в историю
  */
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireUser, async (req, res) => {
   try {
     const user = (req as any).user;
     if (user.role !== 'admin' && user.canEditNews === false) {
@@ -440,7 +453,7 @@ router.patch('/:id', async (req, res) => {
  * DELETE /api/news/:id
  * Удалить новость
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireUser, async (req, res) => {
   try {
     const user = (req as any).user;
     if (user.role !== 'admin' && user.canEditNews === false) {
@@ -490,7 +503,7 @@ router.get('/categories/list', async (_req, res) => {
  * POST /api/news/categories
  * Создать категорию
  */
-router.post('/categories', async (req, res) => {
+router.post('/categories', requireUser, async (req, res) => {
   try {
     const { name, slug, color, sortOrder } = req.body;
     if (!name?.trim() || !slug?.trim()) {
@@ -518,7 +531,7 @@ router.post('/categories', async (req, res) => {
  * PATCH /api/news/categories/:id
  * Обновить категорию
  */
-router.patch('/categories/:id', async (req, res) => {
+router.patch('/categories/:id', requireUser, async (req, res) => {
   try {
     const { name, slug, color, sortOrder } = req.body;
     const category = await prisma.newsCategory.update({
@@ -541,7 +554,7 @@ router.patch('/categories/:id', async (req, res) => {
  * DELETE /api/news/categories/:id
  * Удалить категорию
  */
-router.delete('/categories/:id', async (req, res) => {
+router.delete('/categories/:id', requireUser, async (req, res) => {
   try {
     await prisma.newsCategory.delete({ where: { id: req.params.id } });
     res.json({ success: true });
@@ -557,7 +570,7 @@ router.delete('/categories/:id', async (req, res) => {
  * POST /api/news/subcategories
  * Создать подкатегорию
  */
-router.post('/subcategories', async (req, res) => {
+router.post('/subcategories', requireUser, async (req, res) => {
   try {
     const { name, slug, categoryId } = req.body;
     if (!name?.trim() || !slug?.trim() || !categoryId) {
@@ -584,7 +597,7 @@ router.post('/subcategories', async (req, res) => {
  * PATCH /api/news/subcategories/:id
  * Обновить подкатегорию
  */
-router.patch('/subcategories/:id', async (req, res) => {
+router.patch('/subcategories/:id', requireUser, async (req, res) => {
   try {
     const { name, slug, categoryId } = req.body;
     const subcategory = await prisma.newsSubcategory.update({
@@ -606,7 +619,7 @@ router.patch('/subcategories/:id', async (req, res) => {
  * DELETE /api/news/subcategories/:id
  * Удалить подкатегорию
  */
-router.delete('/subcategories/:id', async (req, res) => {
+router.delete('/subcategories/:id', requireUser, async (req, res) => {
   try {
     await prisma.newsSubcategory.delete({ where: { id: req.params.id } });
     res.json({ success: true });
@@ -638,7 +651,7 @@ router.get('/tags/list', async (_req, res) => {
  * POST /api/news/tags
  * Создать тег
  */
-router.post('/tags', async (req, res) => {
+router.post('/tags', requireUser, async (req, res) => {
   try {
     const { name, slug, color } = req.body;
     if (!name?.trim() || !slug?.trim()) {
@@ -665,7 +678,7 @@ router.post('/tags', async (req, res) => {
  * PATCH /api/news/tags/:id
  * Обновить тег
  */
-router.patch('/tags/:id', async (req, res) => {
+router.patch('/tags/:id', requireUser, async (req, res) => {
   try {
     const { name, slug, color } = req.body;
     const tag = await prisma.newsTag.update({
@@ -687,7 +700,7 @@ router.patch('/tags/:id', async (req, res) => {
  * DELETE /api/news/tags/:id
  * Удалить тег
  */
-router.delete('/tags/:id', async (req, res) => {
+router.delete('/tags/:id', requireUser, async (req, res) => {
   try {
     await prisma.newsTag.delete({ where: { id: req.params.id } });
     res.json({ success: true });
@@ -703,7 +716,7 @@ router.delete('/tags/:id', async (req, res) => {
  * GET /api/news/:id/history
  * Получить историю изменений новости
  */
-router.get('/:id/history', async (req, res) => {
+router.get('/:id/history', requireUser, async (req, res) => {
   try {
     const history = await prisma.newsHistory.findMany({
       where: { newsId: req.params.id },
@@ -721,7 +734,7 @@ router.get('/:id/history', async (req, res) => {
  * POST /api/news/:id/history/:historyId/restore
  * Восстановить версию из истории
  */
-router.post('/:id/history/:historyId/restore', async (req, res) => {
+router.post('/:id/history/:historyId/restore', requireUser, async (req, res) => {
   try {
     const user = (req as any).user;
     if (user.role !== 'admin' && user.canEditNews === false) {
@@ -805,7 +818,7 @@ router.post('/:id/history/:historyId/restore', async (req, res) => {
  * Поставить/сменить/убрать реакцию на новость
  * Body: { type: 'like' | 'dislike' | null }
  */
-router.post('/:id/reaction', async (req, res) => {
+router.post('/:id/reaction', requireUser, async (req, res) => {
   try {
     const user = (req as any).user;
     const { type } = req.body;
@@ -821,7 +834,7 @@ router.post('/:id/reaction', async (req, res) => {
 
     if (type) {
       await prisma.newsReaction.upsert({
-        where: { newsId_userId: { newsId: req.params.id, userId: user.id } },
+        where: { newsId_userId: { newsId: req.params.id, userId: user?.id ?? '' } },
         create: { newsId: req.params.id, userId: user.id, type },
         update: { type },
       });
@@ -877,7 +890,7 @@ router.get('/:id/comments', async (req, res) => {
  * POST /api/news/:id/comments
  * Добавить комментарий к новости
  */
-router.post('/:id/comments', async (req, res) => {
+router.post('/:id/comments', requireUser, async (req, res) => {
   try {
     const user = (req as any).user;
     const { content } = req.body;
@@ -935,7 +948,7 @@ router.post('/:id/comments', async (req, res) => {
  * DELETE /api/news/:id/comments/:commentId
  * Удалить комментарий (автор или админ)
  */
-router.delete('/:id/comments/:commentId', async (req, res) => {
+router.delete('/:id/comments/:commentId', requireUser, async (req, res) => {
   try {
     const user = (req as any).user;
     const comment = await prisma.newsComment.findUnique({
