@@ -194,7 +194,7 @@ function PublicNewsList({ consent = true }: { consent?: boolean }) {
         onSubmit={(value) => { setQ(value); setPage(1); }}
         consent={consent}
       />
-      <div style={{ padding: '16px 24px 40px', maxWidth: 1400, margin: '0 auto' }}>
+      <div style={{ padding: '16px 24px 40px' }}>
         {/* Фильтры */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
           <select value={category} style={selectStyle} onChange={(e) => { setCategory(e.target.value); setSubcategory(''); setPage(1); }}>
