@@ -23,17 +23,6 @@ import { initSoundUnlock } from './lib/sound' ;
 // (тот же механизм, что у кнопки «Войти как гость»), затем отдельная публичная страница PublicFiles
 const FILES_HOSTS = ['welans.click', 'www.welans.click'];
 const WELANS_RU_HOSTS = ['welans.ru', 'www.welans.ru'];
-function AutoGuestLogin() {
-  const { guestLogin } = useAuth() ;
-  const [failed, setFailed] = useState(false) ;
-  useEffect(() => {
-    let cancelled = false ;
-    guestLogin().catch(() => { if (!cancelled) setFailed(true) ; }) ;
-    return () => { cancelled = true ; } ;
-  }, [guestLogin]) ;
-  if (failed) return <Login /> ;
-  return (<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}><div>Загрузка...</div></div>) ;
-}
 function App() { const { user, loading } = useAuth() ; const location = useLocation() ;
   // Разблокировка звуковых уведомлений первым жестом пользователя (autoplay policy)
   useEffect(() => { initSoundUnlock() ; }, []) ;
@@ -72,12 +61,10 @@ function App() { const { user, loading } = useAuth() ; const location = useLocat
 
   if (loading) { return ( <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}> <div>Загрузка...</div> </div> ) ; } const legalSlug = location.pathname === '/offer' ? 'offer' : location.pathname === '/privacy' ? 'privacy' : location.pathname === '/cookies' ? 'cookies' : null; if (legalSlug) { return ( <><InstallAppBanner /><LegalDocumentPage slug={legalSlug} /></> ) ; } // welans.org: корень домена — страница входа организации (как /org-login), адрес не меняется
   if (['welans.org', 'www.welans.org'].includes(window.location.hostname) && location.pathname === '/') { return ( <><InstallAppBanner /><OrgLogin /></> ) ; }
-  if (location.pathname === '/org-login') { return ( <><InstallAppBanner /><OrgLogin /></> ) ; } if (location.pathname === '/register') { return ( <><InstallAppBanner /><Register /></> ) ; } if (location.pathname === '/presentation') { return ( <><InstallAppBanner /><Presentation /></> ) ; } if (location.pathname === '/shop') { return ( <PublicVitrine /> ) ; } if (location.pathname === '/vitrine') { return <Navigate to='/shop' replace /> ; } // welans.click: без сессии — авто-вход гостем; с сессией корень домена — сразу «Файлы»
+  if (location.pathname === '/org-login') { return ( <><InstallAppBanner /><OrgLogin /></> ) ; } if (location.pathname === '/register') { return ( <><InstallAppBanner /><Register /></> ) ; } if (location.pathname === '/presentation') { return ( <><InstallAppBanner /><Presentation /></> ) ; } if (location.pathname === '/shop') { return ( <PublicVitrine /> ) ; } if (location.pathname === '/vitrine') { return <Navigate to='/shop' replace /> ; } // welans.click: публичная страница «Файлы» без входа (обработка ниже по FILES_HOSTS)
   // Перенесённые новости WordPress открываются без входа по прежнему адресу /<slug>/.
+  // welans.click: публичная страница «Файлы» без входа и гостевой сессии (как /shop на welans.ru)
   if (FILES_HOSTS.includes(window.location.hostname)) {
-    if (!user) { return ( <><InstallAppBanner /><AutoGuestLogin /></> ) ; }
-    // Публичная страница «Файлы» — отдельный вид без Layout/сайдбара (по макету),
-    // по любому пути на welans.click, кроме витрины /shop
     if (location.pathname !== '/shop' && location.pathname !== '/vitrine') { return ( <PublicFiles /> ) ; }
   }
   // Публичные новости на welans.ru: лента /news, детальная /news/:id и старые ссылки /<slug>/

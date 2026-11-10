@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import fs from 'fs';
 import path from 'path';
@@ -39,7 +39,9 @@ const TAB_DIRS: Record<string, string> = {
 const resolveTabDir = (tabKey: string): string | undefined =>
   tabKey === 'system' ? uploadsRoot() : TAB_DIRS[tabKey];
 
-router.get('/tabs', authMiddleware, async (req, res) => {
+// Чтение страницы «Файлы» публичное (welans.click без входа): роль admin по-прежнему
+// решает, видна ли вкладка «Система»; запись — только под авторизацией
+router.get('/tabs', optionalAuthMiddleware, async (req, res) => {
   try {
     const tabs = await prisma.fileTabSetting.findMany();
     const defaults = [
@@ -93,7 +95,7 @@ const incrementDownloadCount = (tabKey: string, filePath: string) => {
 };
 
 // Список скрываемых файлов/папок (имена через запятую) — общая настройка страницы «Файлы»
-router.get('/hidden', authMiddleware, async (req, res) => {
+router.get('/hidden', optionalAuthMiddleware, async (req, res) => {
   try {
     const row = await prisma.fileHideSetting.findFirst();
     const theme = row?.theme === 'macos' ? 'macos' : 'win7';
@@ -127,7 +129,7 @@ router.post('/hidden', authMiddleware, async (req, res) => {
 });
 
 // Universal browse endpoint for all tabs
-router.get('/browse', authMiddleware, async (req, res) => {
+router.get('/browse', optionalAuthMiddleware, async (req, res) => {
   const tabKey = (req.query.tab as string) || '';
   const subPath = (req.query.path as string) || '';
   const baseDir = resolveTabDir(tabKey);
@@ -215,7 +217,7 @@ const PREVIEW_TYPES: Record<string, string> = {
   '.pdf': 'application/pdf',
 };
 
-router.get('/preview', authMiddleware, async (req, res) => {
+router.get('/preview', optionalAuthMiddleware, async (req, res) => {
   const tabKey = (req.query.tab as string) || '';
   const filePath = (req.query.path as string) || '';
   const baseDir = resolveTabDir(tabKey);
@@ -278,7 +280,7 @@ router.get('/preview', authMiddleware, async (req, res) => {
 });
 
 // Universal download endpoint
-router.get('/download', authMiddleware, (req, res) => {
+router.get('/download', optionalAuthMiddleware, (req, res) => {
   const tabKey = (req.query.tab as string) || '';
   const filePath = (req.query.path as string) || '';
   const baseDir = resolveTabDir(tabKey);
@@ -325,7 +327,7 @@ router.get('/download', authMiddleware, (req, res) => {
 });
 
 // Universal folder download endpoint
-router.get('/download-folder', authMiddleware, (req, res) => {
+router.get('/download-folder', optionalAuthMiddleware, (req, res) => {
   const tabKey = (req.query.tab as string) || '';
   const folderPath = (req.query.path as string) || '';
   const baseDir = resolveTabDir(tabKey);
@@ -377,7 +379,7 @@ router.get('/download-folder', authMiddleware, (req, res) => {
 });
 
 // Legacy endpoints for backward compatibility with games tab
-router.get('/games', authMiddleware, (req, res) => {
+router.get('/games', optionalAuthMiddleware, (req, res) => {
   req.query.tab = 'games';
   // Re-use browse logic manually
   const tabKey = 'games';
@@ -411,7 +413,7 @@ router.get('/games', authMiddleware, (req, res) => {
   }
 });
 
-router.get('/games/download', authMiddleware, (req, res) => {
+router.get('/games/download', optionalAuthMiddleware, (req, res) => {
   const tabKey = 'games';
   const filePath = (req.query.path as string) || '';
   const baseDir = TAB_DIRS[tabKey];
@@ -448,7 +450,7 @@ router.get('/games/download', authMiddleware, (req, res) => {
   }
 });
 
-router.get('/games/download-folder', authMiddleware, (req, res) => {
+router.get('/games/download-folder', optionalAuthMiddleware, (req, res) => {
   const tabKey = 'games';
   const folderPath = (req.query.path as string) || '';
   const baseDir = TAB_DIRS[tabKey];
