@@ -4,6 +4,9 @@ import { authMiddleware, optionalAuthMiddleware, AuthRequest } from '../middlewa
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { publishNewsToVk } from '../lib/vk-wall.js';
 import { htmlToText } from '../lib/html-to-text.js';
+import fs from 'fs';
+import path from 'path';
+import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
 
 const router = Router();
 
@@ -18,9 +21,7 @@ router.get('/:id/cover-page', async (req, res) => {
     if (!news || !news.isPublished || !news.coverImage) {
       return res.status(404).send('Not found');
     }
-    const cover = /^https?:\/\//i.test(news.coverImage)
-      ? news.coverImage
-      : 'https://welans.cc' + news.coverImage;
+    const cover = 'https://welans.cc/api/news/' + news.id + '/cover-image';
     const summary = htmlToText(news.summary).slice(0, 200);
     const isPublic = (news.externalId != null || news.id.startsWith('rss_')) && news.slug;
     const target = isPublic
@@ -43,6 +44,40 @@ router.get('/:id/cover-page', async (req, res) => {
   } catch (err) {
     console.error('[news:cover-page]', err);
     res.status(500).send('Error');
+  }
+});
+
+// Публичная отдача обложки новости (og:image для превью ВК/мессенджеров):
+// self-hosted прокси — иначе краулер тянет внешние картинки (3dnews и т.п.),
+// что часто ломается (хотлинк-защита, robots, размеры)
+router.get('/:id/cover-image', async (req, res) => {
+  try {
+    const news = await prisma.news.findUnique({ where: { id: req.params.id } });
+    if (!news || !news.isPublished || !news.coverImage) {
+      return res.status(404).end();
+    }
+    let buf: Buffer;
+    let type = 'image/jpeg';
+    if (/^https?:\/\//i.test(news.coverImage)) {
+      const r = await fetch(news.coverImage, { signal: AbortSignal.timeout(10000) });
+      if (!r.ok) return res.status(502).end();
+      buf = Buffer.from(await r.arrayBuffer());
+      type = (r.headers.get('content-type') || '').split(';')[0] || type;
+      if (!type.startsWith('image/')) type = 'image/jpeg';
+    } else {
+      const tenantPfx = tenantUploadPrefix();
+      const local = tenantPfx && news.coverImage.startsWith(tenantPfx)
+        ? path.join(uploadsRoot(), news.coverImage.slice(tenantPfx.length).replace(/^\/+/, ''))
+        : '/app' + news.coverImage;
+      if (!fs.existsSync(local)) return res.status(404).end();
+      buf = fs.readFileSync(local);
+    }
+    res.setHeader('Content-Type', type);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(buf);
+  } catch (err) {
+    console.error('[news:cover-image]', err);
+    res.status(500).end();
   }
 });
 
