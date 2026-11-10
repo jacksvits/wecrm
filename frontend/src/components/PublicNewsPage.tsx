@@ -1,0 +1,402 @@
+// Публичные страницы новостей для гостей: /news (список) и /news/:id (детальная).
+// Чтение доступно без авторизации; лайки и комментарии — только для
+// авторизованных пользователей (гостю предлагаем войти).
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { api } from '../api/client';
+import { safeHtml } from '../lib/safeHtml';
+import { useBrandLogo, useBrandNewsCover } from '../lib/branding';
+
+function stripHtml(html: string): string {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent || div.innerText || '';
+}
+
+const selectStyle: React.CSSProperties = {
+  padding: '8px 12px',
+  borderRadius: 10,
+  border: '1px solid var(--border-color)',
+  background: 'var(--bg-input)',
+  color: 'var(--text-primary)',
+  fontSize: 13,
+  maxWidth: 200,
+};
+
+function PublicNewsHeader({ query, onSearch }: { query: string; onSearch: (q: string) => void }) {
+  const logoUrl = useBrandLogo(true);
+  return (
+    <header style={{
+      position: 'sticky', top: 0, zIndex: 50,
+      background: 'var(--bg-primary)',
+      borderBottom: '1px solid var(--border-color)',
+      display: 'flex', alignItems: 'center', gap: 16,
+      padding: '10px 24px',
+    }}>
+      <a href="/news" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'var(--text-primary)' }}>
+        {logoUrl
+          ? <img src={logoUrl} alt="WeLANS" style={{ height: 28 }} />
+          : <span style={{ fontSize: 20, fontWeight: 700 }}>WeLANS</span>}
+      </a>
+      <input
+        value={query}
+        onChange={(e) => onSearch(e.target.value)}
+        placeholder="Поиск по названию, описанию, темам, меткам…"
+        style={{
+          flex: 1, maxWidth: 520,
+          padding: '8px 14px', borderRadius: 10,
+          border: '1px solid var(--border-color)',
+          background: 'var(--bg-input)', color: 'var(--text-primary)',
+          fontSize: 14, outline: 'none',
+        }}
+      />
+      <a
+        href="/"
+        style={{
+          marginLeft: 'auto',
+          padding: '8px 18px', borderRadius: 10,
+          background: '#005BFF', color: '#fff',
+          textDecoration: 'none', fontSize: 14, fontWeight: 600,
+        }}
+      >
+        Войти
+      </a>
+    </header>
+  );
+}
+
+function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: string | null; onClick: () => void }) {
+  const date = item.publishedAt ? new Date(item.publishedAt) : new Date(item.createdAt);
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: 'var(--bg-secondary, var(--bg-primary))',
+        border: '1px solid var(--border-color)',
+        borderRadius: 16,
+        overflow: 'hidden',
+        cursor: 'pointer',
+        transition: 'box-shadow 0.15s',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div style={{ aspectRatio: '16 / 9', overflow: 'hidden', background: '#000' }}>
+        <img
+          src={item.coverImage || defaultCover}
+          alt=""
+          loading="lazy"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          onError={(e) => {
+            if (defaultCover && (e.target as HTMLImageElement).src !== defaultCover) {
+              (e.target as HTMLImageElement).src = defaultCover;
+            }
+          }}
+        />
+      </div>
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+          {item.category && (
+            <span style={{
+              fontSize: 11, fontWeight: 600,
+              color: item.category.color || '#007AFF',
+              background: (item.category.color || '#007AFF') + '15',
+              padding: '3px 8px', borderRadius: 6,
+            }}>
+              {item.category.name}
+              {item.subcategory && ` / ${item.subcategory.name}`}
+            </span>
+          )}
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+            {date.toLocaleDateString('ru-RU')}
+          </span>
+        </div>
+        <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 600, lineHeight: 1.35, color: 'var(--text-color)' }}>
+          {item.title}
+        </h3>
+        {item.summary && (
+          <p style={{
+            margin: '0 0 12px', fontSize: 13, lineHeight: 1.5,
+            color: 'var(--text-muted)',
+            display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>
+            {stripHtml(item.summary)}
+          </p>
+        )}
+        <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span>👍 {item.likes || 0}</span>
+            <span>💬 {item.commentsCount || 0}</span>
+          </div>
+          <span>{item.views || 0} просмотров</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PublicNewsList() {
+  const navigate = useNavigate();
+  const defaultCover = useBrandNewsCover();
+  const [items, setItems] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [qInput, setQInput] = useState('');
+  const [q, setQ] = useState('');
+  const [category, setCategory] = useState('');
+  const [subcategory, setSubcategory] = useState('');
+  const [tag, setTag] = useState('');
+  const [categories, setCategories] = useState<any[]>([]);
+  const [tags, setTags] = useState<any[]>([]);
+  const limit = 24;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+
+  useEffect(() => {
+    api.news.categories().then((res: any) => setCategories(Array.isArray(res) ? res : res?.categories ?? [])).catch(() => {});
+    api.news.tags().then((res: any) => setTags(Array.isArray(res) ? res : res?.tags ?? [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => { setQ(qInput); setPage(1); }, 400);
+    return () => clearTimeout(t);
+  }, [qInput]);
+
+  useEffect(() => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (q) params.set('q', q);
+    if (category) params.set('category', category);
+    if (subcategory) params.set('subcategory', subcategory);
+    if (tag) params.set('tag', tag);
+    api.news.list(params.toString())
+      .then((res: any) => { setItems(res.news || []); setTotal(res.total || 0); })
+      .catch(() => {});
+  }, [page, q, category, subcategory, tag]);
+
+  const subcategories = categories.flatMap((c: any) => (c.subcategories ?? []).map((s: any) => ({ ...s, categoryId: c.id })));
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+      <PublicNewsHeader query={qInput} onSearch={setQInput} />
+      <div style={{ padding: '16px 24px 40px', maxWidth: 1400, margin: '0 auto' }}>
+        {/* Фильтры */}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+          <select value={category} style={selectStyle} onChange={(e) => { setCategory(e.target.value); setSubcategory(''); setPage(1); }}>
+            <option value="">Все категории</option>
+            {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <select value={subcategory} style={selectStyle} onChange={(e) => { setSubcategory(e.target.value); setPage(1); }}>
+            <option value="">Все темы</option>
+            {(category ? subcategories.filter((s: any) => s.categoryId === category) : subcategories)
+              .map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select value={tag} style={selectStyle} onChange={(e) => { setTag(e.target.value); setPage(1); }}>
+            <option value="">Все метки</option>
+            {tags.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+
+        {/* Сетка новостей */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: 16,
+        }}>
+          {items.map((item) => (
+            <NewsCard
+              key={item.id}
+              item={item}
+              defaultCover={defaultCover}
+              onClick={() => navigate(`/news/${item.id}`)}
+            />
+          ))}
+        </div>
+        {!items.length && (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Новости не найдены</div>
+        )}
+
+        {/* Пагинация */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 24 }}>
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              style={{
+                padding: '8px 14px', borderRadius: 8,
+                background: 'var(--bg-hover)', border: '1px solid var(--border-color)',
+                cursor: page <= 1 ? 'not-allowed' : 'pointer',
+                opacity: page <= 1 ? 0.5 : 1, fontSize: 13,
+                color: 'var(--text-primary)',
+              }}
+            >
+              ← Назад
+            </button>
+            <span style={{ padding: '8px 14px', fontSize: 13, color: 'var(--text-muted)' }}>
+              Страница {page} из {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              style={{
+                padding: '8px 14px', borderRadius: 8,
+                background: 'var(--bg-hover)', border: '1px solid var(--border-color)',
+                cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+                opacity: page >= totalPages ? 0.5 : 1, fontSize: 13,
+                color: 'var(--text-primary)',
+              }}
+            >
+              Вперёд →
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PublicNewsDetail({ id }: { id: string }) {
+  const navigate = useNavigate();
+  const defaultCover = useBrandNewsCover();
+  const [news, setNews] = useState<any>(null);
+  const [comments, setComments] = useState<any[]>([]);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    api.news.get(id).then(setNews).catch(() => setNotFound(true));
+    api.news.comments(id).then((res: any) => setComments(Array.isArray(res) ? res : res?.comments ?? [])).catch(() => {});
+  }, [id]);
+
+  if (notFound) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+        <PublicNewsHeader query="" onSearch={() => {}} />
+        <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
+          Новость не найдена. <a href="/news" style={{ color: '#005BFF' }}>Ко всем новостям</a>
+        </div>
+      </div>
+    );
+  }
+  if (!news) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
+        <PublicNewsHeader query="" onSearch={() => {}} />
+        <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>Загрузка…</div>
+      </div>
+    );
+  }
+
+  const date = news.publishedAt ? new Date(news.publishedAt) : new Date(news.createdAt);
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+      <PublicNewsHeader query="" onSearch={() => {}} />
+      <div style={{ maxWidth: 860, margin: '0 auto', padding: '20px 24px 60px' }}>
+        <button
+          onClick={() => navigate('/news')}
+          style={{
+            padding: '6px 12px', borderRadius: 8, marginBottom: 16,
+            background: 'transparent', border: '1px solid var(--border-color)',
+            cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)',
+          }}
+        >
+          ← Ко всем новостям
+        </button>
+
+        {news.coverImage && (
+          <img
+            src={news.coverImage}
+            alt=""
+            style={{ width: '100%', borderRadius: 16, marginBottom: 20, display: 'block' }}
+            onError={(e) => { if (defaultCover) (e.target as HTMLImageElement).src = defaultCover; }}
+          />
+        )}
+
+        <h1 style={{ margin: '0 0 12px', fontSize: 28, lineHeight: 1.25, color: 'var(--text-color)' }}>{news.title}</h1>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+          {news.category && (
+            <span style={{
+              fontWeight: 600, color: news.category.color || '#007AFF',
+              background: (news.category.color || '#007AFF') + '15',
+              padding: '3px 8px', borderRadius: 6, fontSize: 11,
+            }}>
+              {news.category.name}
+            </span>
+          )}
+          <span>{date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+          {news.author?.name && <span>· {news.author.name}</span>}
+          <span>· 👍 {news.likes || 0}</span>
+          <span>· 👎 {news.dislikes || 0}</span>
+          <span>· {news.views || 0} просмотров</span>
+        </div>
+
+        {news.summary && (
+          <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--text-muted)', margin: '0 0 20px' }}>
+            {stripHtml(news.summary)}
+          </p>
+        )}
+
+        <div
+          className="news-content"
+          style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--text-color)' }}
+          dangerouslySetInnerHTML={{ __html: safeHtml(news.content || '') }}
+        />
+
+        {news.sourceUrl && (
+          <div style={{ marginTop: 24, fontSize: 13 }}>
+            <a href={news.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#005BFF' }}>
+              Источник: {news.sourceUrl}
+            </a>
+          </div>
+        )}
+
+        {/* Комментарии: чтение публичное, оставить можно только авторизованным */}
+        <div style={{ marginTop: 40 }}>
+          <h2 style={{ fontSize: 18, margin: '0 0 16px', color: 'var(--text-color)' }}>Комментарии ({comments.length})</h2>
+          <div style={{
+            padding: '14px 16px', marginBottom: 16, borderRadius: 12,
+            border: '1px dashed var(--border-color)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+          }}>
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              Чтобы оставить комментарий, войдите в свою CRM
+            </span>
+            <a
+              href="/"
+              style={{
+                padding: '8px 16px', borderRadius: 10,
+                background: '#005BFF', color: '#fff',
+                textDecoration: 'none', fontSize: 13, fontWeight: 600,
+              }}
+            >
+              Войти
+            </a>
+          </div>
+          {comments.length === 0 && (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Комментариев пока нет</div>
+          )}
+          {comments.map((c: any) => (
+            <div key={c.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: 13, marginBottom: 4 }}>
+                <span style={{ fontWeight: 600 }}>{c.author?.name || 'Пользователь'}</span>{' '}
+                <span style={{ color: 'var(--text-muted)' }}>
+                  {new Date(c.createdAt).toLocaleString('ru-RU')}
+                </span>
+              </div>
+              <div style={{ fontSize: 14, whiteSpace: 'pre-wrap', color: 'var(--text-color)' }}>{c.text}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Публичная страница новостей для гостей: /news — список, /news/:id — детальная */
+export function PublicNewsPage() {
+  const { pathname } = useLocation();
+  const detailMatch = pathname.match(/^\/news\/([^/]+)$/);
+  if (detailMatch) {
+    return <PublicNewsDetail id={detailMatch[1]} />;
+  }
+  return <PublicNewsList />;
+}
