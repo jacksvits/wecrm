@@ -858,7 +858,7 @@ body {
 }
 .login-form-wrap {
   width: 100%;
-  max-width: 360px;
+  max-width: 440px;
   min-height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
@@ -1091,14 +1091,19 @@ html, body { overflow-x: hidden; }
 
 
 /* Публичные юридические документы: футер регистрации + страницы /offer и /privacy */
-.login-quick-links { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 12px; font-size: 13px; }
+.login-quick-links { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 12px; font-size: 13px; flex-wrap: nowrap; white-space: nowrap; }
 .login-quick-links a { color: #6aa832; font-weight: 600; text-decoration: none; }
 .login-quick-links a:hover { text-decoration: underline; }
 .login-legal-footer { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap; white-space: nowrap; margin-top: 0; padding-top: 14px; border-top: 1px solid #ececf1; font-size: 11.5px; line-height: 1.35; color: #8a8a95; }
+@media (max-width: 640px) {
+  .login-quick-links { gap: 6px; font-size: 12px; }
+  .login-legal-footer { flex-direction: column; gap: 9px; align-items: center; white-space: normal; }
+  .login-legal-footer span[aria-hidden="true"] { display: none; }
+}
 .login-legal-footer a { color: #6aa832; text-decoration: none; font-weight: 600; transition: color 0.2s, opacity 0.2s; }
 .login-legal-footer a:hover { color: #3f8f0f; opacity: 0.9; }
 
-/* Плашка согласия на обработку cookie (только страница авторизации) */
+/* Плашка согласия на обработку cookie (все публичные страницы для гостей) */
 .cookie-consent { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 3000; width: calc(100% - 32px); max-width: 560px; padding: 20px 24px; background: #fff; color: #1a1a1a; border: 1px solid #e8e8ee; border-radius: 18px; box-shadow: 0 16px 48px rgba(31, 41, 55, 0.18); }
 .cookie-consent-close { position: absolute; top: 8px; right: 12px; width: 30px; height: 30px; border: none; background: transparent; color: #9aa0ab; font-size: 22px; line-height: 1; cursor: pointer; transition: color 0.2s; }
 .cookie-consent-close:hover { color: #1a1a1a; }
