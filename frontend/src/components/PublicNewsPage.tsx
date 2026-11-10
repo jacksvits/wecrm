@@ -335,18 +335,39 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
           ← Ко всем новостям
         </button>
 
+        {/* Блок новости — как в CRM: заголовок над обложкой, выжимка плашкой, мета под ней */}
+        <h1 style={{ margin: '0 0 16px', fontSize: 24, fontWeight: 600, lineHeight: 1.3, color: 'var(--text-primary)' }}>{news.title}</h1>
+
+        {/* Обложка */}
         {news.coverImage && (
-          <img
-            src={news.coverImage}
-            alt=""
-            style={{ width: '100%', borderRadius: 16, marginBottom: 20, display: 'block' }}
-            onError={(e) => { if (defaultCover) (e.target as HTMLImageElement).src = defaultCover; }}
-          />
+          <div style={{ borderRadius: 14, overflow: 'hidden', margin: '0 0 14px' }}>
+            <img
+              src={news.coverImage}
+              alt={news.title}
+              style={{ width: '100%', maxHeight: 380, objectFit: 'cover', display: 'block' }}
+              onError={(e) => { if (defaultCover) (e.target as HTMLImageElement).src = defaultCover; }}
+            />
+          </div>
         )}
 
-        <h1 style={{ margin: '0 0 12px', fontSize: 28, lineHeight: 1.25, color: 'var(--text-color)' }}>{news.title}</h1>
+        {/* Краткое описание — отдельным блоком между обложкой и полным текстом */}
+        {news.summary && (
+          <div style={{
+            background: 'var(--bg-hover)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 10,
+            padding: '12px 14px',
+            margin: '0 0 18px',
+            fontSize: 14,
+            lineHeight: 1.6,
+            color: 'var(--text-secondary)',
+          }}>
+            {stripHtml(news.summary)}
+          </div>
+        )}
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+        {/* Мета: категория, дата, автор, реакции, просмотры */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', fontSize: 13, color: 'var(--text-muted)', marginBottom: 18 }}>
           {news.category && (
             <span style={{
               fontWeight: 600, color: news.category.color || '#007AFF',
@@ -362,12 +383,6 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
           <span>· 👎 {news.dislikes || 0}</span>
           <span>· {news.views || 0} просмотров</span>
         </div>
-
-        {news.summary && (
-          <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--text-muted)', margin: '0 0 20px' }}>
-            {stripHtml(news.summary)}
-          </p>
-        )}
 
         <div
           className="news-content"
