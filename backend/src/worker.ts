@@ -13,6 +13,7 @@ import { importMarketItems, syncProductsToVk, syncPricesToVk, syncPricesFromVk, 
 import { syncProductsToWb, syncPricesToWb, syncPricesFromWb, syncStocksToWb, syncStocksFromWb, importWbProducts } from './lib/wb.js';
 import { listWorkerTenants, withTenant, TenantInfo } from './lib/tenant.js';
 import { runStatusAutoChange } from './lib/status-auto-change.js';
+import { syncRssFeeds, isRssSyncRunning } from './lib/rss-sync.js';
 
 /**
  * Entry-point для worker-контейнера (мультитенантный).
@@ -26,7 +27,7 @@ import { runStatusAutoChange } from './lib/status-auto-change.js';
  * глобальный `prisma` обращается к БД нужной организации.
  */
 
-type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkCommunityWorker; onecTimer?: NodeJS.Timeout; ozonProductsTimer?: NodeJS.Timeout; ozonPricesTimer?: NodeJS.Timeout; ozonStocksTimer?: NodeJS.Timeout; vkProductsTimer?: NodeJS.Timeout; vkPricesTimer?: NodeJS.Timeout; vkStocksTimer?: NodeJS.Timeout; wbProductsTimer?: NodeJS.Timeout; wbPricesTimer?: NodeJS.Timeout; wbStocksTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
+type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkCommunityWorker; rssTimer?: NodeJS.Timeout; onecTimer?: NodeJS.Timeout; ozonProductsTimer?: NodeJS.Timeout; ozonPricesTimer?: NodeJS.Timeout; ozonStocksTimer?: NodeJS.Timeout; vkProductsTimer?: NodeJS.Timeout; vkPricesTimer?: NodeJS.Timeout; vkStocksTimer?: NodeJS.Timeout; wbProductsTimer?: NodeJS.Timeout; wbPricesTimer?: NodeJS.Timeout; wbStocksTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
 
 /** Интервал проверки «Авто смены» статусов */
 const STATUS_AUTO_CHANGE_MS = 60_000;
@@ -42,6 +43,7 @@ function stopBag(key: string, bag: TimerBag) {
   try { bag.email?.stop(); } catch { /* ignore */ }
   try { bag.accounting?.stop(); } catch { /* ignore */ }
   try { bag.vk?.stop(); } catch { /* ignore */ }
+  if (bag.rssTimer) clearInterval(bag.rssTimer);
   if (bag.onecTimer) clearInterval(bag.onecTimer);
   if (bag.ozonProductsTimer) clearInterval(bag.ozonProductsTimer);
   if (bag.ozonPricesTimer) clearInterval(bag.ozonPricesTimer);
@@ -284,6 +286,31 @@ async function syncTenant(t: TenantInfo): Promise<void> {
     if (bag.wbProductsTimer) { clearInterval(bag.wbProductsTimer); bag.wbProductsTimer = undefined; }
     if (bag.wbPricesTimer) { clearInterval(bag.wbPricesTimer); bag.wbPricesTimer = undefined; }
     if (bag.wbStocksTimer) { clearInterval(bag.wbStocksTimer); bag.wbStocksTimer = undefined; }
+  }
+
+  // --- Парсинг RSS (только главная организация: архив «Коротко о свежем» живёт в её БД) ---
+  const rssSettings = t.isMain ? await prisma.rssSettings.findFirst() : null;
+  if (rssSettings?.isActive && rssSettings.autoSync) {
+    if (!bag.rssTimer) {
+      const runRssJob = async () => {
+        if (isRssSyncRunning()) {
+          console.log(`[Worker] RSS sync already running (${key}), skipped`);
+          return;
+        }
+        try {
+          const summary = await syncRssFeeds();
+          console.log(`[Worker] RSS sync done (${key}):`, JSON.stringify(summary).slice(0, 300));
+        } catch (e: any) {
+          console.error(`[Worker] RSS sync error (${key}):`, e.message);
+        }
+      };
+      const rssIntervalMin = Math.max(5, rssSettings.intervalMinutes || 15);
+      bag.rssTimer = setInterval(runRssJob, rssIntervalMin * 60 * 1000);
+      console.log(`[Worker] RSS sync scheduled every ${rssIntervalMin} min (${key})`);
+    }
+  } else if (bag.rssTimer) {
+    clearInterval(bag.rssTimer);
+    bag.rssTimer = undefined;
   }
 
 }

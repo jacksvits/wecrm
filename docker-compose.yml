@@ -58,6 +58,11 @@ services:
       VK_CLIENT_ID: "54736647"
       VK_CLIENT_SECRET: ${VK_CLIENT_SECRET:?VK_CLIENT_SECRET is required}
       VK_REDIRECT_URI: "https://welans.cc/api/vk/callback"
+      OLD_SITE_DB_HOST: old-site-db
+      OLD_SITE_DB_PORT: "3306"
+      OLD_SITE_DB_NAME: old_site
+      OLD_SITE_DB_USER: old_site
+      OLD_SITE_DB_PASSWORD: ${OLD_SITE_DB_PASSWORD:?OLD_SITE_DB_PASSWORD is required}
       BEGET_LOGIN: "softboeg"
       NAS_DSM_URL: "http://192.168.8.3:5000"
       NAS_DSM_USER: "jack"
@@ -139,6 +144,11 @@ services:
       VAPID_SUBJECT: mailto:admin@welans.cc
       NODE_ENV: production
       NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt
+      OLD_SITE_DB_HOST: old-site-db
+      OLD_SITE_DB_PORT: "3306"
+      OLD_SITE_DB_NAME: old_site
+      OLD_SITE_DB_USER: old_site
+      OLD_SITE_DB_PASSWORD: ${OLD_SITE_DB_PASSWORD:?OLD_SITE_DB_PASSWORD is required}
     depends_on:
       backend:
         condition: service_healthy

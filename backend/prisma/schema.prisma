@@ -2385,3 +2385,40 @@ model CdekShipment {
   @@index([contactId])
   @@map("cdek_shipments")
 }
+
+
+// ===== Плагин «Парсинг RSS» (механика WP RSS Aggregator, wprss_feed) =====
+// Новости источников публикуются в категорию «Коротко о свежем» и дублируются
+// в архивную MySQL-базу old_site (таблицы rss_feeds/rss_items).
+model RssSettings {
+  id              Int      @id @default(1)
+  isActive        Boolean  @default(false) @map("is_active")
+  autoSync        Boolean  @default(true) @map("auto_sync") // обход лент по расписанию (worker)
+  intervalMinutes Int      @default(15) @map("interval_minutes") // wprss cron_interval (fifteen_min)
+  maxItemsPerFeed Int      @default(200) @map("max_items_per_feed") // wprss limit_feed_items_db
+  limitPerImport  Int      @default(0) @map("limit_per_import") // wprss limit_feed_items_per_import (0 — без лимита)
+  uniqueTitles    Boolean  @default(true) @map("unique_titles") // wprss unique_titles
+  lastSyncAt      DateTime? @map("last_sync_at")
+  lastSyncResult  String?   @map("last_sync_result") // JSON {feeds, items, created, skipped, failed, errors}
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  sources         RssSource[]
+
+  @@map("rss_settings")
+}
+
+model RssSource {
+  id         String       @id @default(cuid())
+  name       String
+  url        String       @unique // адрес RSS-ленты (wprss_url)
+  siteUrl    String?      @map("site_url") // сайт источника (wprss_site_url)
+  feedImage  String?      @map("feed_image") // логотип ленты (wprss_feed_image)
+  isActive   Boolean      @default(true) @map("is_active") // wprss_state: active/paused
+  sortOrder  Int          @default(0) @map("sort_order")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+  settings   RssSettings? @relation(fields: [settingsId], references: [id])
+  settingsId Int?         @map("settings_id")
+
+  @@map("rss_sources")
+}

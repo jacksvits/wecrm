@@ -10,7 +10,7 @@ router.use(authMiddleware);
 // GET /api/integrations/status — статус активности интеграций («плагинов»)
 router.get('/status', async (_req, res) => {
   try {
-    const [email, telephony, max, telegram, vkAuth, vkMarket, vkCommunity, yandex, dgis, beget, pskovline, onec, tochka, vpn, diadoc, tochkaAcquiring, ozon, wb, hikvision, cdek, tapo] = await Promise.all([
+    const [email, telephony, max, telegram, vkAuth, vkMarket, vkCommunity, yandex, dgis, beget, pskovline, onec, tochka, vpn, diadoc, tochkaAcquiring, ozon, wb, hikvision, cdek, tapo, rss] = await Promise.all([
       prisma.emailSettings.findFirst({ select: { isActive: true } }),
       prisma.telephonySettings.findFirst({ select: { isActive: true } }),
       prisma.maxSettings.findFirst({ select: { isActive: true } }),
@@ -32,6 +32,7 @@ router.get('/status', async (_req, res) => {
       prisma.hikvisionPluginSettings.findFirst({ select: { isActive: true } }),
       prisma.cdekSettings.findFirst({ select: { isActive: true } }),
       prisma.tapoPluginSettings.findFirst({ select: { isActive: true } }),
+      prisma.rssSettings.findFirst({ select: { isActive: true, sources: { where: { isActive: true }, select: { id: true } } } }),
     ]);
     res.json({
       email: email?.isActive ?? false,
@@ -57,6 +58,7 @@ router.get('/status', async (_req, res) => {
       hikvision: hikvision?.isActive ?? false,
       cdek: cdek?.isActive ?? false,
       tapo: tapo?.isActive ?? false,
+      rss: (rss?.isActive ?? false) && (rss?.sources?.length ?? 0) > 0,
     });
   } catch (err: any) {
     console.error('[integrations] status error:', err.message);
