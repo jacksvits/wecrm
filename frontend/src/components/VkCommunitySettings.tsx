@@ -16,6 +16,10 @@ interface VkCommunitySettingsData {
   confirmationString: string;
   hasToken?: boolean;
   wallAccessToken: string;
+  wallAppId: string;
+  wallAppSecret: string;
+  hasWallAppId?: boolean;
+  hasWallAppSecret?: boolean;
   hasWallToken?: boolean;
 }
 
@@ -25,6 +29,8 @@ export function VkCommunitySettings() {
     groupId: "",
     accessToken: "",
     wallAccessToken: "",
+    wallAppId: "",
+    wallAppSecret: "",
     defaultCreatorId: null,
     defaultProjectId: null,
     assigneeIds: [],
@@ -37,6 +43,7 @@ export function VkCommunitySettings() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+  const [wallConnectMsg, setWallConnectMsg] = useState("");
 
   useEffect(() => {
     api.vkCommunitySettings.get().then((s: any) => {
@@ -47,6 +54,10 @@ export function VkCommunitySettings() {
           accessToken: "",
           wallAccessToken: "",
           hasWallToken: s.hasWallToken,
+          wallAppId: "",
+          wallAppSecret: "",
+          hasWallAppId: s.hasWallAppId,
+          hasWallAppSecret: s.hasWallAppSecret,
           defaultCreatorId: s.defaultCreatorId || null,
           defaultProjectId: s.defaultProjectId || null,
           assigneeIds: s.assigneeIds || [],
@@ -61,6 +72,16 @@ export function VkCommunitySettings() {
     api.users.list().then(setUsers).catch(() => {});
     api.projects.list().then(setProjects).catch(() => {});
   }, []);
+
+  const connectWall = async () => {
+    setWallConnectMsg("");
+    try {
+      const r = await fetch("/api/vk-community-settings/wall-auth-url");
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Ошибка");
+      window.open(j.url, "_blank");
+    } catch (e: any) { setWallConnectMsg(e.message); }
+  };
 
   const save = async () => {
     setLoading(true);
@@ -126,6 +147,35 @@ export function VkCommunitySettings() {
         2) откройте: <code>https://oauth.vk.com/authorize?client_id=ВАШ_ID&amp;redirect_uri=https://oauth.vk.com/blank.html&amp;scope=wall,photos&amp;response_type=token&amp;v=5.199</code>;
         3) подтвердите доступ и скопируйте access_token из адресной строки. Если ВК пишет «application is disabled» — включите Standalone-платформу в разделе «Разработка» приложения.
       </div>
+      <label style={labelStyle}>App ID Standalone-приложения</label>
+      <input
+        style={inputStyle}
+        value={form.wallAppId}
+        onChange={(e) => setForm({ ...form, wallAppId: e.target.value })}
+        placeholder={form.hasWallAppId ? "Сохранён — введите новый, чтобы заменить" : "ID приложения vk.com/dev"}
+      />
+      <label style={labelStyle}>Secure key приложения</label>
+      <input
+        style={inputStyle}
+        type="password"
+        value={form.wallAppSecret}
+        onChange={(e) => setForm({ ...form, wallAppSecret: e.target.value })}
+        placeholder={form.hasWallAppSecret ? "Сохранён — введите новый, чтобы заменить" : "Защищённый ключ приложения"}
+      />
+      <button
+        type="button"
+        onClick={connectWall}
+        disabled={loading}
+        style={{...inputStyle, cursor: "pointer", background: "#0077FF", color: "#fff", border: "none", fontWeight: 500 }}
+      >
+        Подключить публикацию на стене (авторизация ВК)
+      </button>
+      {wallConnectMsg && <div style={{ fontSize: 12, color: "#dc2626", marginTop: 6 }}>{wallConnectMsg}</div>}
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.5 }}>
+        В настройках приложения ВК (Разработка) добавьте доверенный redirect URI: <code>https://welans.cc/api/vk-community-settings/wall-callback</code>.
+        Затем сохраните настройки здесь и нажмите кнопку — подтвердите вход в ВК. Токен не привязан к IP (кодовый поток с Secure key) и хранится в CRM.
+      </div>
+
       <label style={labelStyle}>Callback Secret (для VK Callback API)</label>
       <input
         style={inputStyle}
