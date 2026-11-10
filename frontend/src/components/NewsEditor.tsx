@@ -46,6 +46,11 @@ export function NewsEditor() {
 
   // Состояния UI
   const [saving, setSaving] = useState(false);
+  // Публикация в ВК (плагин «ВК сообщество»)
+  const [publishingVk, setPublishingVk] = useState(false);
+  const [vkPublished, setVkPublished] = useState<{ postId: number; url: string; publishedAt: string } | null>(null);
+  const [vkError, setVkError] = useState('');
+  const [vkGroupId, setVkGroupId] = useState<number | null>(null);
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState('');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -62,6 +67,10 @@ export function NewsEditor() {
     if (isEdit && id) {
       loadNews();
     }
+    // group_id нужен для ссылки на уже опубликованный пост
+    api.vkCommunitySettings.get()
+      .then(s => setVkGroupId(s?.groupId ?? null))
+      .catch(() => setVkGroupId(null));
   }, [id]);
 
   const loadCategories = async () => {
@@ -94,6 +103,10 @@ export function NewsEditor() {
       setLabels(n.labels?.join(', ') || '');
       setIsPublished(n.isPublished || false);
       setPinnedToHome(n.pinnedToHome || false);
+      setVkPublished(n.vkPostId && n.vkPublishedAt
+        ? { postId: n.vkPostId, url: '', publishedAt: n.vkPublishedAt }
+        : null);
+      setVkError(n.vkPublishError || '');
     } catch (e: any) {
       setError('Не удалось загрузить новость');
     }
@@ -212,6 +225,21 @@ export function NewsEditor() {
       setError(e.message || 'Ошибка сохранения');
     }
     setSaving(false);
+  };
+
+  // Публикация новости постом на стене группы ВК (кнопка «Опубликовать в ВК»)
+  const handlePublishToVk = async () => {
+    if (!id) return;
+    if (vkPublished?.postId && !window.confirm('Новость уже публиковалась в ВК. Опубликовать ещё один пост?')) return;
+    setVkError('');
+    setPublishingVk(true);
+    try {
+      const res = await api.news.publishToVk(id);
+      setVkPublished({ postId: res.postId, url: res.url, publishedAt: res.publishedAt });
+    } catch (e: any) {
+      setVkError(e.message || 'Не удалось опубликовать в ВК');
+    }
+    setPublishingVk(false);
   };
 
   const handleCreateCategory = async () => {
@@ -650,6 +678,56 @@ export function NewsEditor() {
           {saving ? 'Публикация...' : (isEdit ? 'Сохранить и опубликовать' : 'Опубликовать')}
         </button>
       </div>
+
+      {/* Публикация в ВК */}
+      {isEdit && (
+        <div style={{ marginTop: 16 }}>
+          <button
+            onClick={handlePublishToVk}
+            disabled={publishingVk || saving || !isPublished}
+            title={!isPublished ? 'Сначала опубликуйте новость в CRM' : undefined}
+            style={{
+              padding: '10px 24px',
+              borderRadius: 10,
+              background: '#0077FF',
+              color: '#fff',
+              border: 'none',
+              cursor: publishingVk || saving || !isPublished ? 'not-allowed' : 'pointer',
+              fontSize: 14,
+              fontWeight: 500,
+              opacity: publishingVk || saving || !isPublished ? 0.6 : 1,
+            }}
+          >
+            {publishingVk ? 'Публикация в ВК...' : '📣 Опубликовать в ВК'}
+          </button>
+          {vkPublished && vkGroupId && (
+            <div style={{ marginTop: 10, fontSize: 13, color: 'var(--text-secondary)' }}>
+              ✅ Опубликовано в ВК:{" "}
+              <a
+                href={vkPublished.url || `https://vk.com/wall-${vkGroupId}_${vkPublished.postId}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: '#007AFF' }}
+              >
+                открыть пост
+              </a>
+              {' · '}{new Date(vkPublished.publishedAt).toLocaleString('ru-RU')}
+            </div>
+          )}
+          {vkError && (
+            <div style={{
+              marginTop: 10,
+              padding: '10px 14px',
+              borderRadius: 10,
+              background: '#fee2e2',
+              color: '#dc2626',
+              fontSize: 13,
+            }}>
+              Ошибка публикации в ВК: {vkError}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Модал создания категории */}
       {showCategoryModal && (

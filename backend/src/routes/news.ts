@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, optionalAuthMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
+import { publishNewsToVk } from '../lib/vk-wall.js';
 
 const router = Router();
 
@@ -510,6 +511,39 @@ router.delete('/:id', requireUser, async (req, res) => {
  * GET /api/news/categories/list
  * Получить все категории с подкатегориями
  */
+/**
+ * POST /api/news/:id/publish-to-vk
+ * Опубликовать новость постом на стене группы ВК (плагин «ВК сообщество»)
+ */
+router.post('/:id/publish-to-vk', requireUser, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (user.role !== 'admin' && user.canEditNews === false) {
+      return res.status(403).json({ error: 'У вашей роли нет права редактировать новости' });
+    }
+    const existing = await prisma.news.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Новость не найдена' });
+    }
+    // Публиковать может автор или админ (как редактирование)
+    if (existing.authorId !== user.id && user.role !== 'admin') {
+      return res.status(403).json({ error: 'Нет прав на редактирование' });
+    }
+    const result = await publishNewsToVk(existing.id);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    console.error('[news:publish-to-vk]', err);
+    // Сохраняем ошибку на новости для отображения в редакторе
+    try {
+      await prisma.news.update({
+        where: { id: req.params.id },
+        data: { vkPublishError: (err.message || 'Ошибка публикации').slice(0, 500) },
+      });
+    } catch {}
+    res.status(502).json({ error: err.message || 'Не удалось опубликовать в ВК' });
+  }
+});
+
 router.get('/categories/list', async (_req, res) => {
   try {
     const categories = await prisma.newsCategory.findMany({

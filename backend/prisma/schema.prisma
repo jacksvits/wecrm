@@ -1122,6 +1122,9 @@ model News {
   pinnedToHome  Boolean  @default(false) @map("pinned_to_home")
   publishedAt   DateTime? @map("published_at")
   views         Int      @default(0)
+  vkPostId      Int?     @map("vk_post_id")
+  vkPublishedAt DateTime? @map("vk_published_at")
+  vkPublishError String? @map("vk_publish_error")
   labels        String[] @default([])
   authorId      String
   author        User     @relation(fields: [authorId], references: [id])
