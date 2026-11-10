@@ -323,7 +323,8 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} consent={consent} />
-      <div style={{ maxWidth: 860, margin: '0 auto', padding: '20px 24px 60px' }}>
+      {/* Карточка новости — та же, что в CRM (NewsDetail.tsx): рамка, фон, тень */}
+      <div style={{ maxWidth: 800, margin: '0 auto 40px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow)' }}>
         <button
           onClick={() => navigate('/news')}
           style={{
@@ -385,7 +386,7 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
         </div>
 
         <div
-          className="news-content"
+          className="rich-text"
           style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--text-color)' }}
           dangerouslySetInnerHTML={{ __html: safeHtml(news.content || '') }}
         />
