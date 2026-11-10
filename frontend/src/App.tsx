@@ -75,7 +75,7 @@ function App() { const { user, loading } = useAuth() ; const location = useLocat
   if (['welans.org', 'www.welans.org'].includes(window.location.hostname) && location.pathname === '/') { return ( <><InstallAppBanner /><OrgLogin /></> ) ; }
   if (location.pathname === '/org-login') { return ( <><InstallAppBanner /><OrgLogin /></> ) ; } if (location.pathname === '/register') { return ( <><InstallAppBanner /><Register /></> ) ; } if (location.pathname === '/presentation') { return ( <><InstallAppBanner /><Presentation /></> ) ; } if (location.pathname === '/shop') { return ( <PublicVitrine /> ) ; } if (location.pathname === '/vitrine') { return <Navigate to='/shop' replace /> ; } // welans.click: без сессии — авто-вход гостем; с сессией корень домена — сразу «Файлы»
   // Перенесённые новости WordPress открываются без входа по прежнему адресу /<slug>/.
-  if (WELANS_RU_HOSTS.includes(window.location.hostname) && /^\/[^/]+\/?$/.test(location.pathname)) {
+  if (WELANS_RU_HOSTS.includes(window.location.hostname) && /^\/[^/]+\/?$/.test(location.pathname) && location.pathname !== '/news') {
     return <PublicNews /> ;
   }
   if (FILES_HOSTS.includes(window.location.hostname)) {
