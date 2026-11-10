@@ -25,11 +25,23 @@ router.get('/public/:slug', async (req, res) => {
         coverImage: true,
         sourceUrl: true,
         publishedAt: true,
+        createdAt: true,
+        views: true,
+        author: { select: { name: true } },
         category: { select: { id: true, name: true, slug: true, color: true } },
       },
     });
     if (!news) return res.status(404).json({ error: 'Новость не найдена' });
-    res.json(news);
+    const reactionCounts = await prisma.newsReaction.groupBy({
+      by: ['type'],
+      where: { newsId: news.id },
+      _count: { _all: true },
+    });
+    res.json({
+      ...news,
+      likes: reactionCounts.find((c) => c.type === 'like')?._count._all || 0,
+      dislikes: reactionCounts.find((c) => c.type === 'dislike')?._count._all || 0,
+    });
   } catch (err: any) {
     console.error('[news:public]', err);
     res.status(500).json({ error: 'Не удалось загрузить новость' });

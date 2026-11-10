@@ -253,7 +253,7 @@ function PublicNewsList() {
   );
 }
 
-function PublicNewsDetail({ id }: { id: string }) {
+export function PublicNewsDetail({ id, slug }: { id?: string; slug?: string }) {
   const navigate = useNavigate();
   const defaultCover = useBrandNewsCover();
   const [news, setNews] = useState<any>(null);
@@ -261,9 +261,24 @@ function PublicNewsDetail({ id }: { id: string }) {
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    api.news.get(id).then(setNews).catch(() => setNotFound(true));
-    api.news.comments(id).then((res: any) => setComments(Array.isArray(res) ? res : res?.comments ?? [])).catch(() => {});
-  }, [id]);
+    if (slug) {
+      // Старые ссылки welans.ru/<slug>/ — новость ищется по WP-slug
+      fetch(`/api/news/public/${encodeURIComponent(slug)}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error('not found'))))
+        .then(setNews)
+        .catch(() => setNotFound(true));
+    } else if (id) {
+      api.news.get(id).then(setNews).catch(() => setNotFound(true));
+    }
+  }, [id, slug]);
+
+  useEffect(() => {
+    if (news?.id) {
+      api.news.comments(news.id)
+        .then((res: any) => setComments(Array.isArray(res) ? res : res?.comments ?? []))
+        .catch(() => {});
+    }
+  }, [news?.id]);
 
   if (notFound) {
     return (
