@@ -80,6 +80,7 @@ import hikvisionPluginRoutes from './routes/hikvision-plugin.js';
 import tapoPluginRouter from './routes/tapo-plugin.js';
 import handlerSettingsRoutes from './routes/handler-settings.js';
 import seoSettingsRoutes from './routes/seo-settings.js';
+import publicSeoRoutes from './routes/public-seo.js';
 import pwaRoutes from './routes/pwa.js';
 import autoReplySettingsRoutes from './routes/auto-reply-settings.js';
 import legalRoutes from './routes/legal.js';
@@ -250,6 +251,7 @@ app.use('/api/hikvision-plugin', hikvisionPluginRoutes);
 app.use('/api/tapo-plugin', tapoPluginRouter);
 app.use('/api/handler-settings', handlerSettingsRoutes);
 app.use('/api/seo-settings', seoSettingsRoutes);
+app.use('/api/seo', publicSeoRoutes);
 // PWA с данными tenant'а: index.html (мета-теги iOS «Добавить на экран Домой»)
 // и manifest.json. Пути корневые — tenantMiddleware применяем точечно.
 app.use(['/pwa-index', '/manifest.json'], tenantMiddleware);
