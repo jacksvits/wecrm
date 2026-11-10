@@ -15,6 +15,7 @@ import { VpnSettings } from "./VpnSettings";
 import { UserList } from "./UserList";
 import { VkAuthSettings } from "./VkAuthSettings";
 import { VkMarketSettings } from "./VkMarketSettings";
+import { RssSettings } from "./RssSettings";
 import { VkCommunitySettings } from "./VkCommunitySettings";
 import { ContactTypeManager } from "./ContactTypeManager";
 import { SmsJournal } from "./SmsJournal";
@@ -36,7 +37,7 @@ import { ScheduleSettings } from "./ScheduleSettings";
 import { SecuritySettings } from "./SecuritySettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "schedule" | "integrations" | "security" | "system";
-type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "wb" | "vpn" | "hikvision" | "cdek" | "tapo";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "wb" | "vpn" | "hikvision" | "cdek" | "tapo" | "rss";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
 const PLUGINS: { key: PluginKey; label: string; group: string; description: string; helpSlug: string }[] = [
@@ -62,6 +63,7 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "hikvision", helpSlug: "int-hikvision", label: "Камеры Hik-Connect", group: "Видеонаблюдение", description: "Онлайн-просмотр облачных камер Hik-Connect по логину/паролю аккаунта" },
   { key: "tapo", helpSlug: "int-tapo", label: "Камеры Tapo", group: "Видеонаблюдение", description: "Онлайн-просмотр облачных камер TP-Link Tapo по логину/паролю аккаунта (для администраторов)" },
   { key: "cdek", helpSlug: "int-cdek", label: "CDEK", group: "Логистика", description: "Доставка заказов СДЭК: калькулятор стоимости, накладные, трекинг, квитанции" },
+  { key: "rss", helpSlug: "int-rss", label: "Парсинг RSS", group: "Контент", description: "Автоматический сбор новостей из RSS-лент в категорию «Коротко о свежем» (механика wprss_feed)" },
 ];
 
 function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
@@ -88,6 +90,7 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
     hikvision: "M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z",
     tapo: "M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z",
     cdek: "M3 7h11v10H3zM14 10h4l3 3v4h-7zM7 21a2 2 0 100-4 2 2 0 000 4zM18 21a2 2 0 100-4 2 2 0 000 4zM1 17h2M14 17h-1",
+    rss: "M4 19a1 1 0 100-2 1 1 0 000 2zM4 15a5 5 0 015 5M4 11a9 9 0 019 9M4 7a13 13 0 0113 13",
   };
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -146,6 +149,8 @@ function renderPluginSettings(pluginKey: PluginKey) {
       return <TapoSettings />;
     case "cdek":
       return <CdekSettings />;
+    case "rss":
+      return <RssSettings />;
     default:
       return null;
   }
@@ -187,6 +192,7 @@ export function Settings() {
     wb: false,
     vpn: false,
     cdek: false,
+    rss: false,
   });
   useEffect(() => {
     if (!helpSlug) return;
