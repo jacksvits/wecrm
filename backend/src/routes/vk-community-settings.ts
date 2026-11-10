@@ -7,9 +7,8 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 // ===== Настройки плагина «ВК сообщество» =====
 const router = Router();
 // ===== Authorization Code Flow для «Токена публикации на стене» =====
-// Implicit-токены (response_type=token) ВК привязывает к IP выдачи — с сервера они не работают (Error 5).
-// Поэтому response_type=code: обмен кода на токен идёт сервер-сервер с client_secret,
-// и токен к IP не привязан.
+// Implicit-токены ВК привязаны к IP выдачи (Error 5 с сервера) — поэтому code flow:
+// ВК возвращает код на наш сервер, сервер обменивает его на токен с Secure key.
 const WALL_REDIRECT_URI = 'https://welans.cc/api/vk-community-settings/wall-callback';
 
 router.get('/wall-callback', async (req, res) => {
@@ -27,6 +26,19 @@ router.get('/wall-callback', async (req, res) => {
       code,
       v: '5.199',
     });
+    const r = await fetch('https://oauth.vk.com/access_token?' + qs.toString());
+    const j: any = await r.json();
+    if (!j.access_token) return res.status(502).send('ВК не выдал токен: ' + JSON.stringify(j).slice(0, 300));
+    await prisma.vkCommunitySettings.update({
+      where: { id: s.id },
+      data: { wallAccessToken: j.access_token as string, wallOAuthState: null },
+    });
+    res.send('<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>WeLANS CRM</title></head><body style="font-family:sans-serif;padding:40px"><h2>✅ Публикация на стене подключена</h2><p>Токен сохранён в CRM. Это окно можно закрыть.</p></body></html>');
+  } catch (err) {
+    console.error('[vk-wall-callback]', err);
+    res.status(500).send('Ошибка подключения');
+  }
+});
 
 router.use(authMiddleware);
 
@@ -42,7 +54,6 @@ const settingsSchema = z.object({
   groupId: z.number().int().min(1),
   // Пустая строка = «токен не меняем» (UI очищает поле после загрузки)
   accessToken: z.string().default(''),
-  // Пустая строка = «не меняем»
   wallAccessToken: z.string().default(''),
   wallAppId: z.string().default(''),
   wallAppSecret: z.string().default(''),
@@ -115,21 +126,6 @@ router.get('/wall-auth-url', async (req, res) => {
   } catch (err) {
     console.error('[vk-wall-auth]', err);
     res.status(500).json({ error: 'Не удалось построить ссылку авторизации' });
-  }
-});
-
-
-    const r = await fetch('https://oauth.vk.com/access_token?' + qs.toString());
-    const j: any = await r.json();
-    if (!j.access_token) return res.status(502).send('ВК не выдал токен: ' + JSON.stringify(j).slice(0, 300));
-    await prisma.vkCommunitySettings.update({
-      where: { id: s.id },
-      data: { wallAccessToken: j.access_token as string, wallOAuthState: null },
-    });
-    res.send('<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>WeLANS CRM</title></head><body style="font-family:sans-serif;padding:40px"><h2>✅ Публикация на стене подключена</h2><p>Токен сохранён в CRM. Это окно можно закрыть.</p></body></html>');
-  } catch (err) {
-    console.error('[vk-wall-callback]', err);
-    res.status(500).send('Ошибка подключения');
   }
 });
 
