@@ -610,9 +610,11 @@ export function Login() {
           </p>
 
           <footer className="login-legal-footer" aria-label="Юридические документы">
-            <a href="/offer">Договор публичной оферты</a>
-            <span aria-hidden="true">·</span>
-            <a href="/privacy">Политика конфиденциальности</a>
+            <span className="login-legal-group">
+              <a href="/offer">Договор публичной оферты</a>
+              <span aria-hidden="true">·</span>
+              <a href="/privacy">Политика конфиденциальности</a>
+            </span>
             <span aria-hidden="true">·</span>
             <a href="/cookies">Политика использования cookies</a>
           </footer>
