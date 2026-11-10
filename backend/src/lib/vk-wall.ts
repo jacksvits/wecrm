@@ -47,6 +47,8 @@ export interface VkPublishResult {
   postId: number;
   url: string;
   publishedAt: Date;
+  // true — пост запланирован на ~2 минуты: к моменту выхода на стену ВК уже прикрепит превью обложки
+  scheduled: boolean;
   // true — обложка добавлена ссылкой-превью (вложить фото токен не умеет)
   coverAsLink: boolean;
 }
@@ -83,11 +85,27 @@ export async function publishNewsToVk(newsId: string): Promise<VkPublishResult> 
   const cover = coverLink(news);
   const message = [news.title, truncated, cover, link].filter(Boolean).join('\n\n');
 
-  const post = await api('wall.post', {
-    owner_id: -settings.groupId,
-    from_group: 1,
-    message,
-  }, settings.accessToken);
+  // Публикуем отложенно на ~2 минуты: ВК обрабатывает ссылку в момент планирования,
+  // и пост выходит на стену уже с прикреплённым превью обложки.
+  // Если отложенные записи недоступны токену — повторяем без publish_date (мгновенно).
+  let post: any;
+  let scheduled = true;
+  try {
+    post = await api('wall.post', {
+      owner_id: -settings.groupId,
+      from_group: 1,
+      message,
+      publish_date: Math.floor(Date.now() / 1000) + 120,
+    }, settings.accessToken);
+  } catch (err: any) {
+    console.warn('[vk-wall] отложенная публикация недоступна, публикуем сразу:', err?.message);
+    scheduled = false;
+    post = await api('wall.post', {
+      owner_id: -settings.groupId,
+      from_group: 1,
+      message,
+    }, settings.accessToken);
+  }
 
   const postId = post.post_id as number;
   const url = `https://vk.com/wall-${settings.groupId}_${postId}`;
@@ -96,5 +114,5 @@ export async function publishNewsToVk(newsId: string): Promise<VkPublishResult> 
     where: { id: news.id },
     data: { vkPostId: postId, vkPublishedAt: publishedAt, vkPublishError: null },
   });
-  return { postId, url, publishedAt, coverAsLink: !!cover };
+  return { postId, url, publishedAt, scheduled, coverAsLink: !!cover };
 }

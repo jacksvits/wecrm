@@ -48,7 +48,7 @@ export function NewsEditor() {
   const [saving, setSaving] = useState(false);
   // Публикация в ВК (плагин «ВК сообщество»)
   const [publishingVk, setPublishingVk] = useState(false);
-  const [vkPublished, setVkPublished] = useState<{ postId: number; url: string; publishedAt: string; coverAsLink?: boolean } | null>(null);
+  const [vkPublished, setVkPublished] = useState<{ postId: number; url: string; publishedAt: string; coverAsLink?: boolean; scheduled?: boolean } | null>(null);
   const [vkError, setVkError] = useState('');
   const [vkGroupId, setVkGroupId] = useState<number | null>(null);
   const [loading, setLoading] = useState(isEdit);
@@ -235,7 +235,7 @@ export function NewsEditor() {
     setPublishingVk(true);
     try {
       const res = await api.news.publishToVk(id);
-      setVkPublished({ postId: res.postId, url: res.url, publishedAt: res.publishedAt, coverAsLink: res.coverAsLink });
+      setVkPublished({ postId: res.postId, url: res.url, publishedAt: res.publishedAt, coverAsLink: res.coverAsLink, scheduled: res.scheduled });
     } catch (e: any) {
       setVkError(e.message || 'Не удалось опубликовать в ВК');
     }
@@ -702,7 +702,10 @@ export function NewsEditor() {
           </button>
           {vkPublished && vkGroupId && (
             <div style={{ marginTop: 10, fontSize: 13, color: 'var(--text-secondary)' }}>
-              ✅ Опубликовано в ВК:{" "}
+              ✅ Пост в ВК создан:{" "}
+              {vkPublished.scheduled && (
+                <span style={{ color: "var(--text-secondary)" }}> (на стене появится через ~2 минуты — так превью обложки прикрепляется сразу)</span>
+              )}
               <a
                 href={vkPublished.url || `https://vk.com/wall-${vkGroupId}_${vkPublished.postId}`}
                 target="_blank"
