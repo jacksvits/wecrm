@@ -7,6 +7,7 @@ interface VkCommunitySettingsData {
   isActive: boolean;
   groupId: string;
   accessToken: string;
+  wallAccessToken: string;
   defaultCreatorId: string | null;
   defaultProjectId: string | null;
   assigneeIds: string[];
@@ -15,6 +16,7 @@ interface VkCommunitySettingsData {
   callbackSecret: string;
   confirmationString: string;
   hasToken?: boolean;
+  hasWallToken?: boolean;
 }
 
 export function VkCommunitySettings() {
@@ -22,6 +24,7 @@ export function VkCommunitySettings() {
     isActive: true,
     groupId: "",
     accessToken: "",
+    wallAccessToken: "",
     defaultCreatorId: null,
     defaultProjectId: null,
     assigneeIds: [],
@@ -42,6 +45,7 @@ export function VkCommunitySettings() {
           isActive: s.isActive ?? false,
           groupId: s.groupId?.toString() || "",
           accessToken: "",
+          wallAccessToken: "",
           defaultCreatorId: s.defaultCreatorId || null,
           defaultProjectId: s.defaultProjectId || null,
           assigneeIds: s.assigneeIds || [],
@@ -50,6 +54,7 @@ export function VkCommunitySettings() {
           callbackSecret: s.callbackSecret || "",
           confirmationString: s.confirmationString || "",
           hasToken: s.hasToken,
+          hasWallToken: s.hasWallToken,
         });
       }
     }).catch(() => {});
@@ -107,6 +112,23 @@ export function VkCommunitySettings() {
         onChange={(e) => setForm({ ...form, accessToken: e.target.value })}
         placeholder={form.hasToken ? "Сохранён — введите новый, чтобы заменить" : "Введите токен"}
       />
+      <label style={labelStyle}>Токен публикации на стене (пользовательский)</label>
+      <input
+        style={inputStyle}
+        type="password"
+        value={form.wallAccessToken}
+        onChange={(e) => setForm({ ...form, wallAccessToken: e.target.value })}
+        placeholder={form.hasWallToken ? "Сохранён — введите новый, чтобы заменить" : "Вставьте access_token"}
+      />
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.5 }}>
+        Нужен, чтобы публиковать посты с фото: токен сообщества фото на стену прикреплять не умеет (VK Error 27).
+        Как получить (один раз, токен бессрочный):{" "}
+        1) создайте Standalone-приложение на vk.com/dev и скопируйте его ID;{" "}
+        2) откройте в браузере (подставьте ID):{" "}
+        <code>https://oauth.vk.com/authorize?client_id=ВАШ_APP_ID&amp;display=page&amp;redirect_uri=https://oauth.vk.com/blank.html&amp;scope=wall,photos,offline&amp;response_type=token&amp;v=5.199</code>;{" "}
+        3) после подтверждения скопируйте <code>access_token</code> из адресной строки и вставьте выше.
+        Без токена посты публикуются текстом без фото.
+      </div>
       <label style={labelStyle}>Callback Secret (для VK Callback API)</label>
       <input
         style={inputStyle}

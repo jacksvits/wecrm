@@ -1,16 +1,19 @@
 import { prisma } from './prisma.js';
 import { htmlToText } from './html-to-text.js';
 import { uploadsRoot, tenantUploadPrefix } from './tenant.js';
-import { getFreshMarketToken } from './vk-market.js';
 import fs from 'fs';
 import path from 'path';
 
 // ===== Публикация новости постом на стену группы ВК (плагин «ВК сообщество») =====
-// ВАЖНО: методы стены недоступны с токеном сообщества (VK Error 27 «method is
-// unavailable with group auth») — постим пользовательским токеном VK ID
-// (scope wall, выдаётся кнопкой «Получить токен маркета» в Настройки → ВК товары)
-// от имени администратора группы (from_group=1, owner_id=-groupId).
-// Автообновление токена — общее с маркетом (getFreshMarketToken, refresh_token).
+// Ограничения токенов ВК (проверено на живом API в 2026):
+// — токен сообщества (из настроек группы): wall.post (текст) РАБОТАЕТ, а загрузка
+//   фото на стену (photos.getWallUploadServer) — Error 27 «method is unavailable with group auth»;
+// — токен VK ID (vk2.a, OAuth входа): только чтение, писать не может (Error 15/1051);
+// — классический пользовательский токен (vk1.a, implicit flow oauth.vk.com,
+//   redirect_uri=https://oauth.vk.com/blank.html, scope=wall,photos,offline): работает всё —
+//   и пост от имени группы (from_group=1), и загрузка фото.
+// Поэтому: есть wallAccessToken (пользовательский) — пост с фото; нет — текстовый пост
+// токеном сообщества, фото пропускается (признак photoSkipped).
 
 const VK_API_VERSION = '5.199';
 // Лимит ВК на текст поста ~16384 симв. — оставляем запас под ссылку
@@ -36,24 +39,6 @@ async function api(method: string, params: Record<string, any>, accessToken: str
   return json.response;
 }
 
-// Вызывает method пользовательским токеном; при VK Error 5 («User authorization
-// failed» — токен отозван/просрочен) — принудительный рефреш и один повтор
-async function apiAsUser(method: string, params: Record<string, any>): Promise<any> {
-  const token = await getFreshMarketToken();
-  if (!token) {
-    throw new Error('Для публикации на стене нужен пользовательский токен ВК с правом wall — нажмите «Получить токен маркета» в Настройки → ВК товары (выдача токена теперь включает право wall)');
-  }
-  try {
-    return await api(method, params, token);
-  } catch (err: any) {
-    if (err?.vkCode === 5) {
-      const fresh = await getFreshMarketToken(true);
-      if (fresh && fresh !== token) return await api(method, params, fresh);
-    }
-    throw err;
-  }
-}
-
 // Скачивает внешнюю картинку во временный файл (удаляется после загрузки во ВК)
 async function downloadToTmp(url: string): Promise<string> {
   const res = await fetch(url);
@@ -75,9 +60,10 @@ async function resolveCoverImage(coverImage: string): Promise<string> {
   return '/app' + coverImage;
 }
 
-// Загрузка фото на стену: photos.getWallUploadServer → multipart на upload_url → photos.saveWallPhoto
-async function uploadWallPhoto(groupId: number, imagePath: string): Promise<string> {
-  const upload = await apiAsUser('photos.getWallUploadServer', { group_id: groupId });
+// Загрузка фото на стену (только классическим пользовательским токеном):
+// photos.getWallUploadServer → multipart на upload_url → photos.saveWallPhoto
+async function uploadWallPhoto(accessToken: string, groupId: number, imagePath: string): Promise<string> {
+  const upload = await api('photos.getWallUploadServer', { group_id: groupId }, accessToken);
   const form = new FormData();
   form.append('photo', new Blob([fs.readFileSync(imagePath)]), path.basename(imagePath));
   const upRes = await fetch(upload.upload_url, { method: 'POST', body: form });
@@ -85,12 +71,12 @@ async function uploadWallPhoto(groupId: number, imagePath: string): Promise<stri
   if (!upRes.ok || upJson.error) {
     throw new Error(`VK upload error: ${JSON.stringify(upJson).slice(0, 300)}`);
   }
-  const saved = await apiAsUser('photos.saveWallPhoto', {
+  const saved = await api('photos.saveWallPhoto', {
     group_id: groupId,
     server: upJson.server,
     photo: upJson.photo,
     hash: upJson.hash,
-  });
+  }, accessToken);
   const photo = saved?.[0];
   if (!photo) throw new Error('ВК не вернул сохранённое фото');
   return `photo${photo.owner_id}_${photo.id}`;
@@ -100,12 +86,20 @@ export interface VkPublishResult {
   postId: number;
   url: string;
   publishedAt: Date;
+  // true — токен сообщества не умеет прикреплять фото, пост ушёл текстом
+  photoSkipped: boolean;
 }
 
 export async function publishNewsToVk(newsId: string): Promise<VkPublishResult> {
   const settings = await prisma.vkCommunitySettings.findFirst();
   if (!settings) {
     throw new Error('Плагин «ВК сообщество» не настроен (Настройки)');
+  }
+  if (!settings.isActive) {
+    throw new Error('Плагин «ВК сообщество» выключен');
+  }
+  if (!settings.accessToken && !settings.wallAccessToken) {
+    throw new Error('Нет ни токена сообщества, ни пользовательского токена публикации');
   }
 
   const news = await prisma.news.findUnique({
@@ -127,24 +121,41 @@ export async function publishNewsToVk(newsId: string): Promise<VkPublishResult> 
   const link = isPublic ? `https://welans.ru/${news.slug || news.id}/` : null;
   const message = [news.title, truncated, link].filter(Boolean).join('\n\n');
 
+  // Фото прикрепляем только классическим пользовательским токеном;
+  // с токеном сообщества загрузка фото недоступна (VK Error 27) — постим текстом
   let attachment: string | null = null;
+  let photoSkipped = false;
   let tmpFile: string | null = null;
   if (news.coverImage) {
-    const local = await resolveCoverImage(news.coverImage);
-    tmpFile = local.startsWith('/tmp/') ? local : null;
-    try {
-      attachment = await uploadWallPhoto(settings.groupId, local);
-    } finally {
-      if (tmpFile && fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+    if (settings.wallAccessToken) {
+      const local = await resolveCoverImage(news.coverImage);
+      tmpFile = local.startsWith('/tmp/') ? local : null;
+      try {
+        attachment = await uploadWallPhoto(settings.wallAccessToken, settings.groupId, local);
+      } finally {
+        if (tmpFile && fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+      }
+    } else {
+      photoSkipped = true;
     }
   }
 
-  const post = await apiAsUser('wall.post', {
-    owner_id: -settings.groupId,
-    from_group: 1,
-    message,
-    ...(attachment ? { attachments: attachment } : {}),
-  });
+  // wall.post: пользовательским токеном — полный пост, токеном сообщества — текст
+  const token = settings.wallAccessToken || settings.accessToken!;
+  let post: any;
+  try {
+    post = await api('wall.post', {
+      owner_id: -settings.groupId,
+      from_group: 1,
+      message,
+      ...(attachment ? { attachments: attachment } : {}),
+    }, token);
+  } catch (err: any) {
+    if (err?.vkCode === 27) {
+      throw new Error('Токен не позволяет публиковать на стене — добавьте пользовательский токен публикации в Настройки → ВК сообщество (как получить: подсказка под полем)');
+    }
+    throw err;
+  }
 
   const postId = post.post_id as number;
   const url = `https://vk.com/wall-${settings.groupId}_${postId}`;
@@ -153,5 +164,5 @@ export async function publishNewsToVk(newsId: string): Promise<VkPublishResult> 
     where: { id: news.id },
     data: { vkPostId: postId, vkPublishedAt: publishedAt, vkPublishError: null },
   });
-  return { postId, url, publishedAt };
+  return { postId, url, publishedAt, photoSkipped };
 }

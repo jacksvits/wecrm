@@ -1285,7 +1285,7 @@ model VkAuthSettings {
 model VkMarketSettings {
   id                String   @id @default(cuid())
   groupId           Int      @map("group_id") // группа, чей маркет синхронизируем (owner_id = -groupId)
-  marketToken       String?  @map("market_token") // пользовательский токен со scope market photos wall (маркет + публикация на стене группы)
+  marketToken       String?  @map("market_token") // пользовательский токен с scope market (импорт/синхронизация товаров)
   marketRefreshToken String? @map("market_refresh_token") // refresh_token VK ID для автообновления токена маркета
   marketDeviceId    String?  @map("market_device_id") // device_id VK ID (обязателен для refresh_token)
   marketTokenExpiresAt DateTime? @map("market_token_expires_at") // срок жизни access_token маркета
@@ -1311,6 +1311,9 @@ model VkCommunitySettings {
   id                String   @id @default(cuid())
   groupId           Int      @map("group_id")
   accessToken       String   @map("access_token")
+  // классический пользовательский токен (implicit flow oauth.vk.com, offline) — посты на стене с фото;
+  // токен сообщества фото на стену грузить не умеет (VK Error 27)
+  wallAccessToken   String?  @map("wall_access_token")
   defaultCreatorId  String?  @map("default_creator_id")
   defaultCreator    User?    @relation(fields: [defaultCreatorId], references: [id])
   defaultProjectId  String?  @map("default_project_id")

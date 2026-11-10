@@ -19,6 +19,8 @@ const settingsSchema = z.object({
   groupId: z.number().int().min(1),
   // Пустая строка = «токен не меняем» (UI очищает поле после загрузки)
   accessToken: z.string().default(''),
+  // Пустая строка = «не меняем»
+  wallAccessToken: z.string().default(''),
   defaultCreatorId: z.string().optional().nullable(),
   defaultProjectId: z.string().optional().nullable(),
   assigneeIds: z.array(z.string()).default([]),
@@ -32,8 +34,8 @@ const settingsSchema = z.object({
 router.get('/', async (_req, res) => {
   const s = await prisma.vkCommunitySettings.findFirst();
   if (!s) return res.json(null);
-  const { accessToken, ...rest } = s;
-  res.json({ ...rest, hasToken: !!accessToken });
+  const { accessToken, wallAccessToken, ...rest } = s;
+  res.json({ ...rest, hasToken: !!accessToken, hasWallToken: !!wallAccessToken });
 });
 
 router.post('/', async (req: AuthRequest, res) => {
@@ -49,12 +51,13 @@ router.post('/', async (req: AuthRequest, res) => {
       const payload: any = { ...data };
       // Пустой токен не затирает сохранённое значение (UI очищает поле после загрузки)
       if (!payload.accessToken && existing.accessToken) delete payload.accessToken;
+      if (!payload.wallAccessToken && existing.wallAccessToken) delete payload.wallAccessToken;
       s = await prisma.vkCommunitySettings.update({ where: { id: existing.id }, data: payload });
     } else {
       s = await prisma.vkCommunitySettings.create({ data: data as any });
     }
-    const { accessToken, ...rest } = s;
-    res.json({ ...rest, hasToken: !!accessToken });
+    const { accessToken, wallAccessToken, ...rest } = s;
+    res.json({ ...rest, hasToken: !!accessToken, hasWallToken: !!wallAccessToken });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }

@@ -48,7 +48,7 @@ export function NewsEditor() {
   const [saving, setSaving] = useState(false);
   // Публикация в ВК (плагин «ВК сообщество»)
   const [publishingVk, setPublishingVk] = useState(false);
-  const [vkPublished, setVkPublished] = useState<{ postId: number; url: string; publishedAt: string } | null>(null);
+  const [vkPublished, setVkPublished] = useState<{ postId: number; url: string; publishedAt: string; photoSkipped?: boolean } | null>(null);
   const [vkError, setVkError] = useState('');
   const [vkGroupId, setVkGroupId] = useState<number | null>(null);
   const [loading, setLoading] = useState(isEdit);
@@ -235,7 +235,7 @@ export function NewsEditor() {
     setPublishingVk(true);
     try {
       const res = await api.news.publishToVk(id);
-      setVkPublished({ postId: res.postId, url: res.url, publishedAt: res.publishedAt });
+      setVkPublished({ postId: res.postId, url: res.url, publishedAt: res.publishedAt, photoSkipped: res.photoSkipped });
     } catch (e: any) {
       setVkError(e.message || 'Не удалось опубликовать в ВК');
     }
@@ -712,6 +712,11 @@ export function NewsEditor() {
                 открыть пост
               </a>
               {' · '}{new Date(vkPublished.publishedAt).toLocaleString('ru-RU')}
+              {vkPublished.photoSkipped && (
+                <div style={{ marginTop: 6, color: '#b45309', fontSize: 12 }}>
+                  ⚠️ Фото не прикреплено: токен сообщества не умеет грузить фото на стену. Добавьте токен публикации (Настройки → ВК сообщество).
+                </div>
+              )}
             </div>
           )}
           {vkError && (
