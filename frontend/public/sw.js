@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wecrm-v9';
+const CACHE_NAME = 'wecrm-v10';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/favicon.ico',
@@ -33,6 +33,14 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
+
+  // Кэшируем и обрабатываем только same-origin запросы. Кросс-доменные
+  // (метрика, чужие картинки в новостях, chrome-extension://) идут в сеть
+  // напрямую без respondWith: Cache API для них падает с ошибками
+  // и засоряет консоль («Cache put failed», «Both cache and network failed»)
+  if (url.origin !== self.location.origin) {
+    return;
+  }
 
   // API and uploads — always network
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/')) {
