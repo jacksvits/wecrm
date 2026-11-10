@@ -223,7 +223,7 @@ function PublicNewsList({ consent = true }: { consent?: boolean }) {
               key={item.id}
               item={item}
               defaultCover={defaultCover}
-              onClick={() => navigate(`/news/${item.id}`)}
+              onClick={() => navigate(`/${item.slug}`)}
             />
           ))}
         </div>

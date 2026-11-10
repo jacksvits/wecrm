@@ -11,10 +11,14 @@ router.get('/public/:slug', async (req, res) => {
   try {
     const news = await prisma.news.findFirst({
       where: {
-        slug: req.params.slug,
-        isPublished: true,
-        externalId: { not: null },
-        category: { slug: 'korotko-o-svezhem' },
+        AND: [
+          // адрес /<slug>/ или старый /<id>/ (rss_72) — оба продолжают работать
+          { OR: [{ slug: req.params.slug }, { id: req.params.slug }] },
+          { isPublished: true },
+          // импортированные из WP (externalId) + новости RSS-плагина (rss_<id>)
+          { OR: [{ externalId: { not: null } }, { id: { startsWith: 'rss_' } }] },
+          { category: { slug: 'korotko-o-svezhem' } },
+        ],
       },
       select: {
         id: true,

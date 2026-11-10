@@ -79,6 +79,29 @@ function normalizeTitle(title: string): string {
   return title.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
+// Транслитерация заголовка в slug для короткого URL welans.ru/<slug>:
+// «Anthropic хотела привлечь $70 млрд на бирже, а потом передумала» →
+// «anthropic-hotela-privlech-70-mlrd-na-birzhe-a-potom-peredumala»
+const TRANSLIT_MAP: Record<string, string> = {
+  'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e', 'ж': 'zh',
+  'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
+  'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'c',
+  'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+};
+
+export function translitSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .split('')
+    .map((ch) => (TRANSLIT_MAP[ch] !== undefined ? TRANSLIT_MAP[ch] : ch))
+    .join('')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+    .replace(/-+$/g, '');
+}
+
 /** Публичный адрес новости в CRM: /news/<id> */
 function crmNewsUrl(id: string): string {
   const origin = (process.env.BACKEND_ORIGIN || 'https://welans.cc').replace(/\/+$/, '');
@@ -282,8 +305,14 @@ export async function syncRssFeeds(): Promise<RssSyncSummary> {
 
         // Публикация в CRM: id детерминирован от id архива — повторы невозможны
         const newsId = `rss_${itemId}`;
+        // URL новости — транслит заголовка; если из заголовка не вышло латиницы —
+        // технический fallback rss-<дата>-<хеш>, дальше уникальность через -2, -3…
         const datePart = (publishedAt || new Date()).toISOString().slice(0, 10).replace(/-/g, '');
-        const newsSlug = `rss-${datePart}-${permalinkHash.slice(0, 8)}`;
+        const baseSlug = translitSlug(title) || `rss-${datePart}-${permalinkHash.slice(0, 8)}`;
+        let newsSlug = baseSlug;
+        for (let n = 2; await prisma.news.findFirst({ where: { slug: newsSlug }, select: { id: true } }); n += 1) {
+          newsSlug = `${baseSlug}-${n}`;
+        }
         try {
           await prisma.news.create({
             data: {
