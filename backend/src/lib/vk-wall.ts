@@ -37,9 +37,10 @@ async function api(method: string, params: Record<string, any>, accessToken: str
 
 // Обложка в посте — ссылкой на og-страницу новости: ВК по ней рисует превью
 // с картинкой (голая ссылка на .jpg парсером не превьюится)
-function coverLink(news: { id: string; coverImage: string | null }): string | null {
+function coverLink(news: { id: string; coverImage: string | null; updatedAt: Date }): string | null {
   if (!news.coverImage) return null;
-  return `${SITE_ORIGIN}/api/news/${news.id}/cover-page`;
+  // ?v= — версия от updatedAt: для ВК это «новый» URL (краулер ходит заново, а не по кэшу)
+  return `${SITE_ORIGIN}/api/news/${news.id}/cover-page?v=${news.updatedAt.getTime()}`;
 }
 
 export interface VkPublishResult {
