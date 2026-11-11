@@ -159,6 +159,15 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
   const [previewLoading, setPreviewLoading] = useState(false);
   // Папка объекта превью: в обычных видах — текущая папка, в виде «Две панели» — папка панели
   const [previewFolder, setPreviewFolder] = useState("");
+  // Изображения папки превью для слайдера (переход ‹ › между картинками)
+  const [previewList, setPreviewList] = useState<any[]>([]);
+  const previewImages = previewList.filter((it: any) => isImageFile(it.name));
+  const previewIndex = previewItem ? previewImages.findIndex((it: any) => it.name === previewItem.name) : -1;
+  const previewNavigate = (dir: 1 | -1) => {
+    if (previewImages.length < 2) return;
+    const idx = previewIndex >= 0 ? previewIndex : 0;
+    setPreviewItem(previewImages[(idx + dir + previewImages.length) % previewImages.length]);
+  };
   // Открытый TXT-редактор (виды «Иконки»/«Таблица»)
   const [txtEditor, setTxtEditor] = useState<{ item: any; folder: string } | null>(null);
 
@@ -236,10 +245,15 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
     if (!previewItem) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setPreviewItem(null);
+      // Слайдер: стрелки листают изображения папки
+      if (isImageFile(previewItem.name) && previewImages.length > 1) {
+        if (e.key === "ArrowRight") previewNavigate(1);
+        if (e.key === "ArrowLeft") previewNavigate(-1);
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [previewItem]);
+  });
 
   // formatSize импортируется из filesTheme.tsx
 
@@ -250,6 +264,7 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
       setTxtEditor({ item, folder: currentFolder });
     } else if (isPreviewableFile(item.name)) {
       setPreviewFolder(currentFolder);
+      setPreviewList(visibleFiles.filter((f: any) => isImageFile(f.name)));
       setPreviewItem(item);
     } else {
       const filePath = joinPath(currentFolder, item.name);
@@ -500,7 +515,7 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
               tab={activeTab}
               hiddenNames={hiddenNames}
               theme={filesTheme}
-              onPreview={(item, folder) => { setPreviewFolder(folder); setPreviewItem(item); }}
+              onPreview={(item, folder, list) => { setPreviewFolder(folder); setPreviewList(list || []); setPreviewItem(item); }}
               onShare={(e, item, folder) => { openShare(e, item, folder); }}
             />
           ) : viewMode === "table" ? (
@@ -715,6 +730,11 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
               <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {previewItem.name}
               </div>
+              {isImageFile(previewItem.name) && previewImages.length > 1 && (
+                <div style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
+                  {(previewIndex >= 0 ? previewIndex + 1 : 1)} из {previewImages.length}
+                </div>
+              )}
               <button
                 onClick={() => api.files.downloadFile(activeTab, joinPath(previewFolder, previewItem.name)).catch((e: any) => alert("Ошибка скачивания: " + e.message))}
                 title="Скачать"
@@ -726,7 +746,36 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
                 {closeIcon}
               </button>
             </div>
-            <div style={{ flex: 1, minHeight: 0, background: "var(--bg-hover)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+            <div style={{ flex: 1, minHeight: 0, background: "var(--bg-hover)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, position: "relative" }}>
+              {/* Слайдер: стрелки перехода между изображениями папки */}
+              {isImageFile(previewItem.name) && previewImages.length > 1 && (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); previewNavigate(-1); }}
+                    title="Предыдущая (←)"
+                    style={{
+                      position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)",
+                      width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--border-color)",
+                      background: "var(--bg-card)", color: "#007AFF", cursor: "pointer", zIndex: 2,
+                      display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); previewNavigate(1); }}
+                    title="Следующая (→)"
+                    style={{
+                      position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
+                      width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--border-color)",
+                      background: "var(--bg-card)", color: "#007AFF", cursor: "pointer", zIndex: 2,
+                      display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                  </button>
+                </>
+              )}
               {previewLoading ? (
                 <div style={{ color: "var(--text-muted)", fontSize: 14 }}>Загрузка превью...</div>
               ) : previewUrl && isImageFile(previewItem.name) ? (

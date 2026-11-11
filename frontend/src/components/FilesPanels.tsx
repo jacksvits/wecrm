@@ -8,6 +8,7 @@ import {
   downloadIcon,
   fileExtension,
   formatSize,
+  isImageFile,
   isPreviewableFile,
   isTextEditableFile,
   joinPath,
@@ -35,7 +36,7 @@ interface FilesPanelsProps {
   tab: string;
   hiddenNames: string[];
   theme: FileTheme;
-  onPreview: (item: any, folder: string) => void;
+  onPreview: (item: any, folder: string, list?: any[]) => void;
   onShare: (e: React.MouseEvent, item: any, folder: string) => void;
 }
 
@@ -187,7 +188,8 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
       setActivePanel(idx);
       setTxtEditor({ panel: idx, item });
     } else if (isPreviewableFile(item.name)) {
-      onPreview(item, panels[idx].folder);
+      // Слайдер: передаём все изображения папки панели
+      onPreview(item, panels[idx].folder, panels[idx].items.filter((it: any) => isImageFile(it.name)));
     } else {
       api.files
         .downloadFile(tab, joinPath(panels[idx].folder, item.name))
