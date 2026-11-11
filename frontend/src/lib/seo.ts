@@ -90,6 +90,8 @@ function applySeo(s: SeoData) {
     link.setAttribute("href", s.canonical);
   }
   if (s.yandexMetrika) injectYandexMetrika(s.yandexMetrika);
+  // Публичные страницы повторно ставят свой title по этому событию (usePageTitle)
+  window.dispatchEvent(new Event('wecrm-seo-applied'));
 }
 
 // Запускается до первого рендера в main.tsx; ошибки сети игнорируем —

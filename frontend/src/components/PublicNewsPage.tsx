@@ -7,6 +7,8 @@ import { api } from '../api/client';
 import { safeHtml } from '../lib/safeHtml';
 import { useBrandLogo, useBrandNewsCover } from '../lib/branding';
 import { CookieConsent } from './CookieConsent';
+import { usePageTitle } from '../lib/usePageTitle';
+import PublicAuthArea from './PublicAuthArea';
 
 function stripHtml(html: string): string {
   const div = document.createElement('div');
@@ -56,20 +58,7 @@ function PublicNewsHeader({ query, onSearch, onSubmit, consent = true }: { query
           fontSize: 14, outline: 'none',
         }}
       />
-      <a
-        href="/"
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          marginLeft: 'auto', flexShrink: 0,
-          padding: '10px 20px', borderRadius: 12, whiteSpace: 'nowrap',
-          border: '1px solid rgba(120,180,255,0.40)',
-          background: 'linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%)',
-          color: '#fff', fontSize: 14, fontWeight: 600, textDecoration: 'none',
-          boxShadow: '0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)',
-        }}
-      >
-        Войти
-      </a>
+      <PublicAuthArea />
       {consent && <CookieConsent />}
     </header>
   );
@@ -146,6 +135,7 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
 }
 
 function PublicNewsList({ consent = true }: { consent?: boolean }) {
+  usePageTitle('WeLANS - Новости');
   const navigate = useNavigate();
   const location = useLocation();
   const defaultCover = useBrandNewsCover();
