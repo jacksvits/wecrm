@@ -472,23 +472,18 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
         <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>Загрузка...</div>
       ) : (
         <div style={viewMode === "panels" ? { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" } : { flex: 1, overflow: "auto" }}>
-          {/* Строка «Назад / путь» не нужна в виде «Две панели»: навигация у каждой панели своя */}
-          {viewMode !== "panels" && (
+          {/* Строка навигации: в «Две панели» не нужна (своя у каждой панели), в «Иконки»/«Таблица» — только кнопка «Назад», чип-путь не выводим */}
+          {viewMode !== "panels" && currentFolder && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-            {currentFolder && (
-              <button
-                onClick={handleBack}
-                style={{
-                  padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border-color)",
-                  background: "var(--bg-hover)", color: "var(--text-primary)", cursor: "pointer", fontSize: 13,
-                }}
-              >
-                ← Назад
-              </button>
-            )}
-            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-              {currentFolder ? `${tabLabel} / ` + currentFolder.replace(/\//g, " / ") : tabLabel}
-            </div>
+            <button
+              onClick={handleBack}
+              style={{
+                padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border-color)",
+                background: "var(--bg-hover)", color: "var(--text-primary)", cursor: "pointer", fontSize: 13,
+              }}
+            >
+              ← Назад
+            </button>
           </div>
           )}
 
