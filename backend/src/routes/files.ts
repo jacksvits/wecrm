@@ -405,9 +405,9 @@ const isWritableDir = (dir: string): boolean => {
   }
 };
 
-// Общий предохранитель мутаций: роль admin + валидная вкладка + путь внутри хранилища.
-// Вернёт null и ответит ошибкой, если проверка не пройдена.
-const mutateTarget = (req: any, res: any, tabKey: string, subPath: string, opts?: { allowRoot?: boolean }): string | null => {
+// Базовый доступ к объекту вкладки: роль admin + валидная вкладка + путь внутри хранилища.
+// Без проверки записи — подходит и для чтения (текстовый редактор, скачивание).
+const accessTarget = (req: any, res: any, tabKey: string, subPath: string, opts?: { allowRoot?: boolean }): string | null => {
   if (req.user?.role !== 'admin') {
     res.status(403).json({ error: 'Доступ запрещен' });
     return null;
@@ -426,6 +426,15 @@ const mutateTarget = (req: any, res: any, tabKey: string, subPath: string, opts?
     res.status(403).json({ error: 'Доступ запрещен' });
     return null;
   }
+  return target;
+};
+
+// Общий предохранитель мутаций: роль admin + валидная вкладка + путь внутри хранилища + вкладка доступна на запись.
+// Вернёт null и ответит ошибкой, если проверка не пройдена.
+const mutateTarget = (req: any, res: any, tabKey: string, subPath: string, opts?: { allowRoot?: boolean }): string | null => {
+  const target = accessTarget(req, res, tabKey, subPath, opts);
+  if (!target) return null;
+  const baseDir = resolveTabDir(tabKey)!;
   if (!isWritableDir(baseDir)) {
     res.status(409).json({ error: 'Вкладка доступна только для чтения' });
     return null;
@@ -696,6 +705,51 @@ router.post('/create-file', authMiddleware, async (req, res) => {
   } catch (e: any) {
     console.error('[Files/CreateFile] Error:', e?.message || e);
     res.status(500).json({ error: 'Ошибка создания файла', detail: e?.message });
+  }
+});
+
+// === Текстовый редактор TXT ===
+const TEXT_FILE_LIMIT = 5 * 1024 * 1024;
+
+// Чтение содержимого текстового файла (для редактора) — чтение разрешено и с read-only шар
+router.get('/text', authMiddleware, async (req, res) => {
+  const tabKey = String(req.query.tab || '');
+  const itemPath = String(req.query.path || '');
+  const target = accessTarget(req, res, tabKey, itemPath);
+  if (!target) return;
+  try {
+    if (!fs.existsSync(target) || !fs.statSync(target).isFile()) {
+      return res.status(404).json({ error: 'Файл не найден' });
+    }
+    if (fs.statSync(target).size > TEXT_FILE_LIMIT) {
+      return res.status(413).json({ error: 'Файл слишком большой для редактирования (более 5 МБ)' });
+    }
+    res.json({ content: fs.readFileSync(target, 'utf8') });
+  } catch (e: any) {
+    console.error('[Files/TextRead] Error:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка чтения файла', detail: e?.message });
+  }
+});
+
+// Сохранение содержимого текстового файла (мутирующая операция — нужна запись во вкладку)
+router.put('/text', authMiddleware, async (req, res) => {
+  const tabKey = String(req.body?.tabKey || '');
+  const itemPath = String(req.body?.path || '');
+  const target = mutateTarget(req, res, tabKey, itemPath);
+  if (!target) return;
+  const content = String(req.body?.content ?? '');
+  if (Buffer.byteLength(content, 'utf8') > TEXT_FILE_LIMIT) {
+    return res.status(413).json({ error: 'Содержимое слишком большое (более 5 МБ)' });
+  }
+  try {
+    if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
+      return res.status(400).json({ error: 'Это папка, а не файл' });
+    }
+    fs.writeFileSync(target, content, 'utf8');
+    res.json({ ok: true, size: Buffer.byteLength(content, 'utf8') });
+  } catch (e: any) {
+    console.error('[Files/TextWrite] Error:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка сохранения файла', detail: e?.message });
   }
 });
 

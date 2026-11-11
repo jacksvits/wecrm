@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { FilesPanels } from "./FilesPanels";
+import { FilesTextEditor } from "./FilesTextEditor";
 import {
   FILE_THEMES,
   FileTheme,
@@ -157,6 +158,8 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
   const [previewLoading, setPreviewLoading] = useState(false);
   // Папка объекта превью: в обычных видах — текущая папка, в виде «Две панели» — папка панели
   const [previewFolder, setPreviewFolder] = useState("");
+  // Открытый TXT-редактор (виды «Иконки»/«Таблица»)
+  const [txtEditor, setTxtEditor] = useState<{ item: any; folder: string } | null>(null);
 
   const loadSettings = async () => {
     try {
@@ -242,6 +245,8 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
   const handleItemClick = (item: any) => {
     if (item.isDirectory) {
       setCurrentFolder((prev) => (prev ? prev + "/" + item.name : item.name));
+    } else if (fileExtension(item.name) === "txt") {
+      setTxtEditor({ item, folder: currentFolder });
     } else if (isPreviewableFile(item.name)) {
       setPreviewFolder(currentFolder);
       setPreviewItem(item);
@@ -815,6 +820,16 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* TXT-редактор (виды «Иконки»/«Таблица») */}
+      {txtEditor && (
+        <FilesTextEditor
+          tab={activeTab}
+          itemPath={joinPath(txtEditor.folder, txtEditor.item.name)}
+          title={txtEditor.item.name}
+          onClose={() => setTxtEditor(null)}
+        />
       )}
     </div>
   );

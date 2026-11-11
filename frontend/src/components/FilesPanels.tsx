@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
+import { FilesTextEditor } from "./FilesTextEditor";
 import {
   FILE_THEMES,
   FileTheme,
@@ -79,6 +80,8 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
   const [menu, setMenu] = useState<{ x: number; y: number; panel: number; item: any | null } | null>(null);
   const [txtPanel, setTxtPanel] = useState<number | null>(null);
   const [txtName, setTxtName] = useState("Новый документ.txt");
+  // Открытый TXT-редактор: {панель, объект}
+  const [txtEditor, setTxtEditor] = useState<{ panel: number; item: any } | null>(null);
   // Запись в текущую вкладку (NFS-шары архивов могут быть только для чтения)
   const [writable, setWritable] = useState(true);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -179,6 +182,9 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
   const handleRowDoubleClick = (idx: number, item: any) => {
     if (item.isDirectory) {
       enterFolder(idx, item.name);
+    } else if (fileExtension(item.name) === "txt") {
+      setActivePanel(idx);
+      setTxtEditor({ panel: idx, item });
     } else if (isPreviewableFile(item.name)) {
       onPreview(item, panels[idx].folder);
     } else {
@@ -591,6 +597,15 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
           >
             {item ? (
               <>
+                {fileExtension(item.name) === "txt" && !item.isDirectory && (
+                  <MenuItem
+                    label="Редактировать"
+                    onClick={() => {
+                      setMenu(null);
+                      setTxtEditor({ panel, item });
+                    }}
+                  />
+                )}
                 <MenuItem
                   label="Скачать"
                   onClick={() =>
@@ -773,6 +788,16 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
             </div>
           </div>
         </div>
+      )}
+      {/* TXT-редактор */}
+      {txtEditor && (
+        <FilesTextEditor
+          tab={tab}
+          itemPath={joinPath(panels[txtEditor.panel].folder, txtEditor.item.name)}
+          title={txtEditor.item.name}
+          onClose={() => setTxtEditor(null)}
+          onSaved={() => reloadPanel(txtEditor.panel)}
+        />
       )}
     </div>
   );
