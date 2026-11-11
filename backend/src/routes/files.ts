@@ -8,6 +8,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { ZipArchive } from 'archiver';
+import multer from 'multer';
 import sharp from 'sharp';
 import { uploadsRoot } from '../lib/tenant.js';
 
@@ -379,6 +380,192 @@ router.get('/download-folder', optionalAuthMiddleware, (req, res) => {
     }
   }
 });
+
+// === Операции управления файлами страницы «Файлы» (вид «Две панели») ===
+// Все операции изменяют файловое хранилище вкладок — только для администраторов.
+// Проверка путей та же, что у чтения: resolveInside не даёт выйти за пределы вкладки.
+
+// Имя без путей и служебных символов (как у вложений задач)
+const sanitizeName = (raw: any): string | null => {
+  const name = String(raw || '').trim();
+  if (!name) return null;
+  const cleaned = name.replace(/[<>:"\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, ' ').trim();
+  return cleaned || null;
+};
+
+// Общий предохранитель мутаций: роль admin + валидная вкладка + путь внутри хранилища.
+// Вернёт null и ответит ошибкой, если проверка не пройдена.
+const mutateTarget = (req: any, res: any, tabKey: string, subPath: string, opts?: { allowRoot?: boolean }): string | null => {
+  if (req.user?.role !== 'admin') {
+    res.status(403).json({ error: 'Доступ запрещен' });
+    return null;
+  }
+  const baseDir = resolveTabDir(tabKey);
+  if (!baseDir) {
+    res.status(400).json({ error: 'Неверная вкладка' });
+    return null;
+  }
+  if (!subPath && !opts?.allowRoot) {
+    res.status(400).json({ error: 'Не указан путь' });
+    return null;
+  }
+  const target = resolveInside(baseDir, subPath);
+  if (!target) {
+    res.status(403).json({ error: 'Доступ запрещен' });
+    return null;
+  }
+  return target;
+};
+
+// Создание папки внутри указанной папки вкладки
+router.post('/mkdir', authMiddleware, async (req, res) => {
+  const tabKey = String(req.body?.tabKey || '');
+  const folderPath = String(req.body?.path || '');
+  const name = sanitizeName(req.body?.name);
+  if (!name) return res.status(400).json({ error: 'Неверное имя папки' });
+  const parent = mutateTarget(req, res, tabKey, folderPath, { allowRoot: true });
+  if (!parent) return;
+  try {
+    if (!fs.existsSync(parent) || !fs.statSync(parent).isDirectory()) {
+      return res.status(404).json({ error: 'Папка не найдена' });
+    }
+    // sanitizeName убирает разделители — цель гарантированно внутри parent
+    const target = path.join(parent, name);
+    if (fs.existsSync(target)) return res.status(409).json({ error: 'Папка уже существует' });
+    fs.mkdirSync(target);
+    res.status(201).json({ ok: true, name });
+  } catch (e: any) {
+    console.error('[Files/Mkdir] Error:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка создания папки', detail: e?.message });
+  }
+});
+
+// Загрузка файлов в папку вкладки (?tab=&path=), поле формы — files (как у задач)
+const tabFileStorage = multer.diskStorage({
+  destination: (req, _file, cb) => {
+    const tabKey = String((req.query.tab as string) || '');
+    const subPath = String((req.query.path as string) || '');
+    const baseDir = (req as any).user?.role === 'admin' ? resolveTabDir(tabKey) : undefined;
+    const dir = baseDir ? resolveInside(baseDir, subPath) : null;
+    if (!dir || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+      return cb(new Error('Папка не найдена'), '');
+    }
+    cb(null, dir);
+  },
+  filename: (_req, file, cb) => {
+    const dir = (file as any).destination || '';
+    const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    const sanitized = originalName.replace(/[<>:"\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, ' ').trim();
+    if (!sanitized) { cb(null, `${randomUUID()}${path.extname(originalName)}`); return; }
+    let finalName = sanitized;
+    if (dir && fs.existsSync(path.join(dir, finalName))) {
+      const ext = path.extname(sanitized);
+      const base = path.basename(sanitized, ext);
+      let counter = 1;
+      do { finalName = `${base} (${counter})${ext}`; counter++; } while (fs.existsSync(path.join(dir, finalName)));
+    }
+    cb(null, finalName);
+  },
+});
+const tabFileUpload = multer({ storage: tabFileStorage, limits: { fileSize: 2 * 1024 * 1024 * 1024 } });
+
+router.post('/upload', authMiddleware, (req, res, next) => {
+  if ((req as any).user?.role !== 'admin') return res.status(403).json({ error: 'Доступ запрещен' });
+  next();
+}, tabFileUpload.array('files', 20), async (req, res) => {
+  try {
+    const files = (req.files as Express.Multer.File[]) || [];
+    if (!files.length) return res.status(400).json({ error: 'Нет файлов' });
+    res.status(201).json(files.map((f) => ({ name: f.filename, size: f.size })));
+  } catch (e: any) {
+    console.error('[Files/Upload] Error:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка загрузки', detail: e?.message });
+  }
+});
+
+// Переименование файла/папки (path — текущий относительный путь объекта)
+router.post('/rename', authMiddleware, async (req, res) => {
+  const tabKey = String(req.body?.tabKey || '');
+  const itemPath = String(req.body?.path || '');
+  const newName = sanitizeName(req.body?.newName);
+  if (!newName) return res.status(400).json({ error: 'Неверное имя' });
+  const target = mutateTarget(req, res, tabKey, itemPath);
+  if (!target) return;
+  try {
+    if (!fs.existsSync(target)) return res.status(404).json({ error: 'Объект не найден' });
+    const dest = path.join(path.dirname(target), newName);
+    if (fs.existsSync(dest)) return res.status(409).json({ error: 'Объект с таким именем уже существует' });
+    fs.renameSync(target, dest);
+    res.json({ ok: true, name: newName });
+  } catch (e: any) {
+    console.error('[Files/Rename] Error:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка переименования', detail: e?.message });
+  }
+});
+
+// Удаление файла/папки (папка удаляется рекурсивно)
+router.delete('/item', authMiddleware, async (req, res) => {
+  const tabKey = String(req.query.tab || '');
+  const itemPath = String(req.query.path || '');
+  const target = mutateTarget(req, res, tabKey, itemPath);
+  if (!target) return;
+  try {
+    if (!fs.existsSync(target)) return res.status(404).json({ error: 'Объект не найден' });
+    fs.rmSync(target, { recursive: true });
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error('[Files/Delete] Error:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка удаления', detail: e?.message });
+  }
+});
+
+// Копирование/перемещение объекта: from — относительный путь объекта, to — папка назначения
+const transferItem = (req: any, res: any, mode: 'copy' | 'move') => {
+  const tabKey = String(req.body?.tabKey || '');
+  const from = String(req.body?.from || '');
+  const to = String(req.body?.to || '');
+  const target = mutateTarget(req, res, tabKey, from);
+  if (!target) return;
+  const destFolder = mutateTarget(req, res, tabKey, to, { allowRoot: true });
+  if (!destFolder) return;
+  try {
+    if (!fs.existsSync(target)) return res.status(404).json({ error: 'Объект не найден' });
+    if (!fs.existsSync(destFolder) || !fs.statSync(destFolder).isDirectory()) {
+      return res.status(404).json({ error: 'Папка назначения не найдена' });
+    }
+    const dest = path.join(destFolder, path.basename(target));
+    if (dest === target) return res.status(400).json({ error: 'Источник и назначение совпадают' });
+    // запрет переноса папки внутрь самой себя (рекурсивное копирование заблокирует диск)
+    if ((dest + path.sep).startsWith(target + path.sep)) {
+      return res.status(400).json({ error: 'Нельзя переместить папку внутрь самой себя' });
+    }
+    if (fs.existsSync(dest)) {
+      return res.status(409).json({ error: `«${path.basename(target)}» уже существует в папке назначения` });
+    }
+    if (mode === 'copy') {
+      fs.cpSync(target, dest, { recursive: true });
+    } else {
+      // rename не работает между разными точками монтирования — делаем копию+удаление
+      try {
+        fs.renameSync(target, dest);
+      } catch (err: any) {
+        if (err?.code === 'EXDEV') {
+          fs.cpSync(target, dest, { recursive: true });
+          fs.rmSync(target, { recursive: true });
+        } else {
+          throw err;
+        }
+      }
+    }
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error(`[Files/${mode === 'copy' ? 'Copy' : 'Move'}] Error:`, e?.message || e);
+    res.status(500).json({ error: mode === 'copy' ? 'Ошибка копирования' : 'Ошибка перемещения', detail: e?.message });
+  }
+};
+
+router.post('/copy', authMiddleware, async (req, res) => transferItem(req, res, 'copy'));
+router.post('/move', authMiddleware, async (req, res) => transferItem(req, res, 'move'));
 
 // Legacy endpoints for backward compatibility with games tab
 router.get('/games', optionalAuthMiddleware, (req, res) => {

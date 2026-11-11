@@ -294,6 +294,12 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     getShare: (tab: string, filePath: string) => fetchApi(`/api/files/share/existing?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(filePath)}`),
     updateShare: (id: string, expiresInHours: number | null) => fetchApi(`/api/files/share/${id}`, { method: "PATCH", body: JSON.stringify({ expiresInHours }) }),
     deleteShare: (id: string) => fetchApi(`/api/files/share/${id}`, { method: "DELETE" }),
+    mkdir: (tab: string, folderPath: string, name: string) => fetchApi("/api/files/mkdir", { method: "POST", body: JSON.stringify({ tabKey: tab, path: folderPath, name }) }),
+    rename: (tab: string, itemPath: string, newName: string) => fetchApi("/api/files/rename", { method: "POST", body: JSON.stringify({ tabKey: tab, path: itemPath, newName }) }),
+    deleteItem: (tab: string, itemPath: string) => fetchApi(`/api/files/item?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(itemPath)}`, { method: "DELETE" }),
+    copy: (tab: string, from: string, to: string) => fetchApi("/api/files/copy", { method: "POST", body: JSON.stringify({ tabKey: tab, from, to }) }),
+    move: (tab: string, from: string, to: string) => fetchApi("/api/files/move", { method: "POST", body: JSON.stringify({ tabKey: tab, from, to }) }),
+    upload: (tab: string, folderPath: string, formData: FormData) => fetch(`/api/files/upload?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(folderPath)}`, { method: "POST", headers: { "X-Auth-Token": getToken()! }, body: formData }).then(r => r.json()),
   },
   products: {
     list: (params?: string | { q?: string; categoryId?: string; noCategory?: boolean; kind?: string }): Promise<Product[]> => {
