@@ -303,8 +303,7 @@ router.get('/download', optionalAuthMiddleware, (req, res) => {
     }
     const filename = path.basename(targetFile);
     incrementDownloadCount(tabKey, filePath);
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
-    res.setHeader('Content-Type', 'application/octet-stream');
+    setDownloadHeaders(res, filename);
     // Content-Length нужен мобильным браузерам (iOS Safari) для старта скачивания
     res.setHeader('Content-Length', String(fs.statSync(targetFile).size));
     const stream = fs.createReadStream(targetFile);
@@ -354,6 +353,7 @@ router.get('/download-folder', optionalAuthMiddleware, (req, res) => {
     incrementDownloadCount(tabKey, folderPath);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(folderName)}.zip`);
+    res.setHeader('Cache-Control', 'no-transform');
     const archive = new ZipArchive({ zlib: { level: 6 } });
     archive.on('error', (err: any) => {
       console.error('Archiver error:', err);
@@ -429,8 +429,7 @@ router.get('/games/download', optionalAuthMiddleware, (req, res) => {
     }
     const filename = path.basename(targetFile);
     incrementDownloadCount(tabKey, filePath);
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
-    res.setHeader('Content-Type', 'application/octet-stream');
+    setDownloadHeaders(res, filename);
     // Content-Length нужен мобильным браузерам (iOS Safari) для старта скачивания
     res.setHeader('Content-Length', String(fs.statSync(targetFile).size));
     const stream = fs.createReadStream(targetFile);
@@ -470,6 +469,7 @@ router.get('/games/download-folder', optionalAuthMiddleware, (req, res) => {
     incrementDownloadCount(tabKey, folderPath);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(folderName)}.zip`);
+    res.setHeader('Cache-Control', 'no-transform');
     const archive = new ZipArchive({ zlib: { level: 6 } });
     archive.on('error', (err: any) => {
       console.error('Archiver error:', err);
@@ -519,6 +519,15 @@ const parseExpiryHours = (raw: any): number | null => {
   if (raw === null || raw === undefined || raw === '') return null;
   const hours = Number(raw);
   return Number.isFinite(hours) && hours > 0 ? hours : null;
+};
+
+// Скачиваемые файлы уже имеют нужный размер и тип — запрещаем любое
+// трансформирующее сжатие (gzip/brotli посредников и compression-мидлвари):
+// оно убирает Content-Length и мешает мобильным загрузчикам
+const setDownloadHeaders = (res: any, filename: string) => {
+  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Cache-Control', 'no-transform');
 };
 
 // Создание публичной ссылки (авторизованные пользователи)
@@ -674,8 +683,7 @@ router.get('/public-share/:token/download', async (req, res) => {
       return res.status(404).json({ error: 'Файл не найден' });
     }
     incrementDownloadCount(share.tabKey, relPath);
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(targetFile))}`);
-    res.setHeader('Content-Type', 'application/octet-stream');
+    setDownloadHeaders(res, path.basename(targetFile));
     // Поддержка Range (докачка) — для больших файлов на мобильных сетях
     const fileSize = fs.statSync(targetFile).size;
     res.setHeader('Accept-Ranges', 'bytes');
@@ -753,6 +761,7 @@ router.get('/public-share/:token/download-folder', async (req, res) => {
     incrementDownloadCount(share.tabKey, subPath ? `${share.filePath}/${subPath}` : share.filePath);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(folderName)}.zip`);
+    res.setHeader('Cache-Control', 'no-transform');
     const archive = new ZipArchive({ zlib: { level: 6 } });
     archive.on('error', (err: any) => {
       console.error('[Files/Share] Archiver error:', err);
