@@ -146,12 +146,36 @@ router.post('/webhook', async (req, res) => {
     // Извлекаем данные из корректных полей MAX API
     const chatId = String(maxMessage.recipient?.chat_id || '');
     const userId = String(maxMessage.sender?.user_id || '');
-    const text = maxMessage.body?.text?.trim() || '';
+    let text = maxMessage.body?.text?.trim() || '';
     const sender = maxMessage.sender || {};
     const senderName = sender.name || 'MAX User';
     const senderUsername = sender.username || '';
     const messageId = String(maxMessage.body?.mid || maxMessage.timestamp || Date.now());
-    const attachments = maxMessage.body?.attachments || [];
+    let attachments = maxMessage.body?.attachments || [];
+
+    // Пересланные сообщения (link.type === 'forward'): вложения лежат в
+    // link.message(s).attachments, а не в body.attachments — иначе фото из
+    // пересланок молча терялись (пустой текст + 0 вложений = skip)
+    if (attachments.length === 0 && maxMessage.link) {
+      const link = maxMessage.link;
+      const fwdMessages = Array.isArray(link.messages)
+        ? link.messages
+        : (link.message ? [link.message] : []);
+      const fwdAttachments = fwdMessages.flatMap((m: any) => m?.attachments || []);
+      if (fwdAttachments.length > 0) {
+        attachments = fwdAttachments;
+        const fwdSender = link.sender?.name;
+        console.log('[MAX Webhook] Forwarded message from', fwdSender || 'unknown', 'with', fwdAttachments.length, 'attachments');
+      }
+      // Текст пересланного сообщения тоже подхватываем — иначе контекст теряется
+      if (!text && fwdMessages[0]?.text) {
+        text = String(fwdMessages[0].text).trim();
+      }
+      const fwdSender = link.sender?.name;
+      if (fwdSender && (fwdAttachments.length > 0 || fwdMessages[0]?.text)) {
+        text = 'Переслано от ' + fwdSender + (text ? ':\n' + text : '');
+      }
+    }
 
     if (!chatId || !userId) {
       console.log('[MAX Webhook] No chat_id or user_id found in message');
