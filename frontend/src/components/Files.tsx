@@ -22,12 +22,28 @@ const isImageFile = (name: string) => IMAGE_EXTENSIONS.has(fileExtension(name));
 const isPdfFile = (name: string) => fileExtension(name) === PDF_EXTENSION;
 const isPreviewableFile = (name: string) => isImageFile(name) || isPdfFile(name);
 const joinPath = (folder: string, name: string) => (folder ? `${folder}/${name}` : name);
+// Ближайший стандартный срок действия ссылки (часы) для отображения в селекте
+const nearestExpiryOption = (iso: string): string => {
+  const hours = Math.round((new Date(iso).getTime() - Date.now()) / 3600000);
+  for (const opt of [1, 24, 168, 720]) if (Math.abs(hours - opt) <= 1) return String(opt);
+  return "";
+};
 
 const downloadIcon = (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
     <polyline points="7 10 12 15 17 10"></polyline>
     <line x1="12" y1="15" x2="12" y2="3"></line>
+  </svg>
+);
+
+const shareIcon = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="18" cy="5" r="3"></circle>
+    <circle cx="6" cy="12" r="3"></circle>
+    <circle cx="18" cy="19" r="3"></circle>
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
   </svg>
 );
 
@@ -391,6 +407,81 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
     api.files.downloadFolder(activeTab, folderPath).catch((err: any) => alert("Ошибка скачивания: " + err.message));
   };
 
+  // === Публичная ссылка «Поделиться» ===
+  const [shareItem, setShareItem] = useState<any | null>(null);
+  const [shareInfo, setShareInfo] = useState<{ id: string; url: string; expiresAt: string | null } | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  // Выбранный срок действия: "" = без ограничения, иначе — часы
+  const [shareExpiry, setShareExpiry] = useState("");
+
+  const copyShareUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
+  };
+
+  // По клику: открываем окно, ищем активную ссылку на объект, при отсутствии —
+  // создаём без ограничения срока и сразу копируем в буфер обмена
+  const openShare = async (e: React.MouseEvent, item: any) => {
+    e.stopPropagation();
+    const p = joinPath(currentFolder, item.name);
+    setShareItem({ ...item, filePath: p });
+    setShareInfo(null);
+    setShareCopied(false);
+    setShareExpiry("");
+    setShareBusy(true);
+    try {
+      let info: any = await api.files.getShare(activeTab, p);
+      if (!info) info = await api.files.createShare(activeTab, p, !!item.isDirectory, null);
+      setShareInfo(info);
+      setShareExpiry(info.expiresAt ? nearestExpiryOption(info.expiresAt) : "");
+      copyShareUrl(info.url);
+    } catch (err: any) {
+      alert("Ошибка создания ссылки: " + (err?.message || err));
+      setShareItem(null);
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
+  const changeShareExpiry = async (value: string) => {
+    if (!shareInfo) return;
+    setShareExpiry(value);
+    setShareBusy(true);
+    try {
+      const info: any = await api.files.updateShare(shareInfo.id, value ? Number(value) : null);
+      setShareInfo(info);
+    } catch (err: any) {
+      alert("Ошибка сохранения: " + (err?.message || err));
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
+  const revokeShare = async () => {
+    if (!shareInfo) return;
+    setShareBusy(true);
+    try {
+      await api.files.deleteShare(shareInfo.id);
+      setShareItem(null);
+      setShareInfo(null);
+    } catch (err: any) {
+      alert("Ошибка отключения доступа: " + (err?.message || err));
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
   const handleBack = () => {
     if (!currentFolder) return;
     const parts = currentFolder.split("/");
@@ -565,7 +656,16 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
                       <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.isDirectory ? "—" : formatSize(item.size)}</div>
                       {!compactTable && <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.isDirectory ? "Папка" : (fileExtension(item.name) ? fileExtension(item.name).toUpperCase() : "—")}</div>}
                       {!compactTable && <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.downloads || 0}</div>}
-                      <div>
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                        {!publicMode && (
+                          <button
+                            onClick={(e) => openShare(e, item)}
+                            title="Поделиться"
+                            style={{ ...iconButtonStyle, width: 26, height: 26, borderRadius: 7 }}
+                          >
+                            {shareIcon}
+                          </button>
+                        )}
                         <button
                           onClick={(e) => item.isDirectory ? handleDownloadFolder(e, item) : handleDownloadFile(e, item)}
                           title={item.isDirectory ? "Скачать папку как ZIP" : "Скачать"}
@@ -600,6 +700,15 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
                       (e.currentTarget as HTMLElement).style.background = "transparent";
                     }}
                   >
+                    {!publicMode && (
+                      <button
+                        onClick={(e) => openShare(e, item)}
+                        title="Поделиться"
+                        style={{ ...iconButtonStyle, width: 24, height: 24, borderRadius: 7, position: "absolute", top: 4, right: 32, opacity: 0.85 }}
+                      >
+                        {shareIcon}
+                      </button>
+                    )}
                     <button
                       onClick={(e) => item.isDirectory ? handleDownloadFolder(e, item) : handleDownloadFile(e, item)}
                       title={item.isDirectory ? "Скачать папку как ZIP" : "Скачать"}
@@ -621,6 +730,77 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
               })}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Модальное окно «Поделиться»: ссылка уже скопирована в буфер при открытии */}
+      {shareItem && (
+        <div
+          onClick={() => setShareItem(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "var(--bg-card)", borderRadius: 16, width: "min(480px, calc(100vw - 32px))", border: "1px solid var(--border-color)", boxShadow: "0 12px 40px rgba(0,0,0,0.28)", padding: 20 }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <div style={{ color: "#007AFF", display: "flex", flexShrink: 0 }}>{shareIcon}</div>
+              <div style={{ fontSize: 16, fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={shareItem.name}>
+                Поделиться: {shareItem.name}
+              </div>
+              <button onClick={() => setShareItem(null)} title="Закрыть" style={{ ...iconButtonStyle, width: 28, height: 28, borderRadius: 8, color: "var(--text-muted)" }}>{closeIcon}</button>
+            </div>
+            {shareBusy && !shareInfo ? (
+              <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>Создание ссылки…</div>
+            ) : shareInfo ? (
+              <>
+                <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                  <input
+                    readOnly
+                    value={shareInfo.url}
+                    onFocus={(e) => (e.target as HTMLInputElement).select()}
+                    style={{ flex: 1, minWidth: 0, padding: "9px 12px", borderRadius: 10, border: "1px solid var(--border-color)", background: "var(--bg-input)", color: "var(--text-primary)", fontSize: 13 }}
+                  />
+                  <button
+                    onClick={() => copyShareUrl(shareInfo.url)}
+                    disabled={shareBusy}
+                    style={{ padding: "9px 16px", borderRadius: 10, border: "none", background: shareCopied ? "#34C759" : "#007AFF", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
+                  >
+                    {shareCopied ? "Скопировано" : "Копировать"}
+                  </button>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 13, color: "var(--text-muted)" }}>Срок действия:</label>
+                  <select
+                    value={shareExpiry}
+                    onChange={(e) => changeShareExpiry(e.target.value)}
+                    disabled={shareBusy}
+                    style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-input)", color: "var(--text-primary)", fontSize: 13 }}
+                  >
+                    <option value="">Без ограничения</option>
+                    <option value="1">1 час</option>
+                    <option value="24">1 день</option>
+                    <option value="168">7 дней</option>
+                    <option value="720">30 дней</option>
+                  </select>
+                  {shareInfo.expiresAt && (
+                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                      до {new Date(shareInfo.expiresAt).toLocaleString("ru-RU")}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    onClick={revokeShare}
+                    disabled={shareBusy}
+                    style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #FF3B30", background: "transparent", color: "#FF3B30", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Отключить доступ
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
         </div>
       )}
 

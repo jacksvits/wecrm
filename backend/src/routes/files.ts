@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { ZipArchive } from 'archiver';
@@ -489,6 +489,254 @@ router.get('/games/download-folder', optionalAuthMiddleware, (req, res) => {
     if (!res.headersSent) {
       res.status(500).json({ error: 'Ошибка архивации' });
     }
+  }
+});
+
+
+// === Публичные ссылки «Поделиться» на файл/папку страницы «Файлы» ===
+// Ссылка вида https://welans.click/s/<token> работает без входа, пока не истёк срок
+// действия или доступ не отключён вручную. Путь на диске фиксируется на момент
+// создания ссылки — файл можно перемещать между папками вкладки, ссылка не сломается,
+// пока объект существует по прежнему абсолютному пути.
+const SHARE_PUBLIC_BASE = 'https://welans.click/s';
+
+const isShareActive = (share: { expiresAt: Date | null }) =>
+  !share.expiresAt || share.expiresAt.getTime() > Date.now();
+
+// Проверка прав на объект такая же, как у скачивания: вкладка «Система» — только admin
+const shareTargetGuard = (req: any, tabKey: string): string | null | undefined => {
+  const baseDir = resolveTabDir(tabKey);
+  if (!baseDir) return null;
+  if (tabKey === 'system' && req.user?.role !== 'admin') return undefined;
+  return baseDir;
+};
+
+const parseExpiryHours = (raw: any): number | null => {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const hours = Number(raw);
+  return Number.isFinite(hours) && hours > 0 ? hours : null;
+};
+
+// Создание публичной ссылки (авторизованные пользователи)
+router.post('/share', authMiddleware, async (req, res) => {
+  const tabKey = String(req.body?.tabKey || '');
+  const filePath = String(req.body?.path || '');
+  const isFolder = !!req.body?.isFolder;
+  const baseDir = shareTargetGuard(req as any, tabKey);
+  if (baseDir === null) return res.status(400).json({ error: 'Неверная вкладка' });
+  if (baseDir === undefined) return res.status(403).json({ error: 'Доступ запрещен' });
+
+  const target = resolveInside(baseDir, filePath);
+  if (!target) return res.status(403).json({ error: 'Доступ запрещен' });
+
+  try {
+    if (!fs.existsSync(target)) return res.status(404).json({ error: 'Файл не найден' });
+    if (fs.statSync(target).isDirectory() !== isFolder) {
+      return res.status(400).json({ error: 'Тип объекта не совпадает' });
+    }
+    const hours = parseExpiryHours(req.body?.expiresInHours);
+    const share = await prisma.fileShareLink.create({
+      data: {
+        token: randomBytes(24).toString('hex'),
+        name: path.basename(target),
+        diskPath: target,
+        tabKey,
+        filePath,
+        isFolder,
+        expiresAt: hours ? new Date(Date.now() + hours * 3600 * 1000) : null,
+        createdById: (req as any).user?.id || null,
+        createdByName: (req as any).user?.name || null,
+      },
+    });
+    res.json({ id: share.id, url: `${SHARE_PUBLIC_BASE}/${share.token}`, expiresAt: share.expiresAt });
+  } catch (e: any) {
+    console.error('[Files/Share] Error creating share:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка создания ссылки', detail: e?.message });
+  }
+});
+
+// Активная ссылка для объекта (чтобы не плодить дубликаты при повторном «Поделиться»)
+router.get('/share/existing', authMiddleware, async (req, res) => {
+  const tabKey = String(req.query.tab || '');
+  const filePath = String(req.query.path || '');
+  const baseDir = shareTargetGuard(req as any, tabKey);
+  if (baseDir === null) return res.status(400).json({ error: 'Неверная вкладка' });
+  if (baseDir === undefined) return res.status(403).json({ error: 'Доступ запрещен' });
+
+  const target = resolveInside(baseDir, filePath);
+  if (!target) return res.status(403).json({ error: 'Доступ запрещен' });
+
+  try {
+    const share = await prisma.fileShareLink.findFirst({
+      where: { diskPath: target, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(share
+      ? { id: share.id, url: `${SHARE_PUBLIC_BASE}/${share.token}`, expiresAt: share.expiresAt, createdAt: share.createdAt }
+      : null);
+  } catch (e: any) {
+    console.error('[Files/Share] Error loading share:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка загрузки ссылки', detail: e?.message });
+  }
+});
+
+// Смена срока действия: null/0 — без ограничения, иначе — число часов от текущего момента
+router.patch('/share/:id', authMiddleware, async (req, res) => {
+  try {
+    const share = await prisma.fileShareLink.findUnique({ where: { id: req.params.id } });
+    if (!share) return res.status(404).json({ error: 'Ссылка не найдена' });
+    if (share.createdById !== (req as any).user?.id && (req as any).user?.role !== 'admin') {
+      return res.status(403).json({ error: 'Доступ запрещен' });
+    }
+    const hours = parseExpiryHours(req.body?.expiresInHours);
+    const updated = await prisma.fileShareLink.update({
+      where: { id: share.id },
+      data: { expiresAt: hours ? new Date(Date.now() + hours * 3600 * 1000) : null },
+    });
+    res.json({ id: updated.id, url: `${SHARE_PUBLIC_BASE}/${updated.token}`, expiresAt: updated.expiresAt });
+  } catch (e: any) {
+    console.error('[Files/Share] Error updating share:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка сохранения', detail: e?.message });
+  }
+});
+
+// Отключение доступа (удаление ссылки)
+router.delete('/share/:id', authMiddleware, async (req, res) => {
+  try {
+    const share = await prisma.fileShareLink.findUnique({ where: { id: req.params.id } });
+    if (!share) return res.status(404).json({ error: 'Ссылка не найдена' });
+    if (share.createdById !== (req as any).user?.id && (req as any).user?.role !== 'admin') {
+      return res.status(403).json({ error: 'Доступ запрещен' });
+    }
+    await prisma.fileShareLink.delete({ where: { id: share.id } });
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error('[Files/Share] Error deleting share:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка отключения доступа', detail: e?.message });
+  }
+});
+
+// --- Публичная часть: без авторизации, только по валидному непросроченному токену ---
+
+const loadPublicShare = async (req: any, res: any): Promise<any | null> => {
+  const share = await prisma.fileShareLink.findUnique({ where: { token: req.params.token } });
+  if (!share) {
+    res.status(404).json({ error: 'Ссылка не найдена' });
+    return null;
+  }
+  if (!isShareActive(share)) {
+    res.status(410).json({ error: 'Срок действия ссылки истёк' });
+    return null;
+  }
+  if (!fs.existsSync(share.diskPath)) {
+    res.status(404).json({ error: 'Файл не найден' });
+    return null;
+  }
+  return share;
+};
+
+router.get('/public-share/:token/meta', async (req, res) => {
+  try {
+    const share = await loadPublicShare(req, res);
+    if (!share) return;
+    res.json({ name: share.name, isFolder: share.isFolder, expiresAt: share.expiresAt });
+  } catch (e: any) {
+    console.error('[Files/Share] Error loading meta:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка загрузки', detail: e?.message });
+  }
+});
+
+router.get('/public-share/:token/download', async (req, res) => {
+  try {
+    const share = await loadPublicShare(req, res);
+    if (!share) return;
+    // Файл по ссылке — скачивается сам; папка по ссылке — ?path= задаёт файл внутри неё
+    let targetFile = share.diskPath;
+    let relPath = share.filePath;
+    if (share.isFolder) {
+      const subPath = String(req.query.path || '');
+      const resolved = resolveInside(share.diskPath, subPath);
+      if (!resolved) return res.status(403).json({ error: 'Доступ запрещен' });
+      targetFile = resolved;
+      relPath = subPath ? `${share.filePath}/${subPath}` : share.filePath;
+    }
+    if (!fs.existsSync(targetFile) || fs.statSync(targetFile).isDirectory()) {
+      return res.status(404).json({ error: 'Файл не найден' });
+    }
+    incrementDownloadCount(share.tabKey, relPath);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(targetFile))}`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    const stream = fs.createReadStream(targetFile);
+    stream.on('error', (err) => {
+      console.error('[Files/Share] Download stream error:', err);
+      if (!res.headersSent) res.status(500).json({ error: 'Ошибка скачивания файла' });
+      else if (!res.writableEnded) res.end();
+    });
+    res.on('close', () => stream.destroy());
+    stream.pipe(res);
+  } catch (e: any) {
+    console.error('[Files/Share] Download error:', e?.message || e);
+    if (!res.headersSent) res.status(500).json({ error: 'Ошибка скачивания' });
+  }
+});
+
+// Содержимое расшаренной папки (subPath — относительно корня ссылки)
+router.get('/public-share/:token/browse', async (req, res) => {
+  try {
+    const share = await loadPublicShare(req, res);
+    if (!share) return;
+    if (!share.isFolder) return res.status(400).json({ error: 'Это файл' });
+    const subPath = String(req.query.path || '');
+    const targetDir = resolveInside(share.diskPath, subPath);
+    if (!targetDir) return res.status(403).json({ error: 'Доступ запрещен' });
+    if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) {
+      return res.status(404).json({ error: 'Папка не найдена' });
+    }
+    const items = fs.readdirSync(targetDir, { withFileTypes: true }).map(dirent => {
+      const stat = fs.statSync(path.join(targetDir, dirent.name));
+      return { name: dirent.name, isDirectory: dirent.isDirectory(), size: stat.size, updatedAt: stat.mtime };
+    }).sort((a, b) => {
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
+      return a.name.localeCompare(b.name, 'ru');
+    });
+    res.json({ items, currentPath: subPath });
+  } catch (e: any) {
+    console.error('[Files/Share] Browse error:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка чтения папки' });
+  }
+});
+
+// Скачивание всей расшаренной папки (или подпапки внутри неё) архивом
+router.get('/public-share/:token/download-folder', async (req, res) => {
+  try {
+    const share = await loadPublicShare(req, res);
+    if (!share) return;
+    if (!share.isFolder) return res.status(400).json({ error: 'Это файл' });
+    const subPath = String(req.query.path || '');
+    const targetDir = resolveInside(share.diskPath, subPath);
+    if (!targetDir) return res.status(403).json({ error: 'Доступ запрещен' });
+    if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) {
+      return res.status(404).json({ error: 'Папка не найдена' });
+    }
+    const folderName = path.basename(targetDir);
+    incrementDownloadCount(share.tabKey, subPath ? `${share.filePath}/${subPath}` : share.filePath);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(folderName)}.zip`);
+    const archive = new ZipArchive({ zlib: { level: 6 } });
+    archive.on('error', (err: any) => {
+      console.error('[Files/Share] Archiver error:', err);
+      if (!res.headersSent) res.status(500).json({ error: 'Ошибка архивации' });
+      else if (!res.writableEnded) res.end();
+    });
+    archive.on('warning', (err: any) => console.warn('Archiver warning:', err));
+    res.on('close', () => archive.abort());
+    archive.pipe(res);
+    archive.directory(targetDir, folderName);
+    archive.finalize();
+  } catch (e: any) {
+    console.error('[Files/Share] Folder download error:', e?.message || e);
+    if (!res.headersSent) res.status(500).json({ error: 'Ошибка архивации' });
   }
 });
 

@@ -290,6 +290,10 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     downloadGameFolder: (path: string) => downloadBlob(`/api/files/games/download-folder?path=${encodeURIComponent(path)}`, `${path.split("/").pop() || "folder"}.zip`),
     hidden: (): Promise<{ names: string; theme?: string; viewMode?: string }> => fetchApi("/api/files/hidden"),
     saveHidden: (names: string, theme: string, viewMode: string) => fetchApi("/api/files/hidden", { method: "POST", body: JSON.stringify({ names, theme, viewMode }) }),
+    createShare: (tab: string, filePath: string, isFolder: boolean, expiresInHours: number | null) => fetchApi("/api/files/share", { method: "POST", body: JSON.stringify({ tabKey: tab, path: filePath, isFolder, expiresInHours }) }),
+    getShare: (tab: string, filePath: string) => fetchApi(`/api/files/share/existing?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(filePath)}`),
+    updateShare: (id: string, expiresInHours: number | null) => fetchApi(`/api/files/share/${id}`, { method: "PATCH", body: JSON.stringify({ expiresInHours }) }),
+    deleteShare: (id: string) => fetchApi(`/api/files/share/${id}`, { method: "DELETE" }),
   },
   products: {
     list: (params?: string | { q?: string; categoryId?: string; noCategory?: boolean; kind?: string }): Promise<Product[]> => {

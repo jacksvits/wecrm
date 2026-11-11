@@ -2433,3 +2433,20 @@ model RssSource {
 
   @@map("rss_sources")
 }
+
+// Публичная ссылка «Поделиться» на файл/папку страницы «Файлы» (welans.click/s/<token>)
+model FileShareLink {
+  id            String    @id @default(cuid())
+  token         String    @unique
+  name          String
+  diskPath      String    @map("disk_path")
+  tabKey        String    @map("tab_key")
+  filePath      String    @map("file_path")
+  isFolder      Boolean   @default(false) @map("is_folder")
+  expiresAt     DateTime? @map("expires_at")
+  createdById   String?   @map("created_by_id")
+  createdByName String?   @map("created_by_name")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@map("file_share_links")
+}
