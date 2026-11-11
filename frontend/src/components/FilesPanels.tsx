@@ -443,6 +443,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
           alignItems: "center",
           gap: 8,
           flexWrap: "wrap",
+          flexShrink: 0,
           padding: "8px 10px",
           borderRadius: 12,
           border: "1px solid var(--border-color)",

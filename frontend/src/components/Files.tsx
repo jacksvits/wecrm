@@ -471,7 +471,9 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
       {loading || filesLoading ? (
         <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>Загрузка...</div>
       ) : (
-        <div style={{ flex: 1, overflow: "auto" }}>
+        <div style={viewMode === "panels" ? { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" } : { flex: 1, overflow: "auto" }}>
+          {/* Строка «Назад / путь» не нужна в виде «Две панели»: навигация у каждой панели своя */}
+          {viewMode !== "panels" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
             {currentFolder && (
               <button
@@ -488,6 +490,7 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
               {currentFolder ? `${tabLabel} / ` + currentFolder.replace(/\//g, " / ") : tabLabel}
             </div>
           </div>
+          )}
 
           {visibleFiles.length === 0 && viewMode !== "panels" ? (
             <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>Папка пуста</div>
