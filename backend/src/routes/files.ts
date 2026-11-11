@@ -9,6 +9,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { ZipArchive } from 'archiver';
 import multer from 'multer';
+import AdmZip from 'adm-zip';
 import sharp from 'sharp';
 import { uploadsRoot } from '../lib/tenant.js';
 
@@ -566,6 +567,119 @@ const transferItem = (req: any, res: any, mode: 'copy' | 'move') => {
 
 router.post('/copy', authMiddleware, async (req, res) => transferItem(req, res, 'copy'));
 router.post('/move', authMiddleware, async (req, res) => transferItem(req, res, 'move'));
+
+// === Контекстное меню вида «Две панели»: сжатие, распаковка, создание текстового файла ===
+
+// Уникальный путь вида «имя (1).ext» / «имя (1)», если цель уже существует
+const uniqueSiblingPath = (dir: string, name: string): string => {
+  const target = path.join(dir, name);
+  if (!fs.existsSync(target)) return target;
+  const ext = path.extname(name);
+  const base = path.basename(name, ext);
+  let counter = 1;
+  let candidate = path.join(dir, `${base} (${counter})${ext}`);
+  while (fs.existsSync(candidate)) {
+    counter++;
+    candidate = path.join(dir, `${base} (${counter})${ext}`);
+  }
+  return candidate;
+};
+
+// Сжатие файла/папки: рядом с объектом создаётся <имя>.zip (автонумерация при коллизии)
+router.post('/zip', authMiddleware, async (req, res) => {
+  const tabKey = String(req.body?.tabKey || '');
+  const itemPath = String(req.body?.path || '');
+  const target = mutateTarget(req, res, tabKey, itemPath);
+  if (!target) return;
+  try {
+    if (!fs.existsSync(target)) return res.status(404).json({ error: 'Объект не найден' });
+    const destZip = uniqueSiblingPath(path.dirname(target), `${path.basename(target)}.zip`);
+    const archive = new ZipArchive({ zlib: { level: 6 } });
+    const output = fs.createWriteStream(destZip);
+    await new Promise<void>((resolve, reject) => {
+      output.on('close', () => resolve());
+      output.on('error', reject);
+      archive.on('error', reject);
+      archive.pipe(output);
+      if (fs.statSync(target).isDirectory()) {
+        archive.directory(target, path.basename(target));
+      } else {
+        archive.file(target, { name: path.basename(target) });
+      }
+      archive.finalize();
+    });
+    res.status(201).json({ ok: true, name: path.basename(destZip) });
+  } catch (e: any) {
+    console.error('[Files/Zip] Error:', e?.message || e);
+    try { const destZip = path.join(path.dirname(target), `${path.basename(target)}.zip`); if (fs.existsSync(destZip)) fs.rmSync(destZip, { force: true }); } catch {}
+    res.status(500).json({ error: 'Ошибка сжатия в ZIP', detail: e?.message });
+  }
+});
+
+// Распаковка .zip в папку с именем файла (без расширения); защита от zip-slip
+router.post('/unzip', authMiddleware, async (req, res) => {
+  const tabKey = String(req.body?.tabKey || '');
+  const itemPath = String(req.body?.path || '');
+  const target = mutateTarget(req, res, tabKey, itemPath);
+  if (!target) return;
+  try {
+    if (!fs.existsSync(target) || !fs.statSync(target).isFile()) {
+      return res.status(404).json({ error: 'Файл не найден' });
+    }
+    if (path.extname(target).toLowerCase() !== '.zip') {
+      return res.status(400).json({ error: 'Распаковывать можно только ZIP-архивы' });
+    }
+    const destFolder = uniqueSiblingPath(path.dirname(target), path.basename(target, path.extname(target)));
+    fs.mkdirSync(destFolder, { recursive: true });
+    const zip = new AdmZip(target);
+    let extracted = 0;
+    let skipped = 0;
+    for (const entry of zip.getEntries()) {
+      if (entry.isDirectory) continue;
+      // zip-slip защита: отсекаем записи, выходящие за пределы папки назначения
+      const normalized = path.normalize(String(entry.entryName).replace(/\\/g, '/')).replace(/^(\.\.(\/|\\|$))+/, '');
+      if (normalized.startsWith('..') || path.isAbsolute(normalized)) {
+        skipped++;
+        continue;
+      }
+      const destPath = path.join(destFolder, normalized);
+      if (!destPath.startsWith(destFolder + path.sep)) {
+        skipped++;
+        continue;
+      }
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.writeFileSync(destPath, entry.getData());
+      extracted++;
+    }
+    res.status(201).json({ ok: true, name: path.basename(destFolder), extracted, skipped });
+  } catch (e: any) {
+    console.error('[Files/Unzip] Error:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка распаковки ZIP', detail: e?.message });
+  }
+});
+
+// Создание текстового файла (.txt) в папке панели
+router.post('/create-file', authMiddleware, async (req, res) => {
+  const tabKey = String(req.body?.tabKey || '');
+  const folderPath = String(req.body?.path || '');
+  let name = sanitizeName(req.body?.name);
+  if (!name) return res.status(400).json({ error: 'Неверное имя файла' });
+  if (!path.extname(name)) name += '.txt';
+  const parent = mutateTarget(req, res, tabKey, folderPath, { allowRoot: true });
+  if (!parent) return;
+  try {
+    if (!fs.existsSync(parent) || !fs.statSync(parent).isDirectory()) {
+      return res.status(404).json({ error: 'Папка не найдена' });
+    }
+    const target = path.join(parent, name);
+    if (fs.existsSync(target)) return res.status(409).json({ error: 'Файл с таким именем уже существует' });
+    fs.writeFileSync(target, '');
+    res.status(201).json({ ok: true, name });
+  } catch (e: any) {
+    console.error('[Files/CreateFile] Error:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка создания файла', detail: e?.message });
+  }
+});
 
 // Legacy endpoints for backward compatibility with games tab
 router.get('/games', optionalAuthMiddleware, (req, res) => {

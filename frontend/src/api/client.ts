@@ -299,6 +299,9 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     deleteItem: (tab: string, itemPath: string) => fetchApi(`/api/files/item?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(itemPath)}`, { method: "DELETE" }),
     copy: (tab: string, from: string, to: string) => fetchApi("/api/files/copy", { method: "POST", body: JSON.stringify({ tabKey: tab, from, to }) }),
     move: (tab: string, from: string, to: string) => fetchApi("/api/files/move", { method: "POST", body: JSON.stringify({ tabKey: tab, from, to }) }),
+    zip: (tab: string, itemPath: string) => fetchApi("/api/files/zip", { method: "POST", body: JSON.stringify({ tabKey: tab, path: itemPath }) }),
+    unzip: (tab: string, itemPath: string) => fetchApi("/api/files/unzip", { method: "POST", body: JSON.stringify({ tabKey: tab, path: itemPath }) }),
+    createFile: (tab: string, folderPath: string, name: string) => fetchApi("/api/files/create-file", { method: "POST", body: JSON.stringify({ tabKey: tab, path: folderPath, name }) }),
     upload: (tab: string, folderPath: string, formData: FormData) => fetch(`/api/files/upload?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(folderPath)}`, { method: "POST", headers: { "X-Auth-Token": getToken()! }, body: formData }).then(r => r.json()),
   },
   products: {

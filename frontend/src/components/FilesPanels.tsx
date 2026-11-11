@@ -37,6 +37,35 @@ interface FilesPanelsProps {
   onShare: (e: React.MouseEvent, item: any, folder: string) => void;
 }
 
+// Пункт контекстного меню с подсветкой при наведении
+const MenuItem = ({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }) => {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        padding: "8px 12px",
+        border: "none",
+        background: hover ? "var(--bg-hover)" : "transparent",
+        color: danger ? "#FF3B30" : "var(--text-primary)",
+        fontSize: 13,
+        cursor: "pointer",
+        borderRadius: 7,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </button>
+  );
+};
+
+const menuDivider = <div style={{ height: 1, background: "var(--border-color)", margin: "4px 8px" }} />;
+
 export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: FilesPanelsProps) {
   const [panels, setPanels] = useState<PanelState[]>([emptyPanel(), emptyPanel()]);
   const [activePanel, setActivePanel] = useState(0);
@@ -45,9 +74,32 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
   const [mkdirName, setMkdirName] = useState("");
   const [renameTarget, setRenameTarget] = useState<{ panel: number; item: any } | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  // Контекстное меню (правый клик): item === null — клик по пустому месту панели
+  const [menu, setMenu] = useState<{ x: number; y: number; panel: number; item: any | null } | null>(null);
+  const [txtPanel, setTxtPanel] = useState<number | null>(null);
+  const [txtName, setTxtName] = useState("Новый документ.txt");
+  const menuRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  // Закрытие контекстного меню: клик вне его или Escape
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: MouseEvent) => {
+      if (menuRef.current && menuRef.current.contains(e.target as Node)) return;
+      setMenu(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenu(null);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
 
   const loadPanel = useCallback((idx: number, folder: string) => {
     setPanels((prev) => {
@@ -214,6 +266,38 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
     onShare({ stopPropagation: () => {} } as any, items[0], panels[activePanel].folder);
   };
 
+  // === Контекстное меню (правый клик) ===
+
+  const openItemMenu = (idx: number, item: any, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setActivePanel(idx);
+    // Клик по невыделенному объекту переносит выделение на него
+    if (!panels[idx].selected.has(item.name)) patchPanel(idx, { selected: new Set([item.name]) });
+    setMenu({ x: e.clientX, y: e.clientY, panel: idx, item });
+  };
+
+  const openSpaceMenu = (idx: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    setActivePanel(idx);
+    setMenu({ x: e.clientX, y: e.clientY, panel: idx, item: null });
+  };
+
+  const menuRun = (fn: () => void | Promise<void>) => {
+    setMenu(null);
+    void runOp(async () => { await fn(); });
+  };
+
+  const handleCreateTxt = () =>
+    runOp(async () => {
+      if (txtPanel === null) return;
+      const name = txtName.trim();
+      if (!name) return;
+      await api.files.createFile(tab, panels[txtPanel].folder, name);
+      setTxtPanel(null);
+      reloadPanel(txtPanel);
+    });
+
   const handleUploadClick = () => {
     if (uploadInputRef.current) uploadInputRef.current.value = "";
     uploadInputRef.current?.click();
@@ -313,6 +397,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
       <div
         key={idx}
         onClick={() => setActivePanel(idx)}
+        onContextMenu={(e) => openSpaceMenu(idx, e)}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => handleDrop(idx, e)}
         style={{
@@ -361,6 +446,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
                   draggable
                   onDragStart={(e) => handleDragStart(idx, item, e)}
                   onClick={(e) => handleRowClick(idx, item, e)}
+                  onContextMenu={(e) => openItemMenu(idx, item, e)}
                   onDoubleClick={() => handleRowDoubleClick(idx, item)}
                   title={item.name}
                   style={{
@@ -468,6 +554,124 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
         </div>
       </div>
 
+      {/* Контекстное меню (правый клик) */}
+      {menu && (() => {
+        const { x, y, panel, item } = menu;
+        const folder = panels[panel].folder;
+        const itemPath = item ? joinPath(folder, item.name) : "";
+        const isZip = !!item && !item.isDirectory && fileExtension(item.name) === "zip";
+        const MENU_W = 230;
+        const estH = (item ? (item.isDirectory ? 6 : 7) : 3) * 36 + 12;
+        const left = Math.min(x, window.innerWidth - MENU_W - 8);
+        const top = Math.min(y, window.innerHeight - estH - 8);
+        return (
+          <div
+            ref={menuRef}
+            style={{
+              position: "fixed",
+              left,
+              top,
+              width: MENU_W,
+              zIndex: 1300,
+              background: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
+              borderRadius: 10,
+              boxShadow: "0 10px 32px rgba(0,0,0,0.25)",
+              padding: 4,
+            }}
+          >
+            {item ? (
+              <>
+                <MenuItem
+                  label="Скачать"
+                  onClick={() =>
+                    menuRun(() =>
+                      (item.isDirectory ? api.files.downloadFolder(tab, itemPath) : api.files.downloadFile(tab, itemPath)).catch(
+                        (err: any) => alert("Ошибка скачивания: " + err.message)
+                      )
+                    )
+                  }
+                />
+                <MenuItem
+                  label="Сжать в ZIP"
+                  onClick={() =>
+                    menuRun(async () => {
+                      await api.files.zip(tab, itemPath);
+                      reloadPanel(panel);
+                    })
+                  }
+                />
+                {isZip && (
+                  <MenuItem
+                    label="Распаковать ZIP"
+                    onClick={() =>
+                      menuRun(async () => {
+                        await api.files.unzip(tab, itemPath);
+                        reloadPanel(panel);
+                      })
+                    }
+                  />
+                )}
+                <MenuItem
+                  label="Поделиться"
+                  onClick={() => {
+                    setMenu(null);
+                    onShare({ stopPropagation: () => {} } as any, item, folder);
+                  }}
+                />
+                {menuDivider}
+                <MenuItem
+                  label="Переименовать"
+                  onClick={() => {
+                    setMenu(null);
+                    setRenameValue(item.name);
+                    setRenameTarget({ panel, item });
+                  }}
+                />
+                <MenuItem
+                  label="Удалить"
+                  danger
+                  onClick={() =>
+                    menuRun(async () => {
+                      if (!window.confirm(`Удалить «${item.name}»?\nОперацию нельзя отменить.`)) return;
+                      await api.files.deleteItem(tab, itemPath);
+                      reloadPanel(panel);
+                    })
+                  }
+                />
+              </>
+            ) : (
+              <>
+                <MenuItem
+                  label="Загрузить"
+                  onClick={() => {
+                    setMenu(null);
+                    if (uploadInputRef.current) uploadInputRef.current.value = "";
+                    uploadInputRef.current?.click();
+                  }}
+                />
+                <MenuItem
+                  label="Создать папку"
+                  onClick={() => {
+                    setMenu(null);
+                    setMkdirName("");
+                    setMkdirPanel(panel);
+                  }}
+                />
+                <MenuItem
+                  label="Создать TXT"
+                  onClick={() => {
+                    setMenu(null);
+                    setTxtName("Новый документ.txt");
+                    setTxtPanel(panel);
+                  }}
+                />
+              </>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Модальное окно: создать папку */}
       {mkdirPanel !== null && (
         <div
@@ -522,6 +726,35 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
               <button onClick={() => setRenameTarget(null)} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-hover)", color: "var(--text-primary)", cursor: "pointer", fontSize: 14 }}>Отмена</button>
               <button onClick={handleRename} disabled={busy || !renameValue.trim()} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#007AFF", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 500, opacity: busy || !renameValue.trim() ? 0.6 : 1 }}>Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Модальное окно: создать TXT-файл */}
+      {txtPanel !== null && (
+        <div
+          onClick={() => setTxtPanel(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "var(--bg-card)", borderRadius: 16, width: "min(400px, calc(100vw - 32px))", border: "1px solid var(--border-color)", boxShadow: "0 12px 40px rgba(0,0,0,0.28)", padding: 20 }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, flex: 1 }}>Создать TXT-файл</div>
+              <button onClick={() => setTxtPanel(null)} title="Закрыть" style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: 4, display: "flex" }}>{closeIcon}</button>
+            </div>
+            <input
+              autoFocus
+              value={txtName}
+              onChange={(e) => setTxtName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleCreateTxt(); if (e.key === "Escape") setTxtPanel(null); }}
+              placeholder="Имя файла"
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border-color)", background: "var(--bg-input)", color: "var(--text-primary)", fontSize: 14 }}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+              <button onClick={() => setTxtPanel(null)} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-hover)", color: "var(--text-primary)", cursor: "pointer", fontSize: 14 }}>Отмена</button>
+              <button onClick={handleCreateTxt} disabled={busy || !txtName.trim()} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#007AFF", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 500, opacity: busy || !txtName.trim() ? 0.6 : 1 }}>Создать</button>
             </div>
           </div>
         </div>
