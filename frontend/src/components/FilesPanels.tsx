@@ -9,6 +9,7 @@ import {
   fileExtension,
   formatSize,
   isPreviewableFile,
+  isTextEditableFile,
   joinPath,
   shareIcon,
 } from "./filesTheme";
@@ -182,7 +183,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
   const handleRowDoubleClick = (idx: number, item: any) => {
     if (item.isDirectory) {
       enterFolder(idx, item.name);
-    } else if (fileExtension(item.name) === "txt") {
+    } else if (isTextEditableFile(item.name)) {
       setActivePanel(idx);
       setTxtEditor({ panel: idx, item });
     } else if (isPreviewableFile(item.name)) {
@@ -597,7 +598,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
           >
             {item ? (
               <>
-                {fileExtension(item.name) === "txt" && !item.isDirectory && (
+                {(isTextEditableFile(item.name) || fileExtension(item.name) === "svg") && !item.isDirectory && (
                   <MenuItem
                     label="Редактировать"
                     onClick={() => {

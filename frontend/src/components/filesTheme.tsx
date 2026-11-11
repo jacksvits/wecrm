@@ -10,6 +10,14 @@ export const fileExtension = (name: string) => name.split(".").pop()?.toLowerCas
 export const isImageFile = (name: string) => IMAGE_EXTENSIONS.has(fileExtension(name));
 export const isPdfFile = (name: string) => fileExtension(name) === PDF_EXTENSION;
 export const isPreviewableFile = (name: string) => isImageFile(name) || isPdfFile(name);
+
+// Расширения, открываемые в текстовом редакторе (без .svg — он открывается как картинка)
+export const TEXT_EDITABLE_EXTENSIONS = new Set([
+  "txt", "html", "htm", "xml", "css",
+  "js", "py", "cpp", "c", "java", "json", "bat", "cmd", "ps1", "php",
+  "ini", "cfg", "log", "csv", "reg", "yaml", "yml", "htaccess",
+]);
+export const isTextEditableFile = (name: string) => TEXT_EDITABLE_EXTENSIONS.has(fileExtension(name));
 export const joinPath = (folder: string, name: string) => (folder ? `${folder}/${name}` : name);
 
 export const formatSize = (bytes: number) => {

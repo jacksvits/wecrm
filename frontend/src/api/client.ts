@@ -303,7 +303,7 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     unzip: (tab: string, itemPath: string) => fetchApi("/api/files/unzip", { method: "POST", body: JSON.stringify({ tabKey: tab, path: itemPath }) }),
     createFile: (tab: string, folderPath: string, name: string) => fetchApi("/api/files/create-file", { method: "POST", body: JSON.stringify({ tabKey: tab, path: folderPath, name }) }),
     textContent: (tab: string, path: string) => fetchApi(`/api/files/text?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(path)}`),
-    saveText: (tab: string, path: string, content: string) => fetchApi("/api/files/text", { method: "PUT", body: JSON.stringify({ tabKey: tab, path, content }) }),
+    saveText: (tab: string, path: string, content: string, encoding?: string) => fetchApi("/api/files/text", { method: "PUT", body: JSON.stringify({ tabKey: tab, path, content, encoding }) }),
     upload: (tab: string, folderPath: string, formData: FormData) => fetch(`/api/files/upload?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(folderPath)}`, { method: "POST", headers: { "X-Auth-Token": getToken()! }, body: formData }).then(r => r.json()),
   },
   products: {

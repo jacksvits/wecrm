@@ -10,6 +10,8 @@ import { promisify } from 'util';
 import { ZipArchive } from 'archiver';
 import multer from 'multer';
 import AdmZip from 'adm-zip';
+import jschardet from 'jschardet';
+import iconv from 'iconv-lite';
 import sharp from 'sharp';
 import { uploadsRoot } from '../lib/tenant.js';
 
@@ -711,7 +713,8 @@ router.post('/create-file', authMiddleware, async (req, res) => {
 // === Текстовый редактор TXT ===
 const TEXT_FILE_LIMIT = 5 * 1024 * 1024;
 
-// Чтение содержимого текстового файла (для редактора) — чтение разрешено и с read-only шар
+// Чтение содержимого текстового файла (для редактора) — чтение разрешено и с read-only шар.
+// Кодировка определяется автоматически, содержимое всегда отдаётся в UTF-8.
 router.get('/text', authMiddleware, async (req, res) => {
   const tabKey = String(req.query.tab || '');
   const itemPath = String(req.query.path || '');
@@ -721,23 +724,37 @@ router.get('/text', authMiddleware, async (req, res) => {
     if (!fs.existsSync(target) || !fs.statSync(target).isFile()) {
       return res.status(404).json({ error: 'Файл не найден' });
     }
-    if (fs.statSync(target).size > TEXT_FILE_LIMIT) {
+    const buffer = fs.readFileSync(target);
+    if (buffer.length > TEXT_FILE_LIMIT) {
       return res.status(413).json({ error: 'Файл слишком большой для редактирования (более 5 МБ)' });
     }
-    res.json({ content: fs.readFileSync(target, 'utf8') });
+    // Детект кодировки: короткие файлы не детектируются надёжно — по умолчанию UTF-8
+    let encoding = 'utf-8';
+    if (buffer.length > 0) {
+      const detected = jschardet.detect(buffer);
+      const enc = String(detected?.encoding || '').toLowerCase();
+      if (detected && detected.confidence >= 0.5 && iconv.encodingExists(enc) && enc !== 'ascii') {
+        encoding = enc;
+      }
+    }
+    const content = iconv.decode(buffer, encoding);
+    res.json({ content, encoding });
   } catch (e: any) {
     console.error('[Files/TextRead] Error:', e?.message || e);
     res.status(500).json({ error: 'Ошибка чтения файла', detail: e?.message });
   }
 });
 
-// Сохранение содержимого текстового файла (мутирующая операция — нужна запись во вкладку)
+// Сохранение содержимого текстового файла (мутирующая операция — нужна запись во вкладку).
+// encoding — целевая кодировка (по умолчанию utf-8); исходную кодировку выбирает пользователь в редакторе.
 router.put('/text', authMiddleware, async (req, res) => {
   const tabKey = String(req.body?.tabKey || '');
   const itemPath = String(req.body?.path || '');
   const target = mutateTarget(req, res, tabKey, itemPath);
   if (!target) return;
   const content = String(req.body?.content ?? '');
+  const requestedEncoding = String(req.body?.encoding || 'utf-8').toLowerCase();
+  const encoding = iconv.encodingExists(requestedEncoding) ? requestedEncoding : 'utf-8';
   if (Buffer.byteLength(content, 'utf8') > TEXT_FILE_LIMIT) {
     return res.status(413).json({ error: 'Содержимое слишком большое (более 5 МБ)' });
   }
@@ -745,8 +762,8 @@ router.put('/text', authMiddleware, async (req, res) => {
     if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
       return res.status(400).json({ error: 'Это папка, а не файл' });
     }
-    fs.writeFileSync(target, content, 'utf8');
-    res.json({ ok: true, size: Buffer.byteLength(content, 'utf8') });
+    fs.writeFileSync(target, iconv.encode(content, encoding));
+    res.json({ ok: true, size: Buffer.byteLength(content, 'utf8'), encoding });
   } catch (e: any) {
     console.error('[Files/TextWrite] Error:', e?.message || e);
     res.status(500).json({ error: 'Ошибка сохранения файла', detail: e?.message });

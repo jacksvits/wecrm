@@ -15,6 +15,7 @@ import {
   isImageFile,
   isPdfFile,
   isPreviewableFile,
+  isTextEditableFile,
   joinPath,
   shareIcon,
 } from "./filesTheme";
@@ -245,7 +246,7 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
   const handleItemClick = (item: any) => {
     if (item.isDirectory) {
       setCurrentFolder((prev) => (prev ? prev + "/" + item.name : item.name));
-    } else if (fileExtension(item.name) === "txt") {
+    } else if (isTextEditableFile(item.name)) {
       setTxtEditor({ item, folder: currentFolder });
     } else if (isPreviewableFile(item.name)) {
       setPreviewFolder(currentFolder);
