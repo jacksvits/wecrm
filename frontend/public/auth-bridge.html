@@ -8,16 +8,17 @@
 <body>
 <script>
 // Мост авторизации WeCRM (редирект-вариант).
-// Лендинг welans.ru не может читать localStorage домена welans.cc из-за изоляции
-// хранилищ в современных браузерах, поэтому при первом визите страница welans.ru
-// перенаправляет сюда (welans.cc — first-party, токен доступен), а мост возвращает
-// обратно в адресной строке хэш с профилем (#wecrm-user=...) или #wecrm-guest.
+// Публичные страницы на сторонних доменах (welans.ru, welans.click) не могут читать
+// localStorage домена welans.cc из-за изоляции хранилищ в современных браузерах,
+// поэтому при первом визите такая страница перенаправляет сюда (welans.cc —
+// first-party, токен доступен), а мост возвращает обратно в адресной строке хэш
+// с профилем (#wecrm-user=...) или #wecrm-guest.
 (function () {
   var back = 'https://welans.ru/';
   try {
     var q = new URLSearchParams(location.search).get('back') || '';
-    // возврат разрешён только на страницы welans.ru
-    if (/^https:\/\/(www\.)?welans\.ru\//.test(q)) back = q;
+    // возврат разрешён только на публичные домены WeLANS (welans.ru, welans.click)
+    if (/^https:\/\/(www\.)?(welans\.ru|welans\.click)\//.test(q)) back = q;
   } catch (e) {}
   function done(hash) {
     location.replace(back.split('#')[0] + hash);
