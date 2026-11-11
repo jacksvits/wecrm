@@ -31,6 +31,15 @@ const MIME_BY_EXT: Record<string, string> = {
   '.ppt': 'application/vnd.ms-powerpoint',
   '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 };
+// Обратная таблица: фактический MIME CDN → расширение файла
+const EXT_BY_MIME: Record<string, string> = {
+  'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/bmp': '.bmp',
+  'image/webp': '.webp', 'image/tiff': '.tiff', 'image/heic': '.heic', 'image/svg+xml': '.svg',
+  'audio/mpeg': '.mp3', 'audio/mp4': '.m4a', 'audio/wav': '.wav', 'audio/ogg': '.ogg', 'audio/amr': '.amr',
+  'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/x-matroska': '.mkv',
+  'video/webm': '.webm', 'video/x-msvideo': '.avi',
+  'application/pdf': '.pdf',
+};
 const MAX_API_BASE = 'https://platform-api2.max.ru';
 
 // Папки задач создаются по требованию: tasks/<год>/<месяц>/<номер тикета> (см. lib/task-dir.ts)
@@ -438,7 +447,7 @@ async function downloadMaxAttachment(attachment: any, taskDir: string, urlPrefix
     if (attachment.type === 'image' || attachment.type === 'photo') {
       url = payloadUrl || attachment.url || attachment.file_url;
       ext = '.jpg';
-      originalName = 'max_photo_' + (attachment.id || 'unknown') + ext;
+      originalName = 'max_photo_' + (attachment.payload?.photo_id || attachment.id || 'unknown') + ext;
     } else if (attachment.type === 'document' || attachment.type === 'file') {
       url = payloadUrl || attachment.url || attachment.file_url;
       // В webhook MAX оригинальное имя файла приходит в поле filename (верхний уровень
@@ -446,15 +455,15 @@ async function downloadMaxAttachment(attachment: any, taskDir: string, urlPrefix
       // сохранялся с расширением .bin
       const rawName: string = attachment.filename || attachment.name || attachment.payload?.name || '';
       ext = path.extname(rawName);
-      originalName = rawName || 'max_doc_' + (attachment.id || attachment.payload?.fileId || 'unknown') + (ext || '.bin');
+      originalName = rawName || 'max_doc_' + (attachment.payload?.file_id || attachment.id || 'unknown') + (ext || '.bin');
     } else if (attachment.type === 'video') {
       url = payloadUrl || attachment.url || attachment.file_url;
       ext = '.mp4';
-      originalName = 'max_video_' + (attachment.id || 'unknown') + ext;
+      originalName = 'max_video_' + (attachment.payload?.video_id || attachment.id || 'unknown') + ext;
     } else if (attachment.type === 'audio' || attachment.type === 'voice') {
       url = payloadUrl || attachment.url || attachment.file_url;
       ext = '.mp3';
-      originalName = 'max_audio_' + (attachment.id || 'unknown') + ext;
+      originalName = 'max_audio_' + (attachment.payload?.audio_id || attachment.payload?.file_id || attachment.id || 'unknown') + ext;
     } else if (attachment.type === 'sticker') {
       console.log('[MAX Processor] Sticker attachment skipped');
       return null;
@@ -476,15 +485,23 @@ async function downloadMaxAttachment(attachment: any, taskDir: string, urlPrefix
 
     const buffer = await res.arrayBuffer();
     const size = buffer.byteLength;
-    const filename = randomUUID() + ext;
-    const filepath = path.join(taskDir, filename);
-    fs.writeFileSync(filepath, Buffer.from(buffer));
 
     // MIME-тип: сначала из заголовка ответа CDN, иначе по расширению из таблицы
     const headerMime = res.headers.get('content-type')?.split(';')[0]?.trim() || '';
     const mimeType = headerMime && headerMime !== 'application/octet-stream'
       ? headerMime
       : (MIME_BY_EXT[ext.toLowerCase()] || 'application/octet-stream');
+
+    // Расширение по фактическому MIME CDN: MAX отдаёт webp/heic, а дефолт ветки — .jpg
+    const mimeExt = EXT_BY_MIME[mimeType];
+    if (mimeExt) {
+      ext = mimeExt;
+      originalName = originalName.replace(/\.[a-z0-9]+$/i, ext);
+    }
+
+    const filename = randomUUID() + ext;
+    const filepath = path.join(taskDir, filename);
+    fs.writeFileSync(filepath, Buffer.from(buffer));
 
     return {
       filename,
