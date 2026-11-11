@@ -11,6 +11,7 @@ import {
   isImageFile,
   isPreviewableFile,
   isTextEditableFile,
+  isVideoFile,
   joinPath,
   shareIcon,
 } from "./filesTheme";
@@ -38,6 +39,7 @@ interface FilesPanelsProps {
   theme: FileTheme;
   onPreview: (item: any, folder: string, list?: any[]) => void;
   onShare: (e: React.MouseEvent, item: any, folder: string) => void;
+  onVideo: (item: any, folder: string) => void;
 }
 
 // Пункт контекстного меню с подсветкой при наведении
@@ -79,7 +81,7 @@ const fmtModified = (iso: any) => {
   return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: FilesPanelsProps) {
+export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVideo }: FilesPanelsProps) {
   const [panels, setPanels] = useState<PanelState[]>([emptyPanel(), emptyPanel()]);
   const [activePanel, setActivePanel] = useState(0);
   // Модальные окна операций (создание папки / переименование)
@@ -196,6 +198,9 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
     } else if (isTextEditableFile(item.name)) {
       setActivePanel(idx);
       setTxtEditor({ panel: idx, item });
+    } else if (isVideoFile(item.name)) {
+      setActivePanel(idx);
+      onVideo(item, panels[idx].folder);
     } else if (isPreviewableFile(item.name)) {
       // Слайдер: передаём все изображения папки панели
       onPreview(item, panels[idx].folder, panels[idx].items.filter((it: any) => isImageFile(it.name)));
@@ -610,6 +615,15 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
           >
             {item ? (
               <>
+                {isVideoFile(item.name) && !item.isDirectory && (
+                  <MenuItem
+                    label="Смотреть"
+                    onClick={() => {
+                      setMenu(null);
+                      onVideo(item, folder);
+                    }}
+                  />
+                )}
                 {(isTextEditableFile(item.name) || fileExtension(item.name) === "svg") && !item.isDirectory && (
                   <MenuItem
                     label="Редактировать"

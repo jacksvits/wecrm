@@ -18,6 +18,14 @@ export const TEXT_EDITABLE_EXTENSIONS = new Set([
   "ini", "cfg", "log", "csv", "reg", "yaml", "yml", "htaccess",
 ]);
 export const isTextEditableFile = (name: string) => TEXT_EDITABLE_EXTENSIONS.has(fileExtension(name));
+
+// Видео-файлы: открываются в модальном плеере
+export const VIDEO_EXTENSIONS = new Set(["mp4", "m4v", "webm", "mov", "ogv", "avi", "mkv", "wmv"]);
+export const VIDEO_MIME: Record<string, string> = {
+  mp4: "video/mp4", m4v: "video/mp4", webm: "video/webm", mov: "video/quicktime",
+  ogv: "video/ogg", avi: "video/x-msvideo", mkv: "video/x-matroska", wmv: "video/x-ms-wmv",
+};
+export const isVideoFile = (name: string) => VIDEO_EXTENSIONS.has(fileExtension(name));
 export const joinPath = (folder: string, name: string) => (folder ? `${folder}/${name}` : name);
 
 export const formatSize = (bytes: number) => {

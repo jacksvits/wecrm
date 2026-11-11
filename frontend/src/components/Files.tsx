@@ -16,8 +16,10 @@ import {
   isPdfFile,
   isPreviewableFile,
   isTextEditableFile,
+  isVideoFile,
   joinPath,
   shareIcon,
+  VIDEO_MIME,
 } from "./filesTheme";
 
 const ALL_TABS = [
@@ -170,6 +172,11 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
   };
   // Открытый TXT-редактор (виды «Иконки»/«Таблица»)
   const [txtEditor, setTxtEditor] = useState<{ item: any; folder: string } | null>(null);
+  // Видеоплеер: открытый видеофайл (blob грузится через /preview)
+  const [videoItem, setVideoItem] = useState<{ item: any; folder: string } | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoError, setVideoError] = useState("");
 
   const loadSettings = async () => {
     try {
@@ -255,6 +262,39 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   });
 
+  // Загрузка видео для плеера: blob через /preview с корректным MIME
+  useEffect(() => {
+    if (!videoItem) {
+      setVideoUrl(null);
+      return;
+    }
+    let url: string | null = null;
+    let cancelled = false;
+    setVideoLoading(true);
+    setVideoError("");
+    api.files
+      .previewFile(activeTab, joinPath(videoItem.folder, videoItem.item.name))
+      .then((blob: Blob) => {
+        if (cancelled) return;
+        const ext = fileExtension(videoItem.item.name);
+        const typed = blob.type && blob.type !== "application/octet-stream" ? blob : new Blob([blob], { type: VIDEO_MIME[ext] || "video/mp4" });
+        url = URL.createObjectURL(typed);
+        setVideoUrl(url);
+      })
+      .catch((e: any) => { if (!cancelled) setVideoError(e?.message || "Ошибка загрузки видео"); })
+      .finally(() => { if (!cancelled) setVideoLoading(false); });
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+  }, [videoItem, activeTab]);
+
+  useEffect(() => {
+    if (!videoItem) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setVideoItem(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
   // formatSize импортируется из filesTheme.tsx
 
   const handleItemClick = (item: any) => {
@@ -262,6 +302,8 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
       setCurrentFolder((prev) => (prev ? prev + "/" + item.name : item.name));
     } else if (isTextEditableFile(item.name)) {
       setTxtEditor({ item, folder: currentFolder });
+    } else if (isVideoFile(item.name)) {
+      setVideoItem({ item, folder: currentFolder });
     } else if (isPreviewableFile(item.name)) {
       setPreviewFolder(currentFolder);
       setPreviewList(visibleFiles.filter((f: any) => isImageFile(f.name)));
@@ -517,6 +559,7 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
               theme={filesTheme}
               onPreview={(item, folder, list) => { setPreviewFolder(folder); setPreviewList(list || []); setPreviewItem(item); }}
               onShare={(e, item, folder) => { openShare(e, item, folder); }}
+              onVideo={(item, folder) => setVideoItem({ item, folder })}
             />
           ) : viewMode === "table" ? (
             <div style={{ overflowX: compactTable ? "hidden" : "auto" }}>
@@ -880,6 +923,72 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
           title={txtEditor.item.name}
           onClose={() => setTxtEditor(null)}
         />
+      )}
+
+      {/* Модальный видеоплеер */}
+      {videoItem && (
+        <div
+          onClick={() => setVideoItem(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 1240, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(1100px, 100%)",
+              maxWidth: "calc(100vw - 40px)",
+              background: "#0b0b0f",
+              borderRadius: 14,
+              overflow: "hidden",
+              border: "1px solid var(--border-color)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {videoItem.item.name}
+              </div>
+              <button
+                onClick={() => api.files.downloadFile(activeTab, joinPath(videoItem.folder, videoItem.item.name)).catch((e: any) => alert("Ошибка скачивания: " + e.message))}
+                title="Скачать"
+                style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+              >
+                {downloadIcon}
+              </button>
+              <button
+                onClick={() => setVideoItem(null)}
+                title="Закрыть"
+                style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+              >
+                {closeIcon}
+              </button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "#000", minHeight: 300 }}>
+              {videoLoading ? (
+                <div style={{ padding: 60, color: "rgba(255,255,255,0.6)", fontSize: 14 }}>Загрузка видео...</div>
+              ) : videoError ? (
+                <div style={{ padding: 40, textAlign: "center", color: "rgba(255,255,255,0.85)", fontSize: 14, display: "flex", flexDirection: "column", gap: 14, alignItems: "center" }}>
+                  <div>{videoError}</div>
+                  <button
+                    onClick={() => api.files.downloadFile(activeTab, joinPath(videoItem.folder, videoItem.item.name)).catch((e: any) => alert("Ошибка скачивания: " + e.message))}
+                    style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#007AFF", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 500 }}
+                  >
+                    Скачать файл
+                  </button>
+                </div>
+              ) : (
+                <video
+                  src={videoUrl || undefined}
+                  controls
+                  autoPlay
+                  style={{ width: "100%", maxHeight: "calc(100vh - 190px)", display: "block", background: "#000" }}
+                  onError={() => setVideoError("Браузер не может воспроизвести этот формат. Скачайте файл для просмотра в плеере.")}
+                />
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

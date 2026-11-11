@@ -220,6 +220,15 @@ const PREVIEW_TYPES: Record<string, string> = {
   '.ico': 'image/x-icon',
   '.svg': 'image/svg+xml',
   '.pdf': 'application/pdf',
+  // Видео: модальный плеер на странице «Файлы» (avi/mkv/wmv — по попытке, браузер может не сыграть)
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
+  '.ogv': 'video/ogg',
+  '.avi': 'video/x-msvideo',
+  '.mkv': 'video/x-matroska',
+  '.wmv': 'video/x-ms-wmv',
 };
 
 router.get('/preview', optionalAuthMiddleware, async (req, res) => {
