@@ -171,7 +171,8 @@ router.get('/browse', optionalAuthMiddleware, async (req, res) => {
     });
     const countMap = new Map(counts.map((c) => [path.basename(c.filePath), c.count]));
     const itemsWithCounts = items.map((it) => ({ ...it, downloads: countMap.get(it.name) || 0 }));
-    res.json({ items: itemsWithCounts, currentPath: subPath });
+    // Флаг записи: NFS-шары архивов могут быть read-only — фронт скроет операции записи
+    res.json({ items: itemsWithCounts, currentPath: subPath, writable: isWritableDir(targetDir) });
   } catch (e: any) {
     console.error('[Files/Browse] Error reading folder:', e?.message || e);
     res.status(500).json({ error: 'Ошибка чтения папки' });
@@ -394,6 +395,16 @@ const sanitizeName = (raw: any): string | null => {
   return cleaned || null;
 };
 
+// Доступна ли папка на запись (NFS-шары архивов могут быть read-only)
+const isWritableDir = (dir: string): boolean => {
+  try {
+    fs.accessSync(dir, fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 // Общий предохранитель мутаций: роль admin + валидная вкладка + путь внутри хранилища.
 // Вернёт null и ответит ошибкой, если проверка не пройдена.
 const mutateTarget = (req: any, res: any, tabKey: string, subPath: string, opts?: { allowRoot?: boolean }): string | null => {
@@ -413,6 +424,10 @@ const mutateTarget = (req: any, res: any, tabKey: string, subPath: string, opts?
   const target = resolveInside(baseDir, subPath);
   if (!target) {
     res.status(403).json({ error: 'Доступ запрещен' });
+    return null;
+  }
+  if (!isWritableDir(baseDir)) {
+    res.status(409).json({ error: 'Вкладка доступна только для чтения' });
     return null;
   }
   return target;
@@ -472,6 +487,9 @@ const tabFileUpload = multer({ storage: tabFileStorage, limits: { fileSize: 2 * 
 
 router.post('/upload', authMiddleware, (req, res, next) => {
   if ((req as any).user?.role !== 'admin') return res.status(403).json({ error: 'Доступ запрещен' });
+  const baseDir = resolveTabDir(String((req.query.tab as string) || ''));
+  const dir = baseDir ? resolveInside(baseDir, String((req.query.path as string) || '')) : null;
+  if (!dir || !isWritableDir(dir)) return res.status(409).json({ error: 'Вкладка доступна только для чтения' });
   next();
 }, tabFileUpload.array('files', 20), async (req, res) => {
   try {

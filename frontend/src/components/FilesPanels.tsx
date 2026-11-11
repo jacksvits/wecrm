@@ -38,23 +38,24 @@ interface FilesPanelsProps {
 }
 
 // Пункт контекстного меню с подсветкой при наведении
-const MenuItem = ({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }) => {
+const MenuItem = ({ label, onClick, danger, disabled }: { label: string; onClick: () => void; danger?: boolean; disabled?: boolean }) => {
   const [hover, setHover] = useState(false);
   return (
     <button
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      disabled={disabled}
       style={{
         display: "block",
         width: "100%",
         textAlign: "left",
         padding: "8px 12px",
         border: "none",
-        background: hover ? "var(--bg-hover)" : "transparent",
-        color: danger ? "#FF3B30" : "var(--text-primary)",
+        background: hover && !disabled ? "var(--bg-hover)" : "transparent",
+        color: danger ? "#FF3B30" : disabled ? "var(--text-muted)" : "var(--text-primary)",
         fontSize: 13,
-        cursor: "pointer",
+        cursor: disabled ? "default" : "pointer",
         borderRadius: 7,
         whiteSpace: "nowrap",
       }}
@@ -78,6 +79,8 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
   const [menu, setMenu] = useState<{ x: number; y: number; panel: number; item: any | null } | null>(null);
   const [txtPanel, setTxtPanel] = useState<number | null>(null);
   const [txtName, setTxtName] = useState("Новый документ.txt");
+  // Запись в текущую вкладку (NFS-шары архивов могут быть только для чтения)
+  const [writable, setWritable] = useState(true);
   const menuRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -111,6 +114,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
       .browse(tab, folder)
       .then((data: any) => {
         const items = (data.items || []).filter((it: any) => !hiddenNames.includes(String(it.name).toLowerCase()));
+        setWritable(data.writable !== false);
         setPanels((prev) => {
           const next = [...prev];
           if (next[idx].folder !== folder) return prev;
@@ -332,6 +336,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
 
   const handleDrop = (idx: number, e: React.DragEvent) => {
     e.preventDefault();
+    if (!writable) return;
     const raw = e.dataTransfer.getData(DND_MIME);
     if (!raw) return;
     let payload: { from: number; names: string[] };
@@ -398,7 +403,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
         key={idx}
         onClick={() => setActivePanel(idx)}
         onContextMenu={(e) => openSpaceMenu(idx, e)}
-        onDragOver={(e) => e.preventDefault()}
+        onDragOver={(e) => { if (writable) e.preventDefault(); }}
         onDrop={(e) => handleDrop(idx, e)}
         style={{
           flex: 1,
@@ -443,7 +448,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
               return (
                 <div
                   key={item.name}
-                  draggable
+                  draggable={writable}
                   onDragStart={(e) => handleDragStart(idx, item, e)}
                   onClick={(e) => handleRowClick(idx, item, e)}
                   onContextMenu={(e) => openItemMenu(idx, item, e)}
@@ -536,21 +541,25 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
           background: "var(--bg-hover)",
         }}
       >
-        {barBtn("Создать папку", { onClick: () => { setMkdirName(""); setMkdirPanel(activePanel); }, title: "Создать папку в активной панели" })}
+        {writable && barBtn("Создать папку", { onClick: () => { setMkdirName(""); setMkdirPanel(activePanel); }, title: "Создать папку в активной панели" })}
         <input ref={uploadInputRef} type="file" multiple style={{ display: "none" }} onChange={(e) => handleUploadFiles(e.target.files)} />
-        {barBtn(uploading ? "Загрузка..." : "Загрузить", { onClick: handleUploadClick, disabled: uploading, title: "Загрузить файлы в активную панель" })}
-        <div style={{ width: 1, height: 22, background: "var(--border-color)", flexShrink: 0 }} />
-        {barBtn("Копировать →", { onClick: () => transferTo(otherIdx, "copy"), disabled: !activeSelected.length, title: `Скопировать выделенное в панель ${otherIdx + 1}` })}
-        {barBtn("Переместить →", { onClick: () => transferTo(otherIdx, "move"), disabled: !activeSelected.length, title: `Переместить выделенное в панель ${otherIdx + 1}` })}
-        <div style={{ width: 1, height: 22, background: "var(--border-color)", flexShrink: 0 }} />
-        {barBtn("Переименовать", { onClick: () => { const it = activeSelected[0]; setRenameValue(it.name); setRenameTarget({ panel: activePanel, item: it }); }, disabled: activeSelected.length !== 1 })}
-        {barBtn("Удалить", { onClick: handleDelete, disabled: !activeSelected.length })}
+        {writable && barBtn(uploading ? "Загрузка..." : "Загрузить", { onClick: handleUploadClick, disabled: uploading, title: "Загрузить файлы в активную панель" })}
+        {writable && <div style={{ width: 1, height: 22, background: "var(--border-color)", flexShrink: 0 }} />}
+        {writable && barBtn("Копировать →", { onClick: () => transferTo(otherIdx, "copy"), disabled: !activeSelected.length, title: `Скопировать выделенное в панель ${otherIdx + 1}` })}
+        {writable && barBtn("Переместить →", { onClick: () => transferTo(otherIdx, "move"), disabled: !activeSelected.length, title: `Переместить выделенное в панель ${otherIdx + 1}` })}
+        {writable && <div style={{ width: 1, height: 22, background: "var(--border-color)", flexShrink: 0 }} />}
+        {writable && barBtn("Переименовать", { onClick: () => { const it = activeSelected[0]; setRenameValue(it.name); setRenameTarget({ panel: activePanel, item: it }); }, disabled: activeSelected.length !== 1 })}
+        {writable && barBtn("Удалить", { onClick: handleDelete, disabled: !activeSelected.length })}
         <div style={{ width: 1, height: 22, background: "var(--border-color)", flexShrink: 0 }} />
         {barBtn("Скачать", { onClick: handleDownloadSelected, disabled: !activeSelected.length })}
         {barBtn("Поделиться", { onClick: handleShareSelected, disabled: activeSelected.length !== 1 })}
         <div style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
           {shareIcon}
-          <span>Активна панель {activePanel + 1} · Ctrl+клик — несколько объектов · перетаскивание между панелями</span>
+          {writable ? (
+            <span>Активна панель {activePanel + 1} · Ctrl+клик — несколько объектов · перетаскивание между панелями</span>
+          ) : (
+            <span>Вкладка только для чтения — доступны скачивание и публикация ссылок</span>
+          )}
         </div>
       </div>
 
@@ -594,6 +603,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
                 />
                 <MenuItem
                   label="Сжать в ZIP"
+                  disabled={!writable}
                   onClick={() =>
                     menuRun(async () => {
                       await api.files.zip(tab, itemPath);
@@ -604,6 +614,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
                 {isZip && (
                   <MenuItem
                     label="Распаковать ZIP"
+                    disabled={!writable}
                     onClick={() =>
                       menuRun(async () => {
                         await api.files.unzip(tab, itemPath);
@@ -622,6 +633,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
                 {menuDivider}
                 <MenuItem
                   label="Переименовать"
+                  disabled={!writable}
                   onClick={() => {
                     setMenu(null);
                     setRenameValue(item.name);
@@ -631,6 +643,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
                 <MenuItem
                   label="Удалить"
                   danger
+                  disabled={!writable}
                   onClick={() =>
                     menuRun(async () => {
                       if (!window.confirm(`Удалить «${item.name}»?\nОперацию нельзя отменить.`)) return;
@@ -640,7 +653,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
                   }
                 />
               </>
-            ) : (
+            ) : writable ? (
               <>
                 <MenuItem
                   label="Загрузить"
@@ -667,6 +680,8 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
                   }}
                 />
               </>
+            ) : (
+              <MenuItem label="Вкладка доступна только для чтения" disabled onClick={() => {}} />
             )}
           </div>
         );

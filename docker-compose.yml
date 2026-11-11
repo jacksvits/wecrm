@@ -86,10 +86,10 @@ services:
     volumes:
       - /mnt/nfs/wecrm-uploads:/app/uploads
       - /mnt/nfs/wecrm-uploads/tenants:/app/tenants
-      - /mnt/nfs/SOFT:/app/files/programs:ro
-      - /mnt/nfs/DRIVER:/app/files/drivers:ro
-      - /mnt/nfs/BOOK:/app/files/documents:ro
-      - /mnt/nfs/GAME:/app/files/games:ro
+      - /mnt/nfs/SOFT:/app/files/programs
+      - /mnt/nfs/DRIVER:/app/files/drivers
+      - /mnt/nfs/BOOK:/app/files/documents
+      - /mnt/nfs/GAME:/app/files/games
       - /mnt/nfs/GAME:/app/games:ro
       - ./backend/data:/app/data
       # Общий том с конфигом sing-box: бэкенд перезаписывает его из плагина «Прокси через VPN»
@@ -155,10 +155,10 @@ services:
     volumes:
       - /mnt/nfs/wecrm-uploads:/app/uploads
       - /mnt/nfs/wecrm-uploads/tenants:/app/tenants
-      - /mnt/nfs/SOFT:/app/files/programs:ro
-      - /mnt/nfs/DRIVER:/app/files/drivers:ro
-      - /mnt/nfs/BOOK:/app/files/documents:ro
-      - /mnt/nfs/GAME:/app/files/games:ro
+      - /mnt/nfs/SOFT:/app/files/programs
+      - /mnt/nfs/DRIVER:/app/files/drivers
+      - /mnt/nfs/BOOK:/app/files/documents
+      - /mnt/nfs/GAME:/app/files/games
       - /mnt/nfs/GAME:/app/games:ro
       - ./backend/prisma:/app/prisma:ro
     restart: unless-stopped
