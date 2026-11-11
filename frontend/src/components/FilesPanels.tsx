@@ -70,6 +70,15 @@ const MenuItem = ({ label, onClick, danger, disabled }: { label: string; onClick
 
 const menuDivider = <div style={{ height: 1, background: "var(--border-color)", margin: "4px 8px" }} />;
 
+// Дата+время изменения: «12.11.2026 14:32»
+const fmtModified = (iso: any) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
 export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: FilesPanelsProps) {
   const [panels, setPanels] = useState<PanelState[]>([emptyPanel(), emptyPanel()]);
   const [activePanel, setActivePanel] = useState(0);
@@ -465,7 +474,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
                   title={item.name}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "30px minmax(0,1fr) 84px",
+                    gridTemplateColumns: "30px minmax(0,1fr) 122px 84px",
                     alignItems: "center",
                     gap: 8,
                     padding: "5px 10px",
@@ -482,6 +491,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare }: Fil
                     </div>
                   </div>
                   <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: isSelected ? 600 : 500 }}>{item.name}</div>
+                  <div style={{ color: "var(--text-muted)", fontSize: 12, textAlign: "right", whiteSpace: "nowrap" }} title={fmtModified(item.updatedAt)}>{fmtModified(item.updatedAt)}</div>
                   <div style={{ color: "var(--text-muted)", fontSize: 12, textAlign: "right" }}>{item.isDirectory ? "Папка" : formatSize(item.size)}</div>
                 </div>
               );
