@@ -305,6 +305,8 @@ router.get('/download', optionalAuthMiddleware, (req, res) => {
     incrementDownloadCount(tabKey, filePath);
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.setHeader('Content-Type', 'application/octet-stream');
+    // Content-Length нужен мобильным браузерам (iOS Safari) для старта скачивания
+    res.setHeader('Content-Length', String(fs.statSync(targetFile).size));
     const stream = fs.createReadStream(targetFile);
     stream.on('error', (err) => {
       console.error('File download stream error:', err);
@@ -429,6 +431,8 @@ router.get('/games/download', optionalAuthMiddleware, (req, res) => {
     incrementDownloadCount(tabKey, filePath);
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.setHeader('Content-Type', 'application/octet-stream');
+    // Content-Length нужен мобильным браузерам (iOS Safari) для старта скачивания
+    res.setHeader('Content-Length', String(fs.statSync(targetFile).size));
     const stream = fs.createReadStream(targetFile);
     stream.on('error', (err) => {
       console.error('File download stream error:', err);
@@ -672,6 +676,8 @@ router.get('/public-share/:token/download', async (req, res) => {
     incrementDownloadCount(share.tabKey, relPath);
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(targetFile))}`);
     res.setHeader('Content-Type', 'application/octet-stream');
+    // Content-Length нужен мобильным браузерам (iOS Safari) для старта скачивания
+    res.setHeader('Content-Length', String(fs.statSync(targetFile).size));
     const stream = fs.createReadStream(targetFile);
     stream.on('error', (err) => {
       console.error('[Files/Share] Download stream error:', err);
