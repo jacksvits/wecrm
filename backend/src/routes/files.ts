@@ -518,7 +518,9 @@ const parseExpiryHours = (raw: any): number | null => {
 };
 
 // Создание публичной ссылки (авторизованные пользователи)
-router.post('/share', authMiddleware, async (req, res) => {
+// Создание публичной ссылки: авторизованные — любые вкладки; анонимы (welans.click) —
+// только публичные вкладки, «Система» по-прежнему только для администраторов
+router.post('/share', optionalAuthMiddleware, async (req, res) => {
   const tabKey = String(req.body?.tabKey || '');
   const filePath = String(req.body?.path || '');
   const isFolder = !!req.body?.isFolder;
@@ -556,7 +558,7 @@ router.post('/share', authMiddleware, async (req, res) => {
 });
 
 // Активная ссылка для объекта (чтобы не плодить дубликаты при повторном «Поделиться»)
-router.get('/share/existing', authMiddleware, async (req, res) => {
+router.get('/share/existing', optionalAuthMiddleware, async (req, res) => {
   const tabKey = String(req.query.tab || '');
   const filePath = String(req.query.path || '');
   const baseDir = shareTargetGuard(req as any, tabKey);
@@ -581,11 +583,15 @@ router.get('/share/existing', authMiddleware, async (req, res) => {
 });
 
 // Смена срока действия: null/0 — без ограничения, иначе — число часов от текущего момента
-router.patch('/share/:id', authMiddleware, async (req, res) => {
+// Смена срока действия: создатель или admin; анонимно — только ссылки, созданные анонимно
+// (welans.click: иначе посетитель не смог бы ограничить срок ссылки, которую только что сделал)
+router.patch('/share/:id', optionalAuthMiddleware, async (req, res) => {
   try {
     const share = await prisma.fileShareLink.findUnique({ where: { id: req.params.id } });
     if (!share) return res.status(404).json({ error: 'Ссылка не найдена' });
-    if (share.createdById !== (req as any).user?.id && (req as any).user?.role !== 'admin') {
+    const user = (req as any).user;
+    const anonymousOwns = !share.createdById && !user;
+    if (!anonymousOwns && share.createdById !== user?.id && user?.role !== 'admin') {
       return res.status(403).json({ error: 'Доступ запрещен' });
     }
     const hours = parseExpiryHours(req.body?.expiresInHours);

@@ -657,15 +657,13 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
                       {!compactTable && <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.isDirectory ? "Папка" : (fileExtension(item.name) ? fileExtension(item.name).toUpperCase() : "—")}</div>}
                       {!compactTable && <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.downloads || 0}</div>}
                       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                        {!publicMode && (
-                          <button
-                            onClick={(e) => openShare(e, item)}
-                            title="Поделиться"
-                            style={{ ...iconButtonStyle, width: 26, height: 26, borderRadius: 7 }}
-                          >
-                            {shareIcon}
-                          </button>
-                        )}
+                        <button
+                          onClick={(e) => openShare(e, item)}
+                          title="Поделиться"
+                          style={{ ...iconButtonStyle, width: 26, height: 26, borderRadius: 7 }}
+                        >
+                          {shareIcon}
+                        </button>
                         <button
                           onClick={(e) => item.isDirectory ? handleDownloadFolder(e, item) : handleDownloadFile(e, item)}
                           title={item.isDirectory ? "Скачать папку как ZIP" : "Скачать"}
@@ -700,15 +698,13 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
                       (e.currentTarget as HTMLElement).style.background = "transparent";
                     }}
                   >
-                    {!publicMode && (
-                      <button
-                        onClick={(e) => openShare(e, item)}
-                        title="Поделиться"
-                        style={{ ...iconButtonStyle, width: 24, height: 24, borderRadius: 7, position: "absolute", top: 4, right: 32, opacity: 0.85 }}
-                      >
-                        {shareIcon}
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => openShare(e, item)}
+                      title="Поделиться"
+                      style={{ ...iconButtonStyle, width: 24, height: 24, borderRadius: 7, position: "absolute", top: 4, right: 32, opacity: 0.85 }}
+                    >
+                      {shareIcon}
+                    </button>
                     <button
                       onClick={(e) => item.isDirectory ? handleDownloadFolder(e, item) : handleDownloadFile(e, item)}
                       title={item.isDirectory ? "Скачать папку как ZIP" : "Скачать"}
@@ -789,15 +785,21 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
                     </span>
                   )}
                 </div>
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button
-                    onClick={revokeShare}
-                    disabled={shareBusy}
-                    style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #FF3B30", background: "transparent", color: "#FF3B30", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-                  >
-                    Отключить доступ
-                  </button>
-                </div>
+                {user ? (
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button
+                      onClick={revokeShare}
+                      disabled={shareBusy}
+                      style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #FF3B30", background: "transparent", color: "#FF3B30", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                    >
+                      Отключить доступ
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                    Отключить доступ к ссылке может только авторизованный пользователь CRM. Ограничьте ссылку сроком действия.
+                  </div>
+                )}
               </>
             ) : null}
           </div>
