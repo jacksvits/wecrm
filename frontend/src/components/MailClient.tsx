@@ -746,7 +746,8 @@ export function MailClient() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
+      // Отложенный revoke: немедленный отменяет скачивание в iOS Safari/Android WebView
+      setTimeout(() => URL.revokeObjectURL(link.href), 60000);
     } catch (e: any) {
       setError(e.message || 'Не удалось скачать вложение');
     }

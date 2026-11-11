@@ -579,7 +579,8 @@ export function TaskDetail() {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      // Отложенный revoke: немедленный отменяет скачивание в iOS Safari/Android WebView
+      setTimeout(() => window.URL.revokeObjectURL(url), 60000);
     } catch (err: any) {
       alert('Ошибка скачивания: ' + err.message);
     }
