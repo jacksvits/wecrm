@@ -26,6 +26,14 @@ export const VIDEO_MIME: Record<string, string> = {
   ogv: "video/ogg", avi: "video/x-msvideo", mkv: "video/x-matroska", wmv: "video/x-ms-wmv",
 };
 export const isVideoFile = (name: string) => VIDEO_EXTENSIONS.has(fileExtension(name));
+
+// Аудио-файлы: открываются в модальном аудиоплеере
+export const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "oga", "m4a", "aac", "opus", "flac", "wma"]);
+export const AUDIO_MIME: Record<string, string> = {
+  mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", oga: "audio/ogg",
+  m4a: "audio/mp4", aac: "audio/aac", opus: "audio/ogg", flac: "audio/flac", wma: "audio/x-ms-wma",
+};
+export const isAudioFile = (name: string) => AUDIO_EXTENSIONS.has(fileExtension(name));
 export const joinPath = (folder: string, name: string) => (folder ? `${folder}/${name}` : name);
 
 export const formatSize = (bytes: number) => {

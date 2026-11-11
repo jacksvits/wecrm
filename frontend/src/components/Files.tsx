@@ -17,9 +17,11 @@ import {
   isPreviewableFile,
   isTextEditableFile,
   isVideoFile,
+  isAudioFile,
   joinPath,
   shareIcon,
   VIDEO_MIME,
+  AUDIO_MIME,
 } from "./filesTheme";
 
 const ALL_TABS = [
@@ -177,6 +179,11 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
   const [videoError, setVideoError] = useState("");
+  // Аудиоплеер: открытый аудиофайл
+  const [audioItem, setAudioItem] = useState<{ item: any; folder: string } | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioError, setAudioError] = useState("");
 
   const loadSettings = async () => {
     try {
@@ -295,6 +302,39 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   });
 
+  // Загрузка аудио для плеера
+  useEffect(() => {
+    if (!audioItem) {
+      setAudioUrl(null);
+      return;
+    }
+    let url: string | null = null;
+    let cancelled = false;
+    setAudioLoading(true);
+    setAudioError("");
+    api.files
+      .previewFile(activeTab, joinPath(audioItem.folder, audioItem.item.name))
+      .then((blob: Blob) => {
+        if (cancelled) return;
+        const ext = fileExtension(audioItem.item.name);
+        const typed = blob.type && blob.type !== "application/octet-stream" ? blob : new Blob([blob], { type: AUDIO_MIME[ext] || "audio/mpeg" });
+        url = URL.createObjectURL(typed);
+        setAudioUrl(url);
+      })
+      .catch((e: any) => { if (!cancelled) setAudioError(e?.message || "Ошибка загрузки аудио"); })
+      .finally(() => { if (!cancelled) setAudioLoading(false); });
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+  }, [audioItem, activeTab]);
+
+  useEffect(() => {
+    if (!audioItem) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAudioItem(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
   // formatSize импортируется из filesTheme.tsx
 
   const handleItemClick = (item: any) => {
@@ -304,6 +344,8 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
       setTxtEditor({ item, folder: currentFolder });
     } else if (isVideoFile(item.name)) {
       setVideoItem({ item, folder: currentFolder });
+    } else if (isAudioFile(item.name)) {
+      setAudioItem({ item, folder: currentFolder });
     } else if (isPreviewableFile(item.name)) {
       setPreviewFolder(currentFolder);
       setPreviewList(visibleFiles.filter((f: any) => isImageFile(f.name)));
@@ -560,6 +602,7 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
               onPreview={(item, folder, list) => { setPreviewFolder(folder); setPreviewList(list || []); setPreviewItem(item); }}
               onShare={(e, item, folder) => { openShare(e, item, folder); }}
               onVideo={(item, folder) => setVideoItem({ item, folder })}
+              onAudio={(item, folder) => setAudioItem({ item, folder })}
             />
           ) : viewMode === "table" ? (
             <div style={{ overflowX: compactTable ? "hidden" : "auto" }}>
@@ -984,6 +1027,71 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
                   autoPlay
                   style={{ width: "100%", maxHeight: "calc(100vh - 190px)", display: "block", background: "#000" }}
                   onError={() => setVideoError("Браузер не может воспроизвести этот формат. Скачайте файл для просмотра в плеере.")}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальный аудиоплеер */}
+      {audioItem && (
+        <div
+          onClick={() => setAudioItem(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1245, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(560px, calc(100vw - 40px))",
+              background: "var(--bg-card)",
+              borderRadius: 14,
+              overflow: "hidden",
+              border: "1px solid var(--border-color)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: "1px solid var(--border-color)", flexShrink: 0 }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {audioItem.item.name}
+              </div>
+              <button
+                onClick={() => api.files.downloadFile(activeTab, joinPath(audioItem.folder, audioItem.item.name)).catch((e: any) => alert("Ошибка скачивания: " + e.message))}
+                title="Скачать"
+                style={{ ...iconButtonStyle, width: 36, height: 36 }}
+              >
+                {downloadIcon}
+              </button>
+              <button
+                onClick={() => setAudioItem(null)}
+                title="Закрыть"
+                style={{ ...iconButtonStyle, width: 36, height: 36, color: "var(--text-muted)" }}
+              >
+                {closeIcon}
+              </button>
+            </div>
+            <div style={{ padding: "18px 16px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 96 }}>
+              {audioLoading ? (
+                <div style={{ color: "var(--text-muted)", fontSize: 14 }}>Загрузка аудио...</div>
+              ) : audioError ? (
+                <div style={{ textAlign: "center", fontSize: 14, display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+                  <div>{audioError}</div>
+                  <button
+                    onClick={() => api.files.downloadFile(activeTab, joinPath(audioItem.folder, audioItem.item.name)).catch((e: any) => alert("Ошибка скачивания: " + e.message))}
+                    style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#007AFF", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 500 }}
+                  >
+                    Скачать файл
+                  </button>
+                </div>
+              ) : (
+                <audio
+                  src={audioUrl || undefined}
+                  controls
+                  autoPlay
+                  style={{ width: "100%", display: "block" }}
+                  onError={() => setAudioError("Браузер не может воспроизвести этот формат. Скачайте файл для прослушивания.")}
                 />
               )}
             </div>

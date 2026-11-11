@@ -229,6 +229,16 @@ const PREVIEW_TYPES: Record<string, string> = {
   '.avi': 'video/x-msvideo',
   '.mkv': 'video/x-matroska',
   '.wmv': 'video/x-ms-wmv',
+  // Аудио: модальный аудиоплеер на странице «Файлы» (wma — по попытке, браузер может не сыграть)
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.oga': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.opus': 'audio/ogg',
+  '.flac': 'audio/flac',
+  '.wma': 'audio/x-ms-wma',
 };
 
 router.get('/preview', optionalAuthMiddleware, async (req, res) => {
