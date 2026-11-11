@@ -676,9 +676,27 @@ router.get('/public-share/:token/download', async (req, res) => {
     incrementDownloadCount(share.tabKey, relPath);
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(targetFile))}`);
     res.setHeader('Content-Type', 'application/octet-stream');
+    // Поддержка Range (докачка) — для больших файлов на мобильных сетях
+    const fileSize = fs.statSync(targetFile).size;
+    res.setHeader('Accept-Ranges', 'bytes');
+    const rangeHeader = String(req.headers.range || '');
+    const rangeMatch = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+    let start = 0;
+    let end = fileSize - 1;
+    if (rangeMatch && (rangeMatch[1] || rangeMatch[2])) {
+      if (rangeMatch[1]) start = parseInt(rangeMatch[1], 10);
+      if (rangeMatch[2]) end = Math.min(parseInt(rangeMatch[2], 10), fileSize - 1);
+      if (!rangeMatch[1] && rangeMatch[2]) start = Math.max(fileSize - parseInt(rangeMatch[2], 10), 0);
+      if (start > end || start >= fileSize) {
+        res.setHeader('Content-Range', `bytes */${fileSize}`);
+        return res.status(416).end();
+      }
+      res.status(206);
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+    }
     // Content-Length нужен мобильным браузерам (iOS Safari) для старта скачивания
-    res.setHeader('Content-Length', String(fs.statSync(targetFile).size));
-    const stream = fs.createReadStream(targetFile);
+    res.setHeader('Content-Length', String(end - start + 1));
+    const stream = fs.createReadStream(targetFile, { start, end });
     stream.on('error', (err) => {
       console.error('[Files/Share] Download stream error:', err);
       if (!res.headersSent) res.status(500).json({ error: 'Ошибка скачивания файла' });
