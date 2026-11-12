@@ -85,6 +85,138 @@ router.get('/tabs', optionalAuthMiddleware, async (req, res) => {
   }
 });
 
+// === Асинхронные переносы (copy/move) с прогрессом ===
+// POST /api/files/transfer — единый эндпоинт для копирования/перемещения
+// между любыми вкладками (sourceTab/targetTab); работает в фоне,
+// клиент опрашивает GET /api/files/transfer/:jobId.
+interface TransferJob {
+  id: string;
+  mode: 'copy' | 'move';
+  name: string;
+  status: 'running' | 'done' | 'error';
+  totalBytes: number;
+  copiedBytes: number;
+  totalFiles: number;
+  filesDone: number;
+  error: string;
+  startedAt: number;
+  finishedAt?: number;
+}
+const transferJobs = new Map<string, TransferJob>();
+
+// Размеры источника для прогресс-бара
+const scanSizes = (src: string) => {
+  let totalBytes = 0;
+  let totalFiles = 0;
+  const walk = (p: string) => {
+    const st = fs.lstatSync(p);
+    if (st.isDirectory()) {
+      for (const entry of fs.readdirSync(p)) walk(path.join(p, entry));
+    } else {
+      totalBytes += st.size;
+      totalFiles += 1;
+    }
+  };
+  walk(src);
+  return { totalBytes, totalFiles };
+};
+
+// Рекурсивное копирование с подсчётом прогресса после каждого файла
+const copyWithProgress = (src: string, dest: string, job: TransferJob) => {
+  const st = fs.lstatSync(src);
+  if (st.isDirectory()) {
+    fs.mkdirSync(dest, { recursive: true });
+    for (const entry of fs.readdirSync(src)) {
+      copyWithProgress(path.join(src, entry), path.join(dest, entry), job);
+    }
+  } else {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(src, dest);
+    job.copiedBytes += st.size;
+    job.filesDone += 1;
+  }
+};
+
+router.post('/transfer', authMiddleware, async (req, res) => {
+  const mode = req.body?.mode === 'move' ? 'move' : 'copy';
+  const sourceTab = String(req.body?.sourceTab || '');
+  const sourcePath = String(req.body?.sourcePath || '');
+  const targetTab = String(req.body?.targetTab || '');
+  const targetPath = String(req.body?.targetPath || '');
+
+  // Перемещение меняет и источник — значит источник тоже должен быть доступен на запись
+  const src = mode === 'move'
+    ? mutateTarget(req, res, sourceTab, sourcePath)
+    : accessTarget(req, res, sourceTab, sourcePath);
+  if (!src) return;
+  const destFolder = mutateTarget(req, res, targetTab, targetPath, { allowRoot: true });
+  if (!destFolder) return;
+
+  let srcStat: fs.Stats;
+  try {
+    srcStat = fs.statSync(src);
+  } catch {
+    return res.status(404).json({ error: 'Объект не найден' });
+  }
+  if (srcStat.isDirectory() && !fs.statSync(destFolder).isDirectory()) {
+    return res.status(400).json({ error: 'Папку можно перенести только в папку' });
+  }
+  const sameTab = sourceTab === targetTab;
+  if (sameTab && (src === destFolder || destFolder.startsWith(src + path.sep))) {
+    return res.status(400).json({ error: 'Нельзя перенести объект внутрь самого себя' });
+  }
+  const dest = path.join(destFolder, path.basename(src));
+  if (fs.existsSync(dest)) {
+    return res.status(409).json({ error: 'Объект с таким именем уже существует' });
+  }
+
+  const job: TransferJob = {
+    id: randomUUID(),
+    mode,
+    name: path.basename(src),
+    status: 'running',
+    totalBytes: 0,
+    copiedBytes: 0,
+    totalFiles: 0,
+    filesDone: 0,
+    error: '',
+    startedAt: Date.now(),
+  };
+  transferJobs.set(job.id, job);
+  // Не накапливаем старые завершённые задания
+  if (transferJobs.size > 50) {
+    const done = [...transferJobs.values()].filter((j) => j.status !== 'running').sort((a, b) => (a.finishedAt || 0) - (b.finishedAt || 0));
+    for (const old of done.slice(0, transferJobs.size - 50)) transferJobs.delete(old.id);
+  }
+
+  setImmediate(() => {
+    try {
+      const totals = scanSizes(src);
+      job.totalBytes = totals.totalBytes;
+      job.totalFiles = totals.totalFiles;
+      copyWithProgress(src, dest, job);
+      if (mode === 'move') fs.rmSync(src, { recursive: true });
+      job.status = 'done';
+    } catch (e: any) {
+      job.status = 'error';
+      job.error = e?.message || 'Ошибка переноса';
+    } finally {
+      job.finishedAt = Date.now();
+    }
+  });
+
+  res.status(202).json({ jobId: job.id });
+});
+
+// Прогресс задания (опрос клиентом раз в секунду)
+router.get('/transfer/:jobId', authMiddleware, (req, res) => {
+  const job = transferJobs.get(req.params.jobId);
+  if (!job) return res.status(404).json({ error: 'Задание не найдено' });
+  res.json(job);
+});
+
+// === NFS-папки (вкладки) страницы «Файлы» ===
+
 // === Управление NFS-папками (вкладками) страницы «Файлы» — только для администраторов ===
 
 const toFolder = (r: any): NfsFolder => ({

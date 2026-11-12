@@ -24,13 +24,14 @@ import {
 // все операции на бэкенде дополнительно требуют роль admin.
 
 interface PanelState {
+  tabKey: string;
   folder: string;
   items: any[];
   loading: boolean;
   selected: Set<string>;
 }
 
-const emptyPanel = (): PanelState => ({ folder: "", items: [], loading: true, selected: new Set() });
+const emptyPanel = (tabKey = ""): PanelState => ({ tabKey, folder: "", items: [], loading: true, selected: new Set() });
 
 const DND_MIME = "application/x-wecrm-files";
 
@@ -40,6 +41,9 @@ interface FilesPanelsProps {
   theme: FileTheme;
   onPreview: (item: any, folder: string, list?: any[]) => void;
   onShare: (e: React.MouseEvent, item: any, folder: string) => void;
+  // Вкладки (NFS-папки) для выпадающих списков панелей и фоновый перенос с прогрессом
+  tabs?: { key: string; label: string }[];
+  onTransfer?: (mode: "copy" | "move", sourceTab: string, sourcePath: string, targetTab: string, targetPath: string, name: string) => Promise<void>;
   onVideo: (item: any, folder: string) => void;
   onAudio: (item: any, folder: string) => void;
 }
@@ -83,8 +87,10 @@ const fmtModified = (iso: any) => {
   return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVideo, onAudio }: FilesPanelsProps) {
+export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVideo, onAudio, tabs, onTransfer }: FilesPanelsProps) {
   const [panels, setPanels] = useState<PanelState[]>([emptyPanel(), emptyPanel()]);
+  const panelsRef = useRef<PanelState[]>([]);
+  panelsRef.current = panels;
   const [activePanel, setActivePanel] = useState(0);
   // Модальные окна операций (создание папки / переименование)
   const [mkdirPanel, setMkdirPanel] = useState<number | null>(null);
@@ -122,14 +128,15 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
     };
   }, [menu]);
 
-  const loadPanel = useCallback((idx: number, folder: string) => {
+  const loadPanel = useCallback((idx: number, folder: string, tabArg?: string) => {
+    const effTab = tabArg ?? panelsRef.current[idx]?.tabKey ?? tab;
     setPanels((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], folder, loading: true, selected: new Set() };
+      next[idx] = { ...next[idx], folder, loading: true, selected: new Set(), tabKey: effTab };
       return next;
     });
     api.files
-      .browse(tab, folder)
+      .browse(effTab, folder)
       .then((data: any) => {
         const items = (data.items || []).filter((it: any) => !hiddenNames.includes(String(it.name).toLowerCase()));
         setWritable(data.writable !== false);
@@ -152,11 +159,11 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
 
   // Смена вкладки — обе панели возвращаются в корень вкладки
   useEffect(() => {
-    setPanels([emptyPanel(), emptyPanel()]);
-    loadPanel(0, "");
-    loadPanel(1, "");
+    setPanels([emptyPanel(tab), emptyPanel(tab)]);
+    loadPanel(0, "", tab);
+    loadPanel(1, "", tab);
     setActivePanel(0);
-  }, [loadPanel]);
+  }, [tab]);
 
   const reloadPanel = (idx: number) => loadPanel(idx, panels[idx].folder);
   const reloadBoth = () => {
@@ -211,7 +218,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
       onPreview(item, panels[idx].folder, panels[idx].items.filter((it: any) => isImageFile(it.name)));
     } else {
       api.files
-        .downloadFile(tab, joinPath(panels[idx].folder, item.name))
+        .downloadFile(panels[idx].tabKey, joinPath(panels[idx].folder, item.name))
         .catch((err: any) => alert("Ошибка скачивания: " + err.message));
     }
   };
@@ -237,7 +244,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
       if (mkdirPanel === null) return;
       const name = mkdirName.trim();
       if (!name) return;
-      await api.files.mkdir(tab, panels[mkdirPanel].folder, name);
+      await api.files.mkdir(panels[mkdirPanel].tabKey, panels[mkdirPanel].folder, name);
       setMkdirPanel(null);
       setMkdirName("");
       reloadPanel(mkdirPanel);
@@ -251,7 +258,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
         setRenameTarget(null);
         return;
       }
-      await api.files.rename(tab, joinPath(panels[renameTarget.panel].folder, renameTarget.item.name), newName);
+      await api.files.rename(panels[renameTarget.panel].tabKey, joinPath(panels[renameTarget.panel].folder, renameTarget.item.name), newName);
       setRenameTarget(null);
       reloadPanel(renameTarget.panel);
     });
@@ -263,7 +270,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
       const names = items.map((it) => it.name).join(", ");
       if (!window.confirm(`Удалить ${items.length > 1 ? `выбранные объекты (${items.length})` : `«${names}»`}?\nОперацию нельзя отменить.`)) return;
       for (const it of items) {
-        await api.files.deleteItem(tab, joinPath(panels[activePanel].folder, it.name));
+        await api.files.deleteItem(panels[activePanel].tabKey, joinPath(panels[activePanel].folder, it.name));
       }
       reloadPanel(activePanel);
     });
@@ -276,7 +283,9 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
       const destFolder = panels[targetIdx].folder;
       for (const it of items) {
         const from = joinPath(panels[srcIdx].folder, it.name);
-        if (mode === "copy") await api.files.copy(tab, from, destFolder);
+        if (onTransfer) {
+          await onTransfer(mode, panels[srcIdx].tabKey, from, panels[targetIdx].tabKey, destFolder, it.name);
+        } else if (mode === "copy") await api.files.copy(tab, from, destFolder);
         else await api.files.move(tab, from, destFolder);
       }
       reloadBoth();
@@ -287,7 +296,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
     if (!items.length) return;
     items.forEach((it) => {
       const p = joinPath(panels[activePanel].folder, it.name);
-      const req = it.isDirectory ? api.files.downloadFolder(tab, p) : api.files.downloadFile(tab, p);
+      const req = it.isDirectory ? api.files.downloadFolder(panels[activePanel].tabKey, p) : api.files.downloadFile(panels[activePanel].tabKey, p);
       req.catch((err: any) => alert("Ошибка скачивания: " + err.message));
     });
   };
@@ -325,7 +334,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
       if (txtPanel === null) return;
       const name = txtName.trim();
       if (!name) return;
-      await api.files.createFile(tab, panels[txtPanel].folder, name);
+      await api.files.createFile(panels[txtPanel].tabKey, panels[txtPanel].folder, name);
       setTxtPanel(null);
       reloadPanel(txtPanel);
     });
@@ -342,7 +351,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
       for (const file of Array.from(files)) {
         const formData = new FormData();
         formData.append("files", file);
-        await api.files.upload(tab, panels[activePanel].folder, formData);
+        await api.files.upload(panels[activePanel].tabKey, panels[activePanel].folder, formData);
       }
       reloadPanel(activePanel);
     } catch (e: any) {
@@ -380,7 +389,9 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
       for (const name of payload.names) {
         const from = joinPath(panels[srcIdx].folder, name);
         if (from === joinPath(destFolder, name)) continue;
-        if (mode === "copy") await api.files.copy(tab, from, destFolder);
+        if (onTransfer) {
+          await onTransfer(mode, panels[srcIdx].tabKey, from, panels[idx].tabKey, destFolder, name);
+        } else if (mode === "copy") await api.files.copy(tab, from, destFolder);
         else await api.files.move(tab, from, destFolder);
       }
       reloadBoth();
@@ -463,6 +474,19 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
           </button>
+          {(tabs?.length ?? 0) > 0 && (
+            <select
+              value={panel.tabKey}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => { const t = e.target.value; setActivePanel(idx); loadPanel(idx, "", t); }}
+              title="Папка NFS"
+              style={{ border: "1px solid var(--border-color)", background: "var(--bg-card)", color: "var(--text-primary)", borderRadius: 6, fontSize: 12, padding: "3px 6px", cursor: "pointer", maxWidth: 160, flexShrink: 0 }}
+            >
+              {tabs!.map((t) => (
+                <option key={t.key} value={t.key}>{t.label}</option>
+              ))}
+            </select>
+          )}
         </div>
         {/* Список объектов */}
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
@@ -651,7 +675,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
                   label="Скачать"
                   onClick={() =>
                     menuRun(() =>
-                      (item.isDirectory ? api.files.downloadFolder(tab, itemPath) : api.files.downloadFile(tab, itemPath)).catch(
+                      (item.isDirectory ? api.files.downloadFolder(panels[panel].tabKey, itemPath) : api.files.downloadFile(panels[panel].tabKey, itemPath)).catch(
                         (err: any) => alert("Ошибка скачивания: " + err.message)
                       )
                     )
@@ -662,7 +686,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
                   disabled={!writable}
                   onClick={() =>
                     menuRun(async () => {
-                      await api.files.zip(tab, itemPath);
+                      await api.files.zip(panels[panel].tabKey, itemPath);
                       reloadPanel(panel);
                     })
                   }
@@ -673,7 +697,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
                     disabled={!writable}
                     onClick={() =>
                       menuRun(async () => {
-                        await api.files.unzip(tab, itemPath);
+                        await api.files.unzip(panels[panel].tabKey, itemPath);
                         reloadPanel(panel);
                       })
                     }
@@ -703,7 +727,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
                   onClick={() =>
                     menuRun(async () => {
                       if (!window.confirm(`Удалить «${item.name}»?\nОперацию нельзя отменить.`)) return;
-                      await api.files.deleteItem(tab, itemPath);
+                      await api.files.deleteItem(panels[panel].tabKey, itemPath);
                       reloadPanel(panel);
                     })
                   }
@@ -833,7 +857,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
       {/* TXT-редактор */}
       {txtEditor && (
         <FilesTextEditor
-          tab={tab}
+          tab={panels[txtEditor.panel].tabKey}
           itemPath={joinPath(panels[txtEditor.panel].folder, txtEditor.item.name)}
           title={txtEditor.item.name}
           onClose={() => setTxtEditor(null)}

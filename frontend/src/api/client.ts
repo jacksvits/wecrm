@@ -307,6 +307,8 @@ import { PromoBlock, LoginSlide, LoginBrandText, User, Task, Contact, ContactAcc
     nfsCreate: (data: { label: string; host: string; export: string; readOnly: boolean }) => fetchApi("/api/files/nfs", { method: "POST", body: JSON.stringify(data) }),
     nfsUpdate: (id: string, data: { label?: string; host?: string; export?: string; readOnly?: boolean }) => fetchApi(`/api/files/nfs/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     nfsRemove: (id: string) => fetchApi(`/api/files/nfs/${id}`, { method: "DELETE" }),
+    transfer: (mode: "copy" | "move", sourceTab: string, sourcePath: string, targetTab: string, targetPath: string) => fetchApi("/api/files/transfer", { method: "POST", body: JSON.stringify({ mode, sourceTab, sourcePath, targetTab, targetPath }) }),
+    transferStatus: (jobId: string) => fetchApi(`/api/files/transfer/${jobId}`),
     saveText: (tab: string, path: string, content: string, encoding?: string) => fetchApi("/api/files/text", { method: "PUT", body: JSON.stringify({ tabKey: tab, path, content, encoding }) }),
     upload: (tab: string, folderPath: string, formData: FormData) => fetch(`/api/files/upload?tab=${encodeURIComponent(tab)}&path=${encodeURIComponent(folderPath)}`, { method: "POST", headers: { "X-Auth-Token": getToken()! }, body: formData }).then(r => r.json()),
   },

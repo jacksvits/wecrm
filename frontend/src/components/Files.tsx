@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { FilesPanels } from "./FilesPanels";
 import { FilesTextEditor } from "./FilesTextEditor";
 import FilesNfsSettings from "./FilesNfsSettings";
+import FilesTransferProgress from "./FilesTransferProgress";
 import {
   FILE_THEMES,
   FileTheme,
@@ -224,6 +225,48 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
       console.error(e);
     }
   };
+
+  // === Асинхронные переносы файлов с прогрессом (копирование/перемещение между панелями) ===
+  const [jobs, setJobs] = useState<any[]>([]);
+  const jobResolvers = useRef(new Map<string, { resolve: () => void; reject: (e: any) => void }>());
+
+  const startTransfer = useCallback((mode: "copy" | "move", sourceTab: string, sourcePath: string, targetTab: string, targetPath: string, name: string) => {
+    return new Promise<void>((resolve, reject) => {
+      api.files
+        .transfer(mode, sourceTab, sourcePath, targetTab, targetPath)
+        .then((d: any) => {
+          const jobId = d?.jobId;
+          if (!jobId) return reject(new Error("Не удалось запустить перенос"));
+          jobResolvers.current.set(jobId, { resolve, reject });
+          setJobs((prev) => [...prev, { id: jobId, mode, name, status: "running", totalBytes: 0, copiedBytes: 0, totalFiles: 0, filesDone: 0, error: "", startedAt: Date.now() }]);
+        })
+        .catch(reject);
+    });
+  }, []);
+
+  // Опрос активных заданий раз в секунду; завершённые резолвим обещание панелям
+  useEffect(() => {
+    if (!jobs.some((j) => j.status === "running")) return;
+    const t = setInterval(() => {
+      const running = jobs.filter((j) => j.status === "running");
+      if (!running.length) return;
+      running.forEach(async (j) => {
+        try {
+          const st = await api.files.transferStatus(j.id);
+          setJobs((prev) => prev.map((x) => (x.id === j.id ? { ...x, ...st } : x)));
+          if (st.status === "done" || st.status === "error") {
+            const r = jobResolvers.current.get(j.id);
+            jobResolvers.current.delete(j.id);
+            if (r) {
+              if (st.status === "done") r.resolve();
+              else r.reject(new Error(st.error || "Ошибка переноса"));
+            }
+          }
+        } catch { /* повторим на следующем тике */ }
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [jobs]);
 
   useEffect(() => {
     loadSettings();
@@ -612,6 +655,8 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
           ) : viewMode === "panels" ? (
             <FilesPanels
               tab={activeTab}
+              tabs={tabList}
+              onTransfer={startTransfer}
               hiddenNames={hiddenNames}
               theme={filesTheme}
               onPreview={(item, folder, list) => { setPreviewFolder(folder); setPreviewList(list || []); setPreviewItem(item); }}
@@ -985,6 +1030,8 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
       )}
 
       {/* Модальный видеоплеер */}
+      <FilesTransferProgress jobs={jobs} onClose={() => setJobs([])} />
+
       {videoItem && (
         <div
           onClick={() => setVideoItem(null)}
