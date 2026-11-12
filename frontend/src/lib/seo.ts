@@ -94,6 +94,78 @@ function applySeo(s: SeoData) {
   window.dispatchEvent(new Event('wecrm-seo-applied'));
 }
 
+
+// ---- Метатеги отдельных публичных страниц (новости, витрина, файлы) ----
+// Отличие от applySeo (глобальные настройки тенанта): задаёт title/description/canonical
+// конкретной страницы. Повторное применение — по событию 'wecrm-seo-applied' (см. usePageSeo).
+
+export type PageMeta = {
+  title?: string;
+  description?: string;
+  canonical?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: string;
+  ogType?: string;
+};
+
+function setPropertyMeta(property: string, content: string) {
+  let el = document.head.querySelector<HTMLMetaElement>(`meta[property="${property}"]`);
+  if (!el) {
+    el = document.createElement('meta');
+    el.setAttribute('property', property);
+    document.head.appendChild(el);
+  }
+  el.setAttribute('content', content);
+}
+
+// Применяет метатеги страницы; возвращает снимок предыдущих значений для восстановления
+export function applyPageMeta(m: PageMeta) {
+  const snapshot = {
+    title: document.title,
+    description: document.head.querySelector<HTMLMetaElement>('meta[name="description"]')?.content ?? null,
+    canonical: document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.getAttribute('href') ?? null,
+    ogTitle: document.head.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.content ?? null,
+    ogDescription: document.head.querySelector<HTMLMetaElement>('meta[property="og:description"]')?.content ?? null,
+    ogImage: document.head.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.content ?? null,
+    ogType: document.head.querySelector<HTMLMetaElement>('meta[property="og:type"]')?.content ?? null,
+  };
+  if (m.title) document.title = m.title;
+  if (m.description) setMeta('name', 'description', m.description);
+  if (m.canonical) {
+    let link = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.setAttribute('rel', 'canonical');
+      document.head.appendChild(link);
+    }
+    link.setAttribute('href', m.canonical);
+  }
+  if (m.ogTitle) setPropertyMeta('og:title', m.ogTitle);
+  if (m.ogDescription) setPropertyMeta('og:description', m.ogDescription);
+  if (m.ogImage) setPropertyMeta('og:image', m.ogImage);
+  if (m.ogType) setPropertyMeta('og:type', m.ogType);
+  return snapshot;
+}
+
+type PageMetaSnapshot = ReturnType<typeof applyPageMeta>;
+
+// Восстановление значений, снятых applyPageMeta (null — метатега не было, удаляем)
+export function restorePageMeta(snapshot: PageMetaSnapshot) {
+  document.title = snapshot.title;
+  const setOrRemove = (selector: string, attr: string, value: string | null) => {
+    const el = document.head.querySelector<HTMLElement>(selector);
+    if (value === null) el?.remove();
+    else if (el) el.setAttribute(attr, value);
+  };
+  setOrRemove('meta[name="description"]', 'content', snapshot.description);
+  setOrRemove('link[rel="canonical"]', 'href', snapshot.canonical);
+  setOrRemove('meta[property="og:title"]', 'content', snapshot.ogTitle);
+  setOrRemove('meta[property="og:description"]', 'content', snapshot.ogDescription);
+  setOrRemove('meta[property="og:image"]', 'content', snapshot.ogImage);
+  setOrRemove('meta[property="og:type"]', 'content', snapshot.ogType);
+}
+
 // Запускается до первого рендера в main.tsx; ошибки сети игнорируем —
 // останутся дефолтные метатеги из index.html
 export function initSeo() {

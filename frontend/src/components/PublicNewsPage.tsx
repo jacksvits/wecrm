@@ -7,7 +7,9 @@ import { api } from '../api/client';
 import { safeHtml } from '../lib/safeHtml';
 import { useBrandLogo, useBrandNewsCover } from '../lib/branding';
 import { CookieConsent } from './CookieConsent';
-import { usePageTitle } from '../lib/usePageTitle';
+import { usePageSeo } from '../lib/usePageTitle';
+import { makeDescription } from '../lib/stripHtml';
+import { applyPageMeta, restorePageMeta } from '../lib/seo';
 import PublicAuthArea from './PublicAuthArea';
 
 function stripHtml(html: string): string {
@@ -135,7 +137,11 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
 }
 
 function PublicNewsList({ consent = true }: { consent?: boolean }) {
-  usePageTitle('WeLANS - Новости');
+  usePageSeo({
+    title: 'WeLANS - Новости',
+    description: 'Новости WeLANS — коротко о свежем: ИТ-консалтинг, инфраструктура, проекты и анонсы компании.',
+    canonical: `${window.location.origin}/news`,
+  });
   const navigate = useNavigate();
   const location = useLocation();
   const defaultCover = useBrandNewsCover();
@@ -286,6 +292,30 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
         .catch(() => {});
     }
   }, [news?.id]);
+
+  // Метатеги страницы новости: title, description (из выжимки или текста),
+  // canonical и Open Graph. Повторно применяем по событию 'wecrm-seo-applied' —
+  // асинхронные SEO-настройки тенанта иначе перезаписали бы description.
+  useEffect(() => {
+    if (!news) return;
+    const slug = news.slug || news.id;
+    const meta = {
+      title: `${news.title} — WeLANS`,
+      description: makeDescription(news.summary || news.content || ''),
+      canonical: `${window.location.origin}/${encodeURIComponent(slug)}/`,
+      ogTitle: `${news.title} — WeLANS`,
+      ogDescription: makeDescription(news.summary || news.content || ''),
+      ogImage: news.coverImage || undefined,
+      ogType: 'article',
+    };
+    const snapshot = applyPageMeta(meta);
+    const apply = () => { applyPageMeta(meta); };
+    window.addEventListener('wecrm-seo-applied', apply);
+    return () => {
+      window.removeEventListener('wecrm-seo-applied', apply as EventListener);
+      restorePageMeta(snapshot);
+    };
+  }, [news]);
 
   const [searchQ, setSearchQ] = useState('');
 

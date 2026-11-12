@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { safeHtml } from '../lib/safeHtml';
-import { stripHtml } from '../lib/stripHtml';
+import { makeDescription } from '../lib/stripHtml';
 
 type PublicNewsItem = {
   id: string;
@@ -45,7 +45,7 @@ export function PublicNews() {
     if (!news) return;
     const previousTitle = document.title;
     document.title = `${news.title} — WeLANS`;
-    const description = stripHtml(news.summary || news.content).slice(0, 180);
+    const description = makeDescription(news.summary || news.content);
     let meta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     const oldDescription = meta?.content;
     if (!meta) {

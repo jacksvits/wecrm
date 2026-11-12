@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Files } from './Files';
 import { useBrandLogo } from '../lib/branding';
-import { usePageTitle } from '../lib/usePageTitle';
+import { usePageSeo } from '../lib/usePageTitle';
 import PublicAuthArea from './PublicAuthArea';
 
 // Публичная страница «Файлы» для welans.click — без интерфейса CRM (сайдбара и меню).
 // Простая шапка: логотип слева (ссылка на welans.ru), блок «Войти»/аватарка справа.
 export default function PublicFiles() {
-  usePageTitle('WeLANS - Файловый менеджер');
+  usePageSeo({
+    title: 'WeLANS - Файловый менеджер',
+    description: 'Файловый менеджер WeLANS — публичные файлы и папки, обмен документами.',
+    canonical: `${window.location.origin}/`,
+  });
   const brandLogo = useBrandLogo(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   useEffect(() => {

@@ -2,13 +2,17 @@ import { useState } from 'react';
 import { Vitrine } from './Vitrine';
 import { useBrandLogo } from '../lib/branding';
 import { CookieConsent } from './CookieConsent';
-import { usePageTitle } from '../lib/usePageTitle';
+import { usePageSeo } from '../lib/usePageTitle';
 import PublicAuthArea from './PublicAuthArea';
 
 // Публичная страница витрины (каталог) — доступна без авторизации.
 // Открывается по адресу /vitrine, в т.ч. по ссылке «Каталог» с лендинга /welans/.
 export default function PublicVitrine() {
-  usePageTitle('WeLANS - Магазин');
+  usePageSeo({
+    title: 'WeLANS - Магазин',
+    description: 'Магазин WeLANS — каталог товаров: описания, цены и наличие.',
+    canonical: `${window.location.origin}/shop`,
+  });
   const [q, setQ] = useState('');
   const brandLogo = useBrandLogo(false);
   return (
