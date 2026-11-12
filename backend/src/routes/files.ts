@@ -14,6 +14,19 @@ import jschardet from 'jschardet';
 import iconv from 'iconv-lite';
 import sharp from 'sharp';
 import { uploadsRoot } from '../lib/tenant.js';
+import {
+  initNfsRegistry,
+  refreshRegistry,
+  ensureMounted,
+  unmount,
+  removeMountPoint,
+  folderStatus,
+  nfsDirForTab,
+  slugify,
+  testMount,
+  NFS_ROOT,
+  NfsFolder,
+} from '../lib/nfs-mounts.js';
 
 const router = Router();
 
@@ -39,25 +52,29 @@ const TAB_DIRS: Record<string, string> = {
 };
 
 // Вкладка «Система» — корень хранилища текущего tenant'а
-// (main: /app/uploads, tenant: /app/tenants/<slug>); только для администраторов
+// (main: /app/uploads, tenant: /app/tenants/<slug>); только для администраторов.
+// Остальные вкладки — NFS-папки из реестра (монтируются в /app/nfs/<tabKey>).
 const resolveTabDir = (tabKey: string): string | undefined =>
-  tabKey === 'system' ? uploadsRoot() : TAB_DIRS[tabKey];
+  tabKey === 'system' ? uploadsRoot() : nfsDirForTab(tabKey);
+
+// Реестр NFS-папок: стартовая загрузка + периодический ре-маунт (внутри nfs-mounts)
+initNfsRegistry();
 
 // Чтение страницы «Файлы» публичное (welans.click без входа): роль admin по-прежнему
 // решает, видна ли вкладка «Система»; запись — только под авторизацией
 router.get('/tabs', optionalAuthMiddleware, async (req, res) => {
   try {
-    const tabs = await prisma.fileTabSetting.findMany();
-    const defaults = [
-      { tabKey: 'programs', label: 'Программы', url: '', path: '/mnt/nfs/SOFT' },
-      { tabKey: 'drivers', label: 'Драйвера', url: '', path: '/mnt/nfs/DRIVER' },
-      { tabKey: 'documents', label: 'Документы', url: '', path: '/mnt/nfs/BOOK' },
-      { tabKey: 'games', label: 'Игры', url: '', path: '/mnt/nfs/GAME' },
-    ];
-    const merged = defaults.map(d => {
-      const found = tabs.find(t => t.tabKey === d.tabKey);
-      return { ...d, url: found?.url || '', path: found?.path || d.path, id: found?.id || null };
+    const rows = await prisma.fileTabSetting.findMany({
+      where: { host: { not: '' }, export: { not: '' } },
+      orderBy: [{ sort: 'asc' }, { tabKey: 'asc' }],
     });
+    const merged = rows.map((t: any) => ({
+      tabKey: t.tabKey,
+      label: t.label || t.tabKey,
+      url: t.url || '',
+      path: t.path || '',
+      id: t.id,
+    }));
     if ((req as any).user?.role === 'admin') {
       merged.unshift({ tabKey: 'system', label: 'Система', url: '', path: uploadsRoot(), id: null });
     }
@@ -65,6 +82,127 @@ router.get('/tabs', optionalAuthMiddleware, async (req, res) => {
   } catch (e: any) {
     console.error('[Files/Tabs] Error loading tabs:', e?.message || e);
     res.status(500).json({ error: 'Ошибка загрузки настроек', detail: e?.message });
+  }
+});
+
+// === Управление NFS-папками (вкладками) страницы «Файлы» — только для администраторов ===
+
+const toFolder = (r: any): NfsFolder => ({
+  id: r.id,
+  tabKey: r.tabKey,
+  label: r.label || r.tabKey,
+  host: r.host,
+  export: r.export,
+  readOnly: !!r.readOnly,
+  sort: r.sort || 0,
+});
+
+// Список NFS-папок со статусом монтирования
+router.get('/nfs', authMiddleware, async (req, res) => {
+  if ((req as any).user?.role !== 'admin') return res.status(403).json({ error: 'Доступ запрещен' });
+  try {
+    const rows = await prisma.fileTabSetting.findMany({
+      where: { host: { not: '' }, export: { not: '' } },
+      orderBy: [{ sort: 'asc' }, { tabKey: 'asc' }],
+    });
+    res.json(rows.map((r: any) => ({ ...toFolder(r), status: folderStatus(toFolder(r)) })));
+  } catch (e: any) {
+    console.error('[Files/NFS] Error loading folders:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка загрузки списка', detail: e?.message });
+  }
+});
+
+// Добавление NFS-папки: сначала пробное монтирование, потом запись в БД
+router.post('/nfs', authMiddleware, async (req, res) => {
+  if ((req as any).user?.role !== 'admin') return res.status(403).json({ error: 'Доступ запрещен' });
+  const label = String(req.body?.label || '').trim().slice(0, 60);
+  const host = String(req.body?.host || '').trim().slice(0, 100);
+  const nfsExport = String(req.body?.export || '').trim().slice(0, 200);
+  const readOnly = !!req.body?.readOnly;
+  if (!label) return res.status(400).json({ error: 'Укажите название вкладки' });
+  if (!host || /[\s/]/.test(host)) return res.status(400).json({ error: 'Некорректный адрес NFS-сервера' });
+  if (!nfsExport.startsWith('/')) return res.status(400).json({ error: 'Экспорт должен начинаться с / (например /volume3/SHARE)' });
+
+  // Уникальный ключ вкладки по названию
+  const existing = await prisma.fileTabSetting.findMany({ select: { tabKey: true } });
+  const keys = new Set(existing.map((r: any) => r.tabKey));
+  const base = slugify(label, 'folder');
+  let tabKey = base;
+  for (let i = 2; keys.has(tabKey); i++) tabKey = `${base}-${i}`;
+
+  const probe = await testMount(host, nfsExport, readOnly);
+  if (!probe.ok) {
+    return res.status(400).json({ error: `Не удалось подключить шару: ${probe.error || 'ошибка монтирования'}` });
+  }
+  try {
+    const maxSort = await prisma.fileTabSetting.aggregate({ _max: { sort: true } });
+    const row = await prisma.fileTabSetting.create({
+      data: { tabKey, label, host, export: nfsExport, readOnly, sort: (maxSort._max.sort || 0) + 1 },
+    });
+    await refreshRegistry();
+    const folder = toFolder(row);
+    res.status(201).json({ ...folder, status: folderStatus(folder) });
+  } catch (e: any) {
+    console.error('[Files/NFS] Error creating folder:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка сохранения', detail: e?.message });
+  }
+});
+
+// Редактирование NFS-папки: название / сервер / экспорт / только чтение.
+// Ключ вкладки (tabKey) не меняется — на него ссылаются ссылки и настройки.
+router.put('/nfs/:id', authMiddleware, async (req, res) => {
+  if ((req as any).user?.role !== 'admin') return res.status(403).json({ error: 'Доступ запрещен' });
+  const row = await prisma.fileTabSetting.findUnique({ where: { id: req.params.id } });
+  if (!row || !row.host) return res.status(404).json({ error: 'Папка не найдена' });
+
+  const label = String(req.body?.label ?? row.label).trim().slice(0, 60) || row.label;
+  const host = String(req.body?.host ?? row.host).trim().slice(0, 100);
+  const nfsExport = String(req.body?.export ?? row.export).trim().slice(0, 200);
+  const readOnly = req.body?.readOnly === undefined ? row.readOnly : !!req.body.readOnly;
+  if (!host || /[\s/]/.test(host)) return res.status(400).json({ error: 'Некорректный адрес NFS-сервера' });
+  if (!nfsExport.startsWith('/')) return res.status(400).json({ error: 'Экспорт должен начинаться с /' });
+
+  const sourceChanged = host !== row.host || nfsExport !== row.export || readOnly !== row.readOnly;
+  // Проверяем новый источник пробным монтированием, если он изменился
+  if (sourceChanged) {
+    const probe = await testMount(host, nfsExport, readOnly);
+    if (!probe.ok) {
+      return res.status(400).json({ error: `Не удалось подключить шару: ${probe.error || 'ошибка монтирования'}` });
+    }
+  }
+  try {
+    const updated = await prisma.fileTabSetting.update({
+      where: { id: row.id },
+      data: { label, host, export: nfsExport, readOnly },
+    });
+    if (sourceChanged) {
+      await unmount(updated.tabKey);
+      await refreshRegistry();
+    } else {
+      await refreshRegistry();
+    }
+    const folder = toFolder(updated);
+    res.json({ ...folder, status: folderStatus(folder) });
+  } catch (e: any) {
+    console.error('[Files/NFS] Error updating folder:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка сохранения', detail: e?.message });
+  }
+});
+
+// Удаление NFS-папки: отмонтировать, убрать точку, удалить запись
+router.delete('/nfs/:id', authMiddleware, async (req, res) => {
+  if ((req as any).user?.role !== 'admin') return res.status(403).json({ error: 'Доступ запрещен' });
+  const row = await prisma.fileTabSetting.findUnique({ where: { id: req.params.id } });
+  if (!row || !row.host) return res.status(404).json({ error: 'Папка не найдена' });
+  try {
+    await unmount(row.tabKey);
+    await prisma.fileTabSetting.delete({ where: { id: row.id } });
+    removeMountPoint(row.tabKey);
+    await refreshRegistry();
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error('[Files/NFS] Error deleting folder:', e?.message || e);
+    res.status(500).json({ error: 'Ошибка удаления', detail: e?.message });
   }
 });
 

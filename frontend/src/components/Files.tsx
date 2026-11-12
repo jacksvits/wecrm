@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { FilesPanels } from "./FilesPanels";
 import { FilesTextEditor } from "./FilesTextEditor";
+import FilesNfsSettings from "./FilesNfsSettings";
 import {
   FILE_THEMES,
   FileTheme,
@@ -31,6 +32,9 @@ const ALL_TABS = [
   { key: "documents", label: "Документы", short: "Докум.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg> },
   { key: "games", label: "Игры", short: "Игры", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 11h4M8 9v4M15 12h.01M17 10h.01M17.32 5H6.68a4 4 0 0 0-3.98 3.6L2 15a3 3 0 0 0 3 3c.9 0 1.7-.4 2.25-1.03L8.5 15.5h7l1.25 1.47A2.9 2.9 0 0 0 19 18a3 3 0 0 0 3-3l-.7-6.4A4 4 0 0 0 17.32 5z" /></svg> },
 ];
+
+// Универсальная иконка диска для NFS-вкладок, добавленных в настройках
+const DRIVE_ICON = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="12" x2="2" y2="12" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /><line x1="6" y1="16" x2="6.01" y2="16" /><line x1="10" y1="16" x2="10.01" y2="16" /></svg>;
 
 // Разбор списка скрытых имён: через запятую, без пробелов и регистра
 const parseHidden = (value: string): string[] =>
@@ -127,8 +131,10 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
   const { user } = useAuth();
   const isAdmin = (user as any)?.role === "admin";
   // Вкладка «Система» (корень хранилища) — только для администраторов
-  const TABS = isAdmin ? ALL_TABS : ALL_TABS.filter((t) => t.key !== "system");
-  const [activeTab, setActiveTab] = useState(isAdmin ? "system" : "programs");
+  // Вкладки приходят с бэкенда (NFS-папки + «Система» для админа);
+  // ALL_TABS — только источник иконок/подписей для известных ключей
+  const [tabList, setTabList] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState(isAdmin ? "system" : "");
   const [settings, setSettings] = useState<Record<string, { url: string; path: string }>>({});
   const [loading, setLoading] = useState(true);
   const [files, setFiles] = useState<any[]>([]);
@@ -191,6 +197,14 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
       const map: Record<string, { url: string; path: string }> = {};
       data.forEach((t: any) => (map[t.tabKey] = { url: t.url || "", path: t.path || "" }));
       setSettings(map);
+      const tabs = data.map((t: any) => {
+        const known = ALL_TABS.find((k) => k.key === t.tabKey);
+        const label = t.label || known?.label || t.tabKey;
+        const short = known?.short || (label.length > 6 ? label.slice(0, 5) + "…" : label);
+        return { key: t.tabKey, label, short, icon: known?.icon || DRIVE_ICON };
+      });
+      setTabList(tabs);
+      setActiveTab((prev) => (prev && tabs.some((t: any) => t.key === prev) ? prev : tabs[0]?.key || ""));
     } catch (e) {
       console.error(e);
     }
@@ -220,6 +234,7 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
   }, []);
 
   useEffect(() => {
+    if (!activeTab) return;
     setFilesLoading(true);
     api.files.browse(activeTab, currentFolder)
       .then((data: any) => setFiles(data.items || []))
@@ -452,7 +467,7 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
     setCurrentFolder(parts.join("/"));
   };
 
-  const tabLabel = TABS.find((t) => t.key === activeTab)?.label || "Файлы";
+  const tabLabel = tabList.find((t) => t.key === activeTab)?.label || "Файлы";
   // Скрытие по списку применяется во всех вкладках, включая «Система»
   const visibleFiles = files.filter((item) => !hiddenNames.includes(String(item.name).toLowerCase()));
 
@@ -481,7 +496,7 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
       <div style={{ marginBottom: 16 }}>
         {!publicMode && <h2 style={{ margin: "0 0 12px", fontSize: 18 }}>Файлы</h2>}
         <div style={{ display: "flex", gap: isMobile ? 2 : 8, borderBottom: "1px solid var(--border-color)" }}>
-          {TABS.map((tab) => (
+          {tabList.map((tab) => (
             <button
               key={tab.key}
               onClick={() => { setActiveTab(tab.key); setCurrentFolder(""); setPreviewItem(null); }}
@@ -933,6 +948,7 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
                 boxSizing: "border-box", fontFamily: "inherit",
               }}
             />
+            {isAdmin && !publicMode && <FilesNfsSettings onChanged={loadSettings} />}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
               <button
                 onClick={() => setShowSettings(false)}

@@ -1351,10 +1351,17 @@ model TaskTransaction {
   @@map("task_transactions")
 }
 
+// Вкладка страницы «Файлы» = NFS-папка: сервер/экспорт монтируются внутри контейнера
+// в /app/nfs/<tabKey>, вкладка «Система» (system) — особая и в таблице не хранится.
 model FileTabSetting {
-  path      String   @default("")
   id        String   @id @default(cuid())
   tabKey    String   @unique @map("tab_key")
+  label     String   @default("")
+  host      String   @default("")
+  export    String   @default("") @map("nfs_export")
+  readOnly  Boolean  @default(false) @map("read_only")
+  sort      Int      @default(0)
+  path      String   @default("")
   url       String   @default("")
   updatedAt DateTime @updatedAt @map("updated_at")
   createdAt DateTime @default(now()) @map("created_at")

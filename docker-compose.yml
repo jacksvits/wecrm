@@ -39,6 +39,9 @@ services:
   backend:
     build: ./backend
     image: wecrm-backend:latest
+    # Монтирование NFS-папок страницы «Файлы» внутри контейнера (mount -t nfs)
+    cap_add:
+      - SYS_ADMIN
     # доступ к сервису tapo (host-сеть) и другим host-сервисам
     extra_hosts:
       - "host.docker.internal:host-gateway"
