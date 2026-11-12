@@ -22,6 +22,8 @@ import {
   removeMountPoint,
   folderStatus,
   nfsDirForTab,
+  nfsFolderForTab,
+  folderVisibleTo,
   slugify,
   testMount,
   NFS_ROOT,
@@ -57,6 +59,15 @@ const TAB_DIRS: Record<string, string> = {
 const resolveTabDir = (tabKey: string): string | undefined =>
   tabKey === 'system' ? uploadsRoot() : nfsDirForTab(tabKey);
 
+// Проверка видимости NFS-папки по ролям; вернёт false, если доступ запрещён
+const checkTabVisible = (req: any, res: any, tabKey: string): boolean => {
+  const folder = nfsFolderForTab(tabKey);
+  if (!folder) return true; // не динамическая вкладка — отдельных ограничений нет
+  if (folderVisibleTo(folder, req.user || {})) return true;
+  res.status(403).json({ error: 'Нет доступа к папке' });
+  return false;
+};
+
 // Реестр NFS-папок: стартовая загрузка + периодический ре-маунт (внутри nfs-mounts)
 initNfsRegistry();
 
@@ -68,14 +79,20 @@ router.get('/tabs', optionalAuthMiddleware, async (req, res) => {
       where: { host: { not: '' }, export: { not: '' } },
       orderBy: [{ sort: 'asc' }, { tabKey: 'asc' }],
     });
-    const merged = rows.map((t: any) => ({
-      tabKey: t.tabKey,
-      label: t.label || t.tabKey,
-      url: t.url || '',
-      path: t.path || '',
-      id: t.id,
-    }));
-    if ((req as any).user?.role === 'admin') {
+    const user = (req as any).user;
+    const merged = rows
+      .filter((t: any) => folderVisibleTo(
+        { id: t.id, tabKey: t.tabKey, label: t.label, host: t.host, export: t.export, readOnly: !!t.readOnly, sort: t.sort, allowedRoles: Array.isArray(t.allowedRoles) ? t.allowedRoles : [] },
+        user,
+      ))
+      .map((t: any) => ({
+        tabKey: t.tabKey,
+        label: t.label || t.tabKey,
+        url: t.url || '',
+        path: t.path || '',
+        id: t.id,
+      }));
+    if (user?.role === 'admin') {
       merged.unshift({ tabKey: 'system', label: 'Система', url: '', path: uploadsRoot(), id: null });
     }
     res.json(merged);
@@ -227,6 +244,7 @@ const toFolder = (r: any): NfsFolder => ({
   export: r.export,
   readOnly: !!r.readOnly,
   sort: r.sort || 0,
+  allowedRoles: Array.isArray(r.allowedRoles) ? r.allowedRoles : [],
 });
 
 // Список NFS-папок со статусом монтирования
@@ -251,6 +269,11 @@ router.post('/nfs', authMiddleware, async (req, res) => {
   const host = String(req.body?.host || '').trim().slice(0, 100);
   const nfsExport = String(req.body?.export || '').trim().slice(0, 200);
   const readOnly = !!req.body?.readOnly;
+  const allowedRoles = Array.isArray(req.body?.allowedRoles) ? req.body.allowedRoles.map(String) : [];
+  if (allowedRoles.length) {
+    const found = await prisma.role.count({ where: { id: { in: allowedRoles } } });
+    if (found !== allowedRoles.length) return res.status(400).json({ error: 'Указана несуществующая роль' });
+  }
   if (!label) return res.status(400).json({ error: 'Укажите название вкладки' });
   if (!host || /[\s/]/.test(host)) return res.status(400).json({ error: 'Некорректный адрес NFS-сервера' });
   if (!nfsExport.startsWith('/')) return res.status(400).json({ error: 'Экспорт должен начинаться с / (например /volume3/SHARE)' });
@@ -269,7 +292,7 @@ router.post('/nfs', authMiddleware, async (req, res) => {
   try {
     const maxSort = await prisma.fileTabSetting.aggregate({ _max: { sort: true } });
     const row = await prisma.fileTabSetting.create({
-      data: { tabKey, label, host, export: nfsExport, readOnly, sort: (maxSort._max.sort || 0) + 1 },
+      data: { tabKey, label, host, export: nfsExport, readOnly, sort: (maxSort._max.sort || 0) + 1, allowedRoles },
     });
     await refreshRegistry();
     const folder = toFolder(row);
@@ -291,6 +314,13 @@ router.put('/nfs/:id', authMiddleware, async (req, res) => {
   const host = String(req.body?.host ?? row.host).trim().slice(0, 100);
   const nfsExport = String(req.body?.export ?? row.export).trim().slice(0, 200);
   const readOnly = req.body?.readOnly === undefined ? row.readOnly : !!req.body.readOnly;
+  const allowedRoles = Array.isArray(req.body?.allowedRoles)
+    ? req.body.allowedRoles.map(String)
+    : (Array.isArray(row.allowedRoles) ? row.allowedRoles : []);
+  if (allowedRoles.length) {
+    const found = await prisma.role.count({ where: { id: { in: allowedRoles } } });
+    if (found !== allowedRoles.length) return res.status(400).json({ error: 'Указана несуществующая роль' });
+  }
   if (!host || /[\s/]/.test(host)) return res.status(400).json({ error: 'Некорректный адрес NFS-сервера' });
   if (!nfsExport.startsWith('/')) return res.status(400).json({ error: 'Экспорт должен начинаться с /' });
 
@@ -305,7 +335,7 @@ router.put('/nfs/:id', authMiddleware, async (req, res) => {
   try {
     const updated = await prisma.fileTabSetting.update({
       where: { id: row.id },
-      data: { label, host, export: nfsExport, readOnly },
+      data: { label, host, export: nfsExport, readOnly, allowedRoles },
     });
     if (sourceChanged) {
       await unmount(updated.tabKey);
@@ -414,6 +444,7 @@ router.get('/browse', optionalAuthMiddleware, async (req, res) => {
   if (tabKey === 'system' && (req as any).user?.role !== 'admin') {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
+  if (!checkTabVisible(req, res, tabKey)) return;
 
   const targetDir = resolveInside(baseDir, subPath);
   if (!targetDir) {
@@ -522,6 +553,7 @@ router.get('/preview', optionalAuthMiddleware, async (req, res) => {
   if (tabKey === 'system' && (req as any).user?.role !== 'admin') {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
+  if (!checkTabVisible(req, res, tabKey)) return;
 
   const targetFile = resolveInside(baseDir, filePath);
   if (!targetFile) {
@@ -591,6 +623,8 @@ router.get('/download', optionalAuthMiddleware, (req, res) => {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
 
+  if (!checkTabVisible(req, res, tabKey)) return;
+
   try {
     if (!fs.existsSync(targetFile) || fs.statSync(targetFile).isDirectory()) {
       return res.status(404).json({ error: 'Файл не найден' });
@@ -633,6 +667,7 @@ router.get('/download-folder', optionalAuthMiddleware, (req, res) => {
   if (tabKey === 'system' && (req as any).user?.role !== 'admin') {
     return res.status(403).json({ error: 'Доступ запрещен' });
   }
+  if (!checkTabVisible(req, res, tabKey)) return;
 
   const targetDir = resolveInside(baseDir, folderPath);
   if (!targetDir) {

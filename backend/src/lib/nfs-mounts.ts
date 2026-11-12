@@ -26,10 +26,13 @@ export interface NfsFolder {
   export: string;
   readOnly: boolean;
   sort: number;
+  allowedRoles: string[];
 }
 
 // tabKey -> абсолютный путь монтирования; синхронно читается resolveTabDir
 const dirByTab = new Map<string, string>();
+// tabKey -> папка (в т.ч. allowedRoles для проверки видимости по ролям)
+const folderByTab = new Map<string, NfsFolder>();
 // tabKey -> ошибка последнего монтирования (для статуса в настройках)
 const lastErrorByTab = new Map<string, string>();
 // защита от параллельного монтирования одной точки
@@ -161,16 +164,21 @@ export const refreshRegistry = async (): Promise<NfsFolder[]> => {
       export: r.export,
       readOnly: r.readOnly,
       sort: r.sort,
+      allowedRoles: Array.isArray(r.allowedRoles) ? r.allowedRoles : [],
     }));
   const seen = new Set<string>();
   for (const f of folders) {
     seen.add(f.tabKey);
     dirByTab.set(f.tabKey, mountPoint(f.tabKey));
+    folderByTab.set(f.tabKey, f);
     await ensureMounted(f);
   }
   // Строки без host/export — из реестра убираем
   for (const key of [...dirByTab.keys()]) {
-    if (!seen.has(key)) dirByTab.delete(key);
+    if (!seen.has(key)) {
+      dirByTab.delete(key);
+      folderByTab.delete(key);
+    }
   }
   return folders;
 };
@@ -196,6 +204,16 @@ export const folderStatus = (folder: NfsFolder) => {
 
 // Синхронное разрешение вкладки в каталог (вызывается из resolveTabDir)
 export const nfsDirForTab = (tabKey: string): string | undefined => dirByTab.get(tabKey);
+
+// Папка вкладки (для проверки видимости по ролям): пустой allowedRoles = видят все
+export const nfsFolderForTab = (tabKey: string): NfsFolder | undefined => folderByTab.get(tabKey);
+
+// Видимость папки пользователю: админ видит всё; пустой список ролей = все
+export const folderVisibleTo = (folder: NfsFolder, user: { role?: string; roleId?: string }): boolean => {
+  if (!folder.allowedRoles.length) return true;
+  if (user.role === 'admin') return true;
+  return !!user.roleId && folder.allowedRoles.includes(user.roleId);
+};
 
 // Ключ вкладки из названия
 export const slugify = (label: string, fallback: string): string => {

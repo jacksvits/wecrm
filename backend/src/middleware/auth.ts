@@ -10,6 +10,7 @@ export interface AuthRequest extends Request {
     email: string;
     name: string;
     role: string;
+    roleId?: string;
     allowedPages?: string[];
     canAccessChat?: boolean;
     canAccessSupportChat?: boolean;
@@ -54,7 +55,7 @@ async function loadUserByToken(token: string): Promise<AuthRequest['user'] | nul
     // Always load fresh user data from DB to get current role and name
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      include: { role: { select: { name: true, allowedPages: true, canAccessChat: true, canAccessSupportChat: true, canSeeAllSupportTickets: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, canReadContactAccesses: true, canEditContactAccesses: true, canDeleteContactAccesses: true } } },
+      include: { role: { select: { id: true, name: true, allowedPages: true, canAccessChat: true, canAccessSupportChat: true, canSeeAllSupportTickets: true, showFinancesTab: true, stockAccess: true, canChangeTaskStatus: true, allowedTaskStatuses: true, canCreateNews: true, canEditNews: true, canHandleSpam: true, canReadContactAccesses: true, canEditContactAccesses: true, canDeleteContactAccesses: true } } },
     });
     if (!user) {
       return null;
@@ -66,6 +67,7 @@ async function loadUserByToken(token: string): Promise<AuthRequest['user'] | nul
       email: user.email,
       name: user.name || user.email.split('@')[0],
       role: user.role?.name || 'user',
+      roleId: user.role?.id,
       allowedPages: user.role?.allowedPages || [],
       canAccessChat: user.role?.canAccessChat ?? true,
       canAccessSupportChat: user.role?.canAccessSupportChat ?? false,

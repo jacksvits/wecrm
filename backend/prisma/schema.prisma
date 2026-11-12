@@ -1361,6 +1361,7 @@ model FileTabSetting {
   export    String   @default("") @map("nfs_export")
   readOnly  Boolean  @default(false) @map("read_only")
   sort      Int      @default(0)
+  allowedRoles String[] @default([]) @map("allowed_roles")
   path      String   @default("")
   url       String   @default("")
   updatedAt DateTime @updatedAt @map("updated_at")

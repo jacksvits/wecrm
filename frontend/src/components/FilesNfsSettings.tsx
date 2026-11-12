@@ -3,7 +3,7 @@ import { api } from "../api/client";
 
 // === Блок «NFS-папки» в настройках страницы «Файлы» (только для администраторов) ===
 // Список подключённых NFS-шар (вкладок): статус монтирования, чтение/запись,
-// добавление новых и редактирование/удаление существующих.
+// видимость по ролям (пусто = все), добавление/редактирование/удаление.
 
 interface NfsFolder {
   id: string;
@@ -12,6 +12,7 @@ interface NfsFolder {
   host: string;
   export: string;
   readOnly: boolean;
+  allowedRoles?: string[];
   status: { mounted: boolean; readable: boolean; writable: boolean; error: string };
 }
 
@@ -26,6 +27,7 @@ const inputStyle: React.CSSProperties = {
 
 export function FilesNfsSettings({ onChanged }: { onChanged: () => void }) {
   const [folders, setFolders] = useState<NfsFolder[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -34,12 +36,16 @@ export function FilesNfsSettings({ onChanged }: { onChanged: () => void }) {
   const [host, setHost] = useState("192.168.8.3");
   const [nfsExport, setNfsExport] = useState("");
   const [readOnly, setReadOnly] = useState(false);
+  const [allowedRoles, setAllowedRoles] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const roleName = (id: string) => roles.find((r: any) => r.id === id)?.label || roles.find((r: any) => r.id === id)?.name || id;
 
   const load = useCallback(async () => {
     try {
-      const data = await api.files.nfsList();
+      const [data, rolesData] = await Promise.all([api.files.nfsList(), api.roles.list().catch(() => [])]);
       setFolders(Array.isArray(data) ? data : []);
+      setRoles(Array.isArray(rolesData) ? rolesData : []);
       setError("");
     } catch (e: any) {
       setError(e?.message || "Ошибка загрузки списка папок");
@@ -57,6 +63,7 @@ export function FilesNfsSettings({ onChanged }: { onChanged: () => void }) {
     setHost("192.168.8.3");
     setNfsExport("");
     setReadOnly(false);
+    setAllowedRoles([]);
   };
 
   const startEdit = (f: NfsFolder) => {
@@ -66,7 +73,12 @@ export function FilesNfsSettings({ onChanged }: { onChanged: () => void }) {
     setHost(f.host);
     setNfsExport(f.export);
     setReadOnly(f.readOnly);
+    setAllowedRoles(f.allowedRoles || []);
     setError("");
+  };
+
+  const toggleRole = (id: string) => {
+    setAllowedRoles((prev) => (prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]));
   };
 
   const handleSave = async () => {
@@ -75,9 +87,9 @@ export function FilesNfsSettings({ onChanged }: { onChanged: () => void }) {
     setError("");
     try {
       if (editing) {
-        await api.files.nfsUpdate(editing.id, { label: label.trim(), host: host.trim(), export: nfsExport.trim(), readOnly });
+        await api.files.nfsUpdate(editing.id, { label: label.trim(), host: host.trim(), export: nfsExport.trim(), readOnly, allowedRoles });
       } else {
-        await api.files.nfsCreate({ label: label.trim(), host: host.trim(), export: nfsExport.trim(), readOnly });
+        await api.files.nfsCreate({ label: label.trim(), host: host.trim(), export: nfsExport.trim(), readOnly, allowedRoles });
       }
       resetForm();
       await load();
@@ -106,7 +118,7 @@ export function FilesNfsSettings({ onChanged }: { onChanged: () => void }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 600 }}>NFS-папки</div>
         <button
-          onClick={() => { setShowForm(!showForm); setEditing(null); setLabel(""); setHost("192.168.8.3"); setNfsExport(""); setReadOnly(false); setError(""); }}
+          onClick={() => { setShowForm(!showForm); setEditing(null); setLabel(""); setHost("192.168.8.3"); setNfsExport(""); setReadOnly(false); setAllowedRoles([]); setError(""); }}
           style={{ ...btnBase, marginLeft: "auto", border: "1px solid var(--border-color)", background: "var(--bg-hover)", color: "var(--text-primary)" }}
         >
           {showForm && !editing ? "Отмена" : "+ Добавить папку"}
@@ -140,6 +152,11 @@ export function FilesNfsSettings({ onChanged }: { onChanged: () => void }) {
                   <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {f.label}
                     {f.readOnly && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 500, color: "var(--text-muted)" }}>только чтение</span>}
+                    {!!f.allowedRoles?.length && (
+                      <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 500, color: "#FF9500" }} title={f.allowedRoles.map(roleName).join(", ")}>
+                        роли: {f.allowedRoles.map(roleName).join(", ")}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {f.host}:{f.export}
@@ -168,6 +185,30 @@ export function FilesNfsSettings({ onChanged }: { onChanged: () => void }) {
             <input type="checkbox" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} />
             Только чтение
           </label>
+          <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Кто видит папку</div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-primary)", cursor: "pointer", marginBottom: 6 }}>
+              <input
+                type="checkbox"
+                checked={allowedRoles.length === 0}
+                onChange={(e) => setAllowedRoles(e.target.checked ? [] : roles.map((r: any) => r.id))}
+              />
+              Все пользователи
+            </label>
+            {roles.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingLeft: 24, opacity: allowedRoles.length === 0 ? 0.55 : 1 }}>
+                {roles.map((r: any) => (
+                  <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-primary)", cursor: "pointer" }}>
+                    <input type="checkbox" disabled={allowedRoles.length === 0} checked={allowedRoles.includes(r.id)} onChange={() => toggleRole(r.id)} />
+                    {r.label || r.name}
+                  </label>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+              Администратор видит все папки независимо от этой настройки.
+            </div>
+          </div>
           {error && <div style={{ fontSize: 12, color: "#FF3B30" }}>{error}</div>}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button onClick={resetForm} style={{ ...btnBase, border: "1px solid var(--border-color)", background: "transparent", color: "var(--text-primary)" }}>
