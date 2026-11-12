@@ -19,6 +19,10 @@ import { closeIcon, fileExtension } from "./filesTheme";
 // === Модальный текстовый редактор (страница «Файлы») ===
 // Подсветка синтаксиса CodeMirror 6 в зависимости от расширения файла;
 // детект кодировки — на бэкенде, при смене кодировки спрашиваем, в какой сохранить.
+//
+// Загрузка содержимого и создание EditorView разнесены по двум эффектам:
+// нельзя создавать view в .then загрузки — в этот момент ref-контейнер ещё
+// не смонтирован (loading === true), view не создавался и редактор оставался пустым.
 
 const languageForFile = (name: string) => {
   const ext = fileExtension(name);
@@ -69,6 +73,7 @@ interface FilesTextEditorProps {
 }
 
 export function FilesTextEditor({ tab, itemPath, title, onClose, onSaved }: FilesTextEditorProps) {
+  const [text, setText] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -81,44 +86,56 @@ export function FilesTextEditor({ tab, itemPath, title, onClose, onSaved }: File
   const savedRef = useRef(onSaved);
   savedRef.current = onSaved;
 
+  // Эффект 1: загрузка содержимого файла
   useEffect(() => {
-    let view: EditorView | null = null;
+    let cancelled = false;
     api.files
       .textContent(tab, itemPath)
       .then((d: any) => {
-        const text = String(d?.content ?? "");
+        if (cancelled) return;
+        const content = String(d?.content ?? "");
+        setText(content);
         setEncoding(String(d?.encoding || "utf-8").toLowerCase());
-        setCharCount(text.length);
-        if (!hostRef.current) return;
-        view = new EditorView({
-          state: EditorState.create({
-            doc: text,
-            extensions: [
-              lineNumbers(),
-              highlightActiveLine(),
-              highlightActiveLineGutter(),
-              history(),
-              bracketMatching(),
-              keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
-              syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-              editorTheme,
-              languageForFile(title),
-              EditorView.updateListener.of((u) => {
-                if (u.docChanged) {
-                  setDirty(true);
-                  setCharCount(u.state.doc.length);
-                }
-              }),
-            ],
-          }),
-          parent: hostRef.current!,
-        });
-        viewRef.current = view;
+        setCharCount(content.length);
       })
-      .catch((e: any) => setError(e?.message || "Ошибка загрузки файла"))
-      .finally(() => setLoading(false));
-    return () => { view?.destroy(); viewRef.current = null; };
-  }, [tab, itemPath, title]);
+      .catch((e: any) => {
+        if (!cancelled) setError(e?.message || "Ошибка загрузки файла");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [tab, itemPath]);
+
+  // Эффект 2: создание EditorView после монтирования ref-контейнера (loading === false)
+  useEffect(() => {
+    if (loading || error || text === null || !hostRef.current) return;
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: text,
+        extensions: [
+          lineNumbers(),
+          highlightActiveLine(),
+          highlightActiveLineGutter(),
+          history(),
+          bracketMatching(),
+          keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+          syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+          editorTheme,
+          languageForFile(title),
+          EditorView.updateListener.of((u) => {
+            if (u.docChanged) {
+              setDirty(true);
+              setCharCount(u.state.doc.length);
+            }
+          }),
+        ],
+      }),
+      parent: hostRef.current,
+    });
+    viewRef.current = view;
+    return () => { view.destroy(); viewRef.current = null; };
+  }, [loading, error, text, title]);
 
   const doSave = async (targetEncoding: string) => {
     if (saving) return;
