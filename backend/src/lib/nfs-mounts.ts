@@ -1,18 +1,22 @@
 import fs from 'fs';
+import http from 'http';
 import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { prisma } from './prisma.js';
 
 // === Управление NFS-папками страницы «Файлы» ===
-// Каждая строка file_tab_settings = одна NFS-шара: монтируется внутри контейнера
-// в /app/nfs/<tabKey> (нужен nfs-common и SYS_ADMIN в compose). Реестр держится
-// в памяти: resolveTabDir() синхронный, обновляется после любых изменений и
-// периодически перепроверяется (ре-маунт после обрыва/NFS-рестарта).
+// Каждая строка file_tab_settings = одна NFS-шара. Монтирование выполняет
+// helper-контейнер wecrm-nfs-mounter-1 (privileged, host-сеть): NAS принимает
+// NFS только с хоста, из контейнеров по NAT отвечает «access denied».
+// /mnt/nfs на хосте rshared → монтирования helper'а видны на хосте и в backend
+// (том /mnt/nfs:/mnt/nfs:rslave). Реестр в памяти: resolveTabDir() синхронный,
+// обновляется после изменений и периодически перепроверяется (ре-маунт).
 
 const execFileAsync = promisify(execFile);
 
-export const NFS_ROOT = '/app/nfs';
+export const NFS_ROOT = '/mnt/nfs';
+const MOUNTER = process.env.NFS_MOUNTER_CONTAINER || 'wecrm-nfs-mounter-1';
 
 export interface NfsFolder {
   id: string;
@@ -42,24 +46,74 @@ const isMounted = (mp: string): boolean => {
   }
 };
 
+
+// --- Выполнение команд в helper-контейнере через Docker API (unix-сокет, без docker CLI) ---
+const DOCKER_SOCK = '/var/run/docker.sock';
+
+const dockerRequest = (
+  method: string,
+  path: string,
+  body?: string,
+): Promise<{ status: number; data: string }> =>
+  new Promise((resolve, reject) => {
+    const req = http.request(
+      { socketPath: DOCKER_SOCK, path, method, headers: body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } : {} },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => resolve({ status: res.statusCode || 0, data }));
+      },
+    );
+    req.setTimeout(60000, () => req.destroy(new Error('timeout docker api')));
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+
+// sh -c <cmd> внутри контейнера-монтировщика; кидает ошибку при ненулевом коде
+const mounterExec = async (cmd: string): Promise<void> => {
+  const run = async (): Promise<string> => {
+    const created = await dockerRequest('POST', `/containers/${MOUNTER}/exec`, JSON.stringify({
+      AttachStdout: true,
+      AttachStderr: true,
+      Tty: true,
+      Cmd: ['sh', '-c', cmd],
+    }));
+    if (created.status !== 201) throw new Error(created.data || `docker exec create: HTTP ${created.status}`);
+    const execId = JSON.parse(created.data).Id;
+    const started = await dockerRequest('POST', `/exec/${execId}/start`, JSON.stringify({ Detach: false, Tty: true }));
+    if (started.status !== 200) throw new Error(started.data || `docker exec start: HTTP ${started.status}`);
+    const inspect = await dockerRequest('GET', `/exec/${execId}/json`);
+    const info = JSON.parse(inspect.data);
+    if (info.ExitCode !== 0) throw new Error((started.data || '').trim() || `exit code ${info.ExitCode}`);
+    return started.data;
+  };
+  try {
+    await run();
+  } catch (e: any) {
+    const msg = String(e?.message || e);
+    if (/No such container/i.test(msg)) {
+      await dockerRequest('POST', `/containers/${MOUNTER}/start`).catch(() => undefined);
+      await run();
+      return;
+    }
+    throw e;
+  }
+};
+
 const mountOnce = async (folder: NfsFolder): Promise<{ ok: boolean; error?: string }> => {
   const mp = mountPoint(folder.tabKey);
-  try {
-    fs.mkdirSync(mp, { recursive: true });
-  } catch (e: any) {
-    return { ok: false, error: `Не удалось создать точку монтирования: ${e?.message || e}` };
-  }
   if (isMounted(mp)) return { ok: true };
   const mode = folder.readOnly ? 'ro' : 'rw';
   const source = `${folder.host}:${folder.export}`;
   const attempts = [
-    ['-t', 'nfs', '-o', `${mode},soft,timeo=50,retrans=2,nfsvers=4.1`, source, mp],
-    ['-t', 'nfs', '-o', `${mode},soft,timeo=50,retrans=2`, source, mp],
+    `mkdir -p ${shellQuote(mp)} && mount -t nfs -o ${mode},soft,timeo=50,retrans=2,nfsvers=4.1 ${shellQuote(source)} ${shellQuote(mp)}`,
+    `mkdir -p ${shellQuote(mp)} && mount -t nfs -o ${mode},soft,timeo=50,retrans=2 ${shellQuote(source)} ${shellQuote(mp)}`,
   ];
   let lastErr = '';
-  for (const args of attempts) {
+  for (const cmd of attempts) {
     try {
-      await execFileAsync('mount', args, { timeout: 30000 });
+      await mounterExec(cmd);
       lastErrorByTab.delete(folder.tabKey);
       return { ok: true };
     } catch (e: any) {
@@ -83,11 +137,7 @@ export const ensureMounted = (folder: NfsFolder): Promise<{ ok: boolean; error?:
 export const unmount = async (tabKey: string): Promise<void> => {
   const mp = mountPoint(tabKey);
   if (!isMounted(mp)) return;
-  try {
-    await execFileAsync('umount', ['-l', mp], { timeout: 15000 });
-  } catch {
-    /* занято — lazy detach всё равно отработает позже */
-  }
+  await mounterExec(`umount -l ${shellQuote(mp)}`).catch(() => undefined);
 };
 
 export const removeMountPoint = (tabKey: string): void => {
@@ -118,7 +168,7 @@ export const refreshRegistry = async (): Promise<NfsFolder[]> => {
     dirByTab.set(f.tabKey, mountPoint(f.tabKey));
     await ensureMounted(f);
   }
-  // Строки без host/export (в т.ч. удалённые источники) — из реестра убираем
+  // Строки без host/export — из реестра убираем
   for (const key of [...dirByTab.keys()]) {
     if (!seen.has(key)) dirByTab.delete(key);
   }
@@ -147,7 +197,7 @@ export const folderStatus = (folder: NfsFolder) => {
 // Синхронное разрешение вкладки в каталог (вызывается из resolveTabDir)
 export const nfsDirForTab = (tabKey: string): string | undefined => dirByTab.get(tabKey);
 
-// Допустимые ключи вкладок, созданных вручную
+// Ключ вкладки из названия
 export const slugify = (label: string, fallback: string): string => {
   const slug = label
     .toLowerCase()
@@ -160,31 +210,30 @@ export const slugify = (label: string, fallback: string): string => {
   return slug || fallback;
 };
 
-// Проверка монтирования ДО сохранения новой папки: монтируем во временную точку
+const shellQuote = (s: string) => `'${s.replace(/'/g, `'\''`)}'`;
+
+// Проверка монтирования ДО сохранения новой папки: пробный монт во временную точку
 export const testMount = async (host: string, nfsExport: string, readOnly: boolean): Promise<{ ok: boolean; error?: string }> => {
   const staging = path.join(NFS_ROOT, `.staging-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-  try {
-    fs.mkdirSync(staging, { recursive: true });
-    const mode = readOnly ? 'ro' : 'rw';
-    const source = `${host}:${nfsExport}`;
-    const attempts = [
-      ['-t', 'nfs', '-o', `${mode},soft,timeo=50,retrans=2,nfsvers=4.1`, source, staging],
-      ['-t', 'nfs', '-o', `${mode},soft,timeo=50,retrans=2`, source, staging],
-    ];
-    let lastErr = '';
-    for (const args of attempts) {
-      try {
-        await execFileAsync('mount', args, { timeout: 30000 });
-        await execFileAsync('umount', ['-l', staging], { timeout: 15000 }).catch(() => undefined);
-        return { ok: true };
-      } catch (e: any) {
-        lastErr = String(e?.stderr || e?.message || e).trim().split('\n').pop() || 'ошибка монтирования';
-      }
+  const mode = readOnly ? 'ro' : 'rw';
+  const source = `${host}:${nfsExport}`;
+  const attempts = [
+    `mkdir -p ${shellQuote(staging)} && mount -t nfs -o ${mode},soft,timeo=50,retrans=2,nfsvers=4.1 ${shellQuote(source)} ${shellQuote(staging)}`,
+    `mkdir -p ${shellQuote(staging)} && mount -t nfs -o ${mode},soft,timeo=50,retrans=2 ${shellQuote(source)} ${shellQuote(staging)}`,
+  ];
+  let lastErr = '';
+  for (const cmd of attempts) {
+    try {
+      await mounterExec(cmd);
+      await mounterExec(`umount -l ${shellQuote(staging)}`).catch(() => undefined);
+      await mounterExec(`rmdir ${shellQuote(staging)}`).catch(() => undefined);
+      return { ok: true };
+    } catch (e: any) {
+      lastErr = String(e?.stderr || e?.message || e).trim().split('\n').pop() || 'ошибка монтирования';
     }
-    return { ok: false, error: lastErr };
-  } finally {
-    removeMountPoint(path.basename(staging));
   }
+  await mounterExec(`rmdir ${shellQuote(staging)}`).catch(() => undefined);
+  return { ok: false, error: lastErr };
 };
 
 // Стартовая инициализация + периодический ре-маунт

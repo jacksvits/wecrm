@@ -94,6 +94,10 @@ services:
       - /mnt/nfs/BOOK:/app/files/documents
       - /mnt/nfs/GAME:/app/files/games
       - /mnt/nfs/GAME:/app/games:ro
+      # NFS-папки страницы «Файлы»: монтирования nfs-mounter приходят сюда по пропагации
+      - /mnt/nfs:/mnt/nfs:rslave
+      # Docker API: backend управляет nfs-mounter (монтирование шар страницы «Файлы»)
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./backend/data:/app/data
       # Общий том с конфигом sing-box: бэкенд перезаписывает его из плагина «Прокси через VPN»
       - ./vpn/sing-box:/app/vpn-config
@@ -103,6 +107,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Собранный фронтенд (общий том с frontend) — шаблон index.html для /pwa-index
       - fe-dist:/fe-dist:ro
+      # Миграции БД из репозитория (единый источник для entrypoint и worker)
+      - ./backend/prisma:/app/prisma:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4000/api/health || exit 1"]
@@ -133,6 +139,20 @@ services:
       - fe-dist:/fe-dist
     # Копируем только dist в общий том: uploads — большая NFS-папка, её дублировать нельзя.
     command: sh -c "mkdir -p /fe-dist && rm -rf /fe-dist/uploads && tar --exclude='./uploads' -C /usr/share/nginx/html -cf - . | tar -C /fe-dist -xf - && exec nginx -g 'daemon off;'"
+    restart: unless-stopped
+
+  # Монтировщик NFS: монтирует шары страницы «Файлы» в namespace хоста.
+  # backend вызывает его через docker exec (docker.sock); /mnt/nfs на хосте rshared,
+  # поэтому монтирования видны и в backend (rslave), и на хосте.
+  nfs-mounter:
+    image: wecrm-backend:latest
+    container_name: wecrm-nfs-mounter-1
+    entrypoint: ["sh", "-c", "sleep infinity"]
+    privileged: true
+    network_mode: host
+    volumes:
+      - /mnt/nfs:/mnt/nfs:rshared
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
   email-worker:
