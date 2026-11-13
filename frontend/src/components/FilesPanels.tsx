@@ -628,9 +628,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
         {barBtn("Поделиться", { onClick: handleShareSelected, disabled: activeSelected.length !== 1 })}
         <div style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
           {shareIcon}
-          {writable ? (
-            <span>Активна панель {activePanel + 1} · Ctrl+клик — несколько объектов · перетаскивание между панелями</span>
-          ) : (
+          {!writable && (
             <span>Вкладка только для чтения — доступны скачивание и публикация ссылок</span>
           )}
         </div>
