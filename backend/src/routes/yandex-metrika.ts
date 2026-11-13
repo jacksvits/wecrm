@@ -45,6 +45,24 @@ async function metrikaRequest(token: string, params: Record<string, string | num
   return res.json() as Promise<any>;
 }
 
+// Русские подписи типов источников трафика (API возвращает на английском)
+const SOURCE_RU: Record<string, string> = {
+  'Direct traffic': 'Прямые заходы',
+  'Search engine traffic': 'Поисковые системы',
+  'Link traffic': 'Переходы по ссылкам',
+  'Referral traffic': 'Переходы по ссылкам',
+  'Internal traffic': 'Внутренние переходы',
+  'Social network traffic': 'Переходы из соцсетей',
+  'Ad traffic': 'Рекламный трафик',
+  'Messenger traffic': 'Переходы из мессенджеров',
+  'Email traffic': 'Переходы из писем',
+  'Undefined': 'Не определено',
+};
+
+function sourceName(name: string): string {
+  return SOURCE_RU[name] ?? name;
+}
+
 function parseTable(data: any): { headers: string[]; rows: any[][] } {
   const query = data?.query ?? {};
   const ids: string[] = query.ids ?? [];
@@ -232,7 +250,7 @@ router.get('/summary', async (_req, res) => {
       sort: '-ym:s:visits',
       limit: 10,
     });
-    const sources = parseTable(srcData).rows.map((r) => ({ name: String(r[0] ?? '—'), visits: num(r[1]) }));
+    const sources = parseTable(srcData).rows.map((r) => ({ name: sourceName(String(r[0] ?? '—')), visits: num(r[1]) }));
 
     // 5. Возраст аудитории
     const ageData = await metrikaRequest(s.token, {
@@ -279,14 +297,17 @@ router.get('/summary', async (_req, res) => {
     });
     const srcRows = parseTable(srcDailyData).rows; // [date, source, visits]
     const srcTotals = new Map<string, number>();
-    for (const r of srcRows) srcTotals.set(String(r[1] ?? '—'), (srcTotals.get(String(r[1] ?? '—')) ?? 0) + num(r[2]));
+    for (const r of srcRows) {
+      const name = sourceName(String(r[1] ?? '—'));
+      srcTotals.set(name, (srcTotals.get(name) ?? 0) + num(r[2]));
+    }
     const topSources = [...srcTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map((e) => e[0]);
     const srcDates = [...new Set(srcRows.map((r) => String(r[0])))].sort();
     const srcIndex = new Map(topSources.map((name, i) => [name, i]));
     const dateIndex = new Map(srcDates.map((d, i) => [d, i]));
     const matrix = topSources.map(() => srcDates.map(() => 0));
     for (const r of srcRows) {
-      const si = srcIndex.get(String(r[1] ?? '—'));
+      const si = srcIndex.get(sourceName(String(r[1] ?? '—')));
       const di = dateIndex.get(String(r[0]));
       if (si === undefined || di === undefined) continue;
       matrix[si][di] = num(r[2]);

@@ -90,11 +90,12 @@ function BarLineChart({ bars, line, height = 150 }: { bars: number[]; line: numb
   );
 }
 
-function MultiLineChart({ seriesList, labels, colors, height = 150 }: {
+function MultiLineChart({ seriesList, labels, colors, height = 150, showLegend = true }: {
   seriesList: number[][];
   labels: string[];
   colors: string[];
   height?: number;
+  showLegend?: boolean;
 }) {
   const w = 320;
   const h = height;
@@ -115,14 +116,16 @@ function MultiLineChart({ seriesList, labels, colors, height = 150 }: {
             strokeLinejoin="round" strokeLinecap="round" opacity={0.9} />
         ) : null;
       })}
-      <g>
-        {labels.map((l, i) => (
-          <g key={i} transform={`translate(${i * (w / labels.length)}, 0)`}>
-            <rect width={10} height={10} fill={colors[i]} rx={2} />
-            <text x={14} y={9} fontSize={9} fill="var(--text-muted)">{l}</text>
-          </g>
-        ))}
-      </g>
+      {showLegend && (
+        <g>
+          {labels.map((l, i) => (
+            <g key={i} transform={`translate(${i * (w / labels.length)}, 0)`}>
+              <rect width={10} height={10} fill={colors[i]} rx={2} />
+              <text x={14} y={9} fontSize={9} fill="var(--text-muted)">{l}</text>
+            </g>
+          ))}
+        </g>
+      )}
     </svg>
   );
 }
@@ -828,6 +831,7 @@ export function AdSourcesDailyWidget() {
           seriesList={sd.series.map((s: any) => s.values)}
           labels={sd.series.map((s: any) => s.name)}
           colors={sd.series.map((_: any, i: number) => METRIKA_SERIES_COLORS[i % 5])}
+          showLegend={false}
         />
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 2 }}>
           {sd.series.map((s: any, i: number) => (
