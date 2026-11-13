@@ -183,7 +183,7 @@ function injectHeadScript(html: string, marker: string): Promise<void> {
 const AD_COLUMNS_CSS = `
   /* Средняя колонка — по ширине карточки новости: реклама вплотную к тексту с обеих сторон */
   /* Вся строка (карточка новости и обе колонки рекламы) — на одной линии, отступ 8px от верха экрана */
-  .news-ad-grid { display: grid; grid-template-columns: 240px auto 240px; gap: 10px; justify-content: center; margin-top: 8px; }
+  .news-ad-grid { display: grid; grid-template-columns: 240px auto 300px; gap: 10px; justify-content: center; margin-top: 8px; }
   .news-ad-main { width: 800px; max-width: 100%; }
   .news-ad-col { display: flex; flex-direction: column; gap: 14px; }
   .news-ad-col > .news-ad-sticky { position: sticky; top: 68px; }
@@ -206,13 +206,14 @@ function useAdBlocks(): { left: AdBlock[]; right: AdBlock[] } {
   };
 }
 
-/** Колонка рекламных блоков: блоки с флагом isSticky закреплены при прокрутке (top 68), остальные скроллятся с лентой */
-function NewsAdColumn({ blocks }: { blocks: AdBlock[] }) {
+/** Колонка рекламных блоков: блоки с флагом isSticky закреплены при прокрутке (top 68), остальные скроллятся с лентой.
+ *  wide — правая колонка 300px: высоты баннеров пропорционально ×1.25 */
+function NewsAdColumn({ blocks, wide }: { blocks: AdBlock[]; wide?: boolean }) {
   if (!blocks.length) return null;
   return (
     <aside className="news-ad-col">
       {blocks.map(b => {
-        const inner = b.type === 'script' ? <NewsAdScript block={b} /> : <NewsAdCard block={b} />;
+        const inner = b.type === 'script' ? <NewsAdScript block={b} /> : <NewsAdCard block={b} wide={wide} />;
         return b.isSticky
           ? <div key={b.id} className="news-ad-sticky">{inner}</div>
           : <div key={b.id}>{inner}</div>;
@@ -261,11 +262,13 @@ function NewsAdScript({ block }: { block: AdBlock }) {
 }
 
 /** Карточка рекламного блока: только картинка(ы) с ротацией и fade-анимацией */
-function NewsAdCard({ block }: { block: AdBlock }) {
+function NewsAdCard({ block, wide }: { block: AdBlock; wide?: boolean }) {
   const navigate = useNavigate();
   const [hover, setHover] = useState(false);
-  // Три размера блока пропорционально ширине 240: 240×240, 240×320, 240×474
-  const heights: Record<string, number> = { small: 240, medium: 320, big: 474 };
+  // Три размера пропорционально ширине колонки: левая 240px → 240/320/474, правая 300px → 300/400/593
+  const base: Record<string, number> = { small: 240, medium: 320, big: 474 };
+  const k = wide ? 1.25 : 1;
+  const heights: Record<string, number> = { small: Math.round(base.small * k), medium: Math.round(base.medium * k), big: Math.round(base.big * k) };
   // Картинки блока: JSON-массив images, fallback — одиночная imageUrl
   const images: string[] = useMemo(() => {
     let arr: string[] = [];
@@ -692,7 +695,7 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
         </div>
       </div>
         </div>
-        <NewsAdColumn blocks={ads.right} />
+        <NewsAdColumn blocks={ads.right} wide />
       </div>
       </div>
     </div>
