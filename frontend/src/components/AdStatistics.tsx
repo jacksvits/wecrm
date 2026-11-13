@@ -775,6 +775,10 @@ function useDemoEngagement(): number[] {
 
 export function AdAttendanceWidget() {
   const { data, connected } = useMetrikaSummary();
+  const dates = useMemo(
+    () => Array.from({ length: 30 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - 29 + i); return d.toISOString().slice(0, 10); }),
+    []
+  );
   if (connected && data?.daily?.length) {
     const daily: any[] = data.daily;
     return (
@@ -792,10 +796,6 @@ export function AdAttendanceWidget() {
       </>
     );
   }
-  const dates = useMemo(
-    () => Array.from({ length: 30 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - 29 + i); return d.toISOString().slice(0, 10); }),
-    []
-  );
   return (
     <>
       <WidgetHeader title="Посещаемость сайта" badge="📶" badgeBg="#7b61ff" />
@@ -814,6 +814,10 @@ export function AdAttendanceWidget() {
 
 export function AdSourcesDailyWidget() {
   const { data, connected } = useMetrikaSummary();
+  const demo = useMemo(() => {
+    const names = ["Прямые заходы", "Поисковые системы", "Переходы по ссылкам"];
+    return names.map((name, i) => ({ name, values: genSeries(DEMO_SEED + 40 + i, 30, 2, 60 - i * 15) }));
+  }, []);
   if (connected && data?.sourcesDaily?.series?.length) {
     const sd = data.sourcesDaily;
     return (
@@ -837,10 +841,6 @@ export function AdSourcesDailyWidget() {
       </>
     );
   }
-  const demo = useMemo(() => {
-    const names = ["Прямые заходы", "Поисковые системы", "Переходы по ссылкам"];
-    return names.map((name, i) => ({ name, values: genSeries(DEMO_SEED + 40 + i, 30, 2, 60 - i * 15) }));
-  }, []);
   return (
     <>
       <WidgetHeader title="Источники трафика" badge="≋" badgeBg="#ff4fa3" />
