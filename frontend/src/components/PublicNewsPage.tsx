@@ -11,6 +11,9 @@ import { usePageSeo } from '../lib/usePageTitle';
 import { makeDescription } from '../lib/stripHtml';
 import { applyPageMeta, restorePageMeta } from '../lib/seo';
 import PublicAuthArea from './PublicAuthArea';
+import { usePublicUser } from './PublicAuthArea';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import PublicNavMenu from './PublicNavMenu';
 import { AdBlock } from '../types';
 
@@ -138,6 +141,18 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
     </div>
   );
 }
+
+// Модули тулбара WYSIWYG комментария — единая стилистика с CRM (NewsComments)
+const COMMENT_QUILL_MODULES = {
+  toolbar: [
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ list: 'ordered' }, { list: 'bullet' }],
+    ['link'],
+    ['clean'],
+  ],
+};
+// Текст без HTML-тегов (валидация непустоты)
+const commentPlainText = (html: string) => html.replace(/<[^>]*>/g, '').trim();
 
 /* ---------- Рекламные блоки по бокам карточки новости (только детальная страница) ---------- */
 
@@ -406,7 +421,26 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
   const [news, setNews] = useState<any>(null);
   const [comments, setComments] = useState<any[]>([]);
   const [notFound, setNotFound] = useState(false);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [commentBusy, setCommentBusy] = useState(false);
+  const pubUser = usePublicUser();
   const ads = useAdBlocks();
+  // Авторизован через CRM (мост auth-bridge с токеном) — комментарии доступны
+  const canComment = !!pubUser;
+
+  const submitComment = async () => {
+    if (!news || commentBusy || !commentPlainText(commentDraft).trim()) return;
+    setCommentBusy(true);
+    try {
+      await api.news.addComment(news.id, commentDraft);
+      setCommentDraft('');
+      const list = await api.news.comments(news.id);
+      setComments(Array.isArray(list) ? list : []);
+    } catch (e: any) {
+      alert(e.message || 'Не удалось отправить комментарий');
+    }
+    setCommentBusy(false);
+  };
 
   useEffect(() => {
     if (slug) {
@@ -562,6 +596,28 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
         {/* Комментарии: чтение публичное, оставить можно только авторизованным */}
         <div style={{ marginTop: 40 }}>
           <h2 style={{ fontSize: 18, margin: '0 0 16px', color: 'var(--text-color)' }}>Комментарии ({comments.length})</h2>
+          {canComment ? (
+            <div style={{ marginBottom: 16 }}>
+              <style>{'.ql-container { border-radius: 0 0 10px 10px; } .ql-toolbar { border-radius: 10px 10px 0 0; }'}</style>
+              <ReactQuill
+                theme="snow"
+                value={commentDraft}
+                onChange={setCommentDraft}
+                placeholder="Написать комментарий…"
+                modules={COMMENT_QUILL_MODULES}
+                style={{ background: 'var(--bg-card)', borderRadius: 10 }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button
+                  onClick={submitComment}
+                  disabled={commentBusy || !commentPlainText(commentDraft).trim()}
+                  style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: commentBusy || !commentPlainText(commentDraft).trim() ? '#9db8d2' : '#007AFF', color: '#fff', cursor: commentBusy ? 'wait' : 'pointer', fontWeight: 500 }}
+                >
+                  {commentBusy ? 'Отправка…' : 'Отправить'}
+                </button>
+              </div>
+            </div>
+          ) : (
           <div style={{
             padding: '14px 16px', marginBottom: 16, borderRadius: 12,
             border: '1px dashed var(--border-color)',
@@ -581,6 +637,7 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
               Войти
             </a>
           </div>
+          )}
           {comments.length === 0 && (
             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Комментариев пока нет</div>
           )}

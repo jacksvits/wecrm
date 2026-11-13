@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
-type PublicUser = { name?: string; avatar?: string | null } | null;
+export type PublicUser = { name?: string; avatar?: string | null; token?: string } | null;
 
 const BRIDGE_URL = 'https://welans.cc/auth-bridge.html';
 const LS_KEY = 'wecrm_auth';
@@ -29,7 +29,9 @@ function cacheAuth(rec: { ts: number; user: PublicUser }) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(rec)); } catch { /* ignore */ }
 }
 
-function usePublicUser(): PublicUser | undefined {
+// Публичная авторизация: мост отдаёт профиль И токен — витринные домены сохраняют
+// токен в localStorage, авторизованные запросы (комментарии) работают отовсюду
+export function usePublicUser(): PublicUser | undefined {
   const [bridgeUser, setBridgeUser] = useState<PublicUser | undefined>(undefined);
   const crmHost = isCrmHost();
   const { user } = useAuth();
@@ -41,6 +43,12 @@ function usePublicUser(): PublicUser | undefined {
       try {
         u = JSON.parse(decodeURIComponent(escape(atob(window.location.hash.substring(12)))));
       } catch { u = null; }
+      // Токен — в стандартное место api-клиента; в кэш профиля не кладём
+      if (u && typeof u.token === 'string' && u.token) {
+        localStorage.setItem('token', u.token);
+        const { token: _t, ...profile } = u;
+        u = profile;
+      }
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
       cacheAuth({ ts: Date.now(), user: u });
       setBridgeUser(u);

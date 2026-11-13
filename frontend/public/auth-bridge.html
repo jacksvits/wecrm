@@ -18,7 +18,7 @@
   try {
     var q = new URLSearchParams(location.search).get('back') || '';
     // возврат разрешён только на публичные домены WeLANS (welans.ru, welans.click)
-    if (/^https:\/\/(www\.)?(welans\.ru|welans\.click)\//.test(q)) back = q;
+    if (/^https:\/\/(www\.)?(welans\.ru|welans\.click|welans\.org)\//.test(q)) back = q;
   } catch (e) {}
   function done(hash) {
     location.replace(back.split('#')[0] + hash);
@@ -31,7 +31,8 @@
     .then(function (u) {
       var payload;
       try {
-        payload = btoa(unescape(encodeURIComponent(JSON.stringify({ name: u.name || '', avatar: u.avatar || '' }))));
+        // token в хэше: витринные домены сохраняют его и могут делать авторизованные запросы (комментарии и т.п.)
+        payload = btoa(unescape(encodeURIComponent(JSON.stringify({ name: u.name || '', avatar: u.avatar || '', token: token || '' }))));
       } catch (e) { done('#wecrm-guest'); return; }
       done('#wecrm-user=' + payload);
     })
