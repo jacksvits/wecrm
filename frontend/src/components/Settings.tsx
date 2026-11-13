@@ -32,12 +32,13 @@ import WbSellerSettings from "./WbSellerSettings";
 import CdekSettings from "./CdekSettings";
 import { HikvisionSettings } from "./HikvisionSettings";
 import { TapoSettings } from "./TapoSettings";
+import { YandexMetrikaSettings } from "./YandexMetrikaSettings";
 import { SystemSettings } from "./SystemSettings";
 import { ScheduleSettings } from "./ScheduleSettings";
 import { SecuritySettings } from "./SecuritySettings";
 
 type MainTab = "roles" | "statuses" | "users" | "contactTypes" | "schedule" | "integrations" | "security" | "system";
-type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "wb" | "vpn" | "hikvision" | "cdek" | "tapo" | "rss";
+type PluginKey = "email" | "telephony" | "max" | "telegram" | "vkAuth" | "vkMarket" | "vkCommunity" | "sms" | "yandex" | "yandexMetrika" | "dgis" | "beget" | "pskovline" | "tochka" | "tochkaAcquiring" | "onec" | "diadoc" | "ozon" | "wb" | "vpn" | "hikvision" | "cdek" | "tapo" | "rss";
 
 // Интеграции («плагины»): карточка с группой, заголовком и статусом активности
 const PLUGINS: { key: PluginKey; label: string; group: string; description: string; helpSlug: string }[] = [
@@ -64,6 +65,7 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "tapo", helpSlug: "int-tapo", label: "Камеры Tapo", group: "Видеонаблюдение", description: "Онлайн-просмотр облачных камер TP-Link Tapo по логину/паролю аккаунта (для администраторов)" },
   { key: "cdek", helpSlug: "int-cdek", label: "CDEK", group: "Логистика", description: "Доставка заказов СДЭК: калькулятор стоимости, накладные, трекинг, квитанции" },
   { key: "rss", helpSlug: "int-rss", label: "Парсинг RSS", group: "Контент", description: "Автоматический сбор новостей из RSS-лент в категорию «Коротко о свежем» (механика wprss_feed)" },
+  { key: "yandexMetrika", helpSlug: "int-yandex-metrika", label: "Яндекс Метрика", group: "Аналитика", description: "Статистика сайтов: визиты, источники трафика, аудитория — во вкладке «Рекламная статистика» страницы директора" },
 ];
 
 function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
@@ -77,6 +79,7 @@ function PluginIcon({ pluginKey }: { pluginKey: PluginKey }) {
     vkMarket: "M 5.75 6.07 L 2.5 6.07 C 2.65 13.48 6.36 17.93 12.85 17.93 L 13.22 17.93 L 13.22 13.69 C 15.6 13.93 17.41 15.67 18.13 17.93 L 21.5 17.93 C 20.57 14.56 18.14 12.69 16.62 11.98 C 18.14 11.1 20.28 8.97 20.79 6.07 L 17.73 6.07 C 17.06 8.42 15.09 10.56 13.22 10.76 L 13.22 6.07 L 10.15 6.07 L 10.15 14.28 C 8.26 13.81 5.86 11.51 5.75 6.07 Z",
     vkCommunity: "M 5.75 6.07 L 2.5 6.07 C 2.65 13.48 6.36 17.93 12.85 17.93 L 13.22 17.93 L 13.22 13.69 C 15.6 13.93 17.41 15.67 18.13 17.93 L 21.5 17.93 C 20.57 14.56 18.14 12.69 16.62 11.98 C 18.14 11.1 20.28 8.97 20.79 6.07 L 17.73 6.07 C 17.06 8.42 15.09 10.56 13.22 10.76 L 13.22 6.07 L 10.15 6.07 L 10.15 14.28 C 8.26 13.81 5.86 11.51 5.75 6.07 Z",
     yandex: "M8.67 2L2 8.67L2.83 16.48L7.83 21.48L15.65 21.48L21.48 15.65L21.48 7.83L16.48 2.83ZM9.08 6.48L15.33 6.17L15.23 17.42L13.15 17.31L13.15 7.83L9.92 9.08L12.83 13.56L10.23 17.42L7.73 17.31L9.81 13.98L7.73 11.06Z",
+    yandexMetrika: "M3 3v18h18M7 15l3-5 3 3 4-7 3 4",
     dgis: "M20.25 7.14L20 7.14L20 10.25L19.71 10.29L19.71 11.11L19.43 11.14L19.14 12.25L18.86 12.29L18.86 12.54L18.57 12.57L18.57 12.82L18.29 12.86L15.11 16.29L14.86 16.29L14.86 17.11L15.39 17.11L15.43 17.39L19.39 17.39L19.43 17.11L20.25 17.11L20.25 16.86L20.54 16.82L20.54 16.29L20.82 16.25L20.82 15.71L21.11 15.68L21.11 14.86L21.39 14.82L21.39 14L21.96 13.96L21.96 10L21.39 9.96L21.11 8.29L20.82 8.25L20.82 7.71L20.57 7.71ZM8 2.29L5.71 3.71L2 8.29L2 15.68L3.43 17.96L8 21.68L15.39 21.68L17.68 19.43L11.14 19.14L11.11 17.71L16.82 12.25L17.68 8L16.54 6.86L14.57 6.86L13.11 10.29L11.39 10.25L11.39 8L13.43 5.39L17.39 5.11L18.86 5.96L19.11 5.43L15.39 2.29Z",
     beget: "M 8.47 11.38 C 8.72 10.37 8.93 9.42 9.19 8.49 C 9.22 8.36 9.42 8.24 9.57 8.18 C 11.79 7.33 14.28 8.05 15.86 10 C 18.44 13.17 17.48 18.19 13.94 19.99 C 10.97 21.51 7.39 20.06 6.11 16.75 C 5.82 16.02 5.63 15.19 5.62 14.4 C 5.58 10.52 5.6 6.64 5.6 2.76 C 5.6 2.68 5.61 2.6 5.61 2.5 C 6.28 2.5 6.92 2.5 7.62 2.5 C 7.62 2.66 7.62 2.82 7.62 2.98 C 7.62 6.71 7.62 10.44 7.62 14.17 C 7.62 15.32 7.96 16.36 8.72 17.23 C 10.26 18.99 12.72 18.97 14.24 17.19 C 15.76 15.42 15.63 12.57 13.97 10.95 C 12.53 9.54 10.39 9.54 8.95 10.95 C 8.81 11.08 8.67 11.2 8.47 11.38 Z",
     pskovline: "M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20",
@@ -125,6 +128,8 @@ function renderPluginSettings(pluginKey: PluginKey) {
       return <SmsJournal />;
     case "yandex":
       return <YandexSettings />;
+    case "yandexMetrika":
+      return <YandexMetrikaSettings />;
     case "beget":
       return <BegetSettings />;
     case "pskovline":
@@ -193,6 +198,7 @@ export function Settings() {
     vpn: false,
     cdek: false,
     rss: false,
+    yandexMetrika: false,
   });
   useEffect(() => {
     if (!helpSlug) return;

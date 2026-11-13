@@ -1728,6 +1728,16 @@ model BegetSettings {
   @@map("beget_settings")
 }
 
+model YandexMetrikaSettings {
+  id        Int      @id @default(1)
+  counterId String   @default("") @map("counter_id")
+  token     String   @default("")
+  isActive  Boolean  @default(false) @map("is_active")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("yandex_metrika_settings")
+}
+
 model PskovlinePluginSettings {
   id         Int      @id @default(1)
   isActive   Boolean  @default(false) @map("is_active")

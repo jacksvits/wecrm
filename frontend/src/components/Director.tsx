@@ -23,7 +23,7 @@ import { useAuth } from "../hooks/useAuth";
 import { FinanceAnalyticsWidget } from "./accounting/FinanceAnalyticsWidget";
 import { FinanceDocumentsWidget } from "./accounting/FinanceDocumentsWidget";
 import { FinanceReconciliationWidget } from "./accounting/FinanceReconciliationWidget";
-import { AdSocialWidget, AdExpensesWidget, AdChannelsWidget, AdCacWidget, AdLeadsWidget, AdDomainsWidget, AdConversionsWidget, AdDemographicsWidget } from "./AdStatistics";
+import { AdSocialWidget, AdExpensesWidget, AdChannelsWidget, AdCacWidget, AdLeadsWidget, AdDomainsWidget, AdConversionsWidget, AdDemographicsWidget, AdGeoWidget } from "./AdStatistics";
 
 type WidgetSize = "small" | "medium" | "large";
 type WidgetId = string;
@@ -58,6 +58,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "ad-domains", size: "medium", label: "Посещаемость по доменам", tab: "Рекламная статистика" },
   { id: "ad-conversions", size: "small", label: "Конверсии сайта", tab: "Рекламная статистика" },
   { id: "ad-demographics", size: "medium", label: "Возраст аудитории", tab: "Рекламная статистика" },
+  { id: "ad-geo", size: "small", label: "География аудитории", tab: "Рекламная статистика" },
   { id: "widget-email-filter-log", size: "medium", label: "Журнал срабатываний почты", tab: "Основное" },
   // === Вкладка: Биллинг ===
   { id: "widget-billing-subscriptions", size: "medium", label: "Подписки пользователей", tab: "Биллинг" },
@@ -528,6 +529,8 @@ export function Director() {
         return <AdConversionsWidget />;
       case "ad-demographics":
         return <AdDemographicsWidget />;
+      case "ad-geo":
+        return <AdGeoWidget />;
       case "stat-beget":
         return (
           <>

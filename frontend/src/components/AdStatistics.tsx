@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "../api/client";
 
 /**
  * Виджеты вкладки «Рекламная статистика» страницы директора.
@@ -164,11 +165,12 @@ function ProgressBar({ value, max, color = "#007AFF" }: { value: number; max: nu
 }
 
 // ---------- Шапка виджета ----------
-function WidgetHeader({ title, badge, badgeBg, badgeColor }: {
+function WidgetHeader({ title, badge, badgeBg, badgeColor, source = "demo" }: {
   title: string;
   badge?: string;
   badgeBg?: string;
   badgeColor?: string;
+  source?: "demo" | "metrika";
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -195,19 +197,19 @@ function WidgetHeader({ title, badge, badgeBg, badgeColor }: {
         {title}
       </span>
       <span
-        title="Демо-данные — виджет будет настроен отдельно"
+        title={source === "metrika" ? "Данные Яндекс Метрики" : "Демо-данные — виджет будет настроен отдельно"}
         style={{
           marginLeft: "auto",
           flexShrink: 0,
           fontSize: 10,
           padding: "2px 7px",
           borderRadius: 8,
-          background: "#fef3c7",
-          color: "#92400e",
+          background: source === "metrika" ? "#dcfce7" : "#fef3c7",
+          color: source === "metrika" ? "#166534" : "#92400e",
           fontWeight: 600,
         }}
       >
-        Демо
+        {source === "metrika" ? "Метрика" : "Демо"}
       </span>
     </div>
   );
@@ -227,6 +229,40 @@ function KpiNumber({ value, unit, delta, color }: { value: string; unit?: string
 
 // ---------- Демо-данные (заменяются реальными источниками при настройке виджетов) ----------
 const DEMO_SEED = 42;
+
+// ---------- Реальные данные Яндекс Метрики (плагин «Яндекс Метрика») ----------
+// connected: null — загрузка, false — плагин не подключён (демо-фолбэк), true — есть данные
+function useMetrikaSummary() {
+  const [data, setData] = useState<any | null>(null);
+  const [connected, setConnected] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api.yandexMetrika
+      .getSummary()
+      .then((d) => {
+        if (!alive) return;
+        setConnected(!!d);
+        setData(d);
+      })
+      .catch(() => {
+        if (alive) setConnected(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return { data, connected };
+}
+
+function fmtInt(n: number): string {
+  return Math.round(n || 0).toLocaleString("ru-RU");
+}
+
+function pctDelta(cur: number, prev: number): string {
+  if (!prev) return "";
+  const d = ((cur - prev) / prev) * 100;
+  return `${d > 0 ? "+" : ""}${d.toFixed(1)}%`;
+}
 
 function buildDemoData(seed: number) {
   return {
@@ -303,6 +339,36 @@ export function AdExpensesWidget() {
 
 export function AdChannelsWidget() {
   const demo = useMemo(() => buildDemoData(DEMO_SEED), []);
+  const { data, connected } = useMetrikaSummary();
+
+  if (connected && data?.sources?.length) {
+    const total = data.sources.reduce((a: number, s: any) => a + (s.visits || 0), 0) || 1;
+    const palette = ["#FFCC00", "#4285F4", "#0077FF", "#229ED9", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"];
+    return (
+      <>
+        <WidgetHeader title="Источники трафика" badge="▶" badgeBg="#10b981" source="metrika" />
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {data.sources.slice(0, 6).map((s: any, i: number) => {
+            const share = Math.round((s.visits / total) * 100);
+            const color = palette[i % palette.length];
+            return (
+              <div key={s.name}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 3, background: color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text-primary)" }}>{fmtInt(s.visits)}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)", minWidth: 34, textAlign: "right" }}>{share}%</span>
+                </div>
+                <ProgressBar value={s.visits} max={total} color={color} />
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>за 30 дней · Яндекс Метрика</div>
+      </>
+    );
+  }
+
   return (
     <>
       <WidgetHeader title="Каналы: клики" badge="▶" badgeBg="#10b981" />
@@ -354,6 +420,50 @@ export function AdLeadsWidget() {
 
 export function AdDomainsWidget() {
   const demo = useMemo(() => buildDemoData(DEMO_SEED), []);
+  const { data, connected } = useMetrikaSummary();
+
+  if (connected && data?.summary && data?.daily?.length) {
+    const s = data.summary;
+    const visits = data.daily.map((d: any) => d.visits);
+    return (
+      <>
+        <WidgetHeader title="Трафик сайта" badge="⌁" badgeBg="#0ea5e9" source="metrika" />
+        <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+          {[
+            { label: "визиты", cur: s.visits, prev: s.visitsPrev, color: "#007AFF" },
+            { label: "просмотры", cur: s.pageviews, prev: s.pageviewsPrev, color: "#10b981" },
+            { label: "посетители", cur: s.users, prev: s.usersPrev, color: "#f59e0b" },
+          ].map((k) => {
+            const delta = pctDelta(k.cur, k.prev);
+            return (
+              <div key={k.label} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <span style={{ fontSize: 20, fontWeight: 800, color: k.color, letterSpacing: -0.5 }}>{fmtInt(k.cur)}</span>
+                <span style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", gap: 4, alignItems: "center" }}>
+                  {k.label}
+                  {delta && (
+                    <span style={{ fontWeight: 600, color: delta.startsWith("+") ? "#16a34a" : "#dc2626" }}>{delta}</span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <Sparkline data={visits} color="#007AFF" height={56} />
+        {data.perCounter?.length > 1 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {data.perCounter.map((c: any) => (
+              <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                <span style={{ color: "var(--text-primary)", fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>счётчик {c.name}</span>
+                <span style={{ color: "var(--text-secondary)" }}>{fmtInt(c.visits)} визитов</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>за 30 дней · Яндекс Метрика</div>
+      </>
+    );
+  }
+
   return (
     <>
       <WidgetHeader title="Посещаемость по доменам" badge="⌁" badgeBg="#0ea5e9" />
@@ -381,11 +491,75 @@ export function AdConversionsWidget() {
 
 export function AdDemographicsWidget() {
   const demo = useMemo(() => buildDemoData(DEMO_SEED), []);
+  const { data, connected } = useMetrikaSummary();
+
+  if (connected && data?.ages?.length) {
+    return (
+      <>
+        <WidgetHeader title="Возраст аудитории" badge="👥" badgeBg="#64748b" source="metrika" />
+        <VerticalBars data={data.ages.map((a: any) => ({ label: a.label, value: a.visits }))} />
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>визиты за 30 дней · Яндекс Метрика</div>
+      </>
+    );
+  }
+
   return (
     <>
       <WidgetHeader title="Возраст аудитории" badge="👥" badgeBg="#64748b" />
       <VerticalBars data={demo.demographics} />
       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>по данным рекламных кабинетов · демо</div>
+    </>
+  );
+}
+
+export function AdGeoWidget() {
+  const { data, connected } = useMetrikaSummary();
+
+  if (connected && data?.geo?.length) {
+    const max = Math.max(...data.geo.map((g: any) => g.visits)) || 1;
+    return (
+      <>
+        <WidgetHeader title="География аудитории" badge="🌐" badgeBg="#0ea5e9" source="metrika" />
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {data.geo.slice(0, 7).map((g: any) => (
+            <div key={g.name}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>{fmtInt(g.visits)}</span>
+              </div>
+              <ProgressBar value={g.visits} max={max} color="#0ea5e9" />
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>визиты за 30 дней · Яндекс Метрика</div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <WidgetHeader title="География аудитории" badge="🌐" badgeBg="#0ea5e9" />
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {[
+          { name: "Россия", visits: 8120 },
+          { name: "Беларусь", visits: 640 },
+          { name: "Казахстан", visits: 410 },
+          { name: "Украина", visits: 230 },
+          { name: "Германия", visits: 95 },
+        ].map((g) => {
+          const max = 8120;
+          return (
+            <div key={g.name}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>{fmtInt(g.visits)}</span>
+              </div>
+              <ProgressBar value={g.visits} max={max} color="#0ea5e9" />
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>демо</div>
     </>
   );
 }
