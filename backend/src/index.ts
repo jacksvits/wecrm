@@ -135,19 +135,52 @@ app.use('/api', (_req, res, next) => {
 });
 
 // --- Пользователи онлайн (для виджета «Глобус» и счётчиков): скользящее окно 5 минут ---
-// Ключ — хост + хэш(IP + User-Agent); хранится только в памяти процесса
+// Ключ — хост + хэш(IP + User-Agent); координаты — только город (округление ~11 км), IP-геолокация через ipwho.is (без ключа, rate-limit 1 запрос/с)
 import crypto from 'crypto';
 const ONLINE_WINDOW_MS = 5 * 60 * 1000;
-const onlinePresence = new Map<string, { t: number; host: string }>();
+interface Presence { t: number; host: string; ip: string; lat: number | null; lng: number | null }
+const onlinePresence = new Map<string, Presence>();
+const geoCache = new Map<string, { lat: number; lng: number } | null>();
+const geoQueue: string[] = [];
+let geoInFlight = false;
+
 function presenceKey(req: express.Request): string {
   const ip = ((req.headers['x-forwarded-for'] as string) || '').split(',')[0].trim() || req.socket.remoteAddress || '';
   const ua = (req.headers['user-agent'] as string) || '';
   return crypto.createHash('md5').update(ip + '|' + ua).digest('hex').slice(0, 16);
 }
+function clientIp(req: express.Request): string {
+  return ((req.headers['x-forwarded-for'] as string) || '').split(',')[0].trim() || req.socket.remoteAddress || '';
+}
+function isPrivateIp(ip: string): boolean {
+  return /^(10\.|192\.168\.|127\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|::1|localhost|fc|fd|fe80)/i.test(ip);
+}
+async function geoWorker() {
+  if (geoInFlight) return;
+  const ip = geoQueue.shift();
+  if (!ip) return;
+  geoInFlight = true;
+  try {
+    const r = await fetch(`https://ipwho.is/${ip}?fields=success,latitude,longitude`);
+    const d: any = await r.json();
+    if (d && d.success && typeof d.latitude === 'number' && typeof d.longitude === 'number') {
+      geoCache.set(ip, { lat: Math.round(d.latitude * 10) / 10, lng: Math.round(d.longitude * 10) / 10 });
+    } else {
+      geoCache.set(ip, null);
+    }
+  } catch { geoCache.set(ip, null); }
+  geoInFlight = false;
+}
+setInterval(geoWorker, 1100).unref();
+
 app.use('/api', (req, _res, next) => {
   if (req.method === 'GET') {
     const host = (req.headers.host as string) || 'unknown';
-    onlinePresence.set(presenceKey(req), { t: Date.now(), host });
+    const ip = clientIp(req);
+    const key = presenceKey(req);
+    const prev = onlinePresence.get(key);
+    onlinePresence.set(key, { t: Date.now(), host, ip, lat: prev?.lat ?? null, lng: prev?.lng ?? null });
+    if (!geoCache.has(ip) && !geoQueue.includes(ip) && !isPrivateIp(ip)) geoQueue.push(ip);
   }
   next();
 });
@@ -156,15 +189,19 @@ setInterval(() => {
   for (const [k, v] of onlinePresence) if (v.t < cutoff) onlinePresence.delete(k);
 }, 60 * 1000).unref();
 
-// Публичный счётчик онлайн-пользователей (посетители и пользователи всех сайтов)
+// Публичный счётчик онлайн-пользователей (посетители и пользователи всех сайтов) + точки для глобуса
 app.get('/api/online-users', (_req, res) => {
   const cutoff = Date.now() - ONLINE_WINDOW_MS;
   const perHost: Record<string, number> = {};
+  const points: { lat: number; lng: number }[] = [];
   for (const [, v] of onlinePresence) {
     if (v.t < cutoff) continue;
     perHost[v.host] = (perHost[v.host] || 0) + 1;
+    const geo = geoCache.get(v.ip);
+    if (geo) { v.lat = geo.lat; v.lng = geo.lng; }
+    if (v.lat != null && v.lng != null) points.push({ lat: v.lat, lng: v.lng });
   }
-  res.json({ total: Object.values(perHost).reduce((a: number, b: number) => a + b, 0), perHost, windowSec: ONLINE_WINDOW_MS / 1000 });
+  res.json({ total: Object.values(perHost).reduce((a: number, b: number) => a + b, 0), perHost, points, windowSec: ONLINE_WINDOW_MS / 1000 });
 });
 app.use('/api/tochka-acquiring/webhook', express.text({ type: () => true, limit: '64kb' }));
 app.use(express.json({ limit: '10mb' }));
