@@ -65,7 +65,7 @@ export default function AdBlocks() {
         <button style={btnPrimary} onClick={() => setModal('new')}>+ Добавить блок</button>
       </div>
       <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-        Блоки выводятся на публичной странице новостей слева и справа от ленты. Первый блок колонки закреплён при прокрутке, остальные прокручиваются вместе с лентой.
+        Блоки выводятся внутри новости (детальная страница) слева и справа от текста. Первый блок колонки закреплён при прокрутке, остальные прокручиваются вместе с текстом.
       </div>
       {error && <div style={{ color: '#dc2626', fontSize: 14 }}>{error}</div>}
       {loading ? <div>Загрузка…</div> : (
@@ -167,7 +167,7 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
           <input type="number" value={sortOrder} onChange={e => setSortOrder(Number(e.target.value))} style={inputStyle} />
           <label style={{ fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
-            Показывать на странице новостей
+            Показывать в новостях
           </label>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={save} style={btnPrimary}>Сохранить</button>

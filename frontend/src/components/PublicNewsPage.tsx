@@ -139,7 +139,7 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
   );
 }
 
-/* ---------- Рекламные блоки по бокам ленты новостей ---------- */
+/* ---------- Рекламные блоки по бокам карточки новости (только детальная страница) ---------- */
 
 // Общие стили колонок: контейнер-грид и скрытие боковых колонок на узких экранах
 const AD_COLUMNS_CSS = `
@@ -247,7 +247,6 @@ function PublicNewsList({ consent = true }: { consent?: boolean }) {
   const [tag, setTag] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
-  const ads = useAdBlocks();
   const limit = 24;
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -283,10 +282,6 @@ function PublicNewsList({ consent = true }: { consent?: boolean }) {
         consent={consent}
       />
       <div style={{ padding: '16px 24px 40px' }}>
-        <style>{AD_COLUMNS_CSS}</style>
-        <div className="news-ad-grid">
-          <NewsAdColumn blocks={ads.left} />
-          <div>
         {/* Фильтры */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
           <select value={category} style={selectStyle} onChange={(e) => { setCategory(e.target.value); setSubcategory(''); setPage(1); }}>
@@ -357,9 +352,6 @@ function PublicNewsList({ consent = true }: { consent?: boolean }) {
             </button>
           </div>
         )}
-          </div>
-          <NewsAdColumn blocks={ads.right} />
-        </div>
       </div>
     </div>
   );
