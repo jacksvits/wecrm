@@ -23,7 +23,7 @@ import { useAuth } from "../hooks/useAuth";
 import { FinanceAnalyticsWidget } from "./accounting/FinanceAnalyticsWidget";
 import { FinanceDocumentsWidget } from "./accounting/FinanceDocumentsWidget";
 import { FinanceReconciliationWidget } from "./accounting/FinanceReconciliationWidget";
-import { AdSocialWidget, AdExpensesWidget, AdChannelsWidget, AdCacWidget, AdLeadsWidget, AdDomainsWidget, AdConversionsWidget, AdDemographicsWidget, AdGeoWidget } from "./AdStatistics";
+import { AdSocialWidget, AdExpensesWidget, AdChannelsWidget, AdCacWidget, AdLeadsWidget, AdDomainsWidget, AdConversionsWidget, AdDemographicsWidget, AdGeoWidget, AdDurationWidget, AdDepthWidget, AdBounceWidget, AdAttendanceWidget, AdSourcesDailyWidget, AdPagesWidget, AdTitlesWidget } from "./AdStatistics";
 
 type WidgetSize = "small" | "medium" | "large";
 type WidgetId = string;
@@ -59,6 +59,14 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "ad-conversions", size: "small", label: "Конверсии сайта", tab: "Рекламная статистика" },
   { id: "ad-demographics", size: "medium", label: "Возраст аудитории", tab: "Рекламная статистика" },
   { id: "ad-geo", size: "small", label: "География аудитории", tab: "Рекламная статистика" },
+  // Вовлечённость и контент (Яндекс Метрика)
+  { id: "ad-duration", size: "small", label: "Время на сайте", tab: "Рекламная статистика" },
+  { id: "ad-depth", size: "small", label: "Глубина просмотра", tab: "Рекламная статистика" },
+  { id: "ad-bounce", size: "small", label: "Отказы", tab: "Рекламная статистика" },
+  { id: "ad-attendance", size: "large", label: "Посещаемость сайта", tab: "Рекламная статистика" },
+  { id: "ad-sources-daily", size: "large", label: "Источники трафика: динамика", tab: "Рекламная статистика" },
+  { id: "ad-pages", size: "medium", label: "Просмотры URL", tab: "Рекламная статистика" },
+  { id: "ad-titles", size: "medium", label: "Заголовки страниц", tab: "Рекламная статистика" },
   { id: "widget-email-filter-log", size: "medium", label: "Журнал срабатываний почты", tab: "Основное" },
   // === Вкладка: Биллинг ===
   { id: "widget-billing-subscriptions", size: "medium", label: "Подписки пользователей", tab: "Биллинг" },
@@ -531,6 +539,20 @@ export function Director() {
         return <AdDemographicsWidget />;
       case "ad-geo":
         return <AdGeoWidget />;
+      case "ad-duration":
+        return <AdDurationWidget />;
+      case "ad-depth":
+        return <AdDepthWidget />;
+      case "ad-bounce":
+        return <AdBounceWidget />;
+      case "ad-attendance":
+        return <AdAttendanceWidget />;
+      case "ad-sources-daily":
+        return <AdSourcesDailyWidget />;
+      case "ad-pages":
+        return <AdPagesWidget />;
+      case "ad-titles":
+        return <AdTitlesWidget />;
       case "stat-beget":
         return (
           <>

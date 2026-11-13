@@ -60,12 +60,17 @@ function parseTable(data: any): { headers: string[]; rows: any[][] } {
     for (let i = 0; i < dims.length; i++) {
       if (dimensions[i] === 'ym:s:counterID' && ids.length === 1) dims[i] = ids[0];
     }
-    // metrics — массив массивов, но при одной метрике может прийти [значение]
-    const m0 = item.metrics?.[0];
-    const vals: any[] = Array.isArray(m0) ? m0 : m0 !== undefined && m0 !== null ? [m0] : [];
+    // metrics у строки — плоский массив чисел (по одному на каждую метрику)
+    const vals: any[] = Array.isArray(item.metrics) ? item.metrics : [];
     rows.push([...dims, ...vals]);
   }
   return { headers, rows };
+}
+
+// Итоговая строка запроса без измерений — data[0] (dimensions пустой)
+function totalsRow(data: any): number[] {
+  const row = (data?.data ?? []).find((item: any) => (item?.dimensions ?? []).length === 0) ?? data?.data?.[0];
+  return Array.isArray(row?.metrics) ? row.metrics : [];
 }
 
 // ---------- Настройки ----------
@@ -136,7 +141,7 @@ router.get('/status', async (_req, res) => {
       date1: 'today',
       date2: 'today',
     });
-    const visits = data?.totals?.[0]?.[0] ?? 0;
+    const visits = totalsRow(data)[0] ?? 0;
     res.json({ ok: true, counterId: firstCounter, visitsToday: visits });
   } catch (err: any) {
     console.error('[yandex-metrika] status error:', err.message);
@@ -159,46 +164,46 @@ router.get('/summary', async (_req, res) => {
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    // 1. KPI за 30 дней + предыдущие 30 дней (дельта)
-    const kpi = await metrikaRequest(s.token, {
-      ids,
-      metrics: 'ym:s:visits,ym:s:pageviews,ym:s:users',
-      date1: '30daysAgo',
-      date2: 'today',
-    });
-    const kpiPrev = await metrikaRequest(s.token, {
-      ids,
-      metrics: 'ym:s:visits,ym:s:pageviews,ym:s:users',
-      date1: '60daysAgo',
-      date2: '31daysAgo',
-    });
     const num = (v: any) => Number(v ?? 0) || 0;
-    const m = (d: any, i: number) => num(d?.totals?.[0]?.[i]);
+
+    // 1. KPI за 30 дней + предыдущие 30 дней (дельта)
+    const kpiMetrics = 'ym:s:visits,ym:s:pageviews,ym:s:users,ym:s:avgSessionDuration,ym:s:pageDepth,ym:s:bounceRate';
+    const kpi = await metrikaRequest(s.token, { ids, metrics: kpiMetrics, date1: '30daysAgo', date2: 'today' });
+    const kpiPrev = await metrikaRequest(s.token, { ids, metrics: kpiMetrics, date1: '60daysAgo', date2: '31daysAgo' });
+    const m = (d: any, i: number) => num(totalsRow(d)[i]);
     const summary = {
       visits: m(kpi, 0),
       pageviews: m(kpi, 1),
       users: m(kpi, 2),
+      avgSessionDuration: m(kpi, 3),
+      pageDepth: m(kpi, 4),
+      bounceRate: m(kpi, 5),
       visitsPrev: m(kpiPrev, 0),
       pageviewsPrev: m(kpiPrev, 1),
       usersPrev: m(kpiPrev, 2),
+      avgSessionDurationPrev: m(kpiPrev, 3),
+      pageDepthPrev: m(kpiPrev, 4),
+      bounceRatePrev: m(kpiPrev, 5),
     };
 
-    // 2. Динамика по дням (визиты/просмотры/посетители)
+    // 2. Динамика по дням (визиты/просмотры/посетители + вовлечённость)
     const dailyData = await metrikaRequest(s.token, {
       ids,
-      metrics: 'ym:s:visits,ym:s:pageviews,ym:s:users',
+      metrics: kpiMetrics,
       dimensions: 'ym:s:date',
       date1: '30daysAgo',
       date2: 'today',
       sort: 'ym:s:date',
       limit: 100,
     });
-    const dailyTable = parseTable(dailyData);
-    const daily = dailyTable.rows.map((r) => ({
+    const daily = parseTable(dailyData).rows.map((r) => ({
       date: String(r[0] ?? ''),
       visits: num(r[1]),
       pageviews: num(r[2]),
       users: num(r[3]),
+      avgSessionDuration: num(r[4]),
+      pageDepth: num(r[5]),
+      bounceRate: num(r[6]),
     }));
 
     // 3. По доменам/счётчикам (если счётчиков несколько)
@@ -261,7 +266,60 @@ router.get('/summary', async (_req, res) => {
     });
     const geo = parseTable(geoData).rows.map((r) => ({ name: String(r[0] ?? '—'), visits: num(r[1]) }));
 
-    const result = { summary, daily, perCounter, sources, ages, geo, fetchedAt: new Date().toISOString() };
+    // 7. Источники трафика по дням (динамика, топ-5 источников)
+    const srcDailyData = await metrikaRequest(s.token, {
+      ids,
+      metrics: 'ym:s:visits',
+      dimensions: 'ym:s:date,ym:s:lastTrafficSource',
+      date1: '30daysAgo',
+      date2: 'today',
+      sort: 'ym:s:date',
+      limit: 1000,
+    });
+    const srcRows = parseTable(srcDailyData).rows; // [date, source, visits]
+    const srcTotals = new Map<string, number>();
+    for (const r of srcRows) srcTotals.set(String(r[1] ?? '—'), (srcTotals.get(String(r[1] ?? '—')) ?? 0) + num(r[2]));
+    const topSources = [...srcTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map((e) => e[0]);
+    const srcDates = [...new Set(srcRows.map((r) => String(r[0])))].sort();
+    const srcIndex = new Map(topSources.map((name, i) => [name, i]));
+    const dateIndex = new Map(srcDates.map((d, i) => [d, i]));
+    const matrix = topSources.map(() => srcDates.map(() => 0));
+    for (const r of srcRows) {
+      const si = srcIndex.get(String(r[1] ?? '—'));
+      const di = dateIndex.get(String(r[0]));
+      if (si === undefined || di === undefined) continue;
+      matrix[si][di] = num(r[2]);
+    }
+    const sourcesDaily = {
+      dates: srcDates,
+      series: topSources.map((name, i) => ({ name, values: matrix[i] })),
+    };
+
+    // 8. Просмотры URL
+    const pagesData = await metrikaRequest(s.token, {
+      ids,
+      metrics: 'ym:pv:pageviews',
+      dimensions: 'ym:pv:URL',
+      date1: '30daysAgo',
+      date2: 'today',
+      sort: '-ym:pv:pageviews',
+      limit: 10,
+    });
+    const pages = parseTable(pagesData).rows.map((r) => ({ url: String(r[0] ?? '—'), views: num(r[1]) }));
+
+    // 9. Заголовки страниц
+    const titlesData = await metrikaRequest(s.token, {
+      ids,
+      metrics: 'ym:pv:pageviews',
+      dimensions: 'ym:pv:title',
+      date1: '30daysAgo',
+      date2: 'today',
+      sort: '-ym:pv:pageviews',
+      limit: 10,
+    });
+    const titles = parseTable(titlesData).rows.map((r) => ({ title: String(r[0] ?? '—'), views: num(r[1]) }));
+
+    const result = { summary, daily, perCounter, sources, ages, geo, sourcesDaily, pages, titles, fetchedAt: new Date().toISOString() };
     setCached(cacheKey, result);
     res.json(result);
   } catch (err: any) {

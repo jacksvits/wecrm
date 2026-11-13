@@ -563,3 +563,350 @@ export function AdGeoWidget() {
     </>
   );
 }
+
+
+// ---------- Группированные столбцы по дням (стиль Метрики) ----------
+const METRIKA_SERIES_COLORS = ["#7b61ff", "#ff4fa3", "#00b8a9", "#ff9800", "#2196f3"];
+
+function GroupedBars({ dates, series, height = 150 }: {
+  dates: string[];
+  series: { name: string; values: number[]; color: string }[];
+  height?: number;
+}) {
+  const w = 320;
+  const h = height;
+  const padB = 14;
+  const plotH = h - padB;
+  const max = Math.max(...series.flatMap((s) => s.values)) * 1.15 || 1;
+  const step = w / Math.max(dates.length, 1);
+  const groupW = step * 0.66;
+  const bw = groupW / series.length;
+  // полосы выходных (светло-серые вертикальные)
+  const bands: number[] = [];
+  dates.forEach((d, i) => {
+    const day = new Date(d + "T00:00:00").getDay();
+    if (day === 0 || day === 6) bands.push(i);
+  });
+  return (
+    <div>
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: "100%", height: h, display: "block" }}>
+        {bands.map((i) => (
+          <rect key={i} x={i * step} y={0} width={step} height={plotH} fill="#000" opacity={0.035} />
+        ))}
+        {dates.map((_, i) => (
+          <g key={i}>
+            {series.map((s, si) => {
+              const v = s.values[i] ?? 0;
+              const bh = (v / max) * plotH;
+              return (
+                <rect key={si} x={(i * step + (step - groupW) / 2 + si * bw).toFixed(1)} y={(plotH - bh).toFixed(1)}
+                  width={Math.max(bw - 0.6, 0.8).toFixed(1)} height={bh.toFixed(1)} rx={1} fill={s.color} opacity={0.9} />
+              );
+            })}
+          </g>
+        ))}
+        {dates.map((d, i) =>
+          i % Math.ceil(dates.length / 6) === 0 ? (
+            <text key={d} x={(i * step + step / 2).toFixed(1)} y={h - 2} fontSize={8} fill="var(--text-muted)" textAnchor="middle">
+              {d.slice(8, 10)}.{d.slice(5, 7)}
+            </text>
+          ) : null
+        )}
+      </svg>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 6 }}>
+        {series.map((s) => (
+          <span key={s.name} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-secondary)" }}>
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: s.color }} />
+            {s.name}
+            <b style={{ color: "var(--text-primary)" }}>{fmtInt(s.values.reduce((a, b) => a + b, 0))}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Таблица (Просмотры URL / Заголовки) ----------
+function StatTable({ rows, leftHeader }: { rows: { label: string; value: number }[]; leftHeader: string }) {
+  return (
+    <div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 8,
+          padding: "6px 4px",
+          fontSize: 11,
+          color: "var(--text-muted)",
+          borderBottom: "1px solid var(--border-color)",
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{leftHeader}</span>
+        <span style={{ whiteSpace: "nowrap" }}>Просмотры</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {rows.map((r, i) => (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "5px 4px",
+              borderBottom: i === rows.length - 1 ? "none" : "1px solid var(--border-color)",
+            }}
+          >
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: METRIKA_SERIES_COLORS[i % 5], opacity: 0.75, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: "var(--text-primary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.label}>
+              {r.label}
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", whiteSpace: "nowrap" }}>{fmtInt(r.value)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------- KPI-виджет вовлечённости (Время / Глубина / Отказы) ----------
+function EngagementKpi({ title, badge, badgeBg, value, delta, invert, spark, color }: {
+  title: string;
+  badge: string;
+  badgeBg: string;
+  value: string;
+  delta: string;
+  invert?: boolean;
+  spark: number[];
+  color: string;
+}) {
+  const good = invert ? delta.startsWith("-") : delta.startsWith("+");
+  return (
+    <>
+      <WidgetHeader title={title} badge={badge} badgeBg={badgeBg} source="metrika" />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 26, fontWeight: 800, color: "var(--text-primary)", letterSpacing: -0.5 }}>{value}</span>
+        {delta && (
+          <span style={{ fontSize: 12, fontWeight: 600, color: good ? "#16a34a" : "#dc2626" }}>
+            {delta.startsWith("-") ? "▼" : "▲"} {delta.replace(/^[-+]/, "")}
+          </span>
+        )}
+      </div>
+      <Sparkline data={spark} color={color} height={36} />
+    </>
+  );
+}
+
+function fmtDuration(sec: number): string {
+  if (!sec) return "0 с";
+  if (sec < 60) return `${Math.round(sec)} с`;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")} мин`;
+}
+
+// ---------- Виджеты (в стиле дашборда Метрики) ----------
+export function AdDurationWidget() {
+  const { data, connected } = useMetrikaSummary();
+  const demo = useDemoEngagement();
+  if (connected && data?.summary) {
+    const s = data.summary;
+    const spark = (data.daily ?? []).map((d: any) => d.avgSessionDuration).filter((v: number) => v > 0);
+    return (
+      <EngagementKpi
+        title="Время на сайте"
+        badge="⏱"
+        badgeBg="#7b61ff"
+        value={fmtDuration(s.avgSessionDuration)}
+        delta={pctDelta(s.avgSessionDuration, s.avgSessionDurationPrev)}
+        spark={spark.length > 1 ? spark : [s.avgSessionDuration || 1]}
+        color="#7b61ff"
+      />
+    );
+  }
+  return <EngagementKpi title="Время на сайте" badge="⏱" badgeBg="#7b61ff" value="55 с" delta="+59,2%" spark={demo} color="#7b61ff" />;
+}
+
+export function AdDepthWidget() {
+  const { data, connected } = useMetrikaSummary();
+  const demo = useDemoEngagement();
+  if (connected && data?.summary) {
+    const s = data.summary;
+    const spark = (data.daily ?? []).map((d: any) => d.pageDepth).filter((v: number) => v > 0);
+    return (
+      <EngagementKpi
+        title="Глубина просмотра"
+        badge="↕"
+        badgeBg="#ff4fa3"
+        value={s.pageDepth ? s.pageDepth.toFixed(2).replace(".", ",") : "0"}
+        delta={pctDelta(s.pageDepth, s.pageDepthPrev)}
+        spark={spark.length > 1 ? spark : [s.pageDepth || 1]}
+        color="#ff4fa3"
+      />
+    );
+  }
+  return <EngagementKpi title="Глубина просмотра" badge="↕" badgeBg="#ff4fa3" value="1,70" delta="+43,26%" spark={demo} color="#ff4fa3" />;
+}
+
+export function AdBounceWidget() {
+  const { data, connected } = useMetrikaSummary();
+  const demo = useDemoEngagement();
+  if (connected && data?.summary) {
+    const s = data.summary;
+    const spark = (data.daily ?? []).map((d: any) => d.bounceRate).filter((v: number) => v > 0);
+    return (
+      <EngagementKpi
+        title="Отказы"
+        badge="✕"
+        badgeBg="#00b8a9"
+        value={s.bounceRate ? `${s.bounceRate.toFixed(2).replace(".", ",")}%` : "0%"}
+        delta={pctDelta(s.bounceRate, s.bounceRatePrev)}
+        invert
+        spark={spark.length > 1 ? spark : [s.bounceRate || 1]}
+        color="#00b8a9"
+      />
+    );
+  }
+  return <EngagementKpi title="Отказы" badge="✕" badgeBg="#00b8a9" value="63,09%" delta="-22,73%" invert spark={demo} color="#00b8a9" />;
+}
+
+function useDemoEngagement(): number[] {
+  return useMemo(() => genSeries(DEMO_SEED + 30, 30, 30, 90), []);
+}
+
+export function AdAttendanceWidget() {
+  const { data, connected } = useMetrikaSummary();
+  if (connected && data?.daily?.length) {
+    const daily: any[] = data.daily;
+    return (
+      <>
+        <WidgetHeader title="Посещаемость сайта" badge="📶" badgeBg="#7b61ff" source="metrika" />
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Визиты · Посетители · Просмотры</div>
+        <GroupedBars
+          dates={daily.map((d) => d.date)}
+          series={[
+            { name: "Визиты", values: daily.map((d) => d.visits), color: METRIKA_SERIES_COLORS[0] },
+            { name: "Посетители", values: daily.map((d) => d.users), color: METRIKA_SERIES_COLORS[1] },
+            { name: "Просмотры", values: daily.map((d) => d.pageviews), color: METRIKA_SERIES_COLORS[2] },
+          ]}
+        />
+      </>
+    );
+  }
+  const dates = useMemo(
+    () => Array.from({ length: 30 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - 29 + i); return d.toISOString().slice(0, 10); }),
+    []
+  );
+  return (
+    <>
+      <WidgetHeader title="Посещаемость сайта" badge="📶" badgeBg="#7b61ff" />
+      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Визиты · Посетители · Просмотры</div>
+      <GroupedBars
+        dates={dates}
+        series={[
+          { name: "Визиты", values: genSeries(DEMO_SEED + 31, 30, 5, 60), color: METRIKA_SERIES_COLORS[0] },
+          { name: "Посетители", values: genSeries(DEMO_SEED + 32, 30, 4, 55), color: METRIKA_SERIES_COLORS[1] },
+          { name: "Просмотры", values: genSeries(DEMO_SEED + 33, 30, 8, 90), color: METRIKA_SERIES_COLORS[2] },
+        ]}
+      />
+    </>
+  );
+}
+
+export function AdSourcesDailyWidget() {
+  const { data, connected } = useMetrikaSummary();
+  if (connected && data?.sourcesDaily?.series?.length) {
+    const sd = data.sourcesDaily;
+    return (
+      <>
+        <WidgetHeader title="Источники трафика" badge="≋" badgeBg="#ff4fa3" source="metrika" />
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Визиты</div>
+        <MultiLineChart
+          seriesList={sd.series.map((s: any) => s.values)}
+          labels={sd.series.map((s: any) => s.name)}
+          colors={sd.series.map((_: any, i: number) => METRIKA_SERIES_COLORS[i % 5])}
+        />
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 2 }}>
+          {sd.series.map((s: any, i: number) => (
+            <span key={s.name} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-secondary)" }}>
+              <span style={{ width: 9, height: 9, borderRadius: 2, background: METRIKA_SERIES_COLORS[i % 5] }} />
+              {s.name}
+              <b style={{ color: "var(--text-primary)" }}>{fmtInt(s.values.reduce((a: number, b: number) => a + b, 0))}</b>
+            </span>
+          ))}
+        </div>
+      </>
+    );
+  }
+  const demo = useMemo(() => {
+    const names = ["Прямые заходы", "Поисковые системы", "Переходы по ссылкам"];
+    return names.map((name, i) => ({ name, values: genSeries(DEMO_SEED + 40 + i, 30, 2, 60 - i * 15) }));
+  }, []);
+  return (
+    <>
+      <WidgetHeader title="Источники трафика" badge="≋" badgeBg="#ff4fa3" />
+      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Визиты</div>
+      <MultiLineChart
+        seriesList={demo.map((s) => s.values)}
+        labels={demo.map((s) => s.name)}
+        colors={METRIKA_SERIES_COLORS.slice(0, 3)}
+      />
+    </>
+  );
+}
+
+export function AdPagesWidget() {
+  const { data, connected } = useMetrikaSummary();
+  if (connected && data?.pages?.length) {
+    return (
+      <>
+        <WidgetHeader title="Просмотры URL" badge="🔗" badgeBg="#00b8a9" source="metrika" />
+        <StatTable rows={data.pages.map((p: any) => ({ label: p.url, value: p.views }))} leftHeader="Адрес страницы" />
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>за 30 дней · Яндекс Метрика</div>
+      </>
+    );
+  }
+  return (
+    <>
+      <WidgetHeader title="Просмотры URL" badge="🔗" badgeBg="#00b8a9" />
+      <StatTable
+        rows={[
+          { label: "welans.ru/", value: 1085 },
+          { label: "welans.cc/", value: 335 },
+          { label: "welans.click/", value: 205 },
+          { label: "welans.ru/news", value: 110 },
+          { label: "welans.click/s/70eb08946d28219b0cab…", value: 31 },
+        ]}
+        leftHeader="Адрес страницы"
+      />
+      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>демо</div>
+    </>
+  );
+}
+
+export function AdTitlesWidget() {
+  const { data, connected } = useMetrikaSummary();
+  if (connected && data?.titles?.length) {
+    return (
+      <>
+        <WidgetHeader title="Заголовки страниц" badge="📰" badgeBg="#ff9800" source="metrika" />
+        <StatTable rows={data.titles.map((t: any) => ({ label: t.title, value: t.views }))} leftHeader="Заголовок страницы" />
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>за 30 дней · Яндекс Метрика</div>
+      </>
+    );
+  }
+  return (
+    <>
+      <WidgetHeader title="Заголовки страниц" badge="📰" badgeBg="#ff9800" />
+      <StatTable
+        rows={[
+          { label: "WeLANS CRM", value: 1640 },
+          { label: "WeLANS - Файловый менеджер", value: 1109 },
+          { label: "WeLANS - IT Consulting", value: 464 },
+          { label: "WeLANS - Новости", value: 19 },
+        ]}
+        leftHeader="Заголовок страницы"
+      />
+      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>демо</div>
+    </>
+  );
+}
