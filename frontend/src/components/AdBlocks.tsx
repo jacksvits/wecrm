@@ -162,17 +162,17 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
             <option value="banner">Баннер — картинки с ротацией</option>
             <option value="script">Скрипт — вставка HTML/JS-кода</option>
           </select>
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Размещение</label>
+          <select value={position} onChange={e => setPosition(e.target.value as 'left' | 'right')} style={inputStyle}>
+            <option value="left">Слева</option>
+            <option value="right">Справа</option>
+          </select>
           {blockType === 'script' ? (<>
             <label style={{ fontSize: 14, fontWeight: 500 }}>Скрипт (HTML/JS)</label>
             <textarea value={script} onChange={e => setScript(e.target.value)} style={{ ...inputStyle, minHeight: 140, fontFamily: 'monospace', fontSize: 12, resize: 'vertical' }} placeholder="<script>…</script>" />
           </>) : (<>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Ссылка по клику</label>
           <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} style={inputStyle} placeholder="https://… или /shop — необязательно" />
-          <label style={{ fontSize: 14, fontWeight: 500 }}>Размещение</label>
-          <select value={position} onChange={e => setPosition(e.target.value as 'left' | 'right')} style={inputStyle}>
-            <option value="left">Слева</option>
-            <option value="right">Справа</option>
-          </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Размер блока</label>
           <select value={size} onChange={e => setSize(e.target.value as 'small' | 'medium' | 'big')} style={inputStyle}>
             <option value="small">Маленький — 240×240</option>
