@@ -3,6 +3,7 @@ import { Files } from './Files';
 import { useBrandLogo } from '../lib/branding';
 import { usePageSeo } from '../lib/usePageTitle';
 import PublicAuthArea from './PublicAuthArea';
+import PublicNavMenu from './PublicNavMenu';
 
 // Публичная страница «Файлы» для welans.click — без интерфейса CRM (сайдбара и меню).
 // Простая шапка: логотип слева (ссылка на welans.ru), блок «Войти»/аватарка справа.
@@ -26,7 +27,8 @@ export default function PublicFiles() {
           <img src={brandLogo} alt="WeLANS" style={{ height: isMobile ? 28 : 34, maxWidth: 140, objectFit: 'contain' }} />
         </a>
         <div style={{ flex: 1, minWidth: 0 }} />
-        <PublicAuthArea mobile={isMobile} />
+        <PublicNavMenu />
+      <PublicAuthArea mobile={isMobile} />
       </div>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: isMobile ? '10px 12px 12px' : '12px 16px 16px' }}>
         <Files publicMode />

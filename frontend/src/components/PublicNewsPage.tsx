@@ -11,6 +11,7 @@ import { usePageSeo } from '../lib/usePageTitle';
 import { makeDescription } from '../lib/stripHtml';
 import { applyPageMeta, restorePageMeta } from '../lib/seo';
 import PublicAuthArea from './PublicAuthArea';
+import PublicNavMenu from './PublicNavMenu';
 
 function stripHtml(html: string): string {
   const div = document.createElement('div');
@@ -60,6 +61,7 @@ function PublicNewsHeader({ query, onSearch, onSubmit, consent = true }: { query
           fontSize: 14, outline: 'none',
         }}
       />
+      <PublicNavMenu />
       <PublicAuthArea />
       {consent && <CookieConsent />}
     </header>

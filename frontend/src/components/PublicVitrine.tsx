@@ -4,6 +4,7 @@ import { useBrandLogo } from '../lib/branding';
 import { CookieConsent } from './CookieConsent';
 import { usePageSeo } from '../lib/usePageTitle';
 import PublicAuthArea from './PublicAuthArea';
+import PublicNavMenu from './PublicNavMenu';
 
 // Публичная страница витрины (каталог) — доступна без авторизации.
 // Открывается по адресу /vitrine, в т.ч. по ссылке «Каталог» с лендинга /welans/.
@@ -27,7 +28,8 @@ export default function PublicVitrine() {
           placeholder="Поиск по каталогу…"
           style={{ flex: 1, minWidth: 0, padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border-color, #e0e0e0)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
         />
-        <PublicAuthArea />
+        <PublicNavMenu />
+      <PublicAuthArea />
       </div>
       <Vitrine search={q} />
       <CookieConsent />
