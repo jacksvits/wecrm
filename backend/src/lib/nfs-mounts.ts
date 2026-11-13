@@ -209,10 +209,11 @@ export const nfsDirForTab = (tabKey: string): string | undefined => dirByTab.get
 export const nfsFolderForTab = (tabKey: string): NfsFolder | undefined => folderByTab.get(tabKey);
 
 // Видимость папки пользователю: админ видит всё; пустой список ролей = все
-export const folderVisibleTo = (folder: NfsFolder, user: { role?: string; roleId?: string }): boolean => {
+export const folderVisibleTo = (folder: NfsFolder, user?: { role?: string; roleId?: string }): boolean => {
+  const u = user || {};
   if (!folder.allowedRoles.length) return true;
-  if (user.role === 'admin') return true;
-  return !!user.roleId && folder.allowedRoles.includes(user.roleId);
+  if (u.role === 'admin') return true;
+  return !!u.roleId && folder.allowedRoles.includes(u.roleId);
 };
 
 // Ключ вкладки из названия
