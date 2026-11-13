@@ -154,30 +154,27 @@ const COMMENT_QUILL_MODULES = {
 // Текст без HTML-тегов (валидация непустоты)
 const commentPlainText = (html: string) => html.replace(/<[^>]*>/g, '').trim();
 
-/** head-скрипты script-блоков: виджеты, требующие размещения в <head> страницы */
-function useAdHeadScripts() {
-  useEffect(() => {
-    let cancelled = false;
-    api.adBlocks.list().then(blocks => {
-      if (cancelled) return;
-      (blocks || [])
-        .filter((b: AdBlock) => b.type === 'script' && b.headScript)
-        .forEach((b: AdBlock) => {
-          const marker = `adblock-head-${b.id}`;
-          if (document.head.querySelector(`[data-adblock="${marker}"]`)) return;
-          const holder = document.createElement('div');
-          holder.innerHTML = b.headScript || '';
-          Array.from(holder.querySelectorAll('script')).forEach(oldScript => {
-            const ns = document.createElement('script');
-            Array.from(oldScript.attributes).forEach(a => ns.setAttribute(a.name, a.value));
-            ns.textContent = oldScript.textContent || '';
-            ns.dataset.adblock = marker;
-            document.head.appendChild(ns);
-          });
-        });
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+/** Инжект head-скрипта в document.head (script-теги пересоздаются для исполнения).
+ *  Возвращает промис, резолвящийся после загрузки src-скриптов — нужен порядок:
+ *  библиотеки из <head> (openapi.js VK и т.п.) должны загрузиться ДО скрипта блока */
+function injectHeadScript(html: string, marker: string): Promise<void> {
+  if (document.head.querySelector(`[data-adblock="${marker}"]`)) return Promise.resolve();
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  const jobs = Array.from(holder.querySelectorAll('script')).map(oldScript => new Promise<void>(resolve => {
+    const ns = document.createElement('script');
+    Array.from(oldScript.attributes).forEach(a => ns.setAttribute(a.name, a.value));
+    ns.textContent = oldScript.textContent || '';
+    ns.dataset.adblock = marker;
+    if (ns.src) {
+      ns.onload = () => resolve();
+      ns.onerror = () => resolve(); // не блокируем страницу при ошибке CDN
+    } else {
+      resolve();
+    }
+    document.head.appendChild(ns);
+  }));
+  return Promise.all(jobs).then(() => undefined);
 }
 
 /* ---------- Рекламные блоки по бокам карточки новости (только детальная страница) ---------- */
@@ -232,12 +229,26 @@ function NewsAdScript({ block }: { block: AdBlock }) {
   useEffect(() => {
     const root = ref.current;
     if (!root) return;
-    root.querySelectorAll('script').forEach((oldScript) => {
-      const s = document.createElement('script');
-      Array.from(oldScript.attributes).forEach(a => s.setAttribute(a.name, a.value));
-      s.textContent = oldScript.textContent || '';
-      oldScript.replaceWith(s);
-    });
+    let cancelled = false;
+    // Сначала head-скрипты ВСЕХ script-блоков (openapi.js VK и т.п.), потом скрипт блока —
+    // иначе инициализация виджета может сработать раньше загрузки библиотеки (VK is not defined)
+    (async () => {
+      try {
+        const blocks: AdBlock[] = await api.adBlocks.list();
+        if (cancelled) return;
+        await Promise.all((blocks || [])
+          .filter((b: AdBlock) => b.type === 'script' && b.headScript)
+          .map((b: AdBlock) => injectHeadScript(b.headScript || '', `adblock-head-${b.id}`)));
+      } catch { /* head-скрипты — best effort, не блокируем блок */ }
+      if (cancelled) return;
+      root.querySelectorAll('script').forEach((oldScript) => {
+        const s = document.createElement('script');
+        Array.from(oldScript.attributes).forEach(a => s.setAttribute(a.name, a.value));
+        s.textContent = oldScript.textContent || '';
+        oldScript.replaceWith(s);
+      });
+    })();
+    return () => { cancelled = true; };
   }, [html]);
   return (
     <div
@@ -451,7 +462,6 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
   const [commentBusy, setCommentBusy] = useState(false);
   const pubUser = usePublicUser();
   const ads = useAdBlocks();
-  useAdHeadScripts();
   // Авторизован через CRM (мост auth-bridge с токеном) — комментарии доступны
   const canComment = !!pubUser;
 
