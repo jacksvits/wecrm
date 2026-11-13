@@ -60,7 +60,10 @@ function parseTable(data: any): { headers: string[]; rows: any[][] } {
     for (let i = 0; i < dims.length; i++) {
       if (dimensions[i] === 'ym:s:counterID' && ids.length === 1) dims[i] = ids[0];
     }
-    rows.push([...dims, ...(item.metrics?.[0] ?? [])]);
+    // metrics — массив массивов, но при одной метрике может прийти [значение]
+    const m0 = item.metrics?.[0];
+    const vals: any[] = Array.isArray(m0) ? m0 : m0 !== undefined && m0 !== null ? [m0] : [];
+    rows.push([...dims, ...vals]);
   }
   return { headers, rows };
 }
