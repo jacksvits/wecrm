@@ -23,7 +23,7 @@ import { useAuth } from "../hooks/useAuth";
 import { FinanceAnalyticsWidget } from "./accounting/FinanceAnalyticsWidget";
 import { FinanceDocumentsWidget } from "./accounting/FinanceDocumentsWidget";
 import { FinanceReconciliationWidget } from "./accounting/FinanceReconciliationWidget";
-import { AdStatistics } from "./AdStatistics";
+import { AdSocialWidget, AdExpensesWidget, AdChannelsWidget, AdCacWidget, AdLeadsWidget, AdDomainsWidget, AdConversionsWidget, AdDemographicsWidget } from "./AdStatistics";
 
 type WidgetSize = "small" | "medium" | "large";
 type WidgetId = string;
@@ -49,6 +49,15 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "widget-deals", size: "medium", label: "Активные сделки", tab: "Основное" },
   { id: "widget-history", size: "medium", label: "История", tab: "Основное" },
   { id: "widget-push-status", size: "medium", label: "Push-уведомления пользователей", tab: "Основное" },
+  // === Вкладка: Рекламная статистика ===
+  { id: "ad-social", size: "medium", label: "Подписчики и охват", tab: "Рекламная статистика" },
+  { id: "ad-expenses", size: "medium", label: "Расходы на рекламу и трафик сайта", tab: "Рекламная статистика" },
+  { id: "ad-channels", size: "medium", label: "Каналы: клики", tab: "Рекламная статистика" },
+  { id: "ad-cac", size: "small", label: "Стоимость привлечения (CAC)", tab: "Рекламная статистика" },
+  { id: "ad-leads", size: "small", label: "Лиды за месяц", tab: "Рекламная статистика" },
+  { id: "ad-domains", size: "medium", label: "Посещаемость по доменам", tab: "Рекламная статистика" },
+  { id: "ad-conversions", size: "small", label: "Конверсии сайта", tab: "Рекламная статистика" },
+  { id: "ad-demographics", size: "medium", label: "Возраст аудитории", tab: "Рекламная статистика" },
   { id: "widget-email-filter-log", size: "medium", label: "Журнал срабатываний почты", tab: "Основное" },
   // === Вкладка: Биллинг ===
   { id: "widget-billing-subscriptions", size: "medium", label: "Подписки пользователей", tab: "Биллинг" },
@@ -503,6 +512,22 @@ export function Director() {
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Онлайн</div>
           </>
         );
+      case "ad-social":
+        return <AdSocialWidget />;
+      case "ad-expenses":
+        return <AdExpensesWidget />;
+      case "ad-channels":
+        return <AdChannelsWidget />;
+      case "ad-cac":
+        return <AdCacWidget />;
+      case "ad-leads":
+        return <AdLeadsWidget />;
+      case "ad-domains":
+        return <AdDomainsWidget />;
+      case "ad-conversions":
+        return <AdConversionsWidget />;
+      case "ad-demographics":
+        return <AdDemographicsWidget />;
       case "stat-beget":
         return (
           <>
@@ -987,9 +1012,6 @@ export function Director() {
       </div>
 
       {!showWidgetSettings ? (
-        activeTab === "Рекламная статистика" ? (
-          <AdStatistics />
-        ) : (
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -1032,7 +1054,6 @@ export function Director() {
             ) : null}
           </DragOverlay>
         </DndContext>
-        )
       ) : showWidgetSettings ? (
         <div
           style={{
