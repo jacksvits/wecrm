@@ -53,9 +53,10 @@ function parseTable(data: any): { headers: string[]; rows: any[][] } {
   const headers = [...dimensions, ...metrics].map((h) => h.replace(/^ym:[sd]:/, ''));
   const rows: any[][] = [];
   for (const item of data?.data ?? []) {
-    const dims: any[] = (item.dimensions ?? []).map((d: any) =>
-      typeof d === 'object' && d !== null ? d?.name ?? d?.id ?? String(d) : d
-    );
+    const dims: any[] = (item.dimensions ?? []).map((d: any) => {
+      if (d && typeof d === 'object') return d?.name ?? d?.id ?? 'Прочие';
+      return d ?? 'Прочие';
+    });
     // В данных id счётчика возвращается просто числом — подставляем имя из запроса
     for (let i = 0; i < dims.length; i++) {
       if (dimensions[i] === 'ym:s:counterID' && ids.length === 1) dims[i] = ids[0];
