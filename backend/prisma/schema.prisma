@@ -1526,7 +1526,8 @@ model AdBlock {
   imageUrl  String? @map("image_url")
   linkUrl   String? @map("link_url") // ссылка по клику (внутренняя или внешняя); null — без клика
   position  String  @default("left") @map("position") // left | right — колонка страницы новостей
-  size      String  @default("small") @map("size") // small — маленький | big — большой
+  size      String  @default("small") @map("size") // small | medium | big — размер блока
+  images    String? @map("images") // JSON-массив URL картинок: ротация с анимацией при показе
   sortOrder Int     @default(0) @map("sort_order")
   isActive  Boolean @default(true) @map("is_active")
 

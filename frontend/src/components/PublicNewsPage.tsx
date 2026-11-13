@@ -1,7 +1,7 @@
 // Публичные страницы новостей для гостей: /news (список) и /news/:id (детальная).
 // Чтение доступно без авторизации; лайки и комментарии — только для
 // авторизованных пользователей (гостю предлагаем войти).
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { safeHtml } from '../lib/safeHtml';
@@ -144,7 +144,7 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
 // Общие стили колонок: контейнер-грид и скрытие боковых колонок на узких экранах
 const AD_COLUMNS_CSS = `
   /* Средняя колонка — по ширине карточки новости: реклама вплотную к тексту с обеих сторон */
-  .news-ad-grid { display: grid; grid-template-columns: 330px auto 330px; gap: 10px; justify-content: center; align-items: start; }
+  .news-ad-grid { display: grid; grid-template-columns: 240px auto 240px; gap: 10px; justify-content: center; align-items: start; }
   .news-ad-main { width: 800px; max-width: 100%; }
   .news-ad-col { display: flex; flex-direction: column; gap: 14px; }
   .news-ad-col > .news-ad-sticky { position: sticky; top: 68px; }
@@ -179,12 +179,28 @@ function NewsAdColumn({ blocks }: { blocks: AdBlock[] }) {
   );
 }
 
-/** Карточка рекламного блока: маленький — компактная плитка, большой — с заголовком и кнопкой */
+/** Карточка рекламного блока: только картинка(ы) с ротацией и fade-анимацией */
 function NewsAdCard({ block }: { block: AdBlock }) {
   const navigate = useNavigate();
   const [hover, setHover] = useState(false);
-  // Три размера блока пропорционально ширине 330 (×1.5 от 220-базовых): 330×330, 330×440, 330×652
-  const heights: Record<string, number> = { small: 330, medium: 440, big: 652 };
+  // Три размера блока пропорционально ширине 240: 240×240, 240×320, 240×474
+  const heights: Record<string, number> = { small: 240, medium: 320, big: 474 };
+  // Картинки блока: JSON-массив images, fallback — одиночная imageUrl
+  const images: string[] = useMemo(() => {
+    let arr: string[] = [];
+    try {
+      const parsed = block.images ? JSON.parse(block.images) : [];
+      if (Array.isArray(parsed)) arr = parsed.filter((u: any) => typeof u === 'string' && u);
+    } catch { /* ignore */ }
+    if (!arr.length && block.imageUrl) arr = [block.imageUrl];
+    return arr;
+  }, [block.images, block.imageUrl]);
+  const [imgIdx, setImgIdx] = useState(0);
+  useEffect(() => {
+    if (images.length < 2) return;
+    const t = setInterval(() => setImgIdx(i => (i + 1) % images.length), 4000);
+    return () => clearInterval(t);
+  }, [images.length]);
   const open = () => {
     if (!block.linkUrl) return;
     if (/^https?:\/\//i.test(block.linkUrl)) window.open(block.linkUrl, '_blank', 'noopener');
@@ -206,12 +222,19 @@ function NewsAdCard({ block }: { block: AdBlock }) {
         transition: 'transform .2s ease, box-shadow .2s ease',
         display: 'flex',
         flexDirection: 'column',
-        height: heights[block.size] ?? 220,
+        height: heights[block.size] ?? 240,
       }}
     >
-      {block.imageUrl
-        ? <img src={block.imageUrl} alt={block.title} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-        : <div style={{ width: '100%', height: '100%', background: 'var(--bg-hover)' }} />}
+      <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+        {images.length ? images.map((u, i) => (
+          <img key={u + i} src={u} alt={block.title} loading="lazy" style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover', display: 'block',
+            opacity: i === imgIdx ? 1 : 0,
+            transition: 'opacity .8s ease',
+          }} />
+        )) : <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-hover)' }} />}
+      </div>
     </div>
   );
 }

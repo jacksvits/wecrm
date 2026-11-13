@@ -8,7 +8,7 @@ const btnGhost: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, bo
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 };
 
 const POSITION_LABELS: Record<string, string> = { left: 'Слева', right: 'Справа' };
-const SIZE_LABELS: Record<string, string> = { small: 'Маленький (330×330)', medium: 'Средний (330×440)', big: 'Большой (330×652)' };
+const SIZE_LABELS: Record<string, string> = { small: 'Маленький (240×240)', medium: 'Средний (240×320)', big: 'Большой (240×474)' };
 
 export default function AdBlocks() {
   const [blocks, setBlocks] = useState<AdBlock[]>([]);
@@ -48,12 +48,12 @@ export default function AdBlocks() {
     await load();
   };
 
-  const onUpload = async (file: File, editing: AdBlock | 'new', setImageUrl: (v: string) => void) => {
+  const onUpload = async (file: File, editing: AdBlock | 'new', addImage: (v: string) => void) => {
     setUploading(true);
     try {
       const entityId = editing === 'new' ? `draft-${Date.now()}` : editing.id;
       const att = await api.uploads.upload(file, 'ad-block', entityId);
-      setImageUrl(att.path);
+      addImage(att.path);
     } catch (e: any) { alert(e.message || 'Ошибка загрузки'); }
     setUploading(false);
   };
@@ -65,7 +65,7 @@ export default function AdBlocks() {
         <button style={btnPrimary} onClick={() => setModal('new')}>+ Добавить блок</button>
       </div>
       <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-        Блоки выводятся внутри новости (детальная страница) слева и справа от текста. Маленький — 330×330, средний — 330×440, большой — 330×652 (пропорционально ширине 330). Первый блок колонки закреплён при прокрутке, остальные прокручиваются вместе с текстом.
+        Блоки выводятся внутри новости (детальная страница) слева и справа от текста. Маленький — 240×240, средний — 240×320, большой — 240×474 (пропорционально ширине 240). Можно загрузить несколько картинок — они будут меняться с анимацией. Первый блок колонки закреплён при прокрутке, остальные прокручиваются вместе с текстом.
       </div>
       {error && <div style={{ color: '#dc2626', fontSize: 14 }}>{error}</div>}
       {loading ? <div>Загрузка…</div> : (
@@ -76,8 +76,8 @@ export default function AdBlocks() {
                 <button style={{ ...btnGhost, padding: '0 8px' }} disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
                 <button style={{ ...btnGhost, padding: '0 8px' }} disabled={i === blocks.length - 1} onClick={() => move(i, 1)}>↓</button>
               </div>
-              {b.imageUrl
-                ? <img src={b.imageUrl} alt="" style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+              {parseImages(b.images, b.imageUrl)[0]
+                ? <img src={parseImages(b.images, b.imageUrl)[0]} alt="" style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
                 : <div style={{ width: 56, height: 40, borderRadius: 6, background: 'var(--bg-hover)', flexShrink: 0 }} />}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{b.title}</div>
@@ -102,11 +102,22 @@ export default function AdBlocks() {
   );
 }
 
+/** Картинки блока: JSON-массив images, fallback — одиночная imageUrl */
+function parseImages(images: string | null | undefined, imageUrl?: string | null): string[] {
+  let arr: string[] = [];
+  try {
+    const parsed = images ? JSON.parse(images) : [];
+    if (Array.isArray(parsed)) arr = parsed.filter((u: any) => typeof u === 'string' && u);
+  } catch { /* ignore */ }
+  if (!arr.length && imageUrl) arr = [imageUrl];
+  return arr;
+}
+
 /* ---------- Модалка рекламного блока ---------- */
 function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
   modal: AdBlock | 'new';
   uploading: boolean;
-  onUpload: (file: File, modal: AdBlock | 'new', setImageUrl: (v: string) => void) => void;
+  onUpload: (file: File, modal: AdBlock | 'new', addImage: (v: string) => void) => void;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -116,14 +127,14 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
   const [linkUrl, setLinkUrl] = useState(isNew ? '' : (b!.linkUrl || ''));
   const [position, setPosition] = useState<'left' | 'right'>(isNew ? 'left' : b!.position);
   const [size, setSize] = useState<'small' | 'big'>(isNew ? 'small' : b!.size);
-  const [imageUrl, setImageUrl] = useState(isNew ? '' : (b!.imageUrl || ''));
+  const [images, setImages] = useState<string[]>(isNew ? [] : parseImages(b!.images, b!.imageUrl));
   const [sortOrder, setSortOrder] = useState(isNew ? 0 : b!.sortOrder);
   const [isActive, setIsActive] = useState(isNew ? true : b!.isActive);
   const [error, setError] = useState('');
 
   const save = async () => {
     if (!title.trim()) { setError('Заголовок обязателен'); return; }
-    const data: Partial<AdBlock> = { title, linkUrl: linkUrl.trim() || null, position, size, imageUrl: imageUrl || null, sortOrder, isActive };
+    const data: Omit<Partial<AdBlock>, 'images'> & { images?: string[] } = { title, linkUrl: linkUrl.trim() || null, position, size, imageUrl: images[0] || null, images, sortOrder, isActive };
     try {
       if (isNew) await api.adBlocks.create(data);
       else await api.adBlocks.update(b!.id, data);
@@ -148,21 +159,27 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
           </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Размер блока</label>
           <select value={size} onChange={e => setSize(e.target.value as 'small' | 'big')} style={inputStyle}>
-            <option value="small">Маленький — 330×330</option>
-            <option value="medium">Средний — 330×440</option>
-            <option value="big">Большой — 330×652</option>
+            <option value="small">Маленький — 240×240</option>
+            <option value="medium">Средний — 240×320</option>
+            <option value="big">Большой — 240×474</option>
           </select>
-          <label style={{ fontSize: 14, fontWeight: 500 }}>Картинка</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {imageUrl
-              ? <img src={imageUrl} alt="" style={{ width: 96, height: 64, objectFit: 'cover', borderRadius: 8 }} />
-              : <div style={{ width: 96, height: 64, borderRadius: 8, background: 'var(--bg-hover)' }} />}
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Картинки (несколько — будут меняться с анимацией)</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            {images.map((u, i) => (
+              <div key={u + i} style={{ position: 'relative' }}>
+                <img src={u} alt="" style={{ width: 72, height: 48, objectFit: 'cover', borderRadius: 8, display: 'block' }} />
+                <button
+                  onClick={() => setImages(images.filter((_, j) => j !== i))}
+                  style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', border: 'none', background: '#dc2626', color: '#fff', fontSize: 11, cursor: 'pointer', lineHeight: '18px', padding: 0 }}
+                  title="Убрать картинку">×</button>
+                {i === 0 && <span style={{ position: 'absolute', bottom: 2, left: 4, fontSize: 9, color: '#fff', background: 'rgba(0,0,0,.55)', borderRadius: 4, padding: '0 4px' }}>первая</span>}
+              </div>
+            ))}
             <label style={{ ...btnGhost, display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
-              {uploading ? 'Загрузка…' : 'Выбрать файл'}
-              <input type="file" accept="image/*" style={{ display: 'none' }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f, modal, setImageUrl); }} />
+              {uploading ? 'Загрузка…' : '+ Добавить'}
+              <input type="file" accept="image/*" multiple style={{ display: 'none' }}
+                onChange={e => { const fs = Array.from(e.target.files || []); fs.forEach(f => onUpload(f, modal, (v) => setImages(prev => [...prev, v]))); e.target.value = ''; }} />
             </label>
-            {imageUrl && <button style={{ ...btnGhost, color: '#dc2626' }} onClick={() => setImageUrl('')}>Убрать</button>}
           </div>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Порядок (чем меньше, тем выше; первый блок колонки закреплён)</label>
           <input type="number" value={sortOrder} onChange={e => setSortOrder(Number(e.target.value))} style={inputStyle} />

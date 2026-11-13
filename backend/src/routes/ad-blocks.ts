@@ -48,14 +48,17 @@ router.get('/all', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { title, imageUrl, linkUrl, position, size, sortOrder, isActive } = req.body;
+    const { title, imageUrl, linkUrl, position, size, sortOrder, isActive, images } = req.body;
     if (!title?.trim()) return res.status(400).json({ error: 'Заголовок обязателен' });
     if (position && !POSITIONS.includes(position)) return res.status(400).json({ error: 'Некорректное размещение' });
     if (size && !SIZES.includes(size)) return res.status(400).json({ error: 'Некорректный размер блока' });
+    // images — массив URL картинок для ротации; храним как JSON
+    const imgs = Array.isArray(images) ? images.filter(u => typeof u === 'string' && u).slice(0, 20) : [];
     const block = await prisma.adBlock.create({
       data: {
         title: title.trim(),
-        imageUrl: imageUrl || null,
+        imageUrl: imgs[0] || imageUrl || null,
+        images: imgs.length ? JSON.stringify(imgs) : null,
         linkUrl: linkUrl?.trim() || null,
         position: POSITIONS.includes(position) ? position : 'left',
         size: SIZES.includes(size) ? size : 'small',
@@ -78,11 +81,16 @@ router.patch('/:id', async (req, res) => {
   try {
     const existing = await prisma.adBlock.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Блок не найден' });
-    const { title, imageUrl, linkUrl, position, size, sortOrder, isActive } = req.body;
+    const { title, imageUrl, linkUrl, position, size, sortOrder, isActive, images } = req.body;
     const data: any = {};
     if (title !== undefined) {
       if (!title.trim()) return res.status(400).json({ error: 'Заголовок не может быть пустым' });
       data.title = title.trim();
+    }
+    if (images !== undefined) {
+      const imgs = Array.isArray(images) ? images.filter(u => typeof u === 'string' && u).slice(0, 20) : [];
+      data.images = imgs.length ? JSON.stringify(imgs) : null;
+      if (imgs.length) data.imageUrl = imgs[0];
     }
     if (imageUrl !== undefined) data.imageUrl = imageUrl || null;
     if (linkUrl !== undefined) data.linkUrl = linkUrl?.trim() || null;
