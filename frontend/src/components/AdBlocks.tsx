@@ -65,7 +65,7 @@ export default function AdBlocks() {
         <button style={btnPrimary} onClick={() => setModal('new')}>+ Добавить блок</button>
       </div>
       <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-        Блоки выводятся внутри новости (детальная страница) слева и справа от текста. Первый блок колонки закреплён при прокрутке, остальные прокручиваются вместе с текстом.
+        Блоки выводятся внутри новости (детальная страница) слева и справа от текста. Маленький — 220×180, большой — 220×320. Первый блок колонки закреплён при прокрутке, остальные прокручиваются вместе с текстом.
       </div>
       {error && <div style={{ color: '#dc2626', fontSize: 14 }}>{error}</div>}
       {loading ? <div>Загрузка…</div> : (
@@ -148,8 +148,8 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
           </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Размер блока</label>
           <select value={size} onChange={e => setSize(e.target.value as 'small' | 'big')} style={inputStyle}>
-            <option value="small">Маленький</option>
-            <option value="big">Большой</option>
+            <option value="small">Маленький — 220×180 (горизонтальный)</option>
+            <option value="big">Большой — 220×320 (вертикальный)</option>
           </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Картинка</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

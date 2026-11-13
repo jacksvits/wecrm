@@ -143,12 +143,15 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
 
 // Общие стили колонок: контейнер-грид и скрытие боковых колонок на узких экранах
 const AD_COLUMNS_CSS = `
-  .news-ad-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr) 220px; gap: 20px; align-items: start; max-width: 1560px; margin: 0 auto; }
+  /* Средняя колонка — по ширине карточки новости: реклама вплотную к тексту с обеих сторон */
+  .news-ad-grid { display: grid; grid-template-columns: 220px auto 220px; gap: 10px; justify-content: center; align-items: start; }
+  .news-ad-main { width: 800px; max-width: 100%; }
   .news-ad-col { display: flex; flex-direction: column; gap: 14px; }
   .news-ad-col > .news-ad-sticky { position: sticky; top: 68px; }
   @media (max-width: 1100px) {
     .news-ad-grid { grid-template-columns: minmax(0, 1fr); }
     .news-ad-col { display: none; }
+    .news-ad-main { width: auto; }
   }
 `;
 
@@ -202,12 +205,13 @@ function NewsAdCard({ block }: { block: AdBlock }) {
         transition: 'transform .2s ease, box-shadow .2s ease',
         display: 'flex',
         flexDirection: 'column',
+        height: small ? 180 : 320,
       }}
     >
       {block.imageUrl
-        ? <img src={block.imageUrl} alt={block.title} loading="lazy" style={{ width: '100%', aspectRatio: small ? '1 / 1' : '4 / 3', objectFit: 'cover', display: 'block' }} />
-        : <div style={{ width: '100%', aspectRatio: small ? '1 / 1' : '4 / 3', background: 'var(--bg-hover)' }} />}
-      <div style={{ padding: small ? '8px 10px' : '12px 14px', display: 'flex', flexDirection: 'column', gap: small ? 2 : 8 }}>
+        ? <img src={block.imageUrl} alt={block.title} loading="lazy" style={{ width: '100%', flex: 1, minHeight: 0, objectFit: 'cover', display: 'block' }} />
+        : <div style={{ width: '100%', flex: 1, minHeight: 0, background: 'var(--bg-hover)' }} />}
+      <div style={{ padding: small ? '8px 10px' : '12px 14px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: small ? 2 : 8 }}>
         <div style={{ fontSize: small ? 12 : 15, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{block.title}</div>
         {!small && block.linkUrl && (
           <span style={{
@@ -439,7 +443,7 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
       <style>{AD_COLUMNS_CSS}</style>
       <div className="news-ad-grid">
         <NewsAdColumn blocks={ads.left} />
-        <div>
+        <div className="news-ad-main">
       {/* Карточка новости — та же, что в CRM (NewsDetail.tsx): рамка, фон, тень */}
       <div style={{ maxWidth: 800, margin: '0 auto 40px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow)' }}>
         <button
