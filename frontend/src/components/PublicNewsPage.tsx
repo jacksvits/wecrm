@@ -209,24 +209,8 @@ function NewsAdCard({ block }: { block: AdBlock }) {
       }}
     >
       {block.imageUrl
-        ? <img src={block.imageUrl} alt={block.title} loading="lazy" style={{ width: '100%', flex: 1, minHeight: 0, objectFit: 'cover', display: 'block' }} />
-        : <div style={{ width: '100%', flex: 1, minHeight: 0, background: 'var(--bg-hover)' }} />}
-      <div style={{ padding: small ? '8px 10px' : '12px 14px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: small ? 2 : 8 }}>
-        <div style={{ fontSize: small ? 12 : 15, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{block.title}</div>
-        {!small && block.linkUrl && (
-          <span style={{
-            alignSelf: 'flex-start',
-            padding: '5px 12px',
-            borderRadius: 10,
-            fontSize: 12,
-            fontWeight: 500,
-            color: '#fff',
-            border: '1px solid rgba(120,180,255,0.40)',
-            background: 'linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%)',
-            boxShadow: '0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)',
-          }}>Подробнее</span>
-        )}
-      </div>
+        ? <img src={block.imageUrl} alt={block.title} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        : <div style={{ width: '100%', height: '100%', background: 'var(--bg-hover)' }} />}
     </div>
   );
 }
