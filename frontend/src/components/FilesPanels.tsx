@@ -551,7 +551,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
               <span title={`Заполнено на ${Math.round((usage[idx].used / usage[idx].total) * 100)}%`} style={{ width: 80, height: 5, borderRadius: 3, background: "var(--bg-card)", overflow: "hidden", display: "inline-block", flexShrink: 0 }}>
                 <span style={{ display: "block", height: "100%", width: `${Math.min(100, (usage[idx].used / usage[idx].total) * 100).toFixed(1)}%`, background: usage[idx].used / usage[idx].total > 0.9 ? "#FF3B30" : "#007AFF", borderRadius: 3 }} />
               </span>
-              <span>{fmtBytes(usage[idx].used)} / {fmtBytes(usage[idx].total)}</span>
+              <span>{Math.round(usage[idx].used / 1048576).toLocaleString("ru-RU")} МБ / {Math.round(usage[idx].total / 1048576).toLocaleString("ru-RU")} МБ</span>
             </span>
           ) : (
             <span>{"\u00A0"}</span>
