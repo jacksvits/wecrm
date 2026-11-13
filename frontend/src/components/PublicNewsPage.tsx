@@ -173,10 +173,24 @@ function NewsAdColumn({ blocks }: { blocks: AdBlock[] }) {
   if (!blocks.length) return null;
   return (
     <aside className="news-ad-col">
-      {blocks.map(b => b.isSticky
-        ? <div key={b.id} className="news-ad-sticky"><NewsAdCard block={b} /></div>
-        : <NewsAdCard key={b.id} block={b} />)}
+      {blocks.map(b => {
+        const inner = b.type === 'script' ? <NewsAdScript block={b} /> : <NewsAdCard block={b} />;
+        return b.isSticky
+          ? <div key={b.id} className="news-ad-sticky">{inner}</div>
+          : <div key={b.id}>{inner}</div>;
+      })}
     </aside>
+  );
+}
+
+/** Блок скрипта: вставка HTML/JS, высота по содержимому */
+function NewsAdScript({ block }: { block: AdBlock }) {
+  return (
+    <div
+      className="news-ad-script"
+      style={{ borderRadius: 12, overflow: 'hidden', background: 'var(--bg-card)' }}
+      dangerouslySetInnerHTML={{ __html: block.script || '' }}
+    />
   );
 }
 

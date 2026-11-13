@@ -8,6 +8,7 @@ const btnGhost: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, bo
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 };
 
 const POSITION_LABELS: Record<string, string> = { left: 'Слева', right: 'Справа' };
+const TYPE_LABELS: Record<string, string> = { banner: 'Баннер', script: 'Скрипт' };
 const SIZE_LABELS: Record<string, string> = { small: 'Маленький (240×240)', medium: 'Средний (240×320)', big: 'Большой (240×474)' };
 
 export default function AdBlocks() {
@@ -76,13 +77,15 @@ export default function AdBlocks() {
                 <button style={{ ...btnGhost, padding: '0 8px' }} disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
                 <button style={{ ...btnGhost, padding: '0 8px' }} disabled={i === blocks.length - 1} onClick={() => move(i, 1)}>↓</button>
               </div>
-              {parseImages(b.images, b.imageUrl)[0]
-                ? <img src={parseImages(b.images, b.imageUrl)[0]} alt="" style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
-                : <div style={{ width: 56, height: 40, borderRadius: 6, background: 'var(--bg-hover)', flexShrink: 0 }} />}
+              {b.type === 'script'
+                ? <div style={{ width: 56, height: 40, borderRadius: 6, background: 'var(--bg-hover)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--text-muted)', fontFamily: 'monospace' }}>&lt;/&gt;</div>
+                : parseImages(b.images, b.imageUrl)[0]
+                  ? <img src={parseImages(b.images, b.imageUrl)[0]} alt="" style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+                  : <div style={{ width: 56, height: 40, borderRadius: 6, background: 'var(--bg-hover)', flexShrink: 0 }} />}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{b.title}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {POSITION_LABELS[b.position] || b.position} · {SIZE_LABELS[b.size] || b.size}{b.isSticky ? ' · липкий' : ''} · ссылка: {b.linkUrl || '—'}
+                  {TYPE_LABELS[b.type || 'banner']} · {POSITION_LABELS[b.position] || b.position}{b.type !== 'script' ? ` · ${SIZE_LABELS[b.size] || b.size}` : ''}{b.isSticky ? ' · липкий' : ''}
                 </div>
               </div>
               <button style={{ ...btnGhost, fontSize: 12 }} onClick={() => toggle(b)}>{b.isActive ? 'Активен' : 'Выключен'}</button>
@@ -126,17 +129,19 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
   const [title, setTitle] = useState(isNew ? '' : b!.title);
   const [linkUrl, setLinkUrl] = useState(isNew ? '' : (b!.linkUrl || ''));
   const [position, setPosition] = useState<'left' | 'right'>(isNew ? 'left' : b!.position);
-  const [size, setSize] = useState<'small' | 'big'>(isNew ? 'small' : b!.size);
+  const [size, setSize] = useState<'small' | 'medium' | 'big'>(isNew ? 'small' : b!.size);
   const [images, setImages] = useState<string[]>(isNew ? [] : parseImages(b!.images, b!.imageUrl));
   const [sortOrder, setSortOrder] = useState(isNew ? 0 : b!.sortOrder);
   const [isActive, setIsActive] = useState(isNew ? true : b!.isActive);
   const [intervalSec, setIntervalSec] = useState(isNew ? 4 : (b!.intervalSec ?? 4));
   const [isSticky, setIsSticky] = useState(isNew ? false : !!b!.isSticky);
+  const [blockType, setBlockType] = useState<'banner' | 'script'>(isNew ? 'banner' : ((b!.type as 'banner' | 'script') || 'banner'));
+  const [script, setScript] = useState(isNew ? '' : (b!.script || ''));
   const [error, setError] = useState('');
 
   const save = async () => {
     if (!title.trim()) { setError('Заголовок обязателен'); return; }
-    const data: Omit<Partial<AdBlock>, 'images'> & { images?: string[] } = { title, linkUrl: linkUrl.trim() || null, position, size, imageUrl: images[0] || null, images, sortOrder, isActive, intervalSec, isSticky };
+    const data: Omit<Partial<AdBlock>, 'images'> & { images?: string[] } = { title, linkUrl: blockType === 'script' ? null : linkUrl.trim() || null, position, size, imageUrl: images[0] || null, images, sortOrder, isActive, intervalSec, isSticky, type: blockType, script: blockType === 'script' ? script : null };
     try {
       if (isNew) await api.adBlocks.create(data);
       else await api.adBlocks.update(b!.id, data);
@@ -152,6 +157,15 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Заголовок</label>
           <input value={title} onChange={e => setTitle(e.target.value)} style={inputStyle} placeholder="Например: Акция на монтаж СКС" autoFocus />
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Тип блока</label>
+          <select value={blockType} onChange={e => setBlockType(e.target.value as 'banner' | 'script')} style={inputStyle}>
+            <option value="banner">Баннер — картинки с ротацией</option>
+            <option value="script">Скрипт — вставка HTML/JS-кода</option>
+          </select>
+          {blockType === 'script' ? (<>
+            <label style={{ fontSize: 14, fontWeight: 500 }}>Скрипт (HTML/JS)</label>
+            <textarea value={script} onChange={e => setScript(e.target.value)} style={{ ...inputStyle, minHeight: 140, fontFamily: 'monospace', fontSize: 12, resize: 'vertical' }} placeholder="<script>…</script>" />
+          </>) : (<>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Ссылка по клику</label>
           <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} style={inputStyle} placeholder="https://… или /shop — необязательно" />
           <label style={{ fontSize: 14, fontWeight: 500 }}>Размещение</label>
@@ -160,7 +174,7 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
             <option value="right">Справа</option>
           </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Размер блока</label>
-          <select value={size} onChange={e => setSize(e.target.value as 'small' | 'big')} style={inputStyle}>
+          <select value={size} onChange={e => setSize(e.target.value as 'small' | 'medium' | 'big')} style={inputStyle}>
             <option value="small">Маленький — 240×240</option>
             <option value="medium">Средний — 240×320</option>
             <option value="big">Большой — 240×474</option>
@@ -187,6 +201,7 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
           <input type="number" value={sortOrder} onChange={e => setSortOrder(Number(e.target.value))} style={inputStyle} />
           <label style={{ fontSize: 14, fontWeight: 500 }}>Интервал смены картинок, сек (при нескольких картинках)</label>
           <input type="number" min={1} max={120} value={intervalSec} onChange={e => setIntervalSec(Number(e.target.value))} style={inputStyle} />
+          </>)}
           <label style={{ fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
             Показывать в новостях
