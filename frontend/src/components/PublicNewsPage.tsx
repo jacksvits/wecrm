@@ -90,7 +90,7 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
           src={item.coverImage || defaultCover}
           alt=""
           loading="lazy"
-          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           onError={(e) => {
             if (defaultCover && (e.target as HTMLImageElement).src !== defaultCover) {
               (e.target as HTMLImageElement).src = defaultCover;
@@ -183,7 +183,8 @@ function NewsAdColumn({ blocks }: { blocks: AdBlock[] }) {
 function NewsAdCard({ block }: { block: AdBlock }) {
   const navigate = useNavigate();
   const [hover, setHover] = useState(false);
-  const small = block.size === 'small';
+  // Три размера блока: 220×220, 220×293, 220×435 (ширина колонки фиксирована)
+  const heights: Record<string, number> = { small: 220, medium: 293, big: 435 };
   const open = () => {
     if (!block.linkUrl) return;
     if (/^https?:\/\//i.test(block.linkUrl)) window.open(block.linkUrl, '_blank', 'noopener');
@@ -205,11 +206,11 @@ function NewsAdCard({ block }: { block: AdBlock }) {
         transition: 'transform .2s ease, box-shadow .2s ease',
         display: 'flex',
         flexDirection: 'column',
-        height: small ? 180 : 320,
+        height: heights[block.size] ?? 220,
       }}
     >
       {block.imageUrl
-        ? <img src={block.imageUrl} alt={block.title} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+        ? <img src={block.imageUrl} alt={block.title} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
         : <div style={{ width: '100%', height: '100%', background: 'var(--bg-hover)' }} />}
     </div>
   );

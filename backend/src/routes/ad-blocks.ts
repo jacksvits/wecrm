@@ -5,7 +5,7 @@ import { authMiddleware } from '../middleware/auth.js';
 const router = Router();
 
 const POSITIONS = ['left', 'right'];
-const SIZES = ['small', 'big'];
+const SIZES = ['small', 'medium', 'big'];
 
 /**
  * GET /api/ad-blocks
