@@ -90,7 +90,7 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
           src={item.coverImage || defaultCover}
           alt=""
           loading="lazy"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
           onError={(e) => {
             if (defaultCover && (e.target as HTMLImageElement).src !== defaultCover) {
               (e.target as HTMLImageElement).src = defaultCover;
@@ -209,7 +209,7 @@ function NewsAdCard({ block }: { block: AdBlock }) {
       }}
     >
       {block.imageUrl
-        ? <img src={block.imageUrl} alt={block.title} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        ? <img src={block.imageUrl} alt={block.title} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
         : <div style={{ width: '100%', height: '100%', background: 'var(--bg-hover)' }} />}
     </div>
   );
