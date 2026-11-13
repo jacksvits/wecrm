@@ -132,7 +132,7 @@ export interface ProductPrice { id: string; productId: string; priceTypeId: stri
 export interface PromoBlock { id: string; title: string; subtitle?: string | null; imageUrl?: string | null; buttonText: string; buttonStyle: 'green' | 'blue'; categoryId?: string | null; format: 'big' | 'wide' | 'square'; sortOrder: number; isActive: boolean; createdAt: string; updatedAt: string; }
 export interface LoginBrandText { title?: string | null; accent?: string | null; subtitle?: string | null; }
 // Рекламный блок на публичной странице новостей: колонка слева/справа от ленты, маленький/большой
-export interface AdBlock { id: string; title: string; imageUrl?: string | null; images?: string | null; linkUrl?: string | null; position: 'left' | 'right'; size: 'small' | 'big'; sortOrder: number; isActive: boolean; createdAt: string; updatedAt: string; }
+export interface AdBlock { id: string; title: string; imageUrl?: string | null; images?: string | null; intervalSec?: number; linkUrl?: string | null; position: 'left' | 'right'; size: 'small' | 'big'; sortOrder: number; isActive: boolean; createdAt: string; updatedAt: string; }
 export interface LoginSlide { id: string; title: string; description?: string | null; imageUrl?: string | null; sortOrder: number; isActive: boolean; createdAt: string; updatedAt: string; }
 export interface StockMovement { id: string; productId: string; warehouseId: string; type: 'income' | 'outcome' | 'adjust'; quantity: number; price?: number | null; comment?: string | null; date: string; userId?: string | null; createdAt: string; product?: { name: string; sku?: string | null; unit: string }; warehouse?: { name: string }; user?: { name: string } | null; }
 // Элемент виджета «Самые продаваемые»: расход склада + заказы OZON

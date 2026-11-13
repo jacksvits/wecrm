@@ -130,11 +130,12 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
   const [images, setImages] = useState<string[]>(isNew ? [] : parseImages(b!.images, b!.imageUrl));
   const [sortOrder, setSortOrder] = useState(isNew ? 0 : b!.sortOrder);
   const [isActive, setIsActive] = useState(isNew ? true : b!.isActive);
+  const [intervalSec, setIntervalSec] = useState(isNew ? 4 : (b!.intervalSec ?? 4));
   const [error, setError] = useState('');
 
   const save = async () => {
     if (!title.trim()) { setError('Заголовок обязателен'); return; }
-    const data: Omit<Partial<AdBlock>, 'images'> & { images?: string[] } = { title, linkUrl: linkUrl.trim() || null, position, size, imageUrl: images[0] || null, images, sortOrder, isActive };
+    const data: Omit<Partial<AdBlock>, 'images'> & { images?: string[] } = { title, linkUrl: linkUrl.trim() || null, position, size, imageUrl: images[0] || null, images, sortOrder, isActive, intervalSec };
     try {
       if (isNew) await api.adBlocks.create(data);
       else await api.adBlocks.update(b!.id, data);
@@ -183,6 +184,8 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
           </div>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Порядок (чем меньше, тем выше; первый блок колонки закреплён)</label>
           <input type="number" value={sortOrder} onChange={e => setSortOrder(Number(e.target.value))} style={inputStyle} />
+          <label style={{ fontSize: 14, fontWeight: 500 }}>Интервал смены картинок, сек (при нескольких картинках)</label>
+          <input type="number" min={1} max={120} value={intervalSec} onChange={e => setIntervalSec(Number(e.target.value))} style={inputStyle} />
           <label style={{ fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
             Показывать в новостях

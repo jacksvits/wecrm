@@ -48,7 +48,7 @@ router.get('/all', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { title, imageUrl, linkUrl, position, size, sortOrder, isActive, images } = req.body;
+    const { title, imageUrl, linkUrl, position, size, sortOrder, isActive, images, intervalSec } = req.body;
     if (!title?.trim()) return res.status(400).json({ error: 'Заголовок обязателен' });
     if (position && !POSITIONS.includes(position)) return res.status(400).json({ error: 'Некорректное размещение' });
     if (size && !SIZES.includes(size)) return res.status(400).json({ error: 'Некорректный размер блока' });
@@ -64,6 +64,7 @@ router.post('/', async (req, res) => {
         size: SIZES.includes(size) ? size : 'small',
         sortOrder: Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 0,
         isActive: isActive !== false,
+        intervalSec: Number.isFinite(Number(intervalSec)) ? Math.min(120, Math.max(1, Number(intervalSec))) : 4,
       },
     });
     res.status(201).json(block);
@@ -81,7 +82,7 @@ router.patch('/:id', async (req, res) => {
   try {
     const existing = await prisma.adBlock.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Блок не найден' });
-    const { title, imageUrl, linkUrl, position, size, sortOrder, isActive, images } = req.body;
+    const { title, imageUrl, linkUrl, position, size, sortOrder, isActive, images, intervalSec } = req.body;
     const data: any = {};
     if (title !== undefined) {
       if (!title.trim()) return res.status(400).json({ error: 'Заголовок не может быть пустым' });
@@ -104,6 +105,7 @@ router.patch('/:id', async (req, res) => {
     }
     if (sortOrder !== undefined && Number.isFinite(Number(sortOrder))) data.sortOrder = Number(sortOrder);
     if (isActive !== undefined) data.isActive = !!isActive;
+    if (intervalSec !== undefined && Number.isFinite(Number(intervalSec))) data.intervalSec = Math.min(120, Math.max(1, Number(intervalSec)));
     const block = await prisma.adBlock.update({ where: { id: req.params.id }, data });
     res.json(block);
   } catch (err: any) {

@@ -196,11 +196,13 @@ function NewsAdCard({ block }: { block: AdBlock }) {
     return arr;
   }, [block.images, block.imageUrl]);
   const [imgIdx, setImgIdx] = useState(0);
+  // Интервал смены картинок свой у каждого блока (по умолчанию 4с)
+  const intervalSec = Math.min(120, Math.max(1, Number(block.intervalSec) || 4));
   useEffect(() => {
     if (images.length < 2) return;
-    const t = setInterval(() => setImgIdx(i => (i + 1) % images.length), 4000);
+    const t = setInterval(() => setImgIdx(i => (i + 1) % images.length), intervalSec * 1000);
     return () => clearInterval(t);
-  }, [images.length]);
+  }, [images.length, intervalSec]);
   const open = () => {
     if (!block.linkUrl) return;
     if (/^https?:\/\//i.test(block.linkUrl)) window.open(block.linkUrl, '_blank', 'noopener');
