@@ -145,7 +145,7 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
 const AD_COLUMNS_CSS = `
   /* Средняя колонка — по ширине карточки новости: реклама вплотную к тексту с обеих сторон */
   /* Вся строка (карточка новости и обе колонки рекламы) — на одной линии, отступ 8px от верха экрана */
-  .news-ad-grid { display: grid; grid-template-columns: 240px auto 240px; gap: 10px; justify-content: center; align-items: start; margin-top: 8px; }
+  .news-ad-grid { display: grid; grid-template-columns: 240px auto 240px; gap: 10px; justify-content: center; margin-top: 8px; }
   .news-ad-main { width: 800px; max-width: 100%; }
   .news-ad-col { display: flex; flex-direction: column; gap: 14px; }
   .news-ad-col > .news-ad-sticky { position: sticky; top: 68px; }
