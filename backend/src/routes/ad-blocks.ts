@@ -49,7 +49,7 @@ router.get('/all', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { title, imageUrl, linkUrl, position, size, sortOrder, isActive, images, intervalSec, isSticky, type, script } = req.body;
+    const { title, imageUrl, linkUrl, position, size, sortOrder, isActive, images, intervalSec, isSticky, type, script, headScript } = req.body;
     if (!title?.trim()) return res.status(400).json({ error: 'Заголовок обязателен' });
     if (position && !POSITIONS.includes(position)) return res.status(400).json({ error: 'Некорректное размещение' });
     if (size && !SIZES.includes(size)) return res.status(400).json({ error: 'Некорректный размер блока' });
@@ -70,6 +70,7 @@ router.post('/', async (req, res) => {
         isSticky: !!isSticky,
         type: TYPES.includes(type) ? type : 'banner',
         script: type === 'script' ? (script || null) : null,
+        headScript: type === 'script' ? (headScript || null) : null,
       },
     });
     res.status(201).json(block);
@@ -87,7 +88,7 @@ router.patch('/:id', async (req, res) => {
   try {
     const existing = await prisma.adBlock.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Блок не найден' });
-    const { title, imageUrl, linkUrl, position, size, sortOrder, isActive, images, intervalSec, isSticky, type, script } = req.body;
+    const { title, imageUrl, linkUrl, position, size, sortOrder, isActive, images, intervalSec, isSticky, type, script, headScript } = req.body;
     const data: any = {};
     if (title !== undefined) {
       if (!title.trim()) return res.status(400).json({ error: 'Заголовок не может быть пустым' });
@@ -115,11 +116,15 @@ router.patch('/:id', async (req, res) => {
     if (type !== undefined) {
       if (!TYPES.includes(type)) return res.status(400).json({ error: 'Некорректный тип блока' });
       data.type = type;
-      // при смене типа чистим неактуальное содержимое: у banner не храним скрипт
-      if (type === 'script') { if (script !== undefined) data.script = script || null; }
-      else { data.script = null; }
-    } else if (script !== undefined && existing.type === 'script') {
-      data.script = script || null;
+      // при смене типа чистим неактуальное содержимое: у banner не храним скрипты
+      if (type === 'script') {
+        if (script !== undefined) data.script = script || null;
+        if (headScript !== undefined) data.headScript = headScript || null;
+      }
+      else { data.script = null; data.headScript = null; }
+    } else if (existing.type === 'script') {
+      if (script !== undefined) data.script = script || null;
+      if (headScript !== undefined) data.headScript = headScript || null;
     }
     const block = await prisma.adBlock.update({ where: { id: req.params.id }, data });
     res.json(block);

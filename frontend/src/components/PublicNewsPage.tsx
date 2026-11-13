@@ -154,6 +154,32 @@ const COMMENT_QUILL_MODULES = {
 // Текст без HTML-тегов (валидация непустоты)
 const commentPlainText = (html: string) => html.replace(/<[^>]*>/g, '').trim();
 
+/** head-скрипты script-блоков: виджеты, требующие размещения в <head> страницы */
+function useAdHeadScripts() {
+  useEffect(() => {
+    let cancelled = false;
+    api.adBlocks.list().then(blocks => {
+      if (cancelled) return;
+      (blocks || [])
+        .filter((b: AdBlock) => b.type === 'script' && b.headScript)
+        .forEach((b: AdBlock) => {
+          const marker = `adblock-head-${b.id}`;
+          if (document.head.querySelector(`[data-adblock="${marker}"]`)) return;
+          const holder = document.createElement('div');
+          holder.innerHTML = b.headScript || '';
+          Array.from(holder.querySelectorAll('script')).forEach(oldScript => {
+            const ns = document.createElement('script');
+            Array.from(oldScript.attributes).forEach(a => ns.setAttribute(a.name, a.value));
+            ns.textContent = oldScript.textContent || '';
+            ns.dataset.adblock = marker;
+            document.head.appendChild(ns);
+          });
+        });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+}
+
 /* ---------- Рекламные блоки по бокам карточки новости (только детальная страница) ---------- */
 
 // Общие стили колонок: контейнер-грид и скрытие боковых колонок на узких экранах
@@ -425,6 +451,7 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
   const [commentBusy, setCommentBusy] = useState(false);
   const pubUser = usePublicUser();
   const ads = useAdBlocks();
+  useAdHeadScripts();
   // Авторизован через CRM (мост auth-bridge с токеном) — комментарии доступны
   const canComment = !!pubUser;
 

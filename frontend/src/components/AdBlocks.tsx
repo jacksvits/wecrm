@@ -137,11 +137,12 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
   const [isSticky, setIsSticky] = useState(isNew ? false : !!b!.isSticky);
   const [blockType, setBlockType] = useState<'banner' | 'script'>(isNew ? 'banner' : ((b!.type as 'banner' | 'script') || 'banner'));
   const [script, setScript] = useState(isNew ? '' : (b!.script || ''));
+  const [headScript, setHeadScript] = useState(isNew ? '' : (b!.headScript || ''));
   const [error, setError] = useState('');
 
   const save = async () => {
     if (!title.trim()) { setError('Заголовок обязателен'); return; }
-    const data: Omit<Partial<AdBlock>, 'images'> & { images?: string[] } = { title, linkUrl: blockType === 'script' ? null : linkUrl.trim() || null, position, size, imageUrl: images[0] || null, images, sortOrder, isActive, intervalSec, isSticky, type: blockType, script: blockType === 'script' ? script : null };
+    const data: Omit<Partial<AdBlock>, 'images'> & { images?: string[] } = { title, linkUrl: blockType === 'script' ? null : linkUrl.trim() || null, position, size, imageUrl: images[0] || null, images, sortOrder, isActive, intervalSec, isSticky, type: blockType, script: blockType === 'script' ? script : null, headScript: blockType === 'script' ? headScript : null };
     try {
       if (isNew) await api.adBlocks.create(data);
       else await api.adBlocks.update(b!.id, data);
@@ -170,6 +171,8 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
           {blockType === 'script' ? (<>
             <label style={{ fontSize: 14, fontWeight: 500 }}>Скрипт (HTML/JS)</label>
             <textarea value={script} onChange={e => setScript(e.target.value)} style={{ ...inputStyle, minHeight: 140, fontFamily: 'monospace', fontSize: 12, resize: 'vertical' }} placeholder="<script>…</script>" />
+            <label style={{ fontSize: 14, fontWeight: 500 }}>Скрипт для &lt;head&gt; (необязательно — если виджет требует размещения в head)</label>
+            <textarea value={headScript} onChange={e => setHeadScript(e.target.value)} style={{ ...inputStyle, minHeight: 90, fontFamily: 'monospace', fontSize: 12, resize: 'vertical' }} placeholder="<!-- Put this script tag to the <head> of your page -->" />
           </>) : (<>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Ссылка по клику</label>
           <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} style={inputStyle} placeholder="https://… или /shop — необязательно" />

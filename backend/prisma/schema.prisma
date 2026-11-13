@@ -1532,6 +1532,7 @@ model AdBlock {
   isSticky      Boolean @default(false) @map("is_sticky") // закреплён при прокрутке (sticky, top 68)
   type          String  @default("banner") @map("type") // banner — картинки | script — вставка HTML/JS
   script        String? @map("script") // код для типа script
+  headScript    String? @map("head_script") // код для вставки в <head> страницы (требуют некоторые виджеты)
   sortOrder Int     @default(0) @map("sort_order")
   isActive  Boolean @default(true) @map("is_active")
 
