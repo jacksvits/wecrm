@@ -133,6 +133,39 @@ app.use('/api', (_req, res, next) => {
   res.setHeader('Expires', '0');
   next();
 });
+
+// --- Пользователи онлайн (для виджета «Глобус» и счётчиков): скользящее окно 5 минут ---
+// Ключ — хост + хэш(IP + User-Agent); хранится только в памяти процесса
+import crypto from 'crypto';
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+const onlinePresence = new Map<string, { t: number; host: string }>();
+function presenceKey(req: express.Request): string {
+  const ip = ((req.headers['x-forwarded-for'] as string) || '').split(',')[0].trim() || req.socket.remoteAddress || '';
+  const ua = (req.headers['user-agent'] as string) || '';
+  return crypto.createHash('md5').update(ip + '|' + ua).digest('hex').slice(0, 16);
+}
+app.use('/api', (req, _res, next) => {
+  if (req.method === 'GET') {
+    const host = (req.headers.host as string) || 'unknown';
+    onlinePresence.set(presenceKey(req), { t: Date.now(), host });
+  }
+  next();
+});
+setInterval(() => {
+  const cutoff = Date.now() - ONLINE_WINDOW_MS;
+  for (const [k, v] of onlinePresence) if (v.t < cutoff) onlinePresence.delete(k);
+}, 60 * 1000).unref();
+
+// Публичный счётчик онлайн-пользователей (посетители и пользователи всех сайтов)
+app.get('/api/online-users', (_req, res) => {
+  const cutoff = Date.now() - ONLINE_WINDOW_MS;
+  const perHost: Record<string, number> = {};
+  for (const [, v] of onlinePresence) {
+    if (v.t < cutoff) continue;
+    perHost[v.host] = (perHost[v.host] || 0) + 1;
+  }
+  res.json({ total: Object.values(perHost).reduce((a: number, b: number) => a + b, 0), perHost, windowSec: ONLINE_WINDOW_MS / 1000 });
+});
 app.use('/api/tochka-acquiring/webhook', express.text({ type: () => true, limit: '64kb' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
