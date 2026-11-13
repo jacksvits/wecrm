@@ -126,7 +126,7 @@ export function YandexMetrikaSettings() {
           />
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
             Выпускается на{" "}
-            <a href="https://oauth.yandex.ru" target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
+            <a href="https://oauth.yandex.ru" target="_blank" rel="noreferrer" style={{ color: "var(--accent-color)" }}>
               oauth.yandex.ru
             </a>{" "}
             (Яндекс ID → «Сервисы и токены») с правом «Яндекс Метрика — чтение данных (metrika:read)».
@@ -145,7 +145,7 @@ export function YandexMetrikaSettings() {
               padding: "10px 20px",
               borderRadius: 8,
               border: "none",
-              background: "var(--accent)",
+              background: "var(--accent-color)",
               color: "#fff",
               fontSize: 14,
               fontWeight: 600,
