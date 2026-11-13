@@ -949,6 +949,7 @@ export function Files({ publicMode = false }: { publicMode?: boolean }) {
             onClick={(e) => e.stopPropagation()}
             style={{
               background: "var(--bg-card)", borderRadius: 16, padding: 24, width: "100%", maxWidth: 480,
+              maxHeight: "calc(100vh - 32px)", overflowY: "auto", boxSizing: "border-box",
               border: "1px solid var(--border-color)", boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
             }}
           >
