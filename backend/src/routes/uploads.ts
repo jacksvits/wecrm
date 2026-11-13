@@ -53,7 +53,7 @@ router.post('/', authMiddleware, (req: AuthRequest, res, next) => {
       return res.status(400).json({ error: 'Файл не загружен' });
     }
     const { entityType, entityId } = req.body;
-    const privilegedUpload = ['promo-block', 'login-slide'].includes(String(entityType));
+    const privilegedUpload = ['promo-block', 'login-slide', 'ad-block'].includes(String(entityType));
     const newsUpload = entityType === 'news';
     const productUpload = entityType === 'product';
     const allowed = privilegedUpload ? req.user?.role === 'admin'
@@ -147,6 +147,14 @@ router.post('/', authMiddleware, (req: AuthRequest, res, next) => {
       const destPath = path.join(targetDir, filename);
       if (fs.existsSync(srcPath)) moveEntry(srcPath, destPath);
       dbPath = `${tenantPfx || '/uploads'}/shop/promo/${filename}`;
+    } else if (entityType === 'ad-block') {
+      // Рекламные блоки новостей: shop/ad (см. структуру NFS)
+      const targetDir = path.join(tenantRoot, 'shop', 'ad');
+      if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+      const srcPath = path.join(UPLOAD_DIR, filename);
+      const destPath = path.join(targetDir, filename);
+      if (fs.existsSync(srcPath)) moveEntry(srcPath, destPath);
+      dbPath = `${tenantPfx || '/uploads'}/shop/ad/${filename}`;
     } else if (entityType === 'login-slide') {
       // Слайдеры авторизации: slide
       const targetDir = path.join(tenantRoot, 'slide');

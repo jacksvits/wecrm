@@ -12,6 +12,7 @@ import { makeDescription } from '../lib/stripHtml';
 import { applyPageMeta, restorePageMeta } from '../lib/seo';
 import PublicAuthArea from './PublicAuthArea';
 import PublicNavMenu from './PublicNavMenu';
+import { AdBlock } from '../types';
 
 function stripHtml(html: string): string {
   const div = document.createElement('div');
@@ -138,6 +139,94 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
   );
 }
 
+/* ---------- Рекламные блоки по бокам ленты новостей ---------- */
+
+// Общие стили колонок: контейнер-грид и скрытие боковых колонок на узких экранах
+const AD_COLUMNS_CSS = `
+  .news-ad-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr) 220px; gap: 20px; align-items: start; max-width: 1560px; margin: 0 auto; }
+  .news-ad-col { display: flex; flex-direction: column; gap: 14px; }
+  .news-ad-col > .news-ad-sticky { position: sticky; top: 68px; }
+  @media (max-width: 1100px) {
+    .news-ad-grid { grid-template-columns: minmax(0, 1fr); }
+    .news-ad-col { display: none; }
+  }
+`;
+
+/** Активные рекламные блоки, разбитые по колонкам (слева/справа) */
+function useAdBlocks(): { left: AdBlock[]; right: AdBlock[] } {
+  const [blocks, setBlocks] = useState<AdBlock[]>([]);
+  useEffect(() => {
+    api.adBlocks.list().then(setBlocks).catch(() => {});
+  }, []);
+  return {
+    left: blocks.filter(b => b.position === 'left'),
+    right: blocks.filter(b => b.position === 'right'),
+  };
+}
+
+/** Колонка рекламных блоков: первый (по sortOrder) закреплён при прокрутке, остальные скроллятся с лентой */
+function NewsAdColumn({ blocks }: { blocks: AdBlock[] }) {
+  if (!blocks.length) return null;
+  const [sticky, ...rest] = blocks;
+  return (
+    <aside className="news-ad-col">
+      <div className="news-ad-sticky"><NewsAdCard block={sticky} /></div>
+      {rest.map(b => <NewsAdCard key={b.id} block={b} />)}
+    </aside>
+  );
+}
+
+/** Карточка рекламного блока: маленький — компактная плитка, большой — с заголовком и кнопкой */
+function NewsAdCard({ block }: { block: AdBlock }) {
+  const navigate = useNavigate();
+  const [hover, setHover] = useState(false);
+  const small = block.size === 'small';
+  const open = () => {
+    if (!block.linkUrl) return;
+    if (/^https?:\/\//i.test(block.linkUrl)) window.open(block.linkUrl, '_blank', 'noopener');
+    else navigate(block.linkUrl);
+  };
+  return (
+    <div
+      onClick={open}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        borderRadius: 12,
+        overflow: 'hidden',
+        cursor: block.linkUrl ? 'pointer' : 'default',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-color)',
+        boxShadow: hover ? '0 8px 24px rgba(0,0,0,.28)' : '0 2px 8px rgba(0,0,0,.18)',
+        transform: hover ? 'scale3d(1.02, 1.02, 1.02)' : 'scale3d(1, 1, 1)',
+        transition: 'transform .2s ease, box-shadow .2s ease',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {block.imageUrl
+        ? <img src={block.imageUrl} alt={block.title} loading="lazy" style={{ width: '100%', aspectRatio: small ? '1 / 1' : '4 / 3', objectFit: 'cover', display: 'block' }} />
+        : <div style={{ width: '100%', aspectRatio: small ? '1 / 1' : '4 / 3', background: 'var(--bg-hover)' }} />}
+      <div style={{ padding: small ? '8px 10px' : '12px 14px', display: 'flex', flexDirection: 'column', gap: small ? 2 : 8 }}>
+        <div style={{ fontSize: small ? 12 : 15, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{block.title}</div>
+        {!small && block.linkUrl && (
+          <span style={{
+            alignSelf: 'flex-start',
+            padding: '5px 12px',
+            borderRadius: 10,
+            fontSize: 12,
+            fontWeight: 500,
+            color: '#fff',
+            border: '1px solid rgba(120,180,255,0.40)',
+            background: 'linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%)',
+            boxShadow: '0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)',
+          }}>Подробнее</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PublicNewsList({ consent = true }: { consent?: boolean }) {
   usePageSeo({
     title: 'WeLANS - Новости',
@@ -158,6 +247,7 @@ function PublicNewsList({ consent = true }: { consent?: boolean }) {
   const [tag, setTag] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
+  const ads = useAdBlocks();
   const limit = 24;
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -193,6 +283,10 @@ function PublicNewsList({ consent = true }: { consent?: boolean }) {
         consent={consent}
       />
       <div style={{ padding: '16px 24px 40px' }}>
+        <style>{AD_COLUMNS_CSS}</style>
+        <div className="news-ad-grid">
+          <NewsAdColumn blocks={ads.left} />
+          <div>
         {/* Фильтры */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
           <select value={category} style={selectStyle} onChange={(e) => { setCategory(e.target.value); setSubcategory(''); setPage(1); }}>
@@ -263,6 +357,9 @@ function PublicNewsList({ consent = true }: { consent?: boolean }) {
             </button>
           </div>
         )}
+          </div>
+          <NewsAdColumn blocks={ads.right} />
+        </div>
       </div>
     </div>
   );
@@ -274,6 +371,7 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
   const [news, setNews] = useState<any>(null);
   const [comments, setComments] = useState<any[]>([]);
   const [notFound, setNotFound] = useState(false);
+  const ads = useAdBlocks();
 
   useEffect(() => {
     if (slug) {
@@ -345,6 +443,11 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} consent={consent} />
+      <div style={{ padding: '0 24px' }}>
+      <style>{AD_COLUMNS_CSS}</style>
+      <div className="news-ad-grid">
+        <NewsAdColumn blocks={ads.left} />
+        <div>
       {/* Карточка новости — та же, что в CRM (NewsDetail.tsx): рамка, фон, тень */}
       <div style={{ maxWidth: 800, margin: '0 auto 40px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 16, padding: 24, boxShadow: 'var(--shadow)' }}>
         <button
@@ -458,6 +561,10 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
             </div>
           ))}
         </div>
+      </div>
+        </div>
+        <NewsAdColumn blocks={ads.right} />
+      </div>
       </div>
     </div>
   );

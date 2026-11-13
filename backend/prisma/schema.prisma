@@ -1517,6 +1517,25 @@ model PromoBlock {
   @@map("promo_blocks")
 }
 
+// Рекламные блоки на публичной странице новостей: колонки слева и справа
+// от ленты. Первый по sortOrder блок колонки «липкий» (sticky под шапкой),
+// остальные скроллятся вместе с лентой.
+model AdBlock {
+  id        String  @id @default(cuid())
+  title     String
+  imageUrl  String? @map("image_url")
+  linkUrl   String? @map("link_url") // ссылка по клику (внутренняя или внешняя); null — без клика
+  position  String  @default("left") @map("position") // left | right — колонка страницы новостей
+  size      String  @default("small") @map("size") // small — маленький | big — большой
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("ad_blocks")
+}
+
 model LoginSlide {
   id          String   @id @default(cuid())
   title       String
