@@ -146,7 +146,7 @@ const AD_COLUMNS_CSS = `
   /* Средняя колонка — по ширине карточки новости: реклама вплотную к тексту с обеих сторон */
   .news-ad-grid { display: grid; grid-template-columns: 240px auto 240px; gap: 10px; justify-content: center; align-items: start; }
   .news-ad-main { width: 800px; max-width: 100%; }
-  .news-ad-col { display: flex; flex-direction: column; gap: 14px; }
+  .news-ad-col { display: flex; flex-direction: column; gap: 14px; padding-top: 68px; }
   .news-ad-col > .news-ad-sticky { position: sticky; top: 68px; }
   @media (max-width: 1100px) {
     .news-ad-grid { grid-template-columns: minmax(0, 1fr); }
