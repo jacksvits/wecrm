@@ -144,9 +144,10 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
 // Общие стили колонок: контейнер-грид и скрытие боковых колонок на узких экранах
 const AD_COLUMNS_CSS = `
   /* Средняя колонка — по ширине карточки новости: реклама вплотную к тексту с обеих сторон */
-  .news-ad-grid { display: grid; grid-template-columns: 240px auto 240px; gap: 10px; justify-content: center; align-items: start; }
+  /* Вся строка (карточка новости и обе колонки рекламы) — на одной линии, отступ 68px от верха экрана */
+  .news-ad-grid { display: grid; grid-template-columns: 240px auto 240px; gap: 10px; justify-content: center; align-items: start; margin-top: 68px; }
   .news-ad-main { width: 800px; max-width: 100%; }
-  .news-ad-col { display: flex; flex-direction: column; gap: 14px; padding-top: 68px; }
+  .news-ad-col { display: flex; flex-direction: column; gap: 14px; }
   .news-ad-col > .news-ad-sticky { position: sticky; top: 68px; }
   @media (max-width: 1100px) {
     .news-ad-grid { grid-template-columns: minmax(0, 1fr); }
@@ -167,14 +168,14 @@ function useAdBlocks(): { left: AdBlock[]; right: AdBlock[] } {
   };
 }
 
-/** Колонка рекламных блоков: первый (по sortOrder) закреплён при прокрутке, остальные скроллятся с лентой */
+/** Колонка рекламных блоков: блоки с флагом isSticky закреплены при прокрутке (top 68), остальные скроллятся с лентой */
 function NewsAdColumn({ blocks }: { blocks: AdBlock[] }) {
   if (!blocks.length) return null;
-  const [sticky, ...rest] = blocks;
   return (
     <aside className="news-ad-col">
-      <div className="news-ad-sticky"><NewsAdCard block={sticky} /></div>
-      {rest.map(b => <NewsAdCard key={b.id} block={b} />)}
+      {blocks.map(b => b.isSticky
+        ? <div key={b.id} className="news-ad-sticky"><NewsAdCard block={b} /></div>
+        : <NewsAdCard key={b.id} block={b} />)}
     </aside>
   );
 }

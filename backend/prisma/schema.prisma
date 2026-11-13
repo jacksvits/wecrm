@@ -1529,6 +1529,7 @@ model AdBlock {
   size      String  @default("small") @map("size") // small | medium | big — размер блока
   images      String? @map("images") // JSON-массив URL картинок: ротация с анимацией при показе
   intervalSec Int     @default(4) @map("interval_sec") // интервал смены картинок, секунды
+  isSticky      Boolean @default(false) @map("is_sticky") // закреплён при прокрутке (sticky, top 68)
   sortOrder Int     @default(0) @map("sort_order")
   isActive  Boolean @default(true) @map("is_active")
 

@@ -65,7 +65,7 @@ export default function AdBlocks() {
         <button style={btnPrimary} onClick={() => setModal('new')}>+ Добавить блок</button>
       </div>
       <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-        Блоки выводятся внутри новости (детальная страница) слева и справа от текста. Маленький — 240×240, средний — 240×320, большой — 240×474 (пропорционально ширине 240). Можно загрузить несколько картинок — они будут меняться с анимацией. Первый блок колонки закреплён при прокрутке, остальные прокручиваются вместе с текстом.
+        Блоки выводятся внутри новости (детальная страница) слева и справа от текста. Маленький — 240×240, средний — 240×320, большой — 240×474. Можно загрузить несколько картинок — они меняются с анимацией (интервал задаётся ниже). Отметьте «Липкий», чтобы блок закрепился при прокрутке. Первый блок колонки закреплён при прокрутке, остальные прокручиваются вместе с текстом.
       </div>
       {error && <div style={{ color: '#dc2626', fontSize: 14 }}>{error}</div>}
       {loading ? <div>Загрузка…</div> : (
@@ -82,7 +82,7 @@ export default function AdBlocks() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{b.title}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {POSITION_LABELS[b.position] || b.position} · {SIZE_LABELS[b.size] || b.size} · ссылка: {b.linkUrl || '—'}
+                  {POSITION_LABELS[b.position] || b.position} · {SIZE_LABELS[b.size] || b.size}{b.isSticky ? ' · липкий' : ''} · ссылка: {b.linkUrl || '—'}
                 </div>
               </div>
               <button style={{ ...btnGhost, fontSize: 12 }} onClick={() => toggle(b)}>{b.isActive ? 'Активен' : 'Выключен'}</button>
@@ -131,11 +131,12 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
   const [sortOrder, setSortOrder] = useState(isNew ? 0 : b!.sortOrder);
   const [isActive, setIsActive] = useState(isNew ? true : b!.isActive);
   const [intervalSec, setIntervalSec] = useState(isNew ? 4 : (b!.intervalSec ?? 4));
+  const [isSticky, setIsSticky] = useState(isNew ? false : !!b!.isSticky);
   const [error, setError] = useState('');
 
   const save = async () => {
     if (!title.trim()) { setError('Заголовок обязателен'); return; }
-    const data: Omit<Partial<AdBlock>, 'images'> & { images?: string[] } = { title, linkUrl: linkUrl.trim() || null, position, size, imageUrl: images[0] || null, images, sortOrder, isActive, intervalSec };
+    const data: Omit<Partial<AdBlock>, 'images'> & { images?: string[] } = { title, linkUrl: linkUrl.trim() || null, position, size, imageUrl: images[0] || null, images, sortOrder, isActive, intervalSec, isSticky };
     try {
       if (isNew) await api.adBlocks.create(data);
       else await api.adBlocks.update(b!.id, data);
@@ -189,6 +190,10 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
           <label style={{ fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
             Показывать в новостях
+          </label>
+          <label style={{ fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={isSticky} onChange={e => setIsSticky(e.target.checked)} />
+            Липкий — закрепить при прокрутке (отступ 68px от верха экрана)
           </label>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={save} style={btnPrimary}>Сохранить</button>
