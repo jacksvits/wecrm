@@ -91,6 +91,7 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
   const [panels, setPanels] = useState<PanelState[]>([emptyPanel(), emptyPanel()]);
   const panelsRef = useRef<PanelState[]>([]);
   panelsRef.current = panels;
+  const [usage, setUsage] = useState<Record<number, { total: number; used: number }>>({});
   const [activePanel, setActivePanel] = useState(0);
   // Модальные окна операций (создание папки / переименование)
   const [mkdirPanel, setMkdirPanel] = useState<number | null>(null);
@@ -155,6 +156,10 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
           return next;
         });
       });
+    api.files
+      .usage(effTab)
+      .then((u: any) => setUsage((prev) => ({ ...prev, [idx]: u })))
+      .catch(() => setUsage((prev) => { const next = { ...prev }; delete next[idx]; return next; }));
   }, [tab, hiddenNames]);
 
   // Смена вкладки — обе панели возвращаются в корень вкладки
@@ -177,6 +182,12 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
       next[idx] = { ...next[idx], ...patch };
       return next;
     });
+
+  const fmtBytes = (n: number) => {
+    const units = ["Б", "КБ", "МБ", "ГБ", "ТБ"];
+    const i = Math.min(units.length - 1, Math.floor(Math.log(Math.max(1, n)) / Math.log(1024)));
+    return `${(n / Math.pow(1024, i)).toFixed(i >= 2 ? 0 : 1)} ${units[i]}`;
+  };
 
   const enterFolder = (idx: number, name: string) => loadPanel(idx, joinPath(panels[idx].folder, name));
 
@@ -534,8 +545,17 @@ export function FilesPanels({ tab, hiddenNames, theme, onPreview, onShare, onVid
         </div>
         {/* Подвал панели: счётчик выделенных */}
         <div style={{ padding: "5px 10px", borderTop: "1px solid var(--border-color)", fontSize: 11, color: "var(--text-muted)", background: "var(--bg-hover)", display: "flex", justifyContent: "space-between" }}>
-          <span>{panel.items.length} объектов</span>
-          <span>{panel.selected.size ? `выделено: ${panel.selected.size}` : "\u00A0"}</span>
+          <span>{panel.items.length} объектов{panel.selected.size ? ` · выделено: ${panel.selected.size}` : ""}</span>
+          {usage[idx] && usage[idx].total > 0 ? (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span title={`Заполнено на ${Math.round((usage[idx].used / usage[idx].total) * 100)}%`} style={{ width: 80, height: 5, borderRadius: 3, background: "var(--bg-card)", overflow: "hidden", display: "inline-block", flexShrink: 0 }}>
+                <span style={{ display: "block", height: "100%", width: `${Math.min(100, (usage[idx].used / usage[idx].total) * 100).toFixed(1)}%`, background: usage[idx].used / usage[idx].total > 0.9 ? "#FF3B30" : "#007AFF", borderRadius: 3 }} />
+              </span>
+              <span>{fmtBytes(usage[idx].used)} / {fmtBytes(usage[idx].total)}</span>
+            </span>
+          ) : (
+            <span>{"\u00A0"}</span>
+          )}
         </div>
       </div>
     );

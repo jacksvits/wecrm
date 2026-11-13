@@ -102,6 +102,24 @@ router.get('/tabs', optionalAuthMiddleware, async (req, res) => {
   }
 });
 
+// === Дисковая статистика вкладки (индикатор заполнения в панелях) ===
+router.get('/usage', optionalAuthMiddleware, (req, res) => {
+  const tabKey = String(req.query.tab || '');
+  if (tabKey === 'system' && (req as any).user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Доступ запрещен' });
+  }
+  if (!checkTabVisible(req, res, tabKey)) return;
+  const baseDir = resolveTabDir(tabKey);
+  if (!baseDir) return res.status(400).json({ error: 'Неверная вкладка' });
+  try {
+    const st = (fs as any).statfsSync(baseDir);
+    const total = Number(st.blocks) * Number(st.bsize);
+    const free = Number(st.bavail) * Number(st.bsize);
+    res.json({ total, used: total - free, free });
+  } catch {
+    res.status(500).json({ error: 'Не удалось прочитать статистику диска' });
+  }
+});
 // === Асинхронные переносы (copy/move) с прогрессом ===
 // POST /api/files/transfer — единый эндпоинт для копирования/перемещения
 // между любыми вкладками (sourceTab/targetTab); работает в фоне,
