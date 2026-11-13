@@ -23,10 +23,11 @@ import { useAuth } from "../hooks/useAuth";
 import { FinanceAnalyticsWidget } from "./accounting/FinanceAnalyticsWidget";
 import { FinanceDocumentsWidget } from "./accounting/FinanceDocumentsWidget";
 import { FinanceReconciliationWidget } from "./accounting/FinanceReconciliationWidget";
+import { AdStatistics } from "./AdStatistics";
 
 type WidgetSize = "small" | "medium" | "large";
 type WidgetId = string;
-type WidgetTab = "Основное" | "Биллинг" | "Бухгалтерия";
+type WidgetTab = "Основное" | "Биллинг" | "Бухгалтерия" | "Рекламная статистика";
 
 interface WidgetDef {
   id: WidgetId;
@@ -64,7 +65,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "widget-finance-reconciliation", size: "medium", label: "Сверка с банком", tab: "Бухгалтерия" },
 ];
 
-const TABS: WidgetTab[] = ["Основное", "Биллинг", "Бухгалтерия"];
+const TABS: WidgetTab[] = ["Основное", "Биллинг", "Бухгалтерия", "Рекламная статистика"];
 
 const DEFAULT_VISIBLE = ALL_WIDGETS.map((w) => w.id);
 
@@ -986,6 +987,9 @@ export function Director() {
       </div>
 
       {!showWidgetSettings ? (
+        activeTab === "Рекламная статистика" ? (
+          <AdStatistics />
+        ) : (
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -1028,6 +1032,7 @@ export function Director() {
             ) : null}
           </DragOverlay>
         </DndContext>
+        )
       ) : showWidgetSettings ? (
         <div
           style={{
