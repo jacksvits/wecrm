@@ -1,7 +1,7 @@
 // Публичные страницы новостей для гостей: /news (список) и /news/:id (детальная).
 // Чтение доступно без авторизации; лайки и комментарии — только для
 // авторизованных пользователей (гостю предлагаем войти).
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { safeHtml } from '../lib/safeHtml';
@@ -183,13 +183,27 @@ function NewsAdColumn({ blocks }: { blocks: AdBlock[] }) {
   );
 }
 
-/** Блок скрипта: вставка HTML/JS, высота по содержимому */
+/** Блок скрипта: вставка HTML/JS, высота по содержимому.
+ *  <script> из innerHTML браузер не выполняет — пересоздаём их после монтирования */
 function NewsAdScript({ block }: { block: AdBlock }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const html = block.script || '';
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    root.querySelectorAll('script').forEach((oldScript) => {
+      const s = document.createElement('script');
+      Array.from(oldScript.attributes).forEach(a => s.setAttribute(a.name, a.value));
+      s.textContent = oldScript.textContent || '';
+      oldScript.replaceWith(s);
+    });
+  }, [html]);
   return (
     <div
+      ref={ref}
       className="news-ad-script"
       style={{ borderRadius: 12, overflow: 'hidden', background: 'var(--bg-card)' }}
-      dangerouslySetInnerHTML={{ __html: block.script || '' }}
+      dangerouslySetInnerHTML={{ __html: html }}
     />
   );
 }
