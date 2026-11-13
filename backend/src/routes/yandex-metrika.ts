@@ -253,7 +253,7 @@ router.get('/summary', async (_req, res) => {
     const geoData = await metrikaRequest(s.token, {
       ids,
       metrics: 'ym:s:visits',
-      dimensions: 'ym:s:country',
+      dimensions: 'ym:s:regionCountry',
       date1: '30daysAgo',
       date2: 'today',
       sort: '-ym:s:visits',
