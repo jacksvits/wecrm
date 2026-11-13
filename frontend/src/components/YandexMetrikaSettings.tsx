@@ -124,12 +124,47 @@ export function YandexMetrikaSettings() {
             onChange={(e) => setToken(e.target.value)}
             style={inputStyle}
           />
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
-            Выпускается на{" "}
-            <a href="https://oauth.yandex.ru" target="_blank" rel="noreferrer" style={{ color: "var(--accent-color)" }}>
-              oauth.yandex.ru
-            </a>{" "}
-            (Яндекс ID → «Сервисы и токены») с правом «Яндекс Метрика — чтение данных (metrika:read)».
+          {token.trim() && token.trim().length < 50 && (
+            <div
+              style={{
+                marginTop: 6,
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "#fef3c7",
+                color: "#92400e",
+                fontSize: 12,
+              }}
+            >
+              Похоже, это не OAuth-токен: у токенов Яндекса вид «y0_AgAAAA…» и длина около 110 символов.
+              Ключ счётчика или «секретный ключ» Метрики сюда не подходят.
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.5 }}>
+            Как получить токен:
+            <ol style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+              <li>
+                Откройте{" "}
+                <a href="https://oauth.yandex.ru/client/new" target="_blank" rel="noreferrer" style={{ color: "var(--accent-color)" }}>
+                  oauth.yandex.ru/client/new
+                </a>{" "}
+                (войдите под Яндекс-аккаунтом, у которого есть доступ к счётчику) — название любое, например «WeCRM».
+              </li>
+              <li>
+                В разделе «Доступы» (API Яндекс ID → Яндекс Метрика) включите право «Чтение данных (metrika:read)».
+              </li>
+              <li>
+                Откройте в браузере:{" "}
+                <code style={{ fontSize: 11 }}>
+                  https://oauth.yandex.ru/authorize?response_type=token&client_id=ВАШ_ID_ПРИЛОЖЕНИЯ
+                </code>{" "}
+                (ID приложения указан на странице приложения) и подтвердите доступ.
+              </li>
+              <li>
+                Браузер перейдёт на страницу вида{" "}
+                <code style={{ fontSize: 11 }}>…#access_token=y0_AgAAAA…</code> — скопируйте значение после{" "}
+                <code style={{ fontSize: 11 }}>access_token=</code> (до символа «&amp;») и вставьте сюда.
+              </li>
+            </ol>
             Токен виден только администраторам и не передаётся в браузер — статистика идёт через сервер CRM.
           </div>
         </div>
