@@ -167,7 +167,7 @@ router.get('/summary', async (_req, res) => {
     const num = (v: any) => Number(v ?? 0) || 0;
 
     // 1. KPI за 30 дней + предыдущие 30 дней (дельта)
-    const kpiMetrics = 'ym:s:visits,ym:s:pageviews,ym:s:users,ym:s:avgSessionDuration,ym:s:pageDepth,ym:s:bounceRate';
+    const kpiMetrics = 'ym:s:visits,ym:s:pageviews,ym:s:users,ym:s:avgVisitDuration,ym:s:pageDepth,ym:s:bounceRate';
     const kpi = await metrikaRequest(s.token, { ids, metrics: kpiMetrics, date1: '30daysAgo', date2: 'today' });
     const kpiPrev = await metrikaRequest(s.token, { ids, metrics: kpiMetrics, date1: '60daysAgo', date2: '31daysAgo' });
     const m = (d: any, i: number) => num(totalsRow(d)[i]);
