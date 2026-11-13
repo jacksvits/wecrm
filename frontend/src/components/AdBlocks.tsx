@@ -8,7 +8,7 @@ const btnGhost: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, bo
 const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 };
 
 const POSITION_LABELS: Record<string, string> = { left: 'Слева', right: 'Справа' };
-const SIZE_LABELS: Record<string, string> = { small: 'Маленький (220×220)', medium: 'Средний (220×293)', big: 'Большой (220×435)' };
+const SIZE_LABELS: Record<string, string> = { small: 'Маленький (330×330)', medium: 'Средний (330×440)', big: 'Большой (330×652)' };
 
 export default function AdBlocks() {
   const [blocks, setBlocks] = useState<AdBlock[]>([]);
@@ -65,7 +65,7 @@ export default function AdBlocks() {
         <button style={btnPrimary} onClick={() => setModal('new')}>+ Добавить блок</button>
       </div>
       <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-        Блоки выводятся внутри новости (детальная страница) слева и справа от текста. Маленький — 220×220, средний — 220×293, большой — 220×435. Первый блок колонки закреплён при прокрутке, остальные прокручиваются вместе с текстом.
+        Блоки выводятся внутри новости (детальная страница) слева и справа от текста. Маленький — 330×330, средний — 330×440, большой — 330×652 (пропорционально ширине 330). Первый блок колонки закреплён при прокрутке, остальные прокручиваются вместе с текстом.
       </div>
       {error && <div style={{ color: '#dc2626', fontSize: 14 }}>{error}</div>}
       {loading ? <div>Загрузка…</div> : (
@@ -148,9 +148,9 @@ function AdBlockModal({ modal, uploading, onUpload, onClose, onSaved }: {
           </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Размер блока</label>
           <select value={size} onChange={e => setSize(e.target.value as 'small' | 'big')} style={inputStyle}>
-            <option value="small">Маленький — 220×220</option>
-            <option value="medium">Средний — 220×293</option>
-            <option value="big">Большой — 220×435</option>
+            <option value="small">Маленький — 330×330</option>
+            <option value="medium">Средний — 330×440</option>
+            <option value="big">Большой — 330×652</option>
           </select>
           <label style={{ fontSize: 14, fontWeight: 500 }}>Картинка</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

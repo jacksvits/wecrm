@@ -144,7 +144,7 @@ function NewsCard({ item, defaultCover, onClick }: { item: any; defaultCover: st
 // Общие стили колонок: контейнер-грид и скрытие боковых колонок на узких экранах
 const AD_COLUMNS_CSS = `
   /* Средняя колонка — по ширине карточки новости: реклама вплотную к тексту с обеих сторон */
-  .news-ad-grid { display: grid; grid-template-columns: 220px auto 220px; gap: 10px; justify-content: center; align-items: start; }
+  .news-ad-grid { display: grid; grid-template-columns: 330px auto 330px; gap: 10px; justify-content: center; align-items: start; }
   .news-ad-main { width: 800px; max-width: 100%; }
   .news-ad-col { display: flex; flex-direction: column; gap: 14px; }
   .news-ad-col > .news-ad-sticky { position: sticky; top: 68px; }
@@ -183,8 +183,8 @@ function NewsAdColumn({ blocks }: { blocks: AdBlock[] }) {
 function NewsAdCard({ block }: { block: AdBlock }) {
   const navigate = useNavigate();
   const [hover, setHover] = useState(false);
-  // Три размера блока: 220×220, 220×293, 220×435 (ширина колонки фиксирована)
-  const heights: Record<string, number> = { small: 220, medium: 293, big: 435 };
+  // Три размера блока пропорционально ширине 330 (×1.5 от 220-базовых): 330×330, 330×440, 330×652
+  const heights: Record<string, number> = { small: 330, medium: 440, big: 652 };
   const open = () => {
     if (!block.linkUrl) return;
     if (/^https?:\/\//i.test(block.linkUrl)) window.open(block.linkUrl, '_blank', 'noopener');
