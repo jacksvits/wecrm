@@ -134,6 +134,30 @@ router.get('/public/:slug', async (req, res) => {
   }
 });
 
+// GET /api/news/public/post/:idOrSlug — публичная детальная новость для витрины тенанта:
+// любая опубликованная новость по id или slug, без авторизации.
+// Отдельный путь от GET /public/:slug — тот обслуживает WP/RSS-ленту welans.ru.
+router.get('/public/post/:idOrSlug', async (req, res) => {
+  try {
+    const news = await prisma.news.findFirst({
+      where: {
+        OR: [{ slug: req.params.idOrSlug }, { id: req.params.idOrSlug }],
+        isPublished: true,
+      },
+      include: {
+        author: { select: { name: true } },
+        category: { select: { id: true, name: true, slug: true, color: true } },
+      },
+    });
+    if (!news) return res.status(404).json({ error: 'Новость не найдена' });
+    // Просмотр учитывается, как на странице новости в CRM
+    await prisma.news.update({ where: { id: news.id }, data: { views: { increment: 1 } } }).catch(() => {});
+    res.json(news);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.use(optionalAuthMiddleware);
 
 // Публичная страница новостей: чтение доступно гостям, изменения — только авторизованным

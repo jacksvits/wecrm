@@ -325,10 +325,10 @@ function NewsAdCard({ block, wide }: { block: AdBlock; wide?: boolean }) {
   );
 }
 
-function PublicNewsList({ consent = true }: { consent?: boolean }) {
+export function PublicNewsList({ consent = true, seoTitle, seoDescription }: { consent?: boolean; seoTitle?: string; seoDescription?: string }) {
   usePageSeo({
-    title: 'WeLANS - Новости',
-    description: 'Новости WeLANS — коротко о свежем: ИТ-консалтинг, инфраструктура, проекты и анонсы компании.',
+    title: seoTitle || 'WeLANS - Новости',
+    description: seoDescription || 'Новости WeLANS — коротко о свежем: ИТ-консалтинг, инфраструктура, проекты и анонсы компании.',
     canonical: `${window.location.origin}/news`,
   });
   const navigate = useNavigate();
