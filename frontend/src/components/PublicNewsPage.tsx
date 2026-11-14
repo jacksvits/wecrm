@@ -180,17 +180,26 @@ function injectHeadScript(html: string, marker: string): Promise<void> {
 /* ---------- Рекламные блоки по бокам карточки новости (только детальная страница) ---------- */
 
 // Общие стили колонок: контейнер-грид и скрытие боковых колонок на узких экранах
+
+// Одноколоночный режим деталки новости, когда у организации нет рекламных блоков
+// (пустая сетка под колонки сжимала бы текст)
+const NEWS_NO_ADS_CSS = `
+.news-ad-grid { display: block; }
+.news-ad-main { width: auto !important; max-width: 100%; }
+`;
 const AD_COLUMNS_CSS = `
   /* Средняя колонка — по ширине карточки новости: реклама вплотную к тексту с обеих сторон */
   /* Вся строка (карточка новости и обе колонки рекламы) — на одной линии, отступ 8px от верха экрана */
   .news-ad-grid { display: grid; grid-template-columns: 240px auto 300px; gap: 10px; justify-content: center; margin-top: 8px; }
-  .news-ad-main { width: 800px; max-width: 100%; }
+  /* Колонки закреплены явно: если блоков слева нет, NewsAdColumn рендерит null и без
+     grid-column автоплейсмент ставит карточку новости в первую колонку 240px */
+  .news-ad-main { grid-column: 2; width: 800px; max-width: 100%; }
   .news-ad-col { display: flex; flex-direction: column; gap: 14px; }
   .news-ad-col > .news-ad-sticky { position: sticky; top: 68px; }
   @media (max-width: 1100px) {
     .news-ad-grid { grid-template-columns: minmax(0, 1fr); }
     .news-ad-col { display: none; }
-    .news-ad-main { width: auto; }
+    .news-ad-main { grid-column: 1; width: auto; }
   }
 `;
 
@@ -554,12 +563,17 @@ export function PublicNewsDetail({ id, slug, consent = true, fetchByIdOrSlug, br
   }
 
   const date = news.publishedAt ? new Date(news.publishedAt) : new Date(news.createdAt);
+  // Без рекламных блоков страница идёт в одну колонку: пустая сетка под колонки
+  // сжимала бы текст (актуально для тенантов, у которых блоки ещё не созданы)
+  const hasLeftAds = ads.left.length > 0;
+  const hasRightAds = ads.right.length > 0;
+  const hasAnyAds = hasLeftAds || hasRightAds;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} consent={consent} />
       <div style={{ padding: '0 24px' }}>
-      <style>{AD_COLUMNS_CSS}</style>
+      <style>{hasAnyAds ? AD_COLUMNS_CSS : NEWS_NO_ADS_CSS}</style>
       <div className="news-ad-grid">
         <NewsAdColumn blocks={ads.left} />
         <div className="news-ad-main">
