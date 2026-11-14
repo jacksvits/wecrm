@@ -14,6 +14,7 @@ import LoginSlides from "./LoginSlides";
 import { CallHistory } from "./CallHistory";
 import { SeoSettings } from "./SeoSettings";
 import { MenuLinksSettings } from "./MenuLinksSettings";
+import { HeaderMenuSettings } from "./HeaderMenuSettings";
 import { safeHtml } from '../lib/safeHtml';
 
 // WYSIWYG-редактор — та же конфигурация, что и в остальных текстовых полях проекта
@@ -40,7 +41,7 @@ const TAB_CONFIGS = [
   { key: "games", label: "Игры", defaultPath: "/volume3/GAME" },
 ];
 
-type SystemSubTab = "design" | "themes" | "storage" | "promo" | "ads" | "slides" | "calls" | "handler" | "autoreply" | "legal" | "seo" | "menu";
+type SystemSubTab = "design" | "themes" | "storage" | "promo" | "ads" | "slides" | "calls" | "handler" | "autoreply" | "legal" | "seo" | "auth" | "header";
 
 export function SystemSettings() {
   // По умолчанию открываем под-вкладку «Дизайн»
@@ -1597,12 +1598,15 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "seo")} onClick={() => setSubTab("seo")}>
           SEO
         </button>
-        <button style={subTabStyle(subTab === "menu")} onClick={() => setSubTab("menu")}>
-          Меню
+        <button style={subTabStyle(subTab === "auth")} onClick={() => setSubTab("auth")}>
+          Авторизация
+        </button>
+        <button style={subTabStyle(subTab === "header")} onClick={() => setSubTab("header")}>
+          Шапка
         </button>
       </div>
 
-      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "ads" ? <AdBlocks /> : subTab === "slides" ? <LoginSlides /> : subTab === "calls" ? <CallHistory /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : subTab === "seo" ? <SeoSettings /> : subTab === "menu" ? <MenuLinksSettings /> : renderLegal()}
+      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "ads" ? <AdBlocks /> : subTab === "slides" ? <LoginSlides /> : subTab === "calls" ? <CallHistory /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : subTab === "seo" ? <SeoSettings /> : subTab === "auth" ? <MenuLinksSettings /> : subTab === "header" ? <HeaderMenuSettings /> : renderLegal()}
     </div>
   );
 }

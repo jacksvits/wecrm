@@ -165,11 +165,11 @@ function LoginBrandSplash() {
 // Дефолтные ссылки футера страницы входа — совпадают с серверными
 // (backend/src/routes/menu-links.ts). После загрузки из /api/menu-links заменяются настройками организации.
 const DEFAULT_MENU_LINKS = [
-  { key: 'presentation', label: 'Презентация', url: '/presentation' },
-  { key: 'catalog', label: 'Каталог', url: 'https://welans.cc/shop' },
-  { key: 'files', label: 'Файлы', url: 'https://welans.click' },
-  { key: 'news', label: 'Новости', url: 'https://welans.ru/news' },
-  { key: 'about', label: 'О компании', url: 'https://welans.cc/welans/' },
+  { key: 'presentation', title: 'Презентация', url: '/presentation', isActive: true },
+  { key: 'catalog', title: 'Каталог', url: 'https://welans.cc/shop', isActive: true },
+  { key: 'files', title: 'Файлы', url: 'https://welans.click', isActive: true },
+  { key: 'news', title: 'Новости', url: 'https://welans.ru/news', isActive: true },
+  { key: 'about', title: 'О компании', url: 'https://welans.cc/welans/', isActive: true },
 ];
 
 export function Login() {
@@ -592,9 +592,9 @@ export function Login() {
 
           {showCatalogHint && (<>
           <p className="login-quick-links">
-            {menuLinks.flatMap((l, i) => [
+            {menuLinks.filter(l => l.isActive !== false).flatMap((l, i) => [
               ...(i > 0 ? [<span key={`sep-${l.key}`} aria-hidden="true">·</span>] : []),
-              <a key={l.key} href={l.url} {...(l.key === 'presentation' ? {} : { target: '_blank', rel: 'noopener noreferrer' })}>{l.label}</a>,
+              <a key={l.key} href={l.url} {...(l.url.startsWith('/') ? {} : { target: '_blank', rel: 'noopener noreferrer' })}>{l.title}</a>,
             ])}
           </p>
 

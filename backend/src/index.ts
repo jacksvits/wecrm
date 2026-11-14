@@ -87,6 +87,7 @@ import pwaRoutes from './routes/pwa.js';
 import autoReplySettingsRoutes from './routes/auto-reply-settings.js';
 import legalRoutes from './routes/legal.js';
 import menuLinksRoutes from './routes/menu-links.js';
+import headerMenuLinksRoutes from './routes/header-menu-links.js';
 import securityRoutes from './routes/security.js';
 import publicFeedbackRoutes from './routes/public-feedback.js';
 import browserRoutes from './routes/browser.js';
@@ -334,6 +335,7 @@ app.use(pwaRoutes);
 app.use('/api/auto-reply-settings', autoReplySettingsRoutes);
 app.use('/api/legal', legalRoutes);
 app.use('/api/menu-links', menuLinksRoutes);
+app.use('/api/header-menu-links', headerMenuLinksRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/public/feedback', publicFeedbackRoutes); // Публичная форма лендинга: заявка с сайта -> новая задача
 app.use('/api/browser/vnc', vncRoutes);

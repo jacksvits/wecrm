@@ -2500,8 +2500,25 @@ model FileShareLink {
 model MenuLink {
   id        Int      @id @default(autoincrement())
   key       String   @unique
+  title     String   @default("")
   url       String
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("menu_links")
+}
+
+// Меню в шапке публичных страниц (Настройки — Системные — Шапка)
+model HeaderMenuLink {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  title     String   @default("")
+  url       String
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("header_menu_links")
 }
