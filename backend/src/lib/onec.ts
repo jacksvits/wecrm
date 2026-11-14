@@ -541,7 +541,21 @@ export class OneCClient {
       await this.request(`${encodeURI('Catalog_Номенклатура')}?$format=json&$top=1`);
       return { ok: true, message: 'Соединение с 1С установлено' };
     } catch (e: any) {
-      return { ok: false, message: e?.message || 'Не удалось подключиться к 1С' };
+      // Node fetch прячет причину в e.cause — без маппина тенант видел безликое "fetch failed"
+      const code: string = e?.cause?.code || '';
+      if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
+        return { ok: false, message: 'Сервер 1С не найден (DNS). Проверьте адрес базы в поле «Ссылка веб-версии 1С» — он должен открываться в браузере.' };
+      }
+      if (code === 'ECONNREFUSED') {
+        return { ok: false, message: 'Соединение отклонено сервером 1С. Проверьте порт веб-сервера и что база опубликована (шаг 1 инструкции).' };
+      }
+      if (code === 'ETIMEDOUT' || /timed? ?out/i.test(e?.message || '')) {
+        return { ok: false, message: 'Тайм-аут: сервер 1С не отвечает. Проверьте файрвол/VPN и что с сервера CRM (IP 89.23.5.137) разрешён доступ к 1С.' };
+      }
+      if (e?.message && e.message !== 'fetch failed') {
+        return { ok: false, message: e.message };
+      }
+      return { ok: false, message: 'Не удалось подключиться к 1С. Откройте адрес базы в браузере — если там ошибка, причина та же.' };
     }
   }
 }
