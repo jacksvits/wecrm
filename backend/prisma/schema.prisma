@@ -2493,3 +2493,15 @@ model FileShareLink {
 
   @@map("file_share_links")
 }
+
+
+// Ссылки кнопок меню в футере страницы входа (Настройки → Системные → Меню).
+// Дефолтные значения — в backend/src/routes/menu-links.ts и Login.tsx.
+model MenuLink {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  url       String
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("menu_links")
+}

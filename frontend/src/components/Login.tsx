@@ -162,7 +162,22 @@ function LoginBrandSplash() {
 }
 
 
+// Дефолтные ссылки футера страницы входа — совпадают с серверными
+// (backend/src/routes/menu-links.ts). После загрузки из /api/menu-links заменяются настройками организации.
+const DEFAULT_MENU_LINKS = [
+  { key: 'presentation', label: 'Презентация', url: '/presentation' },
+  { key: 'catalog', label: 'Каталог', url: 'https://welans.cc/shop' },
+  { key: 'files', label: 'Файлы', url: 'https://welans.click' },
+  { key: 'news', label: 'Новости', url: 'https://welans.ru/news' },
+  { key: 'about', label: 'О компании', url: 'https://welans.cc/welans/' },
+];
+
 export function Login() {
+  const [menuLinks, setMenuLinks] = useState(DEFAULT_MENU_LINKS);
+  useEffect(() => {
+    fetch('/api/menu-links').then(r => (r.ok ? r.json() : null)).then(d => { if (Array.isArray(d) && d.length) setMenuLinks(d); }).catch(() => {});
+  }, []);
+
   const { login, register } = useAuth()
   const [isRegister, setIsRegister] = useState(false)
   const [loginInput, setLoginInput] = useState('')
@@ -577,15 +592,10 @@ export function Login() {
 
           {showCatalogHint && (<>
           <p className="login-quick-links">
-            <a href="/presentation">Презентация</a>
-            <span aria-hidden="true">·</span>
-            <a href="https://welans.cc/shop">Каталог</a>
-            <span aria-hidden="true">·</span>
-            <a href="https://welans.click">Файлы</a>
-            <span aria-hidden="true">·</span>
-            <a href="https://welans.ru/news" target="_blank" rel="noopener noreferrer">Новости</a>
-            <span aria-hidden="true">·</span>
-            <a href="https://welans.cc/welans/">О компании</a>
+            {menuLinks.flatMap((l, i) => [
+              ...(i > 0 ? [<span key={`sep-${l.key}`} aria-hidden="true">·</span>] : []),
+              <a key={l.key} href={l.url} {...(l.key === 'presentation' ? {} : { target: '_blank', rel: 'noopener noreferrer' })}>{l.label}</a>,
+            ])}
           </p>
 
           <footer className="login-legal-footer" aria-label="Юридические документы">

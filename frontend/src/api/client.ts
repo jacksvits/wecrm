@@ -282,6 +282,10 @@ promoBlocks: { list: (): Promise<PromoBlock[]> => fetchApi('/api/promo-blocks'),
     get: (): Promise<{ title: string; description: string; canonical: string; robots: string; lang: string; viewport: string; keywords: string; yandexMetrika: string }> => fetchApi("/api/seo-settings"),
     save: (data: { title: string; description: string; canonical: string; robots: string; lang: string; viewport: string; keywords: string; yandexMetrika: string }) => fetchApi("/api/seo-settings", { method: "PUT", body: JSON.stringify(data) }),
   },
+  menuLinks: {
+    get: (): Promise<{ key: string; label: string; url: string }[]> => fetchApi("/api/menu-links"),
+    save: (items: { key: string; url: string }[]) => fetchApi("/api/menu-links", { method: "PUT", body: JSON.stringify(items) }),
+  },
   autoReplySettings: {
     get: (): Promise<{ userId: string | null; user?: { id: string; name: string } | null; triggers: AutoReplyTrigger[] }> => fetchApi("/api/auto-reply-settings"),
     saveUser: (userId: string | null) => fetchApi("/api/auto-reply-settings", { method: "PUT", body: JSON.stringify({ userId }) }),

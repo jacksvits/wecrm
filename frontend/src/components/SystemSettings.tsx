@@ -13,6 +13,7 @@ import AdBlocks from "./AdBlocks";
 import LoginSlides from "./LoginSlides";
 import { CallHistory } from "./CallHistory";
 import { SeoSettings } from "./SeoSettings";
+import { MenuLinksSettings } from "./MenuLinksSettings";
 import { safeHtml } from '../lib/safeHtml';
 
 // WYSIWYG-редактор — та же конфигурация, что и в остальных текстовых полях проекта
@@ -39,7 +40,7 @@ const TAB_CONFIGS = [
   { key: "games", label: "Игры", defaultPath: "/volume3/GAME" },
 ];
 
-type SystemSubTab = "design" | "themes" | "storage" | "promo" | "ads" | "slides" | "calls" | "handler" | "autoreply" | "legal" | "seo";
+type SystemSubTab = "design" | "themes" | "storage" | "promo" | "ads" | "slides" | "calls" | "handler" | "autoreply" | "legal" | "seo" | "menu";
 
 export function SystemSettings() {
   // По умолчанию открываем под-вкладку «Дизайн»
@@ -1596,9 +1597,12 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "seo")} onClick={() => setSubTab("seo")}>
           SEO
         </button>
+        <button style={subTabStyle(subTab === "menu")} onClick={() => setSubTab("menu")}>
+          Меню
+        </button>
       </div>
 
-      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "ads" ? <AdBlocks /> : subTab === "slides" ? <LoginSlides /> : subTab === "calls" ? <CallHistory /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : subTab === "seo" ? <SeoSettings /> : renderLegal()}
+      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "ads" ? <AdBlocks /> : subTab === "slides" ? <LoginSlides /> : subTab === "calls" ? <CallHistory /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : subTab === "seo" ? <SeoSettings /> : subTab === "menu" ? <MenuLinksSettings /> : renderLegal()}
     </div>
   );
 }
