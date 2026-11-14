@@ -10,6 +10,7 @@ import { currentTenant, platformPrisma } from '../lib/tenant.js';
 import { recordAuthEvent } from '../lib/auth-events.js';
 import { rateLimit } from '../lib/security.js';
 import { rejectBlockedIp } from '../lib/ip-access.js';
+import { getLinkedContact } from '../lib/contact-link.js';
 
 
 /**
@@ -130,6 +131,8 @@ router.post('/register', rejectBlockedIp, rateLimit({ prefix: 'register', window
         email: user.email,
         username: user.username,
         name: user.name,
+        phone: user.phone,
+        linkedContact: await getLinkedContact(user.id),
         role: roleName,
         roleId: user.roleId,
         allowedPages,
@@ -196,6 +199,8 @@ router.post('/login', rejectBlockedIp, rateLimit({ prefix: 'login', windowMs: 15
         email: user.email,
         username: user.username,
         name: user.name,
+        phone: user.phone,
+        linkedContact: await getLinkedContact(user.id),
         role: roleName,
         roleId: user.roleId,
         allowedPages,
@@ -261,6 +266,8 @@ router.get('/me', async (req, res) => {
       roleId: user.roleId,
       avatar: user.avatar,
       emails: user.emails,
+      phone: user.phone,
+      linkedContact: await getLinkedContact(user.id),
       allowedPages: await applyTenantSubscriptionPages(user.role?.allowedPages || []),
       crmCameras: await getTenantCrmCameras(),
       crmBilling: await getTenantProductFlag('crmSubscriptions'),
