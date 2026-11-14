@@ -685,29 +685,39 @@ const settingsSchema = z.object({
   defaultIovEmployeeId: z.number().optional().nullable(),
   defaultIovEmployeeName: z.string().optional().nullable(),
 });
+
 router.post("/settings", async (req: AuthRequest, res) => {
-  const data = settingsSchema.parse(req.body);
-  const existing = await prisma.telephonySettings.findFirst();
-  if (existing) {
-    // Пустой apiSecret из формы (поле оставлено без изменений, там маска) —
-    // не затираем сохранённый секрет, иначе ломается авторизация в API Novofon
-    const updateData = { ...data };
-    if (!updateData.apiSecret) {
-      delete updateData.apiSecret;
+  try {
+    const data = settingsSchema.parse(req.body);
+    const existing = await prisma.telephonySettings.findFirst();
+    if (existing) {
+      // Пустой apiSecret из формы (поле оставлено без изменений, там маска) —
+      // не затираем сохранённый секрет, иначе ломается авторизация в API Novofon
+      const updateData = { ...data };
+      if (!updateData.apiSecret) {
+        delete updateData.apiSecret;
+      }
+      const updated = await prisma.telephonySettings.update({
+        where: { id: existing.id },
+        data: updateData,
+      });
+      res.json(updated);
+    } else {
+      // apiSecret не обязателен: при работе по access_token достаточно apiKey.
+      // В модели поле обязательное (String) — пустая строка означает «без секрета»
+      const created = await prisma.telephonySettings.create({
+        data: { ...data, apiSecret: data.apiSecret ?? "" },
+      });
+      res.status(201).json(created);
     }
-    const updated = await prisma.telephonySettings.update({
-      where: { id: existing.id },
-      data: updateData,
-    });
-    res.json(updated);
-  } else {
-    // apiSecret не обязателен: при работе по access_token достаточно apiKey
-    const created = await prisma.telephonySettings.create({
-      data: data as any,
-    });
-    res.status(201).json(created);
+  } catch (err: any) {
+    // Ошибки валидации/Prisma раньше улетали в unhandledRejection и роняли
+    // весь процесс бэкенда (у клиента это выглядело как HTTP 502) — возвращаем 400
+    console.error("[Telephony] Ошибка сохранения настроек:", err.message);
+    res.status(400).json({ error: err.message || "Ошибка сохранения настроек" });
   }
 });
+
 // Проверка API-ключей Novofon: лёгкий вызов get.employees с текущими настройками.
 // Позволяет сразу после ввода API Secret в интерфейсе убедиться, что авторизация работает.
 router.post("/test", async (_req, res) => {
