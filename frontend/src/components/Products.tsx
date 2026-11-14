@@ -1523,6 +1523,35 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
 }
 
 /* ---------- Модалка позиции (WYSIWYG-описание + галерея) ---------- */
+// Фолбэк-реестр плагинов: показывается, пока не загружен актуальный список
+// с /api/integrations/registry (должен совпадать с backend/src/lib/plugins.ts)
+const CRM_PLUGIN_FALLBACK: { key: string; label: string }[] = [
+  { key: 'email', label: 'Почта' },
+  { key: 'telephony', label: 'Телефония' },
+  { key: 'sms', label: 'SMS журнал' },
+  { key: 'max', label: 'MAX' },
+  { key: 'telegram', label: 'Telegram' },
+  { key: 'vkCommunity', label: 'ВК сообщество' },
+  { key: 'vkMarket', label: 'ВК товары' },
+  { key: 'vkAuth', label: 'ВК авторизация' },
+  { key: 'yandex', label: 'Яндекс' },
+  { key: 'dgis', label: '2ГИС' },
+  { key: 'beget', label: 'Beget' },
+  { key: 'pskovline', label: 'Псковлайн' },
+  { key: 'onec', label: '1С УТ 8.3' },
+  { key: 'tochka', label: 'Точка Банк' },
+  { key: 'tochkaAcquiring', label: 'Эквайринг от Точки' },
+  { key: 'vpn', label: 'Прокси через VPN' },
+  { key: 'diadoc', label: 'Контур.Диадок' },
+  { key: 'ozon', label: 'OZON Seller' },
+  { key: 'wb', label: 'WB Seller' },
+  { key: 'hikvision', label: 'Камеры Hik-Connect' },
+  { key: 'cdek', label: 'CDEK' },
+  { key: 'tapo', label: 'Камеры Tapo' },
+  { key: 'rss', label: 'Парсинг RSS' },
+  { key: 'yandexMetrika', label: 'Яндекс.Метрика' },
+];
+
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
   const [form, setForm] = useState<{ name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages: string[]; payLink: string; crmRenewMonths: string; crmCameras: boolean; crmSubscriptions: boolean; crmAccounting: boolean; crmVideoNotes: boolean; crmCalls: boolean; crmIntegrations: string[]; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; syncToWb: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
@@ -1550,6 +1579,16 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     description: isNew ? '' : product.description || '',
     tags: isNew ? [] : (product.tags || []),
   });
+  // Реестр плагинов с бэкенда — список «Доступные интеграции» строится по нему,
+  // поэтому новые плагины появляются в форме автоматически
+  const [pluginRegistry, setPluginRegistry] = useState<{ key: string; label: string }[]>(CRM_PLUGIN_FALLBACK);
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    fetch('/api/integrations/registry', { headers: token ? { 'X-Auth-Token': token } : undefined })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (Array.isArray(d) && d.length) setPluginRegistry(d); })
+      .catch(() => {});
+  }, []);
   // Существующие теги всех карточек — для автоподстановки при вводе
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   useEffect(() => {
@@ -1661,141 +1700,18 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
       Отметьте, какие разделы CRM будут доступны организациям с этой подпиской.
     </div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6 }}>
-      {navItems.filter(i => !i.tenantOnly && i.path !== '/platform').map(i => (
-        <label key={i.path} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-          <input
-            type="checkbox"
-            checked={form.crmAllowedPages.includes(i.path)}
-            onChange={() => setForm({ ...form, crmAllowedPages: form.crmAllowedPages.includes(i.path) ? form.crmAllowedPages.filter(x => x !== i.path) : [...form.crmAllowedPages, i.path] })}
-            style={{ width: 15, height: 15 }}
-          />
-          {i.label}
-        </label>
-      ))}
-    </div>
-  </div>
-)}
-{form.kind === 'crm_subscription' && (
-  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginTop: 8 }}>
-    <input type="checkbox" checked={form.crmCameras} onChange={(e: any) => setForm({ ...form, crmCameras: e.target.checked })} style={{ width: 18, height: 18 }} />
-    <span>Подключение камер <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>(вкладка Камеры на странице директора)</span></span>
-  </label>
-)}
-{form.kind === 'crm_subscription' && (
-  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginTop: 6 }}>
-    <input type="checkbox" checked={form.crmSubscriptions} onChange={(e: any) => setForm({ ...form, crmSubscriptions: e.target.checked })} style={{ width: 18, height: 18 }} />
-    <span>Система подписок <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>(вкладка Биллинг на странице директора)</span></span>
-  </label>
-)}
-{form.kind === 'crm_subscription' && (
-  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginTop: 6 }}>
-    <input type="checkbox" checked={form.crmAccounting} onChange={(e: any) => setForm({ ...form, crmAccounting: e.target.checked })} style={{ width: 18, height: 18 }} />
-    <span>Ведение бухгалтерии <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>(вкладка Бухгалтерия на странице директора)</span></span>
-  </label>
-)}
-{form.kind === 'crm_subscription' && (
-  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginTop: 6 }}>
-    <input type="checkbox" checked={form.crmVideoNotes} onChange={(e: any) => setForm({ ...form, crmVideoNotes: e.target.checked })} style={{ width: 18, height: 18 }} />
-    <span>Кружочки в чате <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>(отправка видеосообщений)</span></span>
-  </label>
-)}
-{form.kind === 'crm_subscription' && (
-  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginTop: 6 }}>
-    <input type="checkbox" checked={form.crmCalls} onChange={(e: any) => setForm({ ...form, crmCalls: e.target.checked })} style={{ width: 18, height: 18 }} />
-    <span>Звонки <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>(вкладка в настройках, уведомления о звонках)</span></span>
-  </label>
-)}
-{form.kind === 'crm_subscription' && (
-  <div style={{ marginTop: 12, padding: 10, border: '1px solid var(--border-color)', borderRadius: 8 }}>
-    <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Доступные интеграции</div>
-    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>Неотмеченные интеграции будут недоступны для включения в настройках организации.</div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 6 }}>
-      <label key='email' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('email')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('email') ? form.crmIntegrations.filter(x => x !== 'email') : [...form.crmIntegrations, 'email'] })} style={{ width: 15, height: 15 }} />
-        Почта
-      </label>
-      <label key='telephony' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('telephony')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('telephony') ? form.crmIntegrations.filter(x => x !== 'telephony') : [...form.crmIntegrations, 'telephony'] })} style={{ width: 15, height: 15 }} />
-        Телефония
-      </label>
-      <label key='sms' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('sms')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('sms') ? form.crmIntegrations.filter(x => x !== 'sms') : [...form.crmIntegrations, 'sms'] })} style={{ width: 15, height: 15 }} />
-        SMS журнал
-      </label>
-      <label key='max' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('max')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('max') ? form.crmIntegrations.filter(x => x !== 'max') : [...form.crmIntegrations, 'max'] })} style={{ width: 15, height: 15 }} />
-        MAX
-      </label>
-      <label key='telegram' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('telegram')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('telegram') ? form.crmIntegrations.filter(x => x !== 'telegram') : [...form.crmIntegrations, 'telegram'] })} style={{ width: 15, height: 15 }} />
-        Telegram
-      </label>
-      <label key='vkCommunity' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('vkCommunity') || form.crmIntegrations.includes('vk')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('vkCommunity') ? form.crmIntegrations.filter(x => x !== 'vkCommunity') : [...form.crmIntegrations, 'vkCommunity'] })} style={{ width: 15, height: 15 }} />
-        ВК сообщество
-      </label>
-      <label key='vkMarket' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('vkMarket') || form.crmIntegrations.includes('vk')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('vkMarket') ? form.crmIntegrations.filter(x => x !== 'vkMarket') : [...form.crmIntegrations, 'vkMarket'] })} style={{ width: 15, height: 15 }} />
-        ВК товары
-      </label>
-      <label key='vkAuth' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('vkAuth') || form.crmIntegrations.includes('vk')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('vkAuth') ? form.crmIntegrations.filter(x => x !== 'vkAuth') : [...form.crmIntegrations, 'vkAuth'] })} style={{ width: 15, height: 15 }} />
-        ВК авторизация
-      </label>
-      <label key='yandex' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('yandex')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('yandex') ? form.crmIntegrations.filter(x => x !== 'yandex') : [...form.crmIntegrations, 'yandex'] })} style={{ width: 15, height: 15 }} />
-        Яндекс
-      </label>
-      <label key='dgis' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('dgis')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('dgis') ? form.crmIntegrations.filter(x => x !== 'dgis') : [...form.crmIntegrations, 'dgis'] })} style={{ width: 15, height: 15 }} />
-        2GIS
-      </label>
-      <label key='beget' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('beget')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('beget') ? form.crmIntegrations.filter(x => x !== 'beget') : [...form.crmIntegrations, 'beget'] })} style={{ width: 15, height: 15 }} />
-        Beget
-      </label>
-      <label key='pskovline' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('pskovline')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('pskovline') ? form.crmIntegrations.filter(x => x !== 'pskovline') : [...form.crmIntegrations, 'pskovline'] })} style={{ width: 15, height: 15 }} />
-        Псковлайн
-      </label>
-      <label key='tochka' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('tochka')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('tochka') ? form.crmIntegrations.filter(x => x !== 'tochka') : [...form.crmIntegrations, 'tochka'] })} style={{ width: 15, height: 15 }} />
-        Точка Банк
-      </label>
-      <label key='tochkaAcquiring' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('tochkaAcquiring')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('tochkaAcquiring') ? form.crmIntegrations.filter(x => x !== 'tochkaAcquiring') : [...form.crmIntegrations, 'tochkaAcquiring'] })} style={{ width: 15, height: 15 }} />
-        Эквайринг от Точки
-      </label>
-      <label key='onec' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('onec')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('onec') ? form.crmIntegrations.filter(x => x !== 'onec') : [...form.crmIntegrations, 'onec'] })} style={{ width: 15, height: 15 }} />
-        1С УТ 8.3
-      </label>
-      <label key='diadoc' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('diadoc')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('diadoc') ? form.crmIntegrations.filter(x => x !== 'diadoc') : [...form.crmIntegrations, 'diadoc'] })} style={{ width: 15, height: 15 }} />
-        Контур.Диадок
-      </label>
-      <label key='ozon' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('ozon')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('ozon') ? form.crmIntegrations.filter(x => x !== 'ozon') : [...form.crmIntegrations, 'ozon'] })} style={{ width: 15, height: 15 }} />
-        OZON Seller
-      </label>
-      <label key='wb' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('wb')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('wb') ? form.crmIntegrations.filter(x => x !== 'wb') : [...form.crmIntegrations, 'wb'] })} style={{ width: 15, height: 15 }} />
-        WB Seller
-      </label>
-      <label key='vpn' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type="checkbox" checked={form.crmIntegrations.includes('vpn')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('vpn') ? form.crmIntegrations.filter(x => x !== 'vpn') : [...form.crmIntegrations, 'vpn'] })} style={{ width: 15, height: 15 }} />
-        Прокси через VPN
-      </label>
-      <label key='hikvision' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type='checkbox' checked={form.crmIntegrations.includes('hikvision')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('hikvision') ? form.crmIntegrations.filter(x => x !== 'hikvision') : [...form.crmIntegrations, 'hikvision'] })} style={{ width: 15, height: 15 }} />
-        Камеры Hik-Connect
-      </label>
-      <label key='cdek' style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-        <input type='checkbox' checked={form.crmIntegrations.includes('cdek')} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes('cdek') ? form.crmIntegrations.filter(x => x !== 'cdek') : [...form.crmIntegrations, 'cdek'] })} style={{ width: 15, height: 15 }} />
-        CDEK
-      </label>
-    </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {pluginRegistry.map(p => {
+          // legacy-значение 'vk' в старых подписках отмечает все три vk-плагина
+          const checked = form.crmIntegrations.includes(p.key) || (p.key.startsWith('vk') && form.crmIntegrations.includes('vk'));
+          return (
+            <label key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+              <input type='checkbox' checked={checked} onChange={() => setForm({ ...form, crmIntegrations: form.crmIntegrations.includes(p.key) ? form.crmIntegrations.filter(x => x !== p.key) : [...form.crmIntegrations, p.key] })} style={{ width: 15, height: 15 }} />
+              {p.label}
+            </label>
+          );
+        })}
+      </div>
   </div>
 )}
 {form.kind === 'crm_subscription' && (

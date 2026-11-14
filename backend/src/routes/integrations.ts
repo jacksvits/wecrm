@@ -2,8 +2,16 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { loadTokens } from './tochka.js';
+import { CRM_PLUGINS } from '../lib/plugins.js';
 
 const router = Router();
+
+// GET /api/integrations/registry — единый реестр плагинов.
+// Источник списка «Доступные интеграции» в карточках подписок: новый плагин
+// появляется там автоматически после добавления в backend/src/lib/plugins.ts.
+router.get('/registry', (_req, res) => {
+  res.json(CRM_PLUGINS);
+});
 
 router.use(authMiddleware);
 
