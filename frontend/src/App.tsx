@@ -94,6 +94,11 @@ function App() { const { user, loading } = useAuth() ; const location = useLocat
     if (location.pathname === '/news' || location.pathname === '/news/') return <TenantPublicNews /> ;
     const newsMatch = location.pathname.match(/^\/news\/([^/]+)\/?$/);
     if (newsMatch) return <TenantPublicNewsDetail idOrSlug={decodeURIComponent(newsMatch[1])} /> ;
+    // Карточки новостей ведут на корневой /<slug> — открываем опубликованную новость и по нему
+    const rootSlug = location.pathname.match(/^\/([a-z0-9][a-z0-9-]{1,200})\/?$/);
+    if (rootSlug && !['offer', 'privacy', 'cookies', 'org-login', 'register', 'presentation', 'shop', 'vitrine', 'news', 'files'].includes(rootSlug[1])) {
+      return <TenantPublicNewsDetail idOrSlug={rootSlug[1]} /> ;
+    }
   }
 
   if (!user) { return ( <><InstallAppBanner /><Login /></> ) ; } return ( <CallProvider><CallOverlay /><Layout> <InstallAppBanner /> <Routes> <Route path='/' element={<Dashboard />} /> <Route path='/tasks' element={<RequireRole path='/tasks'><TaskList /></RequireRole>} /> <Route path='/tasks/:id' element={<RequireRole path='/tasks'><TaskDetail /></RequireRole>} /> <Route path='/mail' element={<RequireRole path='/mail'><MailClient /></RequireRole>} /> <Route path='/schedule' element={<RequireRole path='/schedule'><SchedulePage /></RequireRole>} /> <Route path='/deals' element={<RequireRole path='/deals'><DealBoard /></RequireRole>} /> <Route path='/products' element={<RequireRole path='/products'><Products /></RequireRole>} />
