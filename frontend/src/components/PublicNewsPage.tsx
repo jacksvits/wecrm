@@ -455,7 +455,7 @@ export function PublicNewsList({ consent = true, seoTitle, seoDescription }: { c
   );
 }
 
-export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; slug?: string; consent?: boolean }) {
+export function PublicNewsDetail({ id, slug, consent = true, fetchByIdOrSlug, brand }: { id?: string; slug?: string; consent?: boolean; fetchByIdOrSlug?: string; brand?: string }) {
   const navigate = useNavigate();
   const defaultCover = useBrandNewsCover();
   const [news, setNews] = useState<any>(null);
@@ -483,7 +483,13 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
   };
 
   useEffect(() => {
-    if (slug) {
+    if (fetchByIdOrSlug) {
+      // Публичная новость по id или slug (витрина тенанта: /api/news/public/post/:idOrSlug)
+      fetch(`/api/news/public/post/${encodeURIComponent(fetchByIdOrSlug)}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error('not found'))))
+        .then(setNews)
+        .catch(() => setNotFound(true));
+    } else if (slug) {
       // Старые ссылки welans.ru/<slug>/ — новость ищется по WP-slug
       fetch(`/api/news/public/${encodeURIComponent(slug)}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error('not found'))))
@@ -492,7 +498,7 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
     } else if (id) {
       api.news.get(id).then(setNews).catch(() => setNotFound(true));
     }
-  }, [id, slug]);
+  }, [id, slug, fetchByIdOrSlug]);
 
   useEffect(() => {
     if (news?.id) {
@@ -509,10 +515,10 @@ export function PublicNewsDetail({ id, slug, consent = true }: { id?: string; sl
     if (!news) return;
     const slug = news.slug || news.id;
     const meta = {
-      title: `${news.title} — WeLANS`,
+      title: `${news.title} — ${brand || 'WeLANS'}`,
       description: makeDescription(news.summary || news.content || ''),
       canonical: `${window.location.origin}/${encodeURIComponent(slug)}/`,
-      ogTitle: `${news.title} — WeLANS`,
+      ogTitle: `${news.title} — ${brand || 'WeLANS'}`,
       ogDescription: makeDescription(news.summary || news.content || ''),
       ogImage: news.coverImage || undefined,
       ogType: 'article',
