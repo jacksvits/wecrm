@@ -87,8 +87,10 @@ router.post('/test', authMiddleware, async (req: AuthRequest, res) => {
     if (!url || !login || !password) {
       return res.status(400).json({ error: 'Заполните ссылку, логин и пароль' });
     }
-    const ok = await new OneCClient(url, login, password).ping();
-    res.json({ ok, message: ok ? 'Соединение с 1С установлено' : 'Не удалось подключиться к 1С' });
+    // pingDetailed возвращает реальную причину (401/404/тайм-аут) — без неё тенант видел
+    // просто «Не удалось подключиться» и не мог понять, что чинить
+    const result = await new OneCClient(url, login, password).pingDetailed();
+    res.json(result);
   } catch (err: any) {
     res.json({ ok: false, message: err.message });
   }

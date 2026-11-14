@@ -533,4 +533,15 @@ export class OneCClient {
       return false;
     }
   }
+
+
+  // Проверка соединения с детальной причиной ошибки (кнопка «Проверить соединение» в CRM)
+  async pingDetailed(): Promise<{ ok: boolean; message: string }> {
+    try {
+      await this.request(`${encodeURI('Catalog_Номенклатура')}?$format=json&$top=1`);
+      return { ok: true, message: 'Соединение с 1С установлено' };
+    } catch (e: any) {
+      return { ok: false, message: e?.message || 'Не удалось подключиться к 1С' };
+    }
+  }
 }

@@ -156,6 +156,11 @@ export default function OneCSettings() {
         <span style={{ fontSize: 14, fontWeight: 500 }}>Активировать интеграцию с 1С УТ 8.3</span>
       </label>
 
+      {/* Подробная инструкция */}
+      <div style={{ marginBottom: 14, fontSize: 13 }}>
+        <a href='/help/int-1c' target='_blank' rel='noreferrer' style={{ color: '#2563eb' }}>Подробная инструкция по подключению 1С &#8594;</a>
+      </div>
+
       {/* Ссылка веб-версии 1С */}
       <div style={{ marginBottom: 14 }}>
         <label style={labelStyle}>Ссылка веб-версии 1С</label>
@@ -167,7 +172,7 @@ export default function OneCSettings() {
           placeholder="https://welans.org/welans/ru"
         />
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-          Опубликованный HTTP-сервис 1С (hs/wecrm)
+          Стандартный интерфейс OData базы 1С. Укажите только адрес базы — CRM сама допишет путь, например: https://1c.example.com/welans
         </div>
       </div>
 
