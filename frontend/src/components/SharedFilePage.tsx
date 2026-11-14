@@ -66,7 +66,7 @@ export default function SharedFilePage({ token }: { token: string }) {
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-body, #f5f5f5)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: isMobile ? '8px 12px' : '10px 16px', borderBottom: '1px solid var(--border-color, #e5e5e5)', background: 'var(--bg-card, #fff)' }}>
-        <a href="https://welans.ru" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} aria-label="WeLANS — на главную">
+        <a href={window.location.origin} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} aria-label="WeLANS — на главную">
           <img src={brandLogo} alt="WeLANS" style={{ height: isMobile ? 28 : 34, maxWidth: 140, objectFit: 'contain' }} />
         </a>
         <div style={{ flex: 1, minWidth: 0 }} />

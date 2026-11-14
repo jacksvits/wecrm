@@ -43,7 +43,7 @@ function PublicNewsHeader({ query, onSearch, onSubmit, consent = true }: { query
       borderBottom: '1px solid var(--border-color, #e0e0e0)',
       background: 'var(--bg-secondary, #fff)',
     }}>
-      <a href="https://welans.ru" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} aria-label="WeLANS — на главную">
+      <a href={window.location.origin} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} aria-label="WeLANS — на главную">
         {logoUrl
           ? <img src={logoUrl} alt="WeLANS" style={{ height: 34, maxWidth: 140, objectFit: 'contain' }} />
           : <span style={{ fontSize: 20, fontWeight: 700 }}>WeLANS</span>}
