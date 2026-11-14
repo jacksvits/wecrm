@@ -713,6 +713,15 @@ router.post("/settings", async (req: AuthRequest, res) => {
   } catch (err: any) {
     // Ошибки валидации/Prisma раньше улетали в unhandledRejection и роняли
     // весь процесс бэкенда (у клиента это выглядело как HTTP 502) — возвращаем 400
+    if (err?.name === "ZodError" && Array.isArray(err.issues) && err.issues.length) {
+      const issue = err.issues[0];
+      const field = issue.path?.join(".") || "";
+      const labels: Record<string, string> = { apiKey: "API Key / Access Token", apiSecret: "API Secret" };
+      const label = labels[field] || field || "настройки";
+      return res.status(400).json({
+        error: field ? `Проверьте поле «${label}»: ${issue.message}` : `Ошибка валидации: ${issue.message}`,
+      });
+    }
     console.error("[Telephony] Ошибка сохранения настроек:", err.message);
     res.status(400).json({ error: err.message || "Ошибка сохранения настроек" });
   }
