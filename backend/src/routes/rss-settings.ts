@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { syncRssFeeds, isRssSyncRunning } from '../lib/rss-sync.js';
+import { syncGoogleNews, isGoogleNewsSyncRunning } from '../lib/google-news-sync.js';
 import { oldSitePool, ensureRssSchema } from '../lib/old-site.js';
 
 // ===== Настройки плагина «Парсинг RSS» =====
@@ -42,6 +43,7 @@ const settingsSchema = z.object({
   maxItemsPerFeed: z.number().int().min(1).max(10000).optional(),
   limitPerImport: z.number().int().min(0).max(1000).optional(),
   uniqueTitles: z.boolean().optional(),
+  googleNewsKeywords: z.string().max(1000).optional().nullable(),
   sources: z.array(sourceSchema).max(50).optional(),
 });
 
@@ -82,6 +84,7 @@ function settingsWithDefaults(s: any) {
     maxItemsPerFeed: s?.maxItemsPerFeed ?? 200,
     limitPerImport: s?.limitPerImport ?? 0,
     uniqueTitles: s?.uniqueTitles ?? true,
+    googleNewsKeywords: s?.googleNewsKeywords ?? '',
   };
 }
 
@@ -96,6 +99,10 @@ router.get('/', async (_req, res) => {
     if (s?.lastSyncResult) {
       try { lastSync = JSON.parse(s.lastSyncResult); } catch { lastSync = null; }
     }
+    let lastGoogleNewsSync: any = null;
+    if (s?.lastGoogleNewsSyncResult) {
+      try { lastGoogleNewsSync = JSON.parse(s.lastGoogleNewsSyncResult); } catch { lastGoogleNewsSync = null; }
+    }
     const stats = await collectStats(sources.map((x: any) => x.id));
     res.json({
       ...settingsWithDefaults(s),
@@ -103,6 +110,8 @@ router.get('/', async (_req, res) => {
       defaultsApplied: !s?.sources?.length,
       lastSyncAt: s?.lastSyncAt ?? null,
       lastSync,
+      lastGoogleNewsSyncAt: s?.lastGoogleNewsSyncAt ?? null,
+      lastGoogleNewsSync,
       stats,
     });
   } catch (err: any) {
@@ -123,6 +132,13 @@ router.post('/', async (req: AuthRequest, res) => {
       maxItemsPerFeed: data.maxItemsPerFeed ?? existing?.maxItemsPerFeed ?? 200,
       limitPerImport: data.limitPerImport ?? existing?.limitPerImport ?? 0,
       uniqueTitles: data.uniqueTitles ?? existing?.uniqueTitles ?? true,
+      // Ключевые слова Google News — свои у каждого тенанта (таблица в БД организации)
+      googleNewsKeywords: (data.googleNewsKeywords ?? existing?.googleNewsKeywords ?? '')
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .slice(0, 20)
+        .join(', '),
     };
     const settings = await prisma.rssSettings.upsert({
       where: { id: 1 },
@@ -181,6 +197,23 @@ router.post('/sync', async (_req, res) => {
     res.json(summary);
   } catch (err: any) {
     console.error('[rss-settings:sync]', err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/rss-settings/google-news-sync — сбор новостей Google News по ключевым
+ * словам этого тенанта прямо сейчас (ручной запуск, без ожидания расписания worker'а)
+ */
+router.post('/google-news-sync', async (_req, res) => {
+  if (isGoogleNewsSyncRunning()) {
+    return res.status(409).json({ error: 'Сбор новостей Google News уже выполняется' });
+  }
+  try {
+    const summary = await syncGoogleNews();
+    res.json(summary);
+  } catch (err: any) {
+    console.error('[rss-settings:google-news-sync]', err);
     res.status(400).json({ error: err.message });
   }
 });

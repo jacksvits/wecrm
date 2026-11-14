@@ -1,0 +1,160 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: crm_secret_2026
+      POSTGRES_DB: wecrm
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm -d wecrm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    image: wecrm-backend:multitenant
+    # Порт слушается только на localhost: nginx проксирует API с хоста,
+    # внешний доступ (туннель) идёт напрямую по docker-сети (--local-host backend)
+    ports:
+      - "127.0.0.1:4000:4000"
+    environment:
+      DATABASE_URL: postgresql://crm:crm_secret_2026@db:5432/wecrm?schema=public
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      VAPID_PUBLIC_KEY: BBDb3f-KC_ZFFEP6fu2eQ6mNPBVUtn-O1IZme1ZX7Ug8W9JXHFiwzlXeyDEt4n2I7f2NWIII4QLyAJZ7ESZdzSs
+      VAPID_PRIVATE_KEY: duhNuxTRJLTYidASQ8jDpR1OQb7U3zUATxACkV855sA
+      VAPID_SUBJECT: mailto:admin@welans.cc
+      PORT: 4000
+      NODE_ENV: production
+      NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt
+      VK_CLIENT_ID: "54736647"
+      VK_CLIENT_SECRET: "l7d4RoIFcqdzmgLzt3nf"
+      VK_REDIRECT_URI: "https://welans.cc/api/vk/callback"
+      BEGET_LOGIN: "softboeg"
+      NAS_DSM_URL: "http://192.168.8.3:5000"
+      NAS_DSM_USER: "jack"
+      NAS_DSM_PASSWORD: "16Fhuevtyn_"
+      NAS_BACKEND_HOST: "192.168.8.145"
+      NAS_BACKEND_PORT: 80
+      # Базовый домен поддоменов организаций и email для Let's Encrypt на NAS
+      NAS_BASE_DOMAIN: "welans.cc"
+      BEGET_PASSWORD: "nyBNQofDm96"
+      TOCHKA_CLIENT_ID: "4146da5f3ccc42d6a2e725a08062d8e7"
+      TOCHKA_CLIENT_SECRET: "e90a2e242aad441596da65e889d96dad"
+      TOCHKA_REDIRECT_URI: "https://welans.cc/api/tochka/auth-url"
+      TOCHKA_ACCESS_TOKEN: ""
+      FRONTEND_URL: "https://welans.cc"
+      # Прокси для обращений бэкенда к Telegram API (контейнер vpn, sing-box).
+      # Нужен, если прямой доступ к api.telegram.org с сервера заблокирован.
+      TELEGRAM_PROXY_URL: "http://vpn:2080"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - /mnt/nfs/wecrm-uploads:/app/uploads
+      - /mnt/nfs/SOFT:/app/files/programs:ro
+      - /mnt/nfs/DRIVER:/app/files/drivers:ro
+      - /mnt/nfs/BOOK:/app/files/documents:ro
+      - /mnt/nfs/GAME:/app/files/games:ro
+      - /mnt/nfs/GAME:/app/games:ro
+      - ./backend/data:/app/data
+      # Общий том с конфигом sing-box: бэкенд перезаписывает его из плагина «Прокси через VPN»
+      - ./vpn/sing-box:/app/vpn-config
+      # Docker-сокет: спавн контейнеров VNC-браузера (routes/browser-vnc.ts)
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Собранный фронтенд (общий том с frontend) — шаблон index.html для /pwa-index
+      - fe-dist:/fe-dist:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build: ./frontend
+    image: wecrm-frontend:multitenant
+    # Только localhost: отдачу наружу делает nginx на хосте
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - /mnt/nfs/wecrm-uploads:/usr/share/nginx/html/uploads:ro
+      # Общий том с backend: копия собранного dist для /pwa-index (tenant-aware index.html)
+      - fe-dist:/fe-dist
+    # Копируем dist в общий том перед стартом nginx (backend читает index.html оттуда)
+    command: sh -c "mkdir -p /fe-dist && cp -rf /usr/share/nginx/html/. /fe-dist/ && exec nginx -g 'daemon off;'"
+    restart: unless-stopped
+
+  email-worker:
+    build: ./backend
+    image: wecrm-backend:multitenant
+    command: sh -c "npx prisma generate && npx tsx src/worker.ts"
+    environment:
+      DATABASE_URL: postgresql://crm:crm_secret_2026@db:5432/wecrm?schema=public
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      VAPID_PUBLIC_KEY: BBDb3f-KC_ZFFEP6fu2eQ6mNPBVUtn-O1IZme1ZX7Ug8W9JXHFiwzlXeyDEt4n2I7f2NWIII4QLyAJZ7ESZdzSs
+      VAPID_PRIVATE_KEY: duhNuxTRJLTYidASQ8jDpR1OQb7U3zUATxACkV855sA
+      VAPID_SUBJECT: mailto:admin@welans.cc
+      NODE_ENV: production
+      NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - /mnt/nfs/wecrm-uploads:/app/uploads
+      - /mnt/nfs/SOFT:/app/files/programs:ro
+      - /mnt/nfs/DRIVER:/app/files/drivers:ro
+      - /mnt/nfs/BOOK:/app/files/documents:ro
+      - /mnt/nfs/GAME:/app/files/games:ro
+      - /mnt/nfs/GAME:/app/games:ro
+      - ./backend/prisma:/app/prisma:ro
+    restart: unless-stopped
+
+  # Локальный прокси с VPN-подпиской — для трафика Telegram API, когда прямой
+  # доступ к api.telegram.org с сервера заблокирован. Конфиг config.json
+  # перезаписывается бэкендом (плагин «Прокси через VPN»), run.sh следит за
+  # изменением файла и перезапускает sing-box.
+  vpn:
+    image: ghcr.io/sagernet/sing-box:v1.10.7
+    container_name: wecrm-vpn-1
+    # в образе ENTRYPOINT=sing-box, поэтому обёртку запускаем через entrypoint
+    entrypoint: ["/bin/sh", "/etc/sing-box/run.sh"]
+    restart: unless-stopped
+    volumes:
+      - ./vpn/sing-box:/etc/sing-box:ro
+
+
+  # SNI-роутер внешнего HTTPS (443): welans.cc + *.welans.cc -> хостовый nginx :10443
+  # (wildcard ZeroSSL, автообновление acme.sh), остальное -> NAS 192.168.8.3:443
+  # (чужие сайты без изменений). network_mode: host — нужны loopback хоста и LAN.
+  haproxy:
+    image: haproxy:2.9-alpine
+    container_name: wecrm-haproxy-1
+    network_mode: host
+    restart: unless-stopped
+    user: root
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - backend
+
+  # Образ VNC-сессии браузера: собирается вручную
+  # (docker compose --profile manual build vnc-session), запуск контейнеров —
+  # по требованию бэкендом (по сессии на пользователя CRM)
+  vnc-session:
+    build: ./vnc
+    image: wecrm-vnc:latest
+    profiles:
+      - manual
+
+volumes:
+  pgdata:
+  fe-dist:
+

@@ -48,6 +48,7 @@ interface RssForm {
   maxItemsPerFeed: number;
   limitPerImport: number;
   uniqueTitles: boolean;
+  googleNewsKeywords: string;
   sources: RssSourceForm[];
 }
 
@@ -62,10 +63,12 @@ export function RssSettings() {
     maxItemsPerFeed: 200,
     limitPerImport: 0,
     uniqueTitles: true,
+    googleNewsKeywords: '',
     sources: [],
   });
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [googleNewsSyncing, setGoogleNewsSyncing] = useState(false);
   const [msg, setMsg] = useState('');
   const [isError, setIsError] = useState(false);
 
@@ -87,6 +90,7 @@ export function RssSettings() {
           maxItemsPerFeed: s.maxItemsPerFeed || 200,
           limitPerImport: s.limitPerImport || 0,
           uniqueTitles: s.uniqueTitles ?? true,
+          googleNewsKeywords: s.googleNewsKeywords ?? '',
           sources: (s.sources ?? []).map((x: any) => ({
             id: x.id, name: x.name || '', url: x.url || '',
             siteUrl: x.siteUrl || '', feedImage: x.feedImage || '', isActive: x.isActive !== false,
@@ -110,6 +114,7 @@ export function RssSettings() {
         maxItemsPerFeed: Number(form.maxItemsPerFeed) || 200,
         limitPerImport: Number(form.limitPerImport) || 0,
         uniqueTitles: form.uniqueTitles,
+        googleNewsKeywords: form.googleNewsKeywords,
         sources: form.sources.map((s) => ({
           ...(s.id ? { id: s.id } : {}),
           name: s.name.trim(),
@@ -151,6 +156,29 @@ export function RssSettings() {
     }
   };
 
+  const formatGoogleNewsSummary = (s: any) => {
+    const parts: string[] = [];
+    if (s.keywords != null) parts.push(`слов ${s.keywords}`);
+    if (s.created != null) parts.push(`новых ${s.created}`);
+    if (s.skipped != null) parts.push(`пропущено ${s.skipped}`);
+    if (s.failed) parts.push(`ошибок ${s.failed}`);
+    if (s.errors?.length) parts.push(s.errors.slice(0, 3).join('; '));
+    return parts.join(', ') || 'ключевые слова не заданы';
+  };
+
+  const runGoogleNewsSync = async () => {
+    setGoogleNewsSyncing(true);
+    try {
+      const s = await api.rssSettings.googleNewsSync();
+      flash('Сбор новостей Google завершён: ' + formatGoogleNewsSummary(s));
+      await load();
+    } catch (e: any) {
+      flash('Ошибка сбора новостей Google: ' + e.message, true);
+    } finally {
+      setGoogleNewsSyncing(false);
+    }
+  };
+
   const updateSource = (index: number, patch: Partial<RssSourceForm>) => {
     setForm((prev) => ({
       ...prev,
@@ -179,6 +207,20 @@ export function RssSettings() {
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
           Новости из RSS-лент публикуются в категорию «Коротко о свежем» и дублируются в архивную базу old_site.
           Механика повторяет плагин wprss_feed старого сайта welans.ru.
+        </div>
+      </div>
+
+      <div>
+        <label style={labelStyle}>Ключевые слова Google News</label>
+        <textarea
+          style={{ ...inputStyle, minHeight: 64, resize: 'vertical', fontFamily: 'inherit' }}
+          value={form.googleNewsKeywords}
+          onChange={(e) => setForm({ ...form, googleNewsKeywords: e.target.value })}
+          placeholder="stihl, бензопилы, садовая техника"
+        />
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+          Через запятую, до 20 слов. По каждому слову CRM собирает новости из новостной ленты Google
+          в категорию «Новости Google» этой организации. Список слов индивидуален для каждого тенанта.
         </div>
       </div>
 
@@ -318,6 +360,9 @@ export function RssSettings() {
         <button type="button" onClick={runSync} disabled={syncing} style={btnSecondary}>
           {syncing ? 'Получение новостей…' : 'Получить новости'}
         </button>
+        <button type="button" onClick={runGoogleNewsSync} disabled={googleNewsSyncing} style={btnSecondary}>
+          {googleNewsSyncing ? 'Сбор новостей Google…' : 'Получить новости Google'}
+        </button>
       </div>
 
       {settings?.stats && (
@@ -327,6 +372,12 @@ export function RssSettings() {
             <div>
               Последний обход: {new Date(settings.lastSyncAt).toLocaleString('ru-RU')}
               {settings.lastSync && <> — {formatSyncSummary(settings.lastSync)}</>}
+            </div>
+          )}
+          {settings.lastGoogleNewsSyncAt && (
+            <div>
+              Последний сбор Google News: {new Date(settings.lastGoogleNewsSyncAt).toLocaleString('ru-RU')}
+              {settings.lastGoogleNewsSync && <> — {formatGoogleNewsSummary(settings.lastGoogleNewsSync)}</>}
             </div>
           )}
         </div>

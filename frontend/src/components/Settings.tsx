@@ -64,7 +64,7 @@ const PLUGINS: { key: PluginKey; label: string; group: string; description: stri
   { key: "hikvision", helpSlug: "int-hikvision", label: "Камеры Hik-Connect", group: "Видеонаблюдение", description: "Онлайн-просмотр облачных камер Hik-Connect по логину/паролю аккаунта" },
   { key: "tapo", helpSlug: "int-tapo", label: "Камеры Tapo", group: "Видеонаблюдение", description: "Онлайн-просмотр облачных камер TP-Link Tapo по логину/паролю аккаунта (для администраторов)" },
   { key: "cdek", helpSlug: "int-cdek", label: "CDEK", group: "Логистика", description: "Доставка заказов СДЭК: калькулятор стоимости, накладные, трекинг, квитанции" },
-  { key: "rss", helpSlug: "int-rss", label: "Парсинг RSS", group: "Контент", description: "Автоматический сбор новостей из RSS-лент в категорию «Коротко о свежем» (механика wprss_feed)" },
+  { key: "rss", helpSlug: "int-rss", label: "Парсинг RSS", group: "Контент", description: "Автоматический сбор новостей из RSS-лент в категорию «Коротко о свежем» (механика wprss_feed) + новости Google News по ключевым словам" },
   { key: "yandexMetrika", helpSlug: "int-yandex-metrika", label: "Яндекс Метрика", group: "Аналитика", description: "Статистика сайтов: визиты, источники трафика, аудитория — во вкладке «Рекламная статистика» страницы директора" },
 ];
 

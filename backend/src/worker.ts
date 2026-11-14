@@ -14,6 +14,7 @@ import { syncProductsToWb, syncPricesToWb, syncPricesFromWb, syncStocksToWb, syn
 import { listWorkerTenants, withTenant, TenantInfo } from './lib/tenant.js';
 import { runStatusAutoChange } from './lib/status-auto-change.js';
 import { syncRssFeeds, isRssSyncRunning } from './lib/rss-sync.js';
+import { syncGoogleNews, isGoogleNewsSyncRunning } from './lib/google-news-sync.js';
 
 /**
  * Entry-point для worker-контейнера (мультитенантный).
@@ -27,7 +28,7 @@ import { syncRssFeeds, isRssSyncRunning } from './lib/rss-sync.js';
  * глобальный `prisma` обращается к БД нужной организации.
  */
 
-type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkCommunityWorker; rssTimer?: NodeJS.Timeout; onecTimer?: NodeJS.Timeout; ozonProductsTimer?: NodeJS.Timeout; ozonPricesTimer?: NodeJS.Timeout; ozonStocksTimer?: NodeJS.Timeout; vkProductsTimer?: NodeJS.Timeout; vkPricesTimer?: NodeJS.Timeout; vkStocksTimer?: NodeJS.Timeout; wbProductsTimer?: NodeJS.Timeout; wbPricesTimer?: NodeJS.Timeout; wbStocksTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
+type TimerBag = { email?: EmailWorker; accounting?: AccountingWorker; vk?: VkCommunityWorker; rssTimer?: NodeJS.Timeout; googleNewsTimer?: NodeJS.Timeout; onecTimer?: NodeJS.Timeout; ozonProductsTimer?: NodeJS.Timeout; ozonPricesTimer?: NodeJS.Timeout; ozonStocksTimer?: NodeJS.Timeout; vkProductsTimer?: NodeJS.Timeout; vkPricesTimer?: NodeJS.Timeout; vkStocksTimer?: NodeJS.Timeout; wbProductsTimer?: NodeJS.Timeout; wbPricesTimer?: NodeJS.Timeout; wbStocksTimer?: NodeJS.Timeout; statusAutoTimer?: NodeJS.Timeout };
 
 /** Интервал проверки «Авто смены» статусов */
 const STATUS_AUTO_CHANGE_MS = 60_000;
@@ -44,6 +45,7 @@ function stopBag(key: string, bag: TimerBag) {
   try { bag.accounting?.stop(); } catch { /* ignore */ }
   try { bag.vk?.stop(); } catch { /* ignore */ }
   if (bag.rssTimer) clearInterval(bag.rssTimer);
+  if (bag.googleNewsTimer) clearInterval(bag.googleNewsTimer);
   if (bag.onecTimer) clearInterval(bag.onecTimer);
   if (bag.ozonProductsTimer) clearInterval(bag.ozonProductsTimer);
   if (bag.ozonPricesTimer) clearInterval(bag.ozonPricesTimer);
@@ -311,6 +313,33 @@ async function syncTenant(t: TenantInfo): Promise<void> {
   } else if (bag.rssTimer) {
     clearInterval(bag.rssTimer);
     bag.rssTimer = undefined;
+  }
+
+  // --- Новости Google News по ключевым словам (КАЖДЫЙ тенант — со своими словами:
+  //     rss_settings с ключевыми словами живёт в БД каждой организации) ---
+  const googleNewsSettings = await prisma.rssSettings.findFirst();
+  const hasGoogleNewsKeywords = !!googleNewsSettings?.googleNewsKeywords?.trim();
+  if (googleNewsSettings?.isActive && googleNewsSettings.autoSync && hasGoogleNewsKeywords) {
+    if (!bag.googleNewsTimer) {
+      const runGoogleNewsJob = async () => {
+        if (isGoogleNewsSyncRunning()) {
+          console.log(`[Worker] Google News sync already running (${key}), skipped`);
+          return;
+        }
+        try {
+          const summary = await syncGoogleNews();
+          console.log(`[Worker] Google News sync done (${key}):`, JSON.stringify(summary).slice(0, 300));
+        } catch (e: any) {
+          console.error(`[Worker] Google News sync error (${key}):`, e.message);
+        }
+      };
+      const googleNewsIntervalMin = Math.max(5, googleNewsSettings.intervalMinutes || 15);
+      bag.googleNewsTimer = setInterval(runGoogleNewsJob, googleNewsIntervalMin * 60 * 1000);
+      console.log(`[Worker] Google News sync scheduled every ${googleNewsIntervalMin} min (${key})`);
+    }
+  } else if (bag.googleNewsTimer) {
+    clearInterval(bag.googleNewsTimer);
+    bag.googleNewsTimer = undefined;
   }
 
 }
