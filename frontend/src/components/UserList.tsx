@@ -30,6 +30,7 @@ export function UserList() {
     defaultTaskAssignee: false,
     defaultTaskCurator: false,
     novofonExtension: "" as string,
+    phone: "" as string,
   });
   useEffect(() => {
     loadUsers();
@@ -46,7 +47,7 @@ export function UserList() {
   };
   const openCreate = () => {
     setEditingId(null);
-    setForm({ name: "", email: "", password: "", roleId: roles[0]?.id || "", canBeCurator: false, stockAccess: false, defaultTaskAssignee: false, defaultTaskCurator: false, novofonExtension: "" });
+    setForm({ name: "", email: "", password: "", roleId: roles[0]?.id || "", canBeCurator: false, stockAccess: false, defaultTaskAssignee: false, defaultTaskCurator: false, novofonExtension: "", phone: "" });
     setError("");
     setShowModal(true);
   };
@@ -62,6 +63,7 @@ export function UserList() {
       defaultTaskAssignee: u.defaultTaskAssignee ?? false,
       defaultTaskCurator: u.defaultTaskCurator ?? false,
       novofonExtension: u.novofonExtension || "",
+      phone: u.phone || "",
     });
     setError("");
     setShowModal(true);
@@ -71,7 +73,7 @@ export function UserList() {
     setError("");
     try {
       if (editingId) {
-        const data: any = { name: form.name, roleId: form.roleId || null, stockAccess: form.stockAccess, canBeCurator: form.canBeCurator, defaultTaskAssignee: form.defaultTaskAssignee, defaultTaskCurator: form.defaultTaskCurator, novofonExtension: form.novofonExtension || null };
+        const data: any = { name: form.name, roleId: form.roleId || null, stockAccess: form.stockAccess, canBeCurator: form.canBeCurator, defaultTaskAssignee: form.defaultTaskAssignee, defaultTaskCurator: form.defaultTaskCurator, novofonExtension: form.novofonExtension || null, phone: form.phone || null };
         if (form.email !== users.find((u) => u.id === editingId)?.email)
           data.email = form.email;
         await api.users.update(editingId, data);
@@ -337,6 +339,19 @@ export function UserList() {
                     >
                       {u.email}
                     </div>{" "}
+                    {u.phone && (
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text-muted)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        📱 {u.phone}
+                      </div>
+                    )}{" "}
                     {u.canBeCurator && (
                       <span
                         style={{
@@ -663,6 +678,19 @@ export function UserList() {
                   }
                 />
                 Указывать куратором при создании новой задачи
+              </label>
+              <label style={{ display: 'block', marginTop: 12, fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>
+                Телефон
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  placeholder="+7 (___) ___-__-__"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, marginTop: 4 }}
+                />
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontWeight: 400 }}>
+                  Только один номер. При совпадении с телефоном контакта пользователь привяжется к нему и получит доступ к задачам контакта. Сменить номер может только администратор.
+                </div>
               </label>
               <label style={{ display: 'block', marginTop: 12, fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>
                 Короткий номер Novofon

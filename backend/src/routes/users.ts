@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
+import { linkUserToContactByPhone, normalizePhone, unlinkUserContacts } from '../lib/contact-link.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -20,6 +21,7 @@ const createSchema = z.object({
   defaultTaskAssignee: z.boolean().optional(),
   defaultTaskCurator: z.boolean().optional(),
   stockAccess: z.boolean().optional(),
+  phone: z.string().optional().nullable(),
 });
 
 const updateSchema = z.object({
@@ -33,6 +35,9 @@ const updateSchema = z.object({
   defaultTaskCurator: z.boolean().optional(),
   stockAccess: z.boolean().optional(),
   novofonExtension: z.string().optional().nullable(),
+  // Телефон (только один): при совпадении с телефоном контакта пользователь
+  // привязывается к нему и получает доступ к его задачам
+  phone: z.string().optional().nullable(),
 });
 
 const adminOnly = (req: AuthRequest, res: any, next: any) => {
@@ -44,7 +49,7 @@ const adminOnly = (req: AuthRequest, res: any, next: any) => {
 
 router.get('/', async (req, res) => {
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, username: true, emails: true, avatar: true, roleId: true, role: true, createdAt: true, lastActiveAt: true, canBeCurator: true, defaultTaskAssignee: true, defaultTaskCurator: true, stockAccess: true, novofonExtension: true },
+    select: { id: true, name: true, email: true, username: true, emails: true, avatar: true, roleId: true, role: true, createdAt: true, lastActiveAt: true, canBeCurator: true, defaultTaskAssignee: true, defaultTaskCurator: true, stockAccess: true, novofonExtension: true, phone: true },
     orderBy: { name: 'asc' },
   });
   res.json(users);
@@ -61,11 +66,26 @@ router.post('/', adminOnly, async (req: AuthRequest, res) => {
       if (existingUsername) return res.status(400).json({ error: 'Пользователь с таким логином уже существует' });
     }
 
+    // Телефон (только один): при совпадении с телефоном контакта пользователь
+    // привязывается к контакту и получает доступ к его задачам
+    const phone = data.phone ? normalizePhone(data.phone) : null;
+    if (phone) {
+      const phoneBusy = await prisma.user.findUnique({ where: { phone } });
+      if (phoneBusy) return res.status(400).json({ error: 'Этот номер телефона уже указан у другого пользователя' });
+    }
+
     const hash = await bcrypt.hash(data.password, 10);
     const user = await prisma.user.create({
-      data: { email: data.email, username: data.username || null, password: hash, name: data.name, roleId: data.roleId || null, canBeCurator: data.canBeCurator ?? false, defaultTaskAssignee: data.defaultTaskAssignee ?? false, defaultTaskCurator: data.defaultTaskCurator ?? false, stockAccess: data.stockAccess ?? false },
-      select: { id: true, name: true, email: true, username: true, emails: true, avatar: true, roleId: true, role: true, createdAt: true, lastActiveAt: true, canBeCurator: true, defaultTaskAssignee: true, defaultTaskCurator: true, stockAccess: true, novofonExtension: true },
+      data: { email: data.email, username: data.username || null, password: hash, name: data.name, roleId: data.roleId || null, canBeCurator: data.canBeCurator ?? false, defaultTaskAssignee: data.defaultTaskAssignee ?? false, defaultTaskCurator: data.defaultTaskCurator ?? false, stockAccess: data.stockAccess ?? false, phone },
+      select: { id: true, name: true, email: true, username: true, emails: true, avatar: true, roleId: true, role: true, createdAt: true, lastActiveAt: true, canBeCurator: true, defaultTaskAssignee: true, defaultTaskCurator: true, stockAccess: true, novofonExtension: true, phone: true },
     });
+    if (phone) {
+      try {
+        await linkUserToContactByPhone(user.id, phone);
+      } catch (linkErr: any) {
+        return res.status(400).json({ error: linkErr.message });
+      }
+    }
     res.status(201).json(user);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -75,11 +95,47 @@ router.post('/', adminOnly, async (req: AuthRequest, res) => {
 router.patch('/:id', adminOnly, async (req: AuthRequest, res) => {
   try {
     const data = updateSchema.parse(req.body);
+
+    // Смена телефона — только администратором: отвязываем старый контакт,
+    // сохраняем новый номер и привязываем контакт по совпадению (1:1)
+    let phoneChanged = false;
+    if (data.phone !== undefined) {
+      const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { phone: true, name: true } });
+      if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+      const newPhone = data.phone ? normalizePhone(data.phone) : null;
+      if (newPhone !== target.phone) phoneChanged = true;
+      if (newPhone) {
+        const phoneBusy = await prisma.user.findFirst({ where: { phone: newPhone, id: { not: req.params.id } }, select: { id: true } });
+        if (phoneBusy) return res.status(400).json({ error: 'Этот номер телефона уже указан у другого пользователя' });
+        // Проверяем привязку до сохранения: контакт не должен быть занят другим пользователем
+        try {
+          await unlinkUserContacts(req.params.id);
+          await linkUserToContactByPhone(req.params.id, newPhone);
+        } catch (linkErr: any) {
+          return res.status(400).json({ error: linkErr.message });
+        }
+      } else if (target.phone) {
+        await unlinkUserContacts(req.params.id);
+      }
+      data.phone = newPhone;
+    }
+
     const user = await prisma.user.update({
       where: { id: req.params.id },
       data,
-      select: { id: true, name: true, email: true, username: true, emails: true, avatar: true, roleId: true, role: true, createdAt: true, lastActiveAt: true, canBeCurator: true, defaultTaskAssignee: true, defaultTaskCurator: true, stockAccess: true, novofonExtension: true },
+      select: { id: true, name: true, email: true, username: true, emails: true, avatar: true, roleId: true, role: true, createdAt: true, lastActiveAt: true, canBeCurator: true, defaultTaskAssignee: true, defaultTaskCurator: true, stockAccess: true, novofonExtension: true, phone: true },
     });
+    if (phoneChanged) {
+      await prisma.activity.create({
+        data: {
+          action: 'change-phone',
+          entity: 'user',
+          entityId: user.id,
+          details: `Администратор ${req.user!.name} сменил номер телефона пользователя ${user.name}`,
+          userId: req.user!.id,
+        },
+      });
+    }
     res.json(user);
   } catch (err: any) {
     res.status(400).json({ error: err.message });

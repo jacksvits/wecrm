@@ -94,6 +94,13 @@ model User {
   // Novofon extension (internal number)
   novofonExtension String? @map("novofon_extension")
 
+  // Телефон пользователя (только один). При совпадении с телефоном контакта
+  // пользователь привязывается к контакту и получает доступ к его задачам.
+  // После привязки сменить номер может только администратор.
+  phone     String?  @unique
+  // Контакт, привязанный к пользователю по телефону (связь 1:1)
+  linkedContact Contact?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -221,6 +228,11 @@ model Contact {
   // Агент передаёт его при регистрации устройства — у контакта может быть
   // несколько устройств, все они привязываются к одному ключу.
   clientKey    String?        @unique @map("client_key")
+
+  // Привязанный пользователь CRM (по совпадению телефона). У контакта может быть
+  // только один привязанный пользователь — он получает доступ к задачам контакта.
+  userId       String?        @unique @map("user_id")
+  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   devices      ClientDevice[]
 }
 
