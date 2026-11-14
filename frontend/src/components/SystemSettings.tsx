@@ -41,11 +41,14 @@ const TAB_CONFIGS = [
   { key: "games", label: "Игры", defaultPath: "/volume3/GAME" },
 ];
 
-type SystemSubTab = "design" | "themes" | "storage" | "promo" | "ads" | "slides" | "calls" | "handler" | "autoreply" | "legal" | "seo" | "auth" | "header";
+type SystemSubTab = "design" | "themes" | "storage" | "promo" | "ads" | "slides" | "calls" | "handler" | "autoreply" | "legal" | "seo" | "menu";
+type MenuSection = "auth" | "header";
 
 export function SystemSettings() {
   // По умолчанию открываем под-вкладку «Дизайн»
-  const [subTab, setSubTab] = useState<SystemSubTab>("design"); const { user } = useAuth() as any ; const ssPages: string[] = (user as any)?.allowedPages || [] ; const catalogAllowed = ssPages.length === 0 || ssPages.includes('/products') ; const callsAllowed = (user as any)?.crmCalls !== false ; const tasksAllowedSS = ssPages.length === 0 || ssPages.includes('/tasks') ;
+  const [subTab, setSubTab] = useState<SystemSubTab>("design");
+  // Вложенные вкладки раздела «Меню» (Настройки → Системные → Меню)
+  const [menuSection, setMenuSection] = useState<MenuSection>("auth"); const { user } = useAuth() as any ; const ssPages: string[] = (user as any)?.allowedPages || [] ; const catalogAllowed = ssPages.length === 0 || ssPages.includes('/products') ; const callsAllowed = (user as any)?.crmCalls !== false ; const tasksAllowedSS = ssPages.length === 0 || ssPages.includes('/tasks') ;
   const [settings, setSettings] = useState<Record<string, { url: string; path: string }>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -1560,6 +1563,17 @@ export function SystemSettings() {
     );
   };
 
+  // Раздел «Меню»: вложенные вкладки «Авторизация» (футер входа) и «Шапка» (публичные страницы)
+  const renderMenuSection = () => (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <button style={subTabStyle(menuSection === "auth")} onClick={() => setMenuSection("auth")}>Авторизация</button>
+        <button style={subTabStyle(menuSection === "header")} onClick={() => setMenuSection("header")}>Шапка</button>
+      </div>
+      {menuSection === "auth" ? <MenuLinksSettings /> : <HeaderMenuSettings />}
+    </div>
+  );
+
   return (
     <div>
       <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>Системные настройки</h3>
@@ -1598,15 +1612,12 @@ export function SystemSettings() {
         <button style={subTabStyle(subTab === "seo")} onClick={() => setSubTab("seo")}>
           SEO
         </button>
-        <button style={subTabStyle(subTab === "auth")} onClick={() => setSubTab("auth")}>
-          Авторизация
-        </button>
-        <button style={subTabStyle(subTab === "header")} onClick={() => setSubTab("header")}>
-          Шапка
+        <button style={subTabStyle(subTab === "menu")} onClick={() => setSubTab("menu")}>
+          Меню
         </button>
       </div>
 
-      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "ads" ? <AdBlocks /> : subTab === "slides" ? <LoginSlides /> : subTab === "calls" ? <CallHistory /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : subTab === "seo" ? <SeoSettings /> : subTab === "auth" ? <MenuLinksSettings /> : subTab === "header" ? <HeaderMenuSettings /> : renderLegal()}
+      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "ads" ? <AdBlocks /> : subTab === "slides" ? <LoginSlides /> : subTab === "calls" ? <CallHistory /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : subTab === "seo" ? <SeoSettings /> : subTab === "menu" ? renderMenuSection() : renderLegal()}
     </div>
   );
 }
