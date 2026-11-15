@@ -3,8 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { NewsCategory, NewsTag } from '../types';
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
+import ReactQuill from './LazyQuill' ;
 
 const quillModules = {
   toolbar: [
@@ -36,7 +35,7 @@ export function NewsEditor() {
   const [pinnedToHome, setPinnedToHome] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
-  const contentQuillRef = useRef<ReactQuill>(null);
+  const contentQuillRef = useRef<any>(null);
   const contentImageInputRef = useRef<HTMLInputElement>(null);
   const [uploadingContentImage, setUploadingContentImage] = useState(false);
 

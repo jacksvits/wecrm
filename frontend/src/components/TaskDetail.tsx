@@ -25,8 +25,7 @@ import { Avatar } from "./Avatar";
 import { ContactPicker } from "./ContactPicker";
 import { TaskDiscussionContact, DiscussionContact } from "./TaskDiscussionContact";
 import { Vitrine } from "./Vitrine";
-import ReactQuill from "react-quill-new";
-import "react-quill-new/dist/quill.snow.css";
+import ReactQuill from './LazyQuill' ;
 import { safeHtml } from '../lib/safeHtml';
 const priorityLabels: Record<string, string> = {
   low: "Низкий",

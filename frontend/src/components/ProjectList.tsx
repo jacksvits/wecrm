@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useRealtime } from '../hooks/useRealtime';
 import { Project, Status, Contact, User } from '../types';
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
+import ReactQuill from './LazyQuill' ;
 
 export function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([]);

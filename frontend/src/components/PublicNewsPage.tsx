@@ -12,8 +12,7 @@ import { makeDescription } from '../lib/stripHtml';
 import { applyPageMeta, restorePageMeta } from '../lib/seo';
 import PublicAuthArea from './PublicAuthArea';
 import { usePublicUser } from './PublicAuthArea';
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
+import ReactQuill from './LazyQuill' ;
 import PublicNavMenu from './PublicNavMenu';
 import { AdBlock } from '../types';
 

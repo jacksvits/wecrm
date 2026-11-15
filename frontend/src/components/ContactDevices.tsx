@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
+import ReactQuill from './LazyQuill' ;
 import { api } from '../api/client';
 import { ClientDevice } from '../types';
 import { useAuth } from '../context/AuthContext';

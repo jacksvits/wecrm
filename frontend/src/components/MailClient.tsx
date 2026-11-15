@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { Contact } from '../types';
 import { useNavigate } from 'react-router-dom';
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
+import ReactQuill from './LazyQuill' ;
 
 /**
  * Почтовый клиент (страница /mail, доступ только у админов).

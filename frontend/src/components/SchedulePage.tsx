@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
+import ReactQuill from './LazyQuill' ;
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { CalendarMonth, toISODate, MONTH_NAMES } from './calendar/CalendarMonth';

@@ -2,4 +2,7 @@
 hikcloudstream[viewer]>=0.1.4,<0.2
 flask==3.0.3
 
+# hikcloudstream 0.1.4 несовместим с pyezvizapi 2.x (модуль stream удалён) — держим линейку 1.x
+pyezvizapi>=1.0.4.5,<2.0
+
 # PyAV (парсер Annex-B и fMP4-упаковка для /h264) ставится транзитивно через hikcloudstream[viewer]

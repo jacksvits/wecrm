@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { ContactAccess, ContactAccessDirection } from '../types';
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
+import ReactQuill from './LazyQuill' ;
 import { safeHtml } from '../lib/safeHtml';
 
 const quillModules = {

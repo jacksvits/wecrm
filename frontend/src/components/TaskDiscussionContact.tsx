@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ReactQuill from "react-quill-new";
-import "react-quill-new/dist/quill.snow.css";
+import ReactQuill from './LazyQuill' ;
 import { Contact, ContactAccess, ContactAccessDirection, ClientDevice, Deal, Status } from "../types";
 import { Avatar } from "./Avatar";
 import { api } from "../api/client";
