@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import multer from 'multer';
+import * as XLSX from 'xlsx';
 import fs from 'fs';
 import path from 'path';
 import { prisma } from '../lib/prisma.js';
@@ -1378,6 +1380,233 @@ router.put('/:id/prices', async (req, res) => {
     res.json(updated);
   } catch (err: any) {
     console.error('[products:set-price]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ============ Импорт цен из XLS ============ */
+
+// Парсинг цены из ячейки: «12 593», «12593,50», «12 590 руб.» и т.п.
+function parseXlsPrice(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? v : null;
+  let s = String(v).trim().replace(/[\s\u00A0\u202F]/g, '').replace(',', '.').replace(/[^\d.]/g, '');
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function normNameKey(s: string): string {
+  return s.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+function normCodeKey(s: string): string {
+  return s.trim().replace(/\s+/g, '').toUpperCase();
+}
+
+const importXlsUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+/**
+ * GET /api/products/import-xls/template
+ * Шаблон XLS для импорта цен: Название | Артикул | Цена
+ */
+router.get('/import-xls/template', async (_req, res) => {
+  try {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Название', 'Артикул', 'Цена'],
+      ['Пример: Дрель аккумуляторная 18В', 'АРТ-12345', 12590],
+    ]);
+    ws['!cols'] = [{ wch: 50 }, { wch: 18 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Цены');
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="wecrm-prices-template.xlsx"');
+    res.send(buffer);
+  } catch (err: any) {
+    console.error('[products:import-xls:template]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/products/import-xls/parse
+ * Принимает загруженный XLSX, возвращает список столбцов и строки первого листа.
+ * Строка заголовков — первая строка с двумя и более непустыми ячейками.
+ */
+router.post('/import-xls/parse', importXlsUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const wsName = wb.SheetNames[0];
+    if (!wsName) return res.status(400).json({ error: 'В файле нет листов' });
+    const raw = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wsName], { header: 1, defval: '', raw: true });
+    if (!raw.length) return res.status(400).json({ error: 'Лист пуст' });
+    let headerIdx = -1;
+    for (let i = 0; i < Math.min(raw.length, 10); i++) {
+      const filled = (raw[i] || []).filter(c => String(c ?? '').trim() !== '').length;
+      if (filled >= 2) { headerIdx = i; break; }
+    }
+    if (headerIdx < 0) return res.status(400).json({ error: 'Не найдена строка заголовков' });
+    const columns = (raw[headerIdx] || []).map((c, i) => String(c ?? '').trim() || `Столбец ${i + 1}`);
+    const rows = raw.slice(headerIdx + 1).map((r, i) => ({
+      row: headerIdx + i + 2, // номер строки как в Excel
+      cells: columns.map((_, ci) => r[ci] ?? ''),
+    })).filter(r => r.cells.some(c => String(c ?? '').trim() !== ''));
+    if (rows.length > 10000) return res.status(400).json({ error: 'В файле больше 10000 строк — разбейте на части' });
+    res.json({ columns, rows });
+  } catch (err: any) {
+    console.error('[products:import-xls:parse]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/products/import-xls/preview
+ * Сопоставляет строки файла с каталогом (артикул/sku → название) и возвращает
+ * предпросмотр «было → стало» и список ненайденных позиций.
+ */
+router.post('/import-xls/preview', async (req, res) => {
+  try {
+    const { rows, colName, colArticle, colPrice, priceTypeId } = req.body || {};
+    if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'Нет строк для разбора' });
+    if (colName == null || colPrice == null) return res.status(400).json({ error: 'Выберите столбцы названия и цены' });
+    const priceType = await prisma.priceType.findUnique({ where: { id: priceTypeId } });
+    if (!priceType) return res.status(400).json({ error: 'Вид цены не найден' });
+
+    type RowItem = { row: number; name: string; article: string; price: number | null };
+    const items: RowItem[] = [];
+    for (const r of rows.slice(0, 10000)) {
+      const cells = Array.isArray(r?.cells) ? r.cells : [];
+      const name = String(cells[colName] ?? '').trim();
+      const article = colArticle != null ? String(cells[colArticle] ?? '').trim() : '';
+      const price = parseXlsPrice(cells[colPrice]);
+      if (!name) continue; // строки-группы и пустые пропускаем
+      items.push({ row: Number(r?.row) || 0, name: name.slice(0, 500), article: article.slice(0, 100), price });
+    }
+
+    const products = await prisma.product.findMany({
+      where: { kind: 'product' },
+      select: { id: true, name: true, sku: true, article: true, prices: { where: { priceTypeId }, select: { price: true } } },
+    });
+    const byCode = new Map<string, (typeof products)[number]>();
+    const byName = new Map<string, (typeof products)[number]>();
+    for (const p of products) {
+      if (p.sku) { const k = normCodeKey(p.sku); if (!byCode.has(k)) byCode.set(k, p); }
+      if (p.article) { const k = normCodeKey(p.article); if (!byCode.has(k)) byCode.set(k, p); }
+      const nk = normNameKey(p.name);
+      if (!byName.has(nk)) byName.set(nk, p);
+    }
+
+    const matched: any[] = [];
+    const unmatched: any[] = [];
+    const seen = new Set<string>();
+    let skippedNoPrice = 0;
+    for (const it of items) {
+      if (it.price == null) { skippedNoPrice++; continue; }
+      let p = it.article ? byCode.get(normCodeKey(it.article)) : undefined;
+      let matchedBy = p ? 'article' : undefined;
+      if (!p) { p = byName.get(normNameKey(it.name)); matchedBy = p ? 'name' : undefined; }
+      if (p && seen.has(p.id)) {
+        unmatched.push({ ...it, duplicate: true });
+        continue; // товар уже встречался в файле — помечаем как дубль, не перезаписываем молча
+      }
+      if (p) {
+        seen.add(p.id);
+        matched.push({
+          row: it.row, productId: p.id, name: it.name, productName: p.name, article: it.article,
+          oldPrice: p.prices[0]?.price ?? null, newPrice: it.price, matchedBy,
+        });
+      } else {
+        unmatched.push({ ...it });
+      }
+    }
+    res.json({ matched, unmatched, skippedNoPrice });
+  } catch (err: any) {
+    console.error('[products:import-xls:preview]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/products/import-xls/apply
+ * Применяет импорт: обновляет цену выбранного вида у существующих товаров
+ * (с записью в историю цен) и создаёт новые товары в выбранной категории.
+ */
+router.post('/import-xls/apply', async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { priceTypeId, updates, creates, createCategoryId } = req.body || {};
+    const priceType = await prisma.priceType.findUnique({ where: { id: priceTypeId } });
+    if (!priceType) return res.status(400).json({ error: 'Вид цены не найден' });
+
+    const cleanCreates = (Array.isArray(creates) ? creates : []).filter(c => c && String(c.name ?? '').trim() && Number.isFinite(Number(c.price)));
+    let categoryNode: { id: string } | null = null;
+    let categoryPath: string | null = null;
+    if (cleanCreates.length) {
+      if (!createCategoryId) return res.status(400).json({ error: 'Выберите категорию для новых товаров' });
+      categoryNode = await prisma.productCategory.findUnique({ where: { id: createCategoryId } });
+      if (!categoryNode) return res.status(400).json({ error: 'Категория не найдена' });
+      categoryPath = await categoryPathString(categoryNode.id);
+    }
+
+    let updated = 0;
+    const cleanUpdates = (Array.isArray(updates) ? updates : []).filter(u => u && u.productId && Number.isFinite(Number(u.price)));
+    for (let i = 0; i < cleanUpdates.length; i += 200) {
+      const chunk = cleanUpdates.slice(i, i + 200);
+      const existing = await prisma.productPrice.findMany({
+        where: { priceTypeId, productId: { in: chunk.map(u => u.productId) } },
+      });
+      const oldByProduct = new Map(existing.map(e => [e.productId, e.price]));
+      await prisma.$transaction(async (tx) => {
+        for (const u of chunk) {
+          await tx.productPrice.upsert({
+            where: { productId_priceTypeId: { productId: u.productId, priceTypeId } },
+            create: { productId: u.productId, priceTypeId, price: Number(u.price) },
+            update: { price: Number(u.price) },
+          });
+          await tx.priceHistory.create({
+            data: {
+              productId: u.productId, priceTypeId,
+              oldPrice: oldByProduct.get(u.productId) ?? 0,
+              newPrice: Number(u.price),
+              userId: user?.id,
+            },
+          });
+          updated++;
+        }
+      });
+    }
+
+    let created = 0;
+    const errors: string[] = [];
+    for (const c of cleanCreates) {
+      try {
+        const name = String(c.name).trim().slice(0, 500);
+        const article = await generateUniqueArticle();
+        const product = await prisma.product.create({
+          data: {
+            article,
+            source: 'system',
+            name,
+            sku: c.article ? String(c.article).trim().slice(0, 100) : null,
+            kind: 'product',
+            categoryId: categoryNode!.id,
+            category: categoryPath,
+            unit: 'шт',
+          },
+        });
+        await prisma.productPrice.create({ data: { productId: product.id, priceTypeId, price: Number(c.price) } });
+        await prisma.priceHistory.create({
+          data: { productId: product.id, priceTypeId, oldPrice: 0, newPrice: Number(c.price), userId: user?.id },
+        });
+        created++;
+      } catch (err: any) {
+        if (err.code === 'P2002') errors.push(`${String(c.name).slice(0, 60)}: артикул уже занят`);
+        else errors.push(`${String(c.name).slice(0, 60)}: ${err.message}`);
+      }
+    }
+    res.json({ updated, created, errors });
+  } catch (err: any) {
+    console.error('[products:import-xls:apply]', err);
     res.status(500).json({ error: err.message });
   }
 });

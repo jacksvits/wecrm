@@ -73,6 +73,7 @@ export function Products() {
   const [allTags, setAllTags] = useState<string[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);
+  const [importXlsOpen, setImportXlsOpen] = useState(false);
   const [q, setQ] = useState('');
   const [whFilter, setWhFilter] = useState('all');
   // Сортировка таблицы «Склад»: текст — А→Я/Я→А, числа — по убыванию/возрастанию
@@ -1192,6 +1193,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
           {categorySidebar}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => setImportXlsOpen(true)} title='Импорт цен из XLS-файла' style={{ ...btnPrimary, background: '#2563eb' }}>Цены XLS</button>
             {priceTypes.map(t => (
               <div
                 key={t.id}
@@ -1319,6 +1321,9 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
       )}
       {historyProduct && (
         <HistoryModal product={historyProduct} priceTypes={priceTypes} onClose={() => setHistoryProduct(null)} />
+      )}
+      {importXlsOpen && (
+        <ImportXlsModal categories={categories} priceTypes={priceTypes} onClose={() => setImportXlsOpen(false)} onDone={() => { setImportXlsOpen(false); load(); }} />
       )}
       {whManageModal && (
         <WarehousesManageModal warehouses={warehouses}
@@ -3246,6 +3251,263 @@ function CategoryDeleteModal({ info, categories, onClose, onDeleted }: {
           <button onClick={remove} disabled={busy} style={{ ...btnPrimary, background: '#dc2626' }}>{busy ? 'Удаление…' : 'Удалить и перенести'}</button>
           <button onClick={onClose} style={btnGhost}>Отмена</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+/* ---------- Модалка импорта цен из XLS ---------- */
+type XlsParsedRow = { row: number; cells: unknown[] };
+type XlsMatched = { row: number; productId: string; name: string; productName: string; article: string; oldPrice: number | null; newPrice: number; matchedBy: 'article' | 'name' };
+type XlsUnmatched = { row: number; name: string; article: string; price: number; duplicate?: boolean };
+type XlsApplyResult = { updated: number; created: number; errors: string[] };
+
+const cellText = (v: unknown) => (typeof v === 'number' ? String(v) : String(v ?? ''));
+
+// Плоский список категорий с отступами по глубине дерева
+function flatCategoryOptions(cats: ProductCategory[]): { id: string; label: string }[] {
+  const byParent = new Map<string | null, ProductCategory[]>();
+  cats.forEach(c => {
+    const k = c.parentId ?? null;
+    if (!byParent.has(k)) byParent.set(k, []);
+    byParent.get(k)!.push(c);
+  });
+  const out: { id: string; label: string }[] = [];
+  const walk = (parentId: string | null, depth: number) => {
+    (byParent.get(parentId) || []).forEach(c => {
+      out.push({ id: c.id, label: `${'  '.repeat(depth)}${c.name}` });
+      walk(c.id, depth + 1);
+    });
+  };
+  walk(null, 0);
+  return out;
+}
+
+function ImportXlsModal({ categories, priceTypes, onClose, onDone }: { categories: ProductCategory[]; priceTypes: PriceType[]; onClose: () => void; onDone: () => void }) {
+  const activePriceTypes = priceTypes.filter(t => t.isActive);
+  const [file, setFile] = useState<File | null>(null);
+  const [columns, setColumns] = useState<string[]>([]);
+  const [rows, setRows] = useState<XlsParsedRow[]>([]);
+  const [colName, setColName] = useState<number | ''>('');
+  const [colArticle, setColArticle] = useState<number | ''>('');
+  const [colPrice, setColPrice] = useState<number | ''>('');
+  const [priceTypeId, setPriceTypeId] = useState('');
+  const [threshold, setThreshold] = useState(30);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [matched, setMatched] = useState<XlsMatched[] | null>(null);
+  const [unmatched, setUnmatched] = useState<XlsUnmatched[]>([]);
+  const [skippedNoPrice, setSkippedNoPrice] = useState(0);
+  const [selectedUnmatched, setSelectedUnmatched] = useState<Set<number>>(new Set());
+  const [createCategoryId, setCreateCategoryId] = useState('');
+  const [result, setResult] = useState<XlsApplyResult | null>(null);
+
+  const effectivePriceTypeId = priceTypeId || activePriceTypes.find(t => t.isRetail)?.id || activePriceTypes[0]?.id || '';
+  const priceTypeLabel = activePriceTypes.find(t => t.id === effectivePriceTypeId)?.label || '';
+  const catOptions = flatCategoryOptions(categories);
+
+  const doParse = async () => {
+    if (!file) return;
+    setBusy(true); setError('');
+    try {
+      const res = await api.products.importXlsParse(file);
+      if (!res.columns?.length) throw new Error('Не удалось определить столбцы файла');
+      setColumns(res.columns);
+      setRows(res.rows || []);
+      const guess = (patterns: RegExp[]) => res.columns.findIndex(c => patterns.some(p => p.test(c.toLowerCase())));
+      setColName(guess([/назван/, /номенклатур/, /наименование/, /товар/]));
+      setColArticle(guess([/артикул/, /код/, /sku/, /арт\./]));
+      setColPrice(guess([/ррц/, /^цена/, /price/, /стоимост/, /закуп/]));
+    } catch (e: any) { setError(e.message); } finally { setBusy(false); }
+  };
+
+  const doPreview = async () => {
+    if (colName === '' || colPrice === '') { setError('Выберите столбцы названия и цены'); return; }
+    if (!effectivePriceTypeId) { setError('Нет активных видов цен'); return; }
+    setBusy(true); setError('');
+    try {
+      const res = await api.products.importXlsPreview({ rows, colName, colArticle: colArticle === '' ? null : colArticle, colPrice, priceTypeId: effectivePriceTypeId });
+      setMatched(res.matched || []);
+      setUnmatched(res.unmatched || []);
+      setSkippedNoPrice(res.skippedNoPrice || 0);
+      setSelectedUnmatched(new Set());
+    } catch (e: any) { setError(e.message); } finally { setBusy(false); }
+  };
+
+  const toggleUnmatched = (i: number) => {
+    setSelectedUnmatched(prev => { const next = new Set(prev); next.has(i) ? next.delete(i) : next.add(i); return next; });
+  };
+
+  const doApply = async () => {
+    setBusy(true); setError('');
+    try {
+      const creates = [...selectedUnmatched].map(i => unmatched[i]).filter(Boolean);
+      const res = await api.products.importXlsApply({
+        priceTypeId: effectivePriceTypeId,
+        updates: (matched || []).map(m => ({ productId: m.productId, price: m.newPrice })),
+        creates: creates.map(c => ({ name: c.name, article: c.article, price: c.price })),
+        createCategoryId: creates.length ? createCategoryId : undefined,
+      });
+      setResult(res);
+    } catch (e: any) { setError(e.message); } finally { setBusy(false); }
+  };
+
+  const pctChange = (m: XlsMatched) => m.oldPrice != null && m.oldPrice > 0 ? Math.abs(m.newPrice - m.oldPrice) / m.oldPrice * 100 : null;
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 860, maxHeight: '88vh', overflow: 'auto' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0 }}>Импорт цен из XLS</h3>
+          <button onClick={onClose} style={btnGhost}>Закрыть</button>
+        </div>
+
+        {result ? (
+          <div>
+            <div style={{ padding: '12px 16px', borderRadius: 12, background: 'var(--bg-hover)', fontSize: 15, lineHeight: 1.7 }}>
+              Обновлено цен: <b>{result.updated}</b> ({priceTypeLabel})<br />
+              Создано новых товаров: <b>{result.created}</b>
+            </div>
+            {result.errors.length > 0 && (
+              <div style={{ marginTop: 12, color: '#dc2626', fontSize: 13 }}>
+                {result.errors.map((e, i) => <div key={i}>{e}</div>)}
+              </div>
+            )}
+            <button onClick={onDone} style={{ ...btnPrimary, marginTop: 16 }}>Готово</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Шаг 1: файл */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input type="file" accept=".xlsx,.xls,.csv" onChange={e => { setFile(e.target.files?.[0] || null); setColumns([]); setMatched(null); }}
+                style={{ fontSize: 13 }} />
+              <button onClick={doParse} disabled={busy || !file} style={{ ...btnPrimary, opacity: busy || !file ? 0.6 : 1 }}>Загрузить</button>
+              <button onClick={() => api.products.importXlsTemplate()} style={btnGhost}>Скачать шаблон</button>
+            </div>
+            {columns.length > 0 && (
+              <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Найдено строк: {rows.length}. Укажите, какие столбцы что означают:</div>
+            )}
+
+            {/* Шаг 2: столбцы и параметры */}
+            {columns.length > 0 && (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <label style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  Столбец с названием *
+                  <select value={colName} onChange={e => setColName(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, width: 'auto' }}>
+                    <option value="">—</option>
+                    {columns.map((c, i) => <option key={i} value={i}>{c}</option>)}
+                  </select>
+                </label>
+                <label style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  Столбец с артикулом
+                  <select value={colArticle} onChange={e => setColArticle(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, width: 'auto' }}>
+                    <option value="">—</option>
+                    {columns.map((c, i) => <option key={i} value={i}>{c}</option>)}
+                  </select>
+                </label>
+                <label style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  Столбец с ценой *
+                  <select value={colPrice} onChange={e => setColPrice(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, width: 'auto' }}>
+                    <option value="">—</option>
+                    {columns.map((c, i) => <option key={i} value={i}>{c}</option>)}
+                  </select>
+                </label>
+                <label style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  Обновляемая цена
+                  <select value={effectivePriceTypeId} onChange={e => setPriceTypeId(e.target.value)} style={{ ...inputStyle, width: 'auto' }}>
+                    {activePriceTypes.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  </select>
+                </label>
+                <label style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  Подсветка изменений &gt; %
+                  <input type="number" min={0} value={threshold} onChange={e => setThreshold(Number(e.target.value) || 0)} style={{ ...inputStyle, width: 90 }} />
+                </label>
+                <button onClick={doPreview} disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.6 : 1 }}>Найти совпадения</button>
+              </div>
+            )}
+
+            {/* Шаг 3: предпросмотр */}
+            {matched !== null && (
+              <>
+                <div style={{ fontSize: 14 }}>
+                  Найдено в каталоге: <b>{matched.length}</b>, не найдено: <b>{unmatched.length}</b>
+                  {skippedNoPrice > 0 && <span style={{ color: 'var(--text-muted)' }}> (пропущено строк без цены: {skippedNoPrice})</span>}
+                </div>
+                {matched.length > 0 && (
+                  <div style={{ border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'auto', maxHeight: 320 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: 'var(--bg-hover)' }}>
+                          <th style={{ textAlign: 'left', padding: '8px 12px' }}>Позиция из файла</th>
+                          <th style={{ textAlign: 'left', padding: '8px 12px' }}>В каталоге</th>
+                          <th style={{ textAlign: 'right', padding: '8px 12px' }}>Было</th>
+                          <th style={{ textAlign: 'right', padding: '8px 12px' }}>Стало</th>
+                          <th style={{ textAlign: 'center', padding: '8px 12px' }}>Δ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {matched.map(m => {
+                          const pct = pctChange(m);
+                          const hot = pct != null && pct > threshold;
+                          return (
+                            <tr key={m.row} style={{ borderTop: '1px solid var(--border-color)', background: hot ? '#fef2f2' : m.oldPrice == null ? '#f0fdf4' : 'transparent' }}>
+                              <td style={{ padding: '6px 12px' }}>{m.name}{m.article ? <span style={{ color: 'var(--text-muted)' }}> · {m.article}</span> : null}</td>
+                              <td style={{ padding: '6px 12px', color: 'var(--text-muted)' }}>{m.productName}{m.matchedBy === 'name' ? ' (по названию)' : ''}</td>
+                              <td style={{ padding: '6px 12px', textAlign: 'right' }}>{m.oldPrice != null ? fmtMoney(m.oldPrice) : '—'}</td>
+                              <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 600 }}>{fmtMoney(m.newPrice)}</td>
+                              <td style={{ padding: '6px 12px', textAlign: 'center', color: hot ? '#dc2626' : 'var(--text-muted)' }}>{pct != null ? `${pct.toFixed(1)}%` : 'новая'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {unmatched.length > 0 && (
+                  <div style={{ border: '1px solid var(--border-color)', borderRadius: 12, padding: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <b style={{ fontSize: 14 }}>Не найдены в каталоге ({unmatched.length})</b>
+                      <button onClick={() => setSelectedUnmatched(selectedUnmatched.size === unmatched.length ? new Set() : new Set(unmatched.map((_, i) => i)))} style={{ ...btnGhost, padding: '2px 10px', fontSize: 12 }}>
+                        {selectedUnmatched.size === unmatched.length ? 'Снять выбор' : 'Выбрать все'}
+                      </button>
+                    </div>
+                    <div style={{ maxHeight: 220, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {unmatched.map((u, i) => (
+                        <label key={u.row} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
+                          <input type="checkbox" checked={selectedUnmatched.has(i)} onChange={() => toggleUnmatched(i)} />
+                          <span style={{ flex: 1 }}>{u.name}</span>
+                          {u.article && <span style={{ color: 'var(--text-muted)' }}>{u.article}</span>}
+                          <span style={{ fontWeight: 600 }}>{fmtMoney(u.price)}</span>
+                          {u.duplicate && <span style={{ color: '#d97706', fontSize: 12 }}>дубль в файле</span>}
+                        </label>
+                      ))}
+                    </div>
+                    {selectedUnmatched.size > 0 && (
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 13 }}>Создать {selectedUnmatched.size} товар(ов) в категории:</span>
+                        <select value={createCategoryId} onChange={e => setCreateCategoryId(e.target.value)} style={{ ...inputStyle, width: 'auto', minWidth: 260 }}>
+                          <option value="">— выберите категорию —</option>
+                          {catOptions.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button onClick={doApply} disabled={busy || matched.length === 0 && selectedUnmatched.size === 0} style={btnPrimary}>
+                    Применить{matched.length > 0 ? `: обновить ${matched.length} цен` : ''}{selectedUnmatched.size > 0 ? `, создать ${selectedUnmatched.size} товаров` : ''}
+                  </button>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Цена «{priceTypeLabel}», история изменений сохранится</span>
+                </div>
+              </>
+            )}
+            {error && <div style={{ color: '#dc2626', fontSize: 13 }}>{error}</div>}
+          </div>
+        )}
       </div>
     </div>
   );
