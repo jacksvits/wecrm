@@ -218,16 +218,6 @@ export const HELP_DEFAULTS: HelpDefaultArticle[] = [
     ],
   },
   {
-    slug: 'browser',
-    title: 'Браузер',
-    group: 'Функции',
-    desc: 'Встроенный браузер для работы с сайтами внутри CRM',
-    mascot: '/mascot/mascot.png',
-    blocks: [
-      { type: 'p', text: 'Встроенный браузер открывает сайты прямо внутри CRM — удобно, когда нужно сверять данные со сторонним сервисом, не переключаясь между вкладками.' },
-    ],
-  },
-  {
     slug: 'chat',
     title: 'Общий чат',
     group: 'Функции',

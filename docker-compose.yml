@@ -103,8 +103,6 @@ services:
       - ./vpn/sing-box:/app/vpn-config
       # WeAGENT: файлы Windows-агента (с установщиком Python) для выдачи в CRM
       - /home/crm/wecrm/agent/windows:/app/agent-windows:ro
-      # Docker-сокет: спавн контейнеров VNC-браузера (routes/browser-vnc.ts)
-      - /var/run/docker.sock:/var/run/docker.sock
       # Собранный фронтенд (общий том с frontend) — шаблон index.html для /pwa-index
       - fe-dist:/fe-dist:ro
       # Миграции БД из репозитория (единый источник для entrypoint и worker)
@@ -273,15 +271,6 @@ services:
       - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     depends_on:
       - backend
-
-  # Образ VNC-сессии браузера: собирается вручную
-  # (docker compose --profile manual build vnc-session), запуск контейнеров —
-  # по требованию бэкендом (по сессии на пользователя CRM)
-  vnc-session:
-    build: ./vnc
-    image: wecrm-vnc:latest
-    profiles:
-      - manual
 
 volumes:
   pgdata:

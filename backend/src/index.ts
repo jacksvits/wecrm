@@ -90,8 +90,6 @@ import menuLinksRoutes from './routes/menu-links.js';
 import headerMenuLinksRoutes from './routes/header-menu-links.js';
 import securityRoutes from './routes/security.js';
 import publicFeedbackRoutes from './routes/public-feedback.js';
-import browserRoutes from './routes/browser.js';
-import vncRoutes, { handleVncUpgrade, isVncUpgradePath } from './routes/browser-vnc.js';
 import platformRoutes from './routes/platform.js';
 import helpRoutes from './routes/help.js';
 import scheduleRoutes from './routes/schedule.js';
@@ -338,8 +336,6 @@ app.use('/api/menu-links', menuLinksRoutes);
 app.use('/api/header-menu-links', headerMenuLinksRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/public/feedback', publicFeedbackRoutes); // Публичная форма лендинга: заявка с сайта -> новая задача
-app.use('/api/browser/vnc', vncRoutes);
-app.use('/api/browser', browserRoutes);
 app.use('/api/yandex', yandexRoutes);
 app.use('/api/dgis', dgisRoutes);
 app.use('/api/calls', callRoutes);
@@ -349,15 +345,6 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok', connections: getA
 // Один HTTP-сервер на приложение: поверх него работают WebSocket-каналы
 // /api/push/ws (нативный Android-клиент) и /api/calls/ws (сигнальник WebRTC)
 const server = http.createServer(app);
-// WebSocket-апгрейд для VNC-браузера (/api/browser/vnc/<uid>/websockify)
-server.on('upgrade', (req, socket, head) => {
-  // Обрабатываем только VNC-путь. Чужие апгрейды (/api/calls/ws, /api/push/ws)
-  // молча пропускаем: иначе сокет уничтожается здесь раньше, чем его примет
-  // setupPushWs/setupCallsWs, и WebSocket-каналы рвутся с "Empty reply"
-  if (isVncUpgradePath(String(req.url || ''))) {
-    handleVncUpgrade(req, socket, head);
-  }
-});
 setupPushWs(server);
 setupCallsWs(server);
 
