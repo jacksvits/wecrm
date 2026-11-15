@@ -193,6 +193,26 @@ router.get('/meta/warehouses', async (_req, res) => {
 });
 
 /**
+ * GET /api/products/meta/map-config
+ * Конфиг карт для карточки товара: 2ГИС (если плагин активен) или Яндекс Карты.
+ * Публичный роут (ключи карт — публичные, для JS API в браузере).
+ */
+router.get('/meta/map-config', async (_req, res) => {
+  try {
+    const [dgis, yandex] = await Promise.all([
+      prisma.dgisSettings.findFirst({ select: { apiKey: true, isActive: true } }),
+      prisma.yandexSettings.findFirst({ select: { apiKey: true } }),
+    ]);
+    if (dgis?.isActive && dgis.apiKey) return res.json({ provider: 'dgis', apiKey: dgis.apiKey });
+    if (yandex?.apiKey) return res.json({ provider: 'yandex', apiKey: yandex.apiKey });
+    res.json({ provider: null });
+  } catch (err: any) {
+    console.error('[products:map-config]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/products/meta/warehouses
  * Создать склад
  */

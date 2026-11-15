@@ -71,6 +71,8 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
   const [contacts, setContacts] = useState<any[]>([]);
   // Подробная информация о товаре (открывается по нажатию на карточку)
   const [details, setDetails] = useState<Product | null>(null);
+  // Информация о складе (карточка товара): карта, адрес, график, телефон
+  const [warehouseInfo, setWarehouseInfo] = useState<any | null>(null);
   const [detailsImage, setDetailsImage] = useState(0);
   // Корзина (localStorage) — оформление продажи/реализации
   const [cart, setCart] = useState<any[]>(() => {
@@ -1115,7 +1117,9 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
                     <div style={{ border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden' }}>
                       {(d.stocks || []).map((s: any) => (
                         <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '7px 12px', fontSize: 13, borderBottom: '1px solid var(--border-color)' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>{s.warehouse?.name || 'Склад'}</span>
+                          <button type="button" onClick={() => setWarehouseInfo(s.warehouse || { name: 'Склад' })}
+                            style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: 13, textAlign: 'left', color: '#007AFF' }}
+                            title="Информация о складе">{s.warehouse?.name || 'Склад'}</button>
                           <span style={{ color: 'var(--text-primary)' }}>
                             доступно <b>{fmtQty(Math.max(s.quantity - (s.reserved || 0), 0))}</b> {d.unit}
                             {(s.reserved || 0) > 0 && <span style={{ color: 'var(--text-muted)' }}> (всего {fmtQty(s.quantity)}, резерв {fmtQty(s.reserved)})</span>}
@@ -1573,6 +1577,10 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
         </div>
       )}
 
+      {warehouseInfo && (
+        <WarehouseInfoModal warehouse={warehouseInfo} onClose={() => setWarehouseInfo(null)} />
+      )}
+
     </>
   );
 }
@@ -1685,3 +1693,136 @@ function PromoMosaic({ onOpenCategory }: { onOpenCategory: (id: string) => void 
     </div>
   );
 }
+
+/* ---------- Информация о складе: карта (2ГИС/Яндекс), адрес, график работы, телефон ---------- */
+const externalScriptCache = new Map<string, Promise<boolean>>();
+
+function loadExternalScript(src: string): Promise<boolean> {
+  const cached = externalScriptCache.get(src);
+  if (cached) return cached;
+  const promise = new Promise<boolean>((resolve) => {
+    const el = document.createElement('script');
+    el.src = src;
+    el.onload = () => resolve(true);
+    el.onerror = () => resolve(false);
+    document.head.appendChild(el);
+  });
+  externalScriptCache.set(src, promise);
+  return promise;
+}
+
+function stripHtml(html: string): string {
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  return (d.textContent || '').trim();
+}
+
+function WarehouseInfoModal({ warehouse, onClose }: { warehouse: any; onClose: () => void }) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const [mapState, setMapState] = useState<'loading' | 'ok' | 'none'>('loading');
+  const addressPlain = stripHtml(warehouse.address || '');
+
+  useEffect(() => {
+    let cancelled = false;
+    let mapInstance: any = null;
+    const init = async () => {
+      try {
+        if (!addressPlain) { setMapState('none'); return; }
+        const res = await fetch('/api/products/meta/map-config');
+        if (!res.ok) { setMapState('none'); return; }
+        const cfg = await res.json();
+        if (cancelled) return;
+        if (cfg.provider === 'dgis' && cfg.apiKey) {
+          const ok = await loadExternalScript('https://mapgl.2gis.com/api/js/v1?key=' + encodeURIComponent(cfg.apiKey));
+          if (cancelled || !ok || !(window as any).mapgl) { setMapState('none'); return; }
+          const geo = await fetch('https://catalog.api.2gis.com/3.0/items/geocode?q=' + encodeURIComponent(addressPlain) + '&key=' + encodeURIComponent(cfg.apiKey) + '&fields=items.point')
+            .then((r) => r.json()).catch(() => null);
+          const point = geo?.result?.items?.[0]?.point;
+          if (cancelled || !point || !mapRef.current) { setMapState('none'); return; }
+          mapInstance = new (window as any).mapgl.Map(mapRef.current, { center: [point.lon, point.lat], zoom: 15, key: cfg.apiKey });
+          new (window as any).mapgl.Marker(mapInstance, { coordinates: [point.lon, point.lat] });
+          setMapState('ok');
+        } else if (cfg.provider === 'yandex' && cfg.apiKey) {
+          const ok = await loadExternalScript('https://api-maps.yandex.ru/2.1/?apikey=' + encodeURIComponent(cfg.apiKey) + '&lang=ru_RU');
+          if (cancelled || !ok || !(window as any).ymaps) { setMapState('none'); return; }
+          (window as any).ymaps.ready(async () => {
+            if (cancelled) return;
+            try {
+              const result = await (window as any).ymaps.geocode(addressPlain);
+              const first = result.geoObjects.get(0);
+              if (!first || !mapRef.current) { setMapState('none'); return; }
+              const coords = first.geometry.getCoordinates();
+              mapInstance = new (window as any).ymaps.Map(mapRef.current, { center: coords, zoom: 15, controls: ['zoomControl'] });
+              mapInstance.geoObjects.add(new (window as any).ymaps.Placemark(coords));
+              setMapState('ok');
+            } catch {
+              if (!cancelled) setMapState('none');
+            }
+          });
+        } else {
+          setMapState('none');
+        }
+      } catch {
+        if (!cancelled) setMapState('none');
+      }
+    };
+    init();
+    return () => {
+      cancelled = true;
+      if (mapInstance && typeof mapInstance.destroy === 'function') {
+        try { mapInstance.destroy(); } catch { /* ignore */ }
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const hasAny = !!(addressPlain || stripHtml(warehouse.workSchedule || '') || (warehouse.phone || '').trim());
+  const rowLabel: React.CSSProperties = { fontSize: 13, color: 'var(--text-muted)', marginBottom: 2 };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onClick={onClose}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 14, padding: 20, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--border-color)' }}
+        onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>{warehouse.name || 'Склад'}</div>
+          <button type="button" onClick={onClose}
+            style={{ border: 'none', background: 'transparent', fontSize: 15, cursor: 'pointer', color: 'var(--text-muted)', padding: 4, flexShrink: 0 }}>✕</button>
+        </div>
+        {mapState === 'ok' && (
+          <div ref={mapRef} style={{ width: '100%', height: 240, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-color)', marginBottom: 14 }} />
+        )}
+        {mapState === 'loading' && (
+          <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13, marginBottom: 14 }}>
+            Загрузка карты…
+          </div>
+        )}
+        {!hasAny ? (
+          <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>Информация о складе не заполнена — укажите адрес, график работы и телефон в «Управление складами».</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {!!warehouse.address && (
+              <div>
+                <div style={rowLabel}>Адрес</div>
+                <div className="rich-text" style={{ fontSize: 14, color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: safeHtml(warehouse.address) }} />
+              </div>
+            )}
+            {!!stripHtml(warehouse.workSchedule || '') && (
+              <div>
+                <div style={rowLabel}>График работы</div>
+                <div className="rich-text" style={{ fontSize: 14, color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: safeHtml(warehouse.workSchedule || '') }} />
+              </div>
+            )}
+            {!!(warehouse.phone || '').trim() && (
+              <div>
+                <div style={rowLabel}>Телефон</div>
+                <a href={'tel:' + String(warehouse.phone).replace(/[^\d+]/g, '')} style={{ fontSize: 15, fontWeight: 600, color: '#007AFF', textDecoration: 'none' }}>{warehouse.phone}</a>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
