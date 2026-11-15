@@ -508,7 +508,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
   };
 
   const addToCart = (p: Product) => {
-    if (!user) { window.location.href = '/'; return; }
+    // Гость тоже может наполнять корзину — оформление заказа потребует входа
     // Нулевая цена не участвует: берём самую минимальную ненулевую цену
     const visiblePrices = (p.prices || []).filter((x: any) => Number(x.price) > 0)
       .sort((a: any, b: any) => Number(a.price) - Number(b.price));
@@ -538,6 +538,11 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
   const cartTotal = cart.reduce((s, i) => s + effPrice(i) * i.quantity, 0);
 
   const checkout = async () => {
+    // Оформление и оплата заказа — только для авторизованных пользователей
+    if (!user) {
+      alert('Для оформления заказа необходимо войти в аккаунт. Нажмите «Войти» в шапке страницы.');
+      return;
+    }
     if (!cart.length) { setSaleError('Корзина пуста'); return; }
     setSavingSale(true); setSaleError('');
     try {
