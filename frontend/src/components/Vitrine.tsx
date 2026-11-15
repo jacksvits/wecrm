@@ -1113,9 +1113,10 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
                       ))}
                     </div>
                   )}
-                  {(d.stocks || []).length > 0 && d.kind !== 'service' && (
+                  {/* Склады с нулевым доступным остатком не показываем */}
+                  {(d.stocks || []).filter((s: any) => Math.max(Number(s.quantity || 0) - Number(s.reserved || 0), 0) > 0).length > 0 && d.kind !== 'service' && (
                     <div style={{ border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden' }}>
-                      {(d.stocks || []).map((s: any) => (
+                      {(d.stocks || []).filter((s: any) => Math.max(Number(s.quantity || 0) - Number(s.reserved || 0), 0) > 0).map((s: any) => (
                         <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '7px 12px', fontSize: 13, borderBottom: '1px solid var(--border-color)' }}>
                           <button type="button" onClick={() => setWarehouseInfo(s.warehouse || { name: 'Склад' })}
                             style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: 13, textAlign: 'left', color: '#007AFF' }}
