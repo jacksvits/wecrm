@@ -91,6 +91,22 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
       setPickupWarehouseId((prev) => prev || list?.[0]?.id || '');
     }).catch(() => { /* без списка складов самовывоз недоступен */ });
   }, []);
+
+  // Для самовывоза показываем только склады, где есть наличие ВСЕХ позиций корзины в нужном количестве
+  const cartWarehouses = useMemo(() => {
+    if (!cart.length) return pickupWarehouses;
+    const avail = pickupWarehouses.filter(w => cart.every(ci => {
+      const prod = products.find((x: any) => x.id === ci.productId);
+      const st = (prod?.stocks || []).find((x: any) => x.warehouseId === w.id);
+      return !!st && Math.max(Number(st.quantity || 0) - Number(st.reserved || 0), 0) >= (Number(ci.quantity) || 1);
+    }));
+    return avail.length ? avail : pickupWarehouses;
+  }, [cart, pickupWarehouses, products]);
+
+  // Выбранный склад должен быть из списка с наличием — иначе берём первый подходящий
+  const effPickupId = cartWarehouses.some(w => w.id === pickupWarehouseId)
+    ? pickupWarehouseId
+    : (cartWarehouses[0]?.id || pickupWarehouseId);
   // Избранное (localStorage) — отметка «Избранное» на карточках товаров витрины
   // Избранное витрины (сервер, личное у каждого пользователя): группы с товарами
   const [favGroups, setFavGroups] = useState<any[]>([]);
@@ -551,7 +567,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
         // контрагент не передаём — backend подставит личный контакт автора (ФИО пользователя)
         comment: [deliveryNote, saleComment].filter(Boolean).join('\n') || undefined,
         // Самовывоз — резерв/списание с выбранного склада; доставка — со склада по умолчанию
-        warehouseId: receiveMode === 'pickup' && pickupWarehouseId ? pickupWarehouseId : undefined,
+        warehouseId: receiveMode === 'pickup' && effPickupId ? effPickupId : undefined,
         paymentMethod: paymentMethod === 'tochka' ? 'card' : paymentMethod,
         items: cart.map(i => ({ productId: i.productId, quantity: i.quantity, price: effPrice(i) })),
       });
@@ -1245,14 +1261,14 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
                   </label>
                 </div>
                 {receiveMode === 'pickup' ? (
-                  pickupWarehouses.length ? (
+                  cartWarehouses.length ? (
                     <>
-                      <select value={pickupWarehouseId} onChange={e => setPickupWarehouseId(e.target.value)}
+                      <select value={effPickupId} onChange={e => setPickupWarehouseId(e.target.value)}
                         style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}>
-                        {pickupWarehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                        {cartWarehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                       </select>
                       {(() => {
-                        const w = pickupWarehouses.find(x => x.id === pickupWarehouseId);
+                        const w = cartWarehouses.find(x => x.id === effPickupId);
                         return w ? (
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
                             {!!w.address && <div className="rich-text" dangerouslySetInnerHTML={{ __html: safeHtml(w.address) }} />}
