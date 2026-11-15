@@ -26,6 +26,8 @@ export function TaskList() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  // Пользователь с контактом, привязанным по телефону, видит задачи контакта
+  const hasContactLink = !!(user as any)?.linkedContact;
   // Гостевой доступ: создание задач недоступно
   const isGuest = (user as any)?.isGuest === true;
   const canEditTask = (task: Task) => isAdmin || task.creatorId === user?.id || (task.curators || []).some(c => c.id === user?.id);
@@ -700,7 +702,7 @@ export function TaskList() {
             fontSize: 14,
           }}
         >
-          {!isAdmin && projects.length === 0 ? "Вы не привязаны ни к одному проекту. Обратитесь к своему менеджеру" : "Задачи не найдены"}
+          {!isAdmin && projects.length === 0 && !hasContactLink ? "Вы не привязаны ни к одному проекту. Обратитесь к своему менеджеру" : "Задачи не найдены"}
         </div>
       )}{" "}
     </div>
@@ -911,7 +913,7 @@ export function TaskList() {
             fontSize: 14,
           }}
         >
-          {!isAdmin && projects.length === 0 ? "Вы не привязаны ни к одному проекту. Обратитесь к своему менеджеру" : "Задачи не найдены"}
+          {!isAdmin && projects.length === 0 && !hasContactLink ? "Вы не привязаны ни к одному проекту. Обратитесь к своему менеджеру" : "Задачи не найдены"}
         </div>
       )}{" "}
     </div>
@@ -1141,7 +1143,7 @@ export function TaskList() {
     </div>
     );
 
-    if (!isAdmin && projects.length === 0) {
+    if (!isAdmin && projects.length === 0 && !hasContactLink) {
       return (
         <div style={{ textAlign: "center", padding: 40, color: "var(--text-muted)", fontSize: 14 }}>
           Вы не привязаны ни к одному проекту. Обратитесь к своему менеджеру
