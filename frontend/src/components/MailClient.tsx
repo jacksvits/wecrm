@@ -293,6 +293,67 @@ export function MailClient() {
   // Создание подпапки: аккаунт + родительская папка + вводимое имя
   const [creatingSubfolder, setCreatingSubfolder] = useState<{ accountId: string; parent: string; name: string } | null>(null);
 
+  // === Перетаскиваемые границы панелей (десктоп): панель папок и список писем ===
+  // Ширины сохраняются в localStorage; двойной клик по границе — сброс к умолчанию.
+  const FOLDERS_DEFAULT_W = 210;
+  const LIST_DEFAULT_W = 380;
+  const readStoredWidth = (key: string, def: number, min: number, max: number) => {
+    const saved = parseInt(localStorage.getItem(key) || '', 10);
+    return Number.isFinite(saved) && saved >= min && saved <= max ? saved : def;
+  };
+  const [foldersWidth, setFoldersWidth] = useState(() => readStoredWidth('mailFoldersWidth', FOLDERS_DEFAULT_W, 150, 500));
+  const [listWidth, setListWidth] = useState(() => readStoredWidth('mailListWidth', LIST_DEFAULT_W, 280, 1200));
+  const [activeSplitter, setActiveSplitter] = useState<'folders' | 'list' | null>(null);
+  const panelResizeRef = useRef<{ key: 'folders' | 'list'; startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => { localStorage.setItem('mailFoldersWidth', String(foldersWidth)); }, [foldersWidth]);
+  useEffect(() => { localStorage.setItem('mailListWidth', String(listWidth)); }, [listWidth]);
+
+  const startPanelResize = (e: React.PointerEvent, key: 'folders' | 'list') => {
+    e.preventDefault();
+    panelResizeRef.current = { key, startX: e.clientX, startWidth: key === 'folders' ? foldersWidth : listWidth };
+    setActiveSplitter(key);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    const handleMove = (ev: PointerEvent) => {
+      const st = panelResizeRef.current;
+      if (!st) return;
+      if (st.key === 'folders') setFoldersWidth(Math.min(500, Math.max(150, st.startWidth + ev.clientX - st.startX)));
+      else setListWidth(Math.min(1200, Math.max(280, st.startWidth + ev.clientX - st.startX)));
+    };
+    const handleUp = () => {
+      panelResizeRef.current = null;
+      setActiveSplitter(null);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+  };
+
+  // Тонкая граница (стиль «VS Code»): 2px линия, при наведении/перетаскивании
+  // утолщается и подсвечивается акцентным цветом. Захват 6px с каждой стороны.
+  const renderSplitter = (key: 'folders' | 'list') => {
+    const active = activeSplitter === key;
+    return (
+      <div
+        onPointerDown={e => startPanelResize(e, key)}
+        onMouseEnter={() => setActiveSplitter(key)}
+        onMouseLeave={() => setActiveSplitter(null)}
+        onDoubleClick={() => key === 'folders' ? setFoldersWidth(FOLDERS_DEFAULT_W) : setListWidth(LIST_DEFAULT_W)}
+        title='Перетащите, чтобы изменить ширину. Двойной клик — сброс.'
+        style={{
+          flexShrink: 0, width: active ? 5 : 2,
+          marginLeft: active ? -1.5 : 0, marginRight: active ? -1.5 : 0,
+          background: active ? '#0b5fd0' : 'var(--border-color)',
+          cursor: 'col-resize', zIndex: 3, transition: 'width 0.12s ease, background 0.12s ease',
+        }}
+      />
+    );
+  };
+
   const account: MailAccount | undefined = accounts.find(a => a.id === selectedAccountId);
 
   // В десктопной колонке показываем аккаунты с ★ (isDefault). Текущий аккаунт добавляем,
@@ -1204,8 +1265,7 @@ export function MailClient() {
 
     return (
       <div style={{
-        width: isMobile ? '100%' : 380, flexShrink: 0, overflowY: 'auto',
-        borderRight: isMobile ? 'none' : `1px solid ${borderColor}`,
+        width: isMobile ? '100%' : listWidth, flexShrink: 0, overflowY: 'auto',
         display: 'flex', flexDirection: 'column', background: 'var(--bg-card)',
       }}>
         {/* Панель фильтров и сортировки над списком писем — как на референсном скриншоте */}
@@ -1693,18 +1753,19 @@ export function MailClient() {
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', flexDirection: 'row' }}>
           {/* Панель папок */}
           <div className='desktop-only' style={{
-            width: 210, flexShrink: 0, overflowY: 'auto',
-            borderRight: `1px solid ${borderColor}`,
+            width: foldersWidth, flexShrink: 0, overflowY: 'auto',
             display: 'flex', flexDirection: 'column',
             padding: 8, gap: 2, background: 'var(--bg-card)',
           }}>
             {renderDesktopAccountTrees()}
           </div>
+          {renderSplitter('folders')}
 
           {/* Центральная часть: список/чтение + статусная строка */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
             <div style={{ flex: 1, display: 'flex', overflow: 'hidden', flexDirection: 'row' }}>
               {renderMessageList()}
+              {renderSplitter('list')}
               {renderReadingPane()}
             </div>
             {renderStatusBar()}
