@@ -170,13 +170,38 @@ const canAccessTask = async (taskId: string, userId: string, role: string) => {
       creatorId: true,
       assignees: { select: { userId: true } },
       curators: { select: { userId: true } },
+      project: { select: { users: { select: { userId: true } } } },
+      contact: { select: { userId: true } },
     },
   });
   if (!task) return false;
+  // Пользователь, привязанный к контакту задачи по телефону, видит задачи контакта
+  if (task.contact?.userId === userId) return true;
   if (task.creatorId === userId) return true;
   if (task.assignees.some(a => a.userId === userId)) return true;
   if (task.curators.some(c => c.userId === userId)) return true;
-  return false;
+  return !!task.project?.users.some(u => u.userId === userId);
+};
+
+// Внешний клиент, привязанный к контакту задачи по телефону (без прав сотрудника):
+// не видит инкогнито-комментарии, не может писать в завершённые задачи
+// и не может менять статус/редактировать задачу.
+const isContactLinkedViewer = async (taskId: string, userId: string, role: string) => {
+  if (role === 'admin' || role === 'developer') return false;
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: {
+      creatorId: true,
+      assignees: { select: { userId: true } },
+      curators: { select: { userId: true } },
+      contact: { select: { userId: true } },
+    },
+  });
+  if (!task) return false;
+  if (task.creatorId === userId) return false;
+  if (task.assignees.some(a => a.userId === userId)) return false;
+  if (task.curators.some(c => c.userId === userId)) return false;
+  return task.contact?.userId === userId;
 };
 
 router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) => {
@@ -197,18 +222,29 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
       return res.status(404).json({ error: 'Задача не найдена' });
     }
 
-    // Доступ к обсуждению = доступ к задаче (админ, создатель, исполнители, кураторы)
+    // Доступ к обсуждению = доступ к задаче (админ, создатель, исполнители, кураторы, привязанный контакт)
     const hasAccess = await canAccessTask(taskId, req.user!.id, req.user!.role);
     if (!hasAccess) {
       return res.status(403).json({ error: 'Доступ запрещен' });
     }
+
+    // Внешний клиент (привязан к контакту задачи по телефону): писать можно
+    // только в активные задачи; инкогнито-комментарии для него недоступны.
+    const linkedViewer = await isContactLinkedViewer(taskId, req.user!.id, req.user!.role);
+    if (linkedViewer) {
+      const status = task.status ? await prisma.status.findFirst({ where: { entityType: 'task', name: task.status } }) : null;
+      if (status && !status.isActive) {
+        return res.status(403).json({ error: 'Обсуждение завершённой задачи доступно только сотрудникам' });
+      }
+    }
+    const effectiveInternal = linkedViewer ? false : (isInternal || false);
 
     const comment = await prisma.comment.create({
       data: {
         content,
         authorId: req.user!.id,
         taskId,
-        isInternal: isInternal || false,
+        isInternal: effectiveInternal,
       },
       include: {
         author: { select: { id: true, name: true, avatar: true } },
@@ -223,8 +259,10 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
       });
     }
 
-    // Задача привязана к запросу организации — дублируем комментарий в тикет (внешним клиентам)
-    if (!isInternal) {
+    // Задача привязана к запросу организации — дублируем комментарий в тикет (внешним клиентам).
+    // Внешний клиент с привязанным контактом не дублируется: его слова не должны уходить
+    // в тикет организации от имени поддержки.
+    if (!effectiveInternal && !linkedViewer) {
       try {
         await addTaskCommentToTicket(taskId, req.user!.name || 'Поддержка WeCRM', content);
       } catch (e: any) {
@@ -498,6 +536,10 @@ router.get('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =>
 router.patch('/:taskId/comments/:commentId/pin', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { taskId, commentId } = req.params;
+    // Закрепление — действие сотрудников: внешний клиент с привязанным контактом не может
+    if (await isContactLinkedViewer(taskId, req.user!.id, req.user!.role)) {
+      return res.status(403).json({ error: 'Закреплять сообщения может только сотрудник' });
+    }
     // Закреплять/откреплять можно участникам обсуждения (тем же, кто видит задачу)
     const hasAccess = await canAccessTask(taskId, req.user!.id, req.user!.role);
     if (!hasAccess) {

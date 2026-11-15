@@ -852,7 +852,7 @@ export function TaskDetail() {
       const attachmentIds = pendingAttachments.length
         ? pendingAttachments.map((a) => a.id)
         : undefined;
-      const comment = await api.comments.create(id!, content, attachmentIds, isInternalComment);
+      const comment = await api.comments.create(id!, content, attachmentIds, isLinkedViewer ? false : isInternalComment);
       setComments((prev) => [...prev, comment]);
       setNewComment("");
       setPendingAttachments([]);
@@ -972,6 +972,11 @@ export function TaskDetail() {
     return (
       <div style={{ padding: 40, textAlign: "center" }}>Задача не найдена</div>
     );
+  // Внешний клиент, привязанный к контакту по телефону: только просмотр —
+  // без смены статуса, без записи в завершённые задачи, без инкогнито
+  const isLinkedViewer = !!(user as any)?.linkedContact;
+  const currentStatus = statuses.find((s) => s.name === task.status);
+  const taskCompleted = !!currentStatus && currentStatus.isActive === false;
   const st = getStatusStyle(task.status);
   const tabStyle = (isActive: boolean): React.CSSProperties => ({
     padding: "10px 20px",
@@ -1101,6 +1106,25 @@ export function TaskDetail() {
           )}{" "}
           {/* Выпадающий список статусов — виден при всех вкладках, расположен справа */}
           <div ref={statusDropdownRef} style={{ position: "relative" }}>
+            {isLinkedViewer ? (
+              <span
+                title="Сменить статус может только сотрудник"
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 12,
+                  border: "1px solid var(--border-color)",
+                  background: st.bg,
+                  color: st.text,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                {getStatusLabel(task.status)}
+              </span>
+            ) : (
             <button
               onClick={() => setShowStatusDropdown(!showStatusDropdown)}
               style={{
@@ -1119,6 +1143,7 @@ export function TaskDetail() {
             >
               {getStatusLabel(task.status)} ▼
             </button>
+            )}
             {showStatusDropdown && (
               <div
                 style={{
@@ -2422,6 +2447,7 @@ export function TaskDetail() {
                     );
                   })}{" "}
                 </div>{" "}
+                {!(isLinkedViewer && taskCompleted) ? (
                 <div
                   style={{
                     display: "flex",
@@ -2442,7 +2468,8 @@ export function TaskDetail() {
                       variant="button"
                       multiple={true}
                     />
-                    <button
+                    {!isLinkedViewer && (
+<button
                       type="button"
                       onClick={() => setIsInternalComment(!isInternalComment)}
                       style={{
@@ -2466,6 +2493,7 @@ export function TaskDetail() {
                     >
                       🥷 Инкогнито
                     </button>
+)}
                   </div>
 
                   {/* Pending attachments */}
@@ -2560,7 +2588,12 @@ export function TaskDetail() {
                       ↑
                     </button>
                   </div>
-                </div>{" "}
+                </div>
+                ) : (
+                  <div style={{ marginTop: 14, padding: "12px 0", borderTop: "1px solid var(--border-color)", fontSize: 14, color: "var(--text-secondary)", textAlign: "center" }}>
+                    Обсуждение завершённой задачи доступно только сотрудникам
+                  </div>
+                )}{" "}
               </div>{" "}
               </div>
               <div
