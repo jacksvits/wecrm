@@ -102,6 +102,24 @@ router.get('/vitrine/categories', async (_req, res) => {
 });
 
 /**
+ * GET /api/products/vitrine/warehouses
+ * Активные склады с контактами — для выбора самовывоза на публичной витрине. Публичный роут.
+ */
+router.get('/vitrine/warehouses', async (_req, res) => {
+  try {
+    const warehouses = await prisma.warehouse.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, name: true, address: true, workSchedule: true, phone: true },
+    });
+    res.json(warehouses);
+  } catch (err: any) {
+    console.error('[products:vitrine/warehouses]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/products/meta/map-config
  * Конфиг карт для карточки товара: 2ГИС (если плагин активен) или Яндекс Карты.
  * Публичный роут (ключи карт — публичные, для JS API в браузере).

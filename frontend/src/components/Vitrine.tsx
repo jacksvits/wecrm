@@ -79,6 +79,18 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
     try { return JSON.parse(localStorage.getItem('wecrm_vitrine_cart') || '[]'); } catch { return []; }
   });
   const [cartOpen, setCartOpen] = useState(false);
+  // Способ получения заказа: самовывоз со склада / доставка
+  const [receiveMode, setReceiveMode] = useState<'pickup' | 'delivery'>('pickup');
+  const [pickupWarehouseId, setPickupWarehouseId] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  // Активные склады с контактами (публичный список) для выбора самовывоза
+  const [pickupWarehouses, setPickupWarehouses] = useState<any[]>([]);
+  useEffect(() => {
+    fetch('/api/products/vitrine/warehouses').then((r) => (r.ok ? r.json() : [])).then((list: any[]) => {
+      setPickupWarehouses(Array.isArray(list) ? list : []);
+      setPickupWarehouseId((prev) => prev || list?.[0]?.id || '');
+    }).catch(() => { /* без списка складов самовывоз недоступен */ });
+  }, []);
   // Избранное (localStorage) — отметка «Избранное» на карточках товаров витрины
   // Избранное витрины (сервер, личное у каждого пользователя): группы с товарами
   const [favGroups, setFavGroups] = useState<any[]>([]);
@@ -529,9 +541,12 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
     if (!cart.length) { setSaleError('Корзина пуста'); return; }
     setSavingSale(true); setSaleError('');
     try {
+      const deliveryNote = receiveMode === 'delivery' && deliveryAddress.trim() ? `Доставка: ${deliveryAddress.trim()}` : '';
       const s: any = await api.sales.create({
         // контрагент не передаём — backend подставит личный контакт автора (ФИО пользователя)
-        comment: saleComment,
+        comment: [deliveryNote, saleComment].filter(Boolean).join('\n') || undefined,
+        // Самовывоз — резерв/списание с выбранного склада; доставка — со склада по умолчанию
+        warehouseId: receiveMode === 'pickup' && pickupWarehouseId ? pickupWarehouseId : undefined,
         paymentMethod: paymentMethod === 'tochka' ? 'card' : paymentMethod,
         items: cart.map(i => ({ productId: i.productId, quantity: i.quantity, price: effPrice(i) })),
       });
@@ -1209,6 +1224,46 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Заказчик</span>
                 <input value={user?.name || ''} readOnly title="Заказ оформляется на вас — ваше ФИО будет указано как контрагент" style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Способ получения</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, border: `1px solid ${receiveMode === 'pickup' ? '#007AFF' : 'var(--border-color)'}`, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)' }}>
+                    <input type="radio" name="receive-mode" checked={receiveMode === 'pickup'} onChange={() => setReceiveMode('pickup')} />
+                    Самовывоз
+                  </label>
+                  <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, border: `1px solid ${receiveMode === 'delivery' ? '#007AFF' : 'var(--border-color)'}`, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)' }}>
+                    <input type="radio" name="receive-mode" checked={receiveMode === 'delivery'} onChange={() => setReceiveMode('delivery')} />
+                    Доставка
+                  </label>
+                </div>
+                {receiveMode === 'pickup' ? (
+                  pickupWarehouses.length ? (
+                    <>
+                      <select value={pickupWarehouseId} onChange={e => setPickupWarehouseId(e.target.value)}
+                        style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}>
+                        {pickupWarehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                      {(() => {
+                        const w = pickupWarehouses.find(x => x.id === pickupWarehouseId);
+                        return w ? (
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                            {!!w.address && <div className="rich-text" dangerouslySetInnerHTML={{ __html: safeHtml(w.address) }} />}
+                            {!!w.workSchedule && <div className="rich-text" dangerouslySetInnerHTML={{ __html: safeHtml(w.workSchedule) }} />}
+                            {!!w.phone && <div><a href={'tel:' + String(w.phone).replace(/[^\d+]/g, '')} style={{ color: '#007AFF', textDecoration: 'none' }}>{w.phone}</a></div>}
+                          </div>
+                        ) : null;
+                      })()}
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Нет активных складов для самовывоза</div>
+                  )
+                ) : (
+                  <input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder="Адрес доставки"
+                    style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
+                )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Способ оплаты</span>
