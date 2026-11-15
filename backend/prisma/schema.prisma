@@ -1685,6 +1685,8 @@ model PriceHistory {
   priceType   PriceType @relation(fields: [priceTypeId], references: [id], onDelete: Cascade)
   oldPrice    Float     @map("old_price")
   newPrice    Float     @map("new_price")
+  // Источник изменения цены: manual (руками в CRM) | import-xls (импорт «Цены XLS»)
+  source      String?   @map("source")
   userId      String?   @map("user_id")
   user        User?     @relation(fields: [userId], references: [id])
   createdAt   DateTime  @default(now()) @map("created_at")

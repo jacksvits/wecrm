@@ -2001,6 +2001,7 @@ function HistoryModal({ product, priceTypes, onClose }: { product: Product; pric
             <span>{format(new Date(h.createdAt), 'dd.MM.yyyy HH:mm')}</span>
             <span style={{ fontWeight: 500 }}>{h.priceType?.label || priceTypes.find(t => t.id === h.priceTypeId)?.label}</span>
             <span>{fmtMoney(h.oldPrice)} → <b>{fmtMoney(h.newPrice)}</b></span>
+            {h.source === 'import-xls' && <span title='Изменено импортом «Цены XLS»' style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 6, background: '#dbeafe', color: '#1d4ed8' }}>XLS</span>}
             <span style={{ color: 'var(--text-muted)' }}>{h.user?.name || ''}</span>
           </div>
         ))}

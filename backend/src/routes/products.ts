@@ -1372,6 +1372,7 @@ router.put('/:id/prices', async (req, res) => {
           oldPrice: existing?.price ?? 0,
           newPrice: value,
           userId: user.id,
+          source: 'manual',
         },
       });
       return { ...p, priceFrom: priceFrom !== undefined ? !!priceFrom : undefined };
@@ -1569,6 +1570,7 @@ router.post('/import-xls/apply', async (req, res) => {
               oldPrice: oldByProduct.get(u.productId) ?? 0,
               newPrice: Number(u.price),
               userId: user?.id,
+              source: 'import-xls',
             },
           });
           updated++;
@@ -1596,7 +1598,7 @@ router.post('/import-xls/apply', async (req, res) => {
         });
         await prisma.productPrice.create({ data: { productId: product.id, priceTypeId, price: Number(c.price) } });
         await prisma.priceHistory.create({
-          data: { productId: product.id, priceTypeId, oldPrice: 0, newPrice: Number(c.price), userId: user?.id },
+          data: { productId: product.id, priceTypeId, oldPrice: 0, newPrice: Number(c.price), userId: user?.id, source: 'import-xls' },
         });
         created++;
       } catch (err: any) {
