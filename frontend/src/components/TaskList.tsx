@@ -45,7 +45,7 @@ export function TaskList() {
   );
   const [hideCompleted, setHideCompleted] = useState(() => {
     const fromUrl = searchParams.get("hideCompleted");
-    return fromUrl !== null ? fromUrl === "true" : true;
+    return fromUrl !== null ? fromUrl === "true" : !hasContactLink; // по умолчанию завершённые скрыты; у привязанного к контакту — показываем все задачи
   });
   // Фильтр «Избранное» (приходит из дашборда: /tasks?favorite=true)
   const [favoriteOnly, setFavoriteOnly] = useState(
@@ -145,7 +145,9 @@ export function TaskList() {
       .then((u) => {
         // Only apply profile default if URL didn't specify hideCompleted
         const fromUrl = searchParams.get("hideCompleted");
-        if (fromUrl === null) {
+        if (fromUrl === null && !hasContactLink) {
+          // У привязанного к контакту пользователя сохранённое значение не применяем:
+          // внешний клиент должен видеть все задачи контакта, включая завершённые
           setHideCompleted(u.hideCompletedTasks ?? true);
         }
       })
