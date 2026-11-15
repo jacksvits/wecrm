@@ -43,6 +43,21 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
   useEffect(() => {
     try { localStorage.setItem('wecrm_vitrine_catpanel', catPanelOpen ? '1' : '0'); } catch {}
   }, [catPanelOpen]);
+  // Лепесток зафиксирован по центру экрана (position: fixed) — следим за левым
+  // краем витрины, чтобы при сворачивании бокового меню лепесток не уехал под него;
+  // resize не срабатывает при анимации ширины меню, поэтому MutationObserver
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const [layoutLeft, setLayoutLeft] = useState(0);
+  useEffect(() => {
+    const measure = () => setLayoutLeft(layoutRef.current?.getBoundingClientRect().left ?? 0);
+    measure();
+    window.addEventListener('resize', measure);
+    const t1 = setTimeout(measure, 230);
+    const t2 = setTimeout(measure, 450);
+    const mo = new MutationObserver(measure);
+    mo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
+    return () => { window.removeEventListener('resize', measure); clearTimeout(t1); clearTimeout(t2); mo.disconnect(); };
+  }, []);
 
   // Встроенная витрина (панель задачи): локальный поиск — та же фильтрация,
   // что и у пропа search на странице «Каталог»
@@ -740,11 +755,11 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
           границы панели; панель уезжает влево */
         .vitrine-cat-petal { display: none; }
         @media (min-width: 641px) {
-          .vitrine-layout { position: relative; }
           .vitrine-cat-wrap:not(.embedded) { display: flex; width: 240px; flex-shrink: 0; overflow: hidden; transition: width .25s ease, margin-right .25s ease; }
           .vitrine-cat-wrap:not(.embedded).collapsed { width: 0; margin-right: -16px; }
-          .vitrine-cat-petal { display: flex; align-items: center; justify-content: center; position: absolute; top: 50%; left: 0; z-index: 5; width: 28px; height: 60px; padding: 0; border: 1px solid var(--border-color); border-left: none; border-radius: 0 14px 14px 0; background: var(--bg-card); color: var(--text-primary); cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,.14); transform: translateY(-50%); transition: left .25s ease, background .15s ease; }
-          .vitrine-cat-petal.open { left: 238px; }
+          /* Лепесток зафиксирован по центру экрана (position: fixed); left приходит
+            инлайн от левого края витрины — при открытой панели с 6px отступом от неё */
+          .vitrine-cat-petal { display: flex; align-items: center; justify-content: center; position: fixed; top: 50%; z-index: 5; width: 28px; height: 60px; padding: 0; border: 1px solid var(--border-color); border-left: none; border-radius: 0 14px 14px 0; background: var(--bg-card); color: var(--text-primary); cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,.14); transform: translateY(-50%); transition: left .25s ease, background .15s ease; }
           .vitrine-cat-petal:hover { background: var(--bg-hover); }
         }
         @media (max-width: 640px) {
@@ -837,7 +852,7 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
           </button>
         </div>
       )}
-      <div className="vitrine-layout" style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
+      <div ref={layoutRef} className="vitrine-layout" style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
         <div className={'vitrine-cat-wrap' + (catPanelOpen ? '' : ' collapsed') + (embedded ? ' embedded' : '')}>
         <aside className={'vitrine-catalog' + (catalogOpen ? ' open' : '') + (embedded ? ' embedded' + (catalogOpen ? '' : ' cat-collapsed') : '')} style={{ width: 240, flexShrink: 0, overflowY: 'auto', paddingRight: 4 }}>
           <div className="vitrine-catalog-head" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '2px 2px 8px' }}>
@@ -859,7 +874,8 @@ export function Vitrine({ search = '', embedded = false }: { search?: string; em
         {!embedded && (
           <button
             type="button"
-            className={'vitrine-cat-petal' + (catPanelOpen ? ' open' : '')}
+            className="vitrine-cat-petal"
+            style={{ left: layoutLeft + (catPanelOpen ? 246 : 0) }}
             onClick={() => setCatPanelOpen(o => !o)}
             aria-label={catPanelOpen ? 'Скрыть категории' : 'Показать категории'}
             title={catPanelOpen ? 'Скрыть категории' : 'Показать категории'}
