@@ -333,8 +333,9 @@ export function MailClient() {
     window.addEventListener('pointerup', handleUp);
   };
 
-  // Тонкая граница (стиль «VS Code»): 2px линия, при наведении/перетаскивании
-  // утолщается и подсвечивается акцентным цветом. Захват 6px с каждой стороны.
+  // Граница (стиль «Notion»): в покое — тонкая серая линия, при наведении/
+  // перетаскивании полоса утолщается, подсвечивается акцентным цветом и в центре
+  // появляется ручка из точек. Зона захвата 6px.
   const renderSplitter = (key: 'folders' | 'list') => {
     const active = activeSplitter === key;
     return (
@@ -345,12 +346,35 @@ export function MailClient() {
         onDoubleClick={() => key === 'folders' ? setFoldersWidth(FOLDERS_DEFAULT_W) : setListWidth(LIST_DEFAULT_W)}
         title='Перетащите, чтобы изменить ширину. Двойной клик — сброс.'
         style={{
-          flexShrink: 0, width: active ? 5 : 2,
-          marginLeft: active ? -1.5 : 0, marginRight: active ? -1.5 : 0,
-          background: active ? '#0b5fd0' : 'var(--border-color)',
-          cursor: 'col-resize', zIndex: 3, transition: 'width 0.12s ease, background 0.12s ease',
+          flexShrink: 0, width: 6, position: 'relative',
+          cursor: 'col-resize', zIndex: 3,
         }}
-      />
+      >
+        {/* Центрированная линия: 1px в покое, 5px подсвеченная при наведении */}
+        <div style={{
+          position: 'absolute', top: 0, bottom: 0, left: '50%',
+          width: active ? 5 : 1,
+          transform: 'translateX(-50%)',
+          background: active ? '#0b5fd0' : 'var(--border-color)',
+          transition: 'width 0.12s ease, background 0.12s ease',
+        }} />
+        {/* Ручка-точки в центре — видна при наведении/перетаскивании */}
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          display: 'grid', gridTemplateColumns: 'repeat(2, 4px)', gridAutoRows: '4px', gap: 3,
+          opacity: active ? 1 : 0,
+          transition: 'opacity 0.12s ease',
+          pointerEvents: 'none',
+        }}>
+          {[0, 1, 2, 3, 4, 5].map(i => (
+            <span key={i} style={{
+              width: 4, height: 4, borderRadius: '50%', background: '#fff',
+              boxShadow: '0 0 0 1px rgba(0,0,0,0.18)',
+            }} />
+          ))}
+        </div>
+      </div>
     );
   };
 
