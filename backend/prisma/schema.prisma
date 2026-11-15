@@ -1589,10 +1589,13 @@ model ProductCategory {
 }
 
 model Warehouse {
-  id        String   @id @default(cuid())
-  name      String
-  location  String?
-  isActive  Boolean  @default(true) @map("is_active")
+  id           String   @id @default(cuid())
+  name         String
+  location     String?
+  address      String?
+  workSchedule String?  @map("work_schedule")
+  phone        String?
+  isActive     Boolean  @default(true) @map("is_active")
   sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at")
 

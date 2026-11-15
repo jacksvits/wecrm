@@ -92,7 +92,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
   const [productModal, setProductModal] = useState<Product | 'new' | null>(null);
   const [movementModal, setMovementModal] = useState<{ product: Product; type: 'income' | 'outcome' } | null>(null);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
-  const [whModal, setWhModal] = useState<Warehouse | 'new' | null>(null);
+  const [whManageModal, setWhManageModal] = useState(false);
   const [ptModal, setPtModal] = useState<PriceType | 'new' | null>(null);
   // Управление категориями: модалка создания/редактирования и удаления с переносом
   const [catModal, setCatModal] = useState<{ category: ProductCategory | 'new'; parentId?: string | null } | null>(null);
@@ -676,7 +676,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
           <button onClick={() => setProductModal('new')} style={btnPrimary}>+ Позиция</button>
         )}
         {effectiveTab === 'stock' && (
-          <button onClick={() => setWhModal('new')} style={btnPrimary}>+ Склад</button>
+          <button onClick={() => setWhManageModal(true)} style={btnPrimary}>+ Склад</button>
         )}
         {effectiveTab === 'prices' && (
           <button onClick={() => setPtModal('new')} style={btnPrimary}>+ Вид цены</button>
@@ -912,13 +912,14 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
               <button
                 key={w.id}
                 onClick={() => setWhFilter(w.id)}
-                style={{ ...btnGhost, background: whFilter === w.id ? 'var(--bg-hover)' : 'var(--bg-card)', fontWeight: whFilter === w.id ? 600 : 400 }}
+                {...(w.isActive ? {} : { title: 'Неактивен — на витрине не показывается' })}
+                style={{ ...btnGhost, background: whFilter === w.id ? 'var(--bg-hover)' : 'var(--bg-card)', fontWeight: whFilter === w.id ? 600 : 400, ...(w.isActive ? {} : { opacity: 0.55 }) }}
               >
                 {w.name}
               </button>
             ))}
             <span style={{ flex: 1 }} />
-            <button onClick={() => setWhModal(warehouses.find(w => w.id === whFilter) || 'new')} style={btnGhost}>
+            <button onClick={() => setWhManageModal(true)} style={btnGhost}>
               Управление складами
             </button>
           </div>
@@ -1320,9 +1321,9 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
       {historyProduct && (
         <HistoryModal product={historyProduct} priceTypes={priceTypes} onClose={() => setHistoryProduct(null)} />
       )}
-      {whModal && (
-        <WarehouseModal warehouse={whModal}
-          onClose={() => setWhModal(null)} onSaved={() => { setWhModal(null); load(); }} />
+      {whManageModal && (
+        <WarehousesManageModal warehouses={warehouses}
+          onClose={() => setWhManageModal(false)} onSaved={() => { setWhManageModal(false); load(); }} onChanged={load} />
       )}
       {ptModal && (
         <PriceTypeModal priceType={ptModal}
@@ -2006,43 +2007,152 @@ function HistoryModal({ product, priceTypes, onClose }: { product: Product; pric
 }
 
 /* ---------- Модалка склада ---------- */
-function WarehouseModal({ warehouse, onClose, onSaved }: { warehouse: Warehouse | 'new'; onClose: () => void; onSaved: () => void }) {
-  const isNew = warehouse === 'new';
-  const [name, setName] = useState(isNew ? '' : warehouse.name);
-  const [location, setLocation] = useState(isNew ? '' : warehouse.location || '');
+/* ---------- Модалка управления складами: все склады, активность (витрина), адрес, график, телефон ---------- */
+function WarehousesManageModal({ warehouses, onClose, onSaved, onChanged }: { warehouses: Warehouse[]; onClose: () => void; onSaved: () => void; onChanged: () => void }) {
+  const [showNew, setShowNew] = useState(false);
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 760, maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0, flex: 1 }}>Управление складами</h3>
+          {!showNew && <button onClick={() => setShowNew(true)} style={{ ...btnPrimary, marginRight: 8 }}>+ Склад</button>}
+          <button onClick={onClose} style={btnGhost}>Закрыть</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {warehouses.map(w => (
+            <WarehouseRow key={w.id} warehouse={w} onChanged={onChanged} onDeleted={onSaved} />
+          ))}
+          {warehouses.length === 0 && !showNew && (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px 0' }}>Склады не созданы</div>
+          )}
+          {showNew && <NewWarehouseRow onCreated={() => { setShowNew(false); onSaved(); }} onCancel={() => setShowNew(false)} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WarehouseRow({ warehouse, onChanged, onDeleted }: { warehouse: Warehouse; onChanged: () => void; onDeleted: () => void }) {
+  const [name, setName] = useState(warehouse.name);
+  const [location, setLocation] = useState(warehouse.location || '');
+  const [address, setAddress] = useState(warehouse.address || '');
+  const [workSchedule, setWorkSchedule] = useState(warehouse.workSchedule || '');
+  const [phone, setPhone] = useState(warehouse.phone || '');
+  const [isActive, setIsActive] = useState(warehouse.isActive);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [savedTick, setSavedTick] = useState(false);
 
   const save = async () => {
     if (!name.trim()) { setError('Название обязательно'); return; }
+    setSaving(true); setError('');
     try {
-      if (isNew) await api.products.warehouses.create({ name, location });
-      else await api.products.warehouses.update(warehouse.id, { name, location });
-      onSaved();
+      await api.products.warehouses.update(warehouse.id, { name, location, address, workSchedule, phone, isActive });
+      setSavedTick(true); setTimeout(() => setSavedTick(false), 1600);
+      onChanged();
     } catch (e: any) { setError(e.message || 'Ошибка'); }
+    finally { setSaving(false); }
   };
 
   const remove = async () => {
-    if (isNew || !confirm('Удалить склад?')) return;
-    try { await api.products.warehouses.delete(warehouse.id); onSaved(); }
+    if (!confirm('Удалить склад «' + warehouse.name + '»?')) return;
+    try { await api.products.warehouses.delete(warehouse.id); onDeleted(); }
     catch (e: any) { setError(e.message || 'Ошибка удаления'); }
   };
 
   return (
-    <div style={overlayStyle}>
-      <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400 }}>
-        <h3 style={{ margin: '0 0 16px' }}>{isNew ? 'Новый склад' : 'Изменить склад'}</h3>
-        {error && <div style={{ color: '#dc2626', marginBottom: 12, fontSize: 14 }}>{error}</div>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <label style={{ fontSize: 14, fontWeight: 500 }}>Название</label>
-          <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
-          <label style={{ fontSize: 14, fontWeight: 500 }}>Расположение</label>
-          <input value={location} onChange={e => setLocation(e.target.value)} style={inputStyle} />
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button onClick={save} style={btnPrimary}>Сохранить</button>
-            {!isNew && <button onClick={remove} style={{ ...btnPrimary, background: '#dc2626' }}>Удалить</button>}
-            <button onClick={onClose} style={btnGhost}>Отмена</button>
-          </div>
+    <div style={{ border: '1px solid var(--border-color)', borderRadius: 12, padding: 16 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input value={name} onChange={e => setName(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: 160 }} placeholder="Название склада" />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
+          Активен (на витрине)
+        </label>
+        <button onClick={save} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>{savedTick ? 'Сохранено ✓' : 'Сохранить'}</button>
+        <button onClick={remove} style={{ ...btnGhost, color: '#dc2626' }}>Удалить</button>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Расположение</label>
+          <input value={location} onChange={e => setLocation(e.target.value)} style={{ ...inputStyle, marginTop: 4 }} placeholder="Город, район..." />
         </div>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Телефон</label>
+          <input value={phone} onChange={e => setPhone(e.target.value)} style={{ ...inputStyle, marginTop: 4 }} placeholder="+7 ..." />
+        </div>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Адрес</label>
+        <div style={{ marginTop: 4 }}>
+          <ReactQuill theme="snow" value={address} onChange={(v: string) => setAddress(v)} modules={quillModules} formats={quillFormats} placeholder="Адрес склада" />
+        </div>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>График работы</label>
+        <div style={{ marginTop: 4 }}>
+          <ReactQuill theme="snow" value={workSchedule} onChange={(v: string) => setWorkSchedule(v)} modules={quillModules} formats={quillFormats} placeholder="Пн–Пт 9:00–18:00, Сб 10:00–14:00..." />
+        </div>
+      </div>
+      {error && <div style={{ color: '#dc2626', marginTop: 8, fontSize: 13 }}>{error}</div>}
+    </div>
+  );
+}
+
+function NewWarehouseRow({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
+  const [name, setName] = useState('');
+  const [location, setLocation] = useState('');
+  const [address, setAddress] = useState('');
+  const [workSchedule, setWorkSchedule] = useState('');
+  const [phone, setPhone] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const save = async () => {
+    if (!name.trim()) { setError('Название обязательно'); return; }
+    setSaving(true); setError('');
+    try {
+      await api.products.warehouses.create({ name, location, address, workSchedule, phone, isActive });
+      onCreated();
+    } catch (e: any) { setError(e.message || 'Ошибка'); setSaving(false); }
+  };
+
+  return (
+    <div style={{ border: '2px dashed var(--border-color)', borderRadius: 12, padding: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Новый склад</div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input value={name} onChange={e => setName(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: 160 }} placeholder="Название склада" />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
+          Активен (на витрине)
+        </label>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Расположение</label>
+          <input value={location} onChange={e => setLocation(e.target.value)} style={{ ...inputStyle, marginTop: 4 }} placeholder="Город, район..." />
+        </div>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Телефон</label>
+          <input value={phone} onChange={e => setPhone(e.target.value)} style={{ ...inputStyle, marginTop: 4 }} placeholder="+7 ..." />
+        </div>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Адрес</label>
+        <div style={{ marginTop: 4 }}>
+          <ReactQuill theme="snow" value={address} onChange={(v: string) => setAddress(v)} modules={quillModules} formats={quillFormats} placeholder="Адрес склада" />
+        </div>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>График работы</label>
+        <div style={{ marginTop: 4 }}>
+          <ReactQuill theme="snow" value={workSchedule} onChange={(v: string) => setWorkSchedule(v)} modules={quillModules} formats={quillFormats} placeholder="Пн–Пт 9:00–18:00, Сб 10:00–14:00..." />
+        </div>
+      </div>
+      {error && <div style={{ color: '#dc2626', marginTop: 8, fontSize: 13 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        <button onClick={save} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>Создать</button>
+        <button onClick={onCancel} style={btnGhost}>Отмена</button>
       </div>
     </div>
   );

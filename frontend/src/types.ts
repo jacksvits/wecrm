@@ -117,7 +117,7 @@ export interface Reminder {
 }
 
 // Products (Товары)
-export interface Warehouse { id: string; name: string; location?: string | null; isActive: boolean; sortOrder: number; createdAt: string; }
+export interface Warehouse { id: string; name: string; location?: string | null; address?: string | null; workSchedule?: string | null; phone?: string | null; isActive: boolean; sortOrder: number; createdAt: string; }
 export interface PriceType { id: string; name: string; label: string; color: string; sortOrder: number; isActive: boolean; createdAt: string;   forVitrine?: boolean;
   forVk?: boolean;
   forOzon?: boolean;

@@ -44,7 +44,11 @@ router.get('/vitrine', async (_req, res) => {
     const productsRaw = await prisma.product.findMany({
       where: { onVitrine: true, isActive: true },
       include: {
-        stocks: { include: { warehouse: { select: { name: true } } } },
+        stocks: {
+          // На витрине показываем остатки только активных складов
+          where: { warehouse: { isActive: true } },
+          include: { warehouse: { select: { name: true, address: true, workSchedule: true, phone: true } } },
+        },
         prices: { include: { priceType: { select: { label: true, sortOrder: true } } } },
         images: { orderBy: { sortOrder: 'asc' } },
       },
@@ -194,11 +198,18 @@ router.get('/meta/warehouses', async (_req, res) => {
  */
 router.post('/meta/warehouses', async (req, res) => {
   try {
-    const { name, location, sortOrder } = req.body;
+    const { name, location, address, workSchedule, phone, sortOrder } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' });
     const count = await prisma.warehouse.count();
     const warehouse = await prisma.warehouse.create({
-      data: { name: name.trim(), location: location?.trim() || null, sortOrder: sortOrder ?? count + 1 },
+      data: {
+        name: name.trim(),
+        location: location?.trim() || null,
+        address: address?.trim() || null,
+        workSchedule: workSchedule?.trim() || null,
+        phone: phone?.trim() || null,
+        sortOrder: sortOrder ?? count + 1,
+      },
     });
     res.status(201).json(warehouse);
   } catch (err: any) {
@@ -213,12 +224,15 @@ router.post('/meta/warehouses', async (req, res) => {
  */
 router.patch('/meta/warehouses/:id', async (req, res) => {
   try {
-    const { name, location, isActive, sortOrder } = req.body;
+    const { name, location, address, workSchedule, phone, isActive, sortOrder } = req.body;
     const existing = await prisma.warehouse.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Склад не найден' });
     const data: any = {};
     if (name !== undefined) data.name = name.trim();
     if (location !== undefined) data.location = location?.trim() || null;
+    if (address !== undefined) data.address = address?.trim() || null;
+    if (workSchedule !== undefined) data.workSchedule = workSchedule?.trim() || null;
+    if (phone !== undefined) data.phone = phone?.trim() || null;
     if (isActive !== undefined) data.isActive = !!isActive;
     if (sortOrder !== undefined) data.sortOrder = Number(sortOrder);
     const warehouse = await prisma.warehouse.update({ where: { id: req.params.id }, data });
