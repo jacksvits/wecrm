@@ -53,13 +53,55 @@ export function ReminderEditor() {
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState('');
 
-  // Список сотрудников, с которыми можно поделиться напоминанием
-  // (показываем только пользователей с ролью «Сотрудник»)
+  // Списки получателей напоминания: сотрудники и прочие пользователи.
+  // Системные обработчики не предлагаются ни в одном из списков.
   useEffect(() => {
     api.users.list().then(list => setUsers(list.filter(u =>
-      u.id !== currentUser?.id && (u.role as Role | undefined)?.isEmployee === true
+      u.id !== currentUser?.id && (u.role as Role | undefined)?.isSystemHandler !== true
     ))).catch(() => {});
   }, [currentUser?.id]);
+
+  const employeeUsers = users.filter(u => (u.role as Role | undefined)?.isEmployee === true);
+  const regularUsers = users.filter(u => (u.role as Role | undefined)?.isEmployee !== true);
+
+  const renderShareBlock = (title: string, list: User[]) => {
+    const selectedCount = list.filter(u => recipientIds.includes(u.id)).length;
+    return (
+      <div style={{ marginBottom: 16 }}>
+        <label style={labelStyle}>{title}</label>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {list.map(u => (
+            <label
+              key={u.id}
+              style={{
+                padding: '6px 14px', borderRadius: 12, cursor: 'pointer', fontSize: 13,
+                background: recipientIds.includes(u.id) ? '#007AFF' : 'var(--bg-hover)',
+                color: recipientIds.includes(u.id) ? '#fff' : 'var(--text-color)',
+                border: '1px solid var(--border-color)',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={recipientIds.includes(u.id)}
+                onChange={() =>
+                  setRecipientIds(prev =>
+                    prev.includes(u.id) ? prev.filter(x => x !== u.id) : [...prev, u.id]
+                  )
+                }
+                style={{ display: 'none' }}
+              />
+              {u.name}
+            </label>
+          ))}
+        </div>
+        {selectedCount > 0 && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+            Выбрано получателей: {selectedCount}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '10px 14px', borderRadius: 10,
@@ -252,42 +294,11 @@ export function ReminderEditor() {
         </select>
       </div>
 
-      {/* Поделиться с пользователями */}
-      {users.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Поделиться с сотрудниками</label>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {users.map(u => (
-              <label
-                key={u.id}
-                style={{
-                  padding: '6px 14px', borderRadius: 12, cursor: 'pointer', fontSize: 13,
-                  background: recipientIds.includes(u.id) ? '#007AFF' : 'var(--bg-hover)',
-                  color: recipientIds.includes(u.id) ? '#fff' : 'var(--text-color)',
-                  border: '1px solid var(--border-color)',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={recipientIds.includes(u.id)}
-                  onChange={() =>
-                    setRecipientIds(prev =>
-                      prev.includes(u.id) ? prev.filter(x => x !== u.id) : [...prev, u.id]
-                    )
-                  }
-                  style={{ display: 'none' }}
-                />
-                {u.name}
-              </label>
-            ))}
-          </div>
-          {recipientIds.length > 0 && (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-              Выбрано получателей: {recipientIds.length}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Поделиться с сотрудниками */}
+      {employeeUsers.length > 0 && renderShareBlock('Поделиться с сотрудниками', employeeUsers)}
+
+      {/* Поделиться с пользователями (все, кроме сотрудников и системных обработчиков) */}
+      {regularUsers.length > 0 && renderShareBlock('Поделиться с пользователями', regularUsers)}
 
       {/* Текст (WYSIWYG) */}
       <div style={{ marginBottom: 24 }}>
