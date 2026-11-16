@@ -2676,7 +2676,7 @@ export function TaskDetail() {
                         transition: "color 0.2s ease",
                       }}
                     >
-                      ↑
+                      ➤
                     </button>
                   </div>
                 </div>
