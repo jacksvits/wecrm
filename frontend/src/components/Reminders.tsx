@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { Reminder, Status } from '../types';
 import { ReminderCalendar } from './ReminderCalendar';
+import { ReminderModal } from './ReminderEditor';
 
 const REPEAT_LABELS: Record<string, string> = {
   none: 'Без повтора',
@@ -24,7 +25,10 @@ const formatDate = (iso: string) =>
 
 export function Reminders() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user: currentUser } = useAuth();
+  // Модальное окно создания напоминания (открыто по прямой ссылке /reminders/new)
+  const [showNew, setShowNew] = useState(location.pathname === '/reminders/new');
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [search, setSearch] = useState('');
@@ -89,6 +93,12 @@ export function Reminders() {
     }
   };
 
+  const closeNew = () => {
+    setShowNew(false);
+    loadReminders();
+    if (location.pathname === '/reminders/new') navigate('/reminders', { replace: true });
+  };
+
   return (
     <div>
       {/* Шапка */}
@@ -99,7 +109,7 @@ export function Reminders() {
           <button style={chip(view === 'calendar')} onClick={() => setView('calendar')}>Календарь</button>
           <button
             className="btn-action"
-            onClick={() => navigate('/reminders/new')}
+            onClick={() => setShowNew(true)}
             title="Создать напоминание"
           >
             +
@@ -232,6 +242,7 @@ export function Reminders() {
       )}
       </>)}
       {view === 'calendar' && <ReminderCalendar onOpen={(id) => navigate(`/reminders/${id}/edit`)} />}
+      {showNew && <ReminderModal onClose={closeNew} />}
     </div>
   );
 }

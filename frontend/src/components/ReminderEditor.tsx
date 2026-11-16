@@ -28,10 +28,9 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const toLocalInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const toLocalDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-export function ReminderEditor() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const isEdit = !!id;
+// Форма напоминания (создание/редактирование), onDone — после сохранения или отмены
+function ReminderForm({ reminderId, onDone }: { reminderId?: string; onDone: () => void }) {
+  const isEdit = !!reminderId;
   const { user: currentUser } = useAuth();
 
   const [title, setTitle] = useState('');
@@ -163,11 +162,11 @@ export function ReminderEditor() {
   }, []);
 
   useEffect(() => {
-    if (isEdit && id) {
+    if (isEdit && reminderId) {
       (async () => {
         setLoading(true);
         try {
-          const r = await api.reminders.get(id);
+          const r = await api.reminders.get(reminderId);
           setTitle(r.title || '');
           setContent(r.content || '');
           setRemindAt(toLocalInput(new Date(r.remindAt)));
@@ -189,7 +188,7 @@ export function ReminderEditor() {
         setLoading(false);
       })();
     }
-  }, [id]);
+  }, [isEdit, reminderId]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -216,12 +215,12 @@ export function ReminderEditor() {
         recipientIds,
       };
 
-      if (isEdit && id) {
-        await api.reminders.update(id, data);
+      if (isEdit && reminderId) {
+        await api.reminders.update(reminderId, data);
       } else {
         await api.reminders.create(data);
       }
-      navigate('/reminders');
+      onDone();
     } catch (e: any) {
       setError(e.message || 'Ошибка сохранения');
     }
@@ -233,19 +232,7 @@ export function ReminderEditor() {
   }
 
   return (
-    <div style={{ maxWidth: 800 }}>
-      {/* Шапка */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>
-        <button
-          onClick={() => navigate('/reminders')}
-          style={{ background: 'none', border: 'none', color: '#007AFF', cursor: 'pointer', fontSize: 14 }}
-        >
-          ← Назад к напоминаниям
-        </button>
-        <h2 style={{ margin: 0, fontSize: 18 }}>
-          {isEdit ? 'Редактировать напоминание' : 'Новое напоминание'}
-        </h2>
-      </div>
+    <div>
 
       {/* Ошибка */}
       {error && (
@@ -366,7 +353,7 @@ export function ReminderEditor() {
           {saving ? 'Сохранение...' : (isEdit ? 'Сохранить' : 'Создать напоминание')}
         </button>
         <button
-          onClick={() => navigate('/reminders')}
+          onClick={onDone}
           disabled={saving}
           style={{
             padding: '10px 24px', borderRadius: 10, background: 'var(--bg-hover)',
@@ -375,6 +362,56 @@ export function ReminderEditor() {
         >
           Отмена
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Страница редактирования напоминания
+export function ReminderEditor() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  return (
+    <div style={{ maxWidth: 800 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>
+        <button
+          onClick={() => navigate('/reminders')}
+          style={{ background: 'none', border: 'none', color: '#007AFF', cursor: 'pointer', fontSize: 14 }}
+        >
+          ← Назад к напоминаниям
+        </button>
+        <h2 style={{ margin: 0, fontSize: 18 }}>Редактировать напоминание</h2>
+      </div>
+      <ReminderForm reminderId={id} onDone={() => navigate('/reminders')} />
+    </div>
+  );
+}
+
+// Модальное окно создания напоминания (адаптировано под мобильные: на узком экране — почти на весь экран)
+export function ReminderModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{
+        width: '100%', maxWidth: 640, maxHeight: '92vh', display: 'flex', flexDirection: 'column',
+        background: 'var(--bg-card)', borderRadius: 14, overflow: 'hidden',
+        border: '1px solid var(--border-color)', boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>Новое напоминание</div>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-color)', fontSize: 18, lineHeight: 1, padding: 4 }}
+            title='Закрыть'
+          >
+            ✕
+          </button>
+        </div>
+        <div style={{ padding: 16, overflowY: 'auto' }}>
+          <ReminderForm onDone={onClose} />
+        </div>
       </div>
     </div>
   );
