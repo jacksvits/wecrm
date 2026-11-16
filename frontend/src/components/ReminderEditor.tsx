@@ -64,39 +64,77 @@ export function ReminderEditor() {
   const employeeUsers = users.filter(u => (u.role as Role | undefined)?.isEmployee === true);
   const regularUsers = users.filter(u => (u.role as Role | undefined)?.isEmployee !== true);
 
-  const renderShareBlock = (title: string, list: User[]) => {
-    const selectedCount = list.filter(u => recipientIds.includes(u.id)).length;
+  const [empQuery, setEmpQuery] = useState('');
+  const [usrQuery, setUsrQuery] = useState('');
+  const [empOpen, setEmpOpen] = useState(false);
+  const [usrOpen, setUsrOpen] = useState(false);
+
+  // Поиск получателя по имени, email или логину (без уже выбранных)
+  const pickerOptions = (list: User[], query: string) => {
+    const q = query.trim().toLowerCase();
+    return list
+      .filter(u => !recipientIds.includes(u.id) && (
+        !q ||
+        u.name.toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q) ||
+        (u.username || '').toLowerCase().includes(q)
+      ))
+      .slice(0, 8);
+  };
+
+  // Поле выбора получателей: выбранные — чипами внутри строки ввода,
+  // поиск — по имени/email, выбор — из выпадающего списка
+  const renderPicker = (title: string, list: User[], query: string, setQuery: (v: string) => void, open: boolean, setOpen: (v: boolean) => void) => {
+    const selected = list.filter(u => recipientIds.includes(u.id));
+    const options = pickerOptions(list, query);
     return (
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16, position: 'relative' }}>
         <label style={labelStyle}>{title}</label>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {list.map(u => (
-            <label
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center',
+          padding: '6px 8px', borderRadius: 10, minHeight: 42,
+          border: '1px solid var(--border-color)', background: 'var(--bg-color)',
+        }}>
+          {selected.map(u => (
+            <span
               key={u.id}
-              style={{
-                padding: '6px 14px', borderRadius: 12, cursor: 'pointer', fontSize: 13,
-                background: recipientIds.includes(u.id) ? '#007AFF' : 'var(--bg-hover)',
-                color: recipientIds.includes(u.id) ? '#fff' : 'var(--text-color)',
-                border: '1px solid var(--border-color)',
-              }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 12, fontSize: 13, background: '#007AFF', color: '#fff' }}
             >
-              <input
-                type="checkbox"
-                checked={recipientIds.includes(u.id)}
-                onChange={() =>
-                  setRecipientIds(prev =>
-                    prev.includes(u.id) ? prev.filter(x => x !== u.id) : [...prev, u.id]
-                  )
-                }
-                style={{ display: 'none' }}
-              />
               {u.name}
-            </label>
+              <span
+                onClick={() => setRecipientIds(prev => prev.filter(x => x !== u.id))}
+                style={{ cursor: 'pointer', opacity: 0.8 }}
+                title='Убрать'
+              >
+                ✕
+              </span>
+            </span>
           ))}
+          <input
+            value={query}
+            placeholder={selected.length > 0 ? '' : 'Начните вводить имя или email…'}
+            onChange={e => { setQuery(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            style={{ flex: 1, minWidth: 150, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text-color)', fontSize: 14, padding: '4px 2px' }}
+          />
         </div>
-        {selectedCount > 0 && (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-            Выбрано получателей: {selectedCount}
+        {open && options.length > 0 && (
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+            background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12,
+            maxHeight: 220, overflow: 'auto', zIndex: 300, boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+          }}>
+            {options.map(u => (
+              <div
+                key={u.id}
+                onMouseDown={() => { setRecipientIds(prev => [...prev, u.id]); setQuery(''); }}
+                style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--border-color)' }}
+              >
+                <div style={{ fontWeight: 500 }}>{u.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.email}</div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -295,10 +333,10 @@ export function ReminderEditor() {
       </div>
 
       {/* Поделиться с сотрудниками */}
-      {employeeUsers.length > 0 && renderShareBlock('Поделиться с сотрудниками', employeeUsers)}
+      {employeeUsers.length > 0 && renderPicker('Поделиться с сотрудниками', employeeUsers, empQuery, setEmpQuery, empOpen, setEmpOpen)}
 
       {/* Поделиться с пользователями (все, кроме сотрудников и системных обработчиков) */}
-      {regularUsers.length > 0 && renderShareBlock('Поделиться с пользователями', regularUsers)}
+      {regularUsers.length > 0 && renderPicker('Поделиться с пользователями', regularUsers, usrQuery, setUsrQuery, usrOpen, setUsrOpen)}
 
       {/* Текст (WYSIWYG) */}
       <div style={{ marginBottom: 24 }}>
