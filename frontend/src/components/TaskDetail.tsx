@@ -27,6 +27,7 @@ import { TaskDiscussionContact, DiscussionContact } from "./TaskDiscussionContac
 import { Vitrine } from "./Vitrine";
 import ReactQuill from './LazyQuill' ;
 import { safeHtml } from '../lib/safeHtml';
+import { ReminderModal } from "./ReminderEditor";
 const priorityLabels: Record<string, string> = {
   low: "Низкий",
   medium: "Средний",
@@ -294,6 +295,7 @@ export function TaskDetail() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const canSeeFinances = isAdmin || (user as any)?.showFinancesTab === true;
+  const canViewReminders = isAdmin || ((user as any)?.allowedPages || []).includes('/reminders');
   const [task, setTask] = useState<Task | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [taskAttachments, setTaskAttachments] = useState<FileAttachment[]>([]);
@@ -301,6 +303,7 @@ export function TaskDetail() {
   const [newComment, setNewComment] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<FileAttachment[]>([]);
   const [isInternalComment, setIsInternalComment] = useState(false);
+  const [showReminderModal, setShowReminderModal] = useState(false);
   const [pinningCommentId, setPinningCommentId] = useState<string | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -2516,6 +2519,31 @@ export function TaskDetail() {
                       🥷 Инкогнито
                     </button>
 )}
+                    {canViewReminders && (
+                      <>
+                        <div style={{ flex: 1 }} />
+                        <button
+                          type="button"
+                          onClick={() => setShowReminderModal(true)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            padding: "5px 12px",
+                            borderRadius: 8,
+                            border: "1px solid var(--border-color)",
+                            background: "var(--bg-input)",
+                            color: "var(--text-secondary)",
+                            fontSize: 13,
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                            transition: "all 0.2s ease",
+                          }}
+                        >
+                          🔔 Новое напоминание
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   {/* Pending attachments */}
@@ -3531,6 +3559,7 @@ export function TaskDetail() {
           </div>
         </div>
       )}{" "}
+      {showReminderModal && <ReminderModal onClose={() => setShowReminderModal(false)} />}{" "}
     </div>
   );
 }
