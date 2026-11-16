@@ -349,6 +349,29 @@ export function TaskDetail() {
   // Панель остаётся смонтированной на время анимации закрытия
   const [vitrineMounted, setVitrineMounted] = useState(false);
 
+  // Сдвиг лепестка «Витрина» от правого края, когда открыта панель камер
+  // (режим «В панели» CameraPipOverlay): лепесток прижимается к левому
+  // краю панели камер, а не к краю экрана. Те же источники, что у Layout.
+  const [camPanelOffset, setCamPanelOffset] = useState<number>(0);
+  useEffect(() => {
+    const read = () => {
+      try {
+        const pos = localStorage.getItem('camera_pip_position');
+        const ids = JSON.parse(localStorage.getItem('camera_pip_ids') || '[]');
+        const w = parseInt(localStorage.getItem('camera_pip_panel_width') || '300', 10);
+        const open = pos === 'panel' && Array.isArray(ids) && ids.length > 0 && window.innerWidth >= 1024;
+        setCamPanelOffset(open && Number.isFinite(w) && w >= 200 ? w : 0);
+      } catch { setCamPanelOffset(0); }
+    };
+    read();
+    window.addEventListener('storage', read);
+    window.addEventListener('camera-pip-panel', read);
+    return () => {
+      window.removeEventListener('storage', read);
+      window.removeEventListener('camera-pip-panel', read);
+    };
+  }, []);
+
   const openVitrinePanel = () => setVitrineMounted(true);
   const closeVitrinePanel = () => {
     setVitrineOpen(false);
@@ -3451,6 +3474,10 @@ export function TaskDetail() {
           className="task-vitrine-petal"
           onClick={openVitrinePanel}
           title="Витрина"
+          style={{
+            right: camPanelOffset > 0 ? camPanelOffset : undefined,
+            transition: "right 0.15s ease, padding 0.2s ease, background 0.2s ease",
+          }}
         >
           <svg
             width="20"
