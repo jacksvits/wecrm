@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
-import { Role, Status, User } from '../types';
+import { Reminder, Role, Status, User } from '../types';
 import ReactQuill from './LazyQuill' ;
 
 const quillModules = {
@@ -28,8 +28,9 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const toLocalInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const toLocalDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-// Форма напоминания (создание/редактирование), onDone — после сохранения или отмены
-function ReminderForm({ reminderId, onDone }: { reminderId?: string; onDone: () => void }) {
+// Форма напоминания (создание/редактирование), onDone — после сохранения или отмены,
+// onCreated — с созданным напоминанием (для баннера уведомления)
+function ReminderForm({ reminderId, onDone, onCreated }: { reminderId?: string; onDone: () => void; onCreated?: (reminder: Reminder) => void }) {
   const isEdit = !!reminderId;
   const { user: currentUser } = useAuth();
 
@@ -218,7 +219,8 @@ function ReminderForm({ reminderId, onDone }: { reminderId?: string; onDone: () 
       if (isEdit && reminderId) {
         await api.reminders.update(reminderId, data);
       } else {
-        await api.reminders.create(data);
+        const created = await api.reminders.create(data);
+        onCreated?.(created);
       }
       onDone();
     } catch (e: any) {
@@ -387,8 +389,72 @@ export function ReminderEditor() {
   );
 }
 
-// Модальное окно создания напоминания (адаптировано под мобильные: на узком экране — почти на весь экран)
+// Модальное окно создания напоминания (адаптировано под мобильные: на узком экране — почти на весь экран).
+// После создания показывает баннер сверху по центру: кликабельное название напоминания
+// и круглый таймер 10 секунд, после которого баннер закрывается.
 export function ReminderModal({ onClose }: { onClose: () => void }) {
+  const navigate = useNavigate();
+  const [created, setCreated] = useState<{ id: string; title: string } | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(10);
+
+  // Обратный отсчёт таймера баннера
+  useEffect(() => {
+    if (!created) return;
+    if (secondsLeft <= 0) {
+      onClose();
+      return;
+    }
+    const t = setTimeout(() => setSecondsLeft(v => v - 1), 1000);
+    return () => clearTimeout(t);
+  }, [created, secondsLeft, onClose]);
+
+  // Баннер уведомления о созданном напоминании
+  if (created) {
+    const R = 9;
+    const C = 2 * Math.PI * R;
+    return (
+      <div
+        style={{
+          position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 300, maxWidth: 'calc(100vw - 24px)',
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 14px', borderRadius: 10,
+          background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+        }}
+      >
+        <span style={{ fontSize: 16 }}>🔔</span>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+          Создано новое напоминание:
+        </div>
+        <div
+          onClick={() => { onClose(); navigate(`/reminders/${created.id}/edit`); }}
+          title='Открыть напоминание'
+          style={{
+            fontSize: 13, fontWeight: 600, color: '#007AFF', cursor: 'pointer',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280,
+          }}
+        >
+          {created.title}
+        </div>
+        {/* Круглый таймер обратного отсчёта (10 секунд) */}
+        <span onClick={onClose} title='Закрыть' style={{ display: 'inline-flex', cursor: 'pointer', flexShrink: 0 }}>
+        <svg width='24' height='24' viewBox='0 0 24 24'>
+          <circle cx='12' cy='12' r={R} fill='none' stroke='var(--border-color)' strokeWidth='2.5' />
+          <circle
+            cx='12' cy='12' r={R} fill='none' stroke='#007AFF' strokeWidth='2.5'
+            strokeLinecap='round' strokeDasharray={C} strokeDashoffset={C * (1 - secondsLeft / 10)}
+            transform='rotate(-90 12 12)'
+          />
+          <text x='12' y='15.5' textAnchor='middle' fontSize='8.5' fill='var(--text-secondary)' fontFamily='inherit'>
+            {secondsLeft}
+          </text>
+        </svg>
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}
@@ -410,7 +476,10 @@ export function ReminderModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div style={{ padding: 16, overflowY: 'auto' }}>
-          <ReminderForm onDone={onClose} />
+          <ReminderForm
+            onDone={onClose}
+            onCreated={r => setCreated({ id: r.id, title: r.title })}
+          />
         </div>
       </div>
     </div>
