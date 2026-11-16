@@ -1,0 +1,168 @@
+/*
+Theme Name: Interio
+Theme URI: https://burgerthemes.com/interio-free/
+Author: burgersoftware
+Author URI: https://burgerthemes.com/
+Description: Prove that architecture is a visual art with a theme made for interior designers and architects! Interio has all it takes for a beautiful online presentation – a large set of portfolio templates, captivating interior design and house décor layouts, various blog styles & more. This modern theme comes with flexible options and is compatible with the WooCommerce plugin so you can sell your products online. Packed with stunning homepages and fully customisable inner pages, Interio will help you quickly build an alluring architecture and interior design website, Interio is specially made for Interior Design, Dining Room, Exterior Design, Kitchen Design, Living Room Design, Master Bedroom Design, Residential Design, Furniture Design, Office Design, Commercial Design, Hospital Design, Cottage, Architecture, Contractor, Construction, Building, Industrial, Industry & Manufacturing, Factory, Gardening, Lawn & Landscaping, Staging Website, Construction & Business, etc.
+Template: decorme
+Version: 1.3
+Tested up to: 6.7
+Requires PHP: 5.6
+License: GPLv3 or later
+License URI: https://www.gnu.org/licenses/gpl-3.0.html
+Text Domain: interio
+Slug: interio
+Tags: one-column, two-columns, left-sidebar, right-sidebar, flexible-header, custom-background, custom-colors, custom-header, custom-menu, featured-image-header, featured-images, footer-widgets, full-width-template, theme-options, threaded-comments, translation-ready, blog, grid-layout, portfolio, photography
+
+This theme, like WordPress, is licensed under the GPL.
+Use it to make something cool, have fun, and share what you've learned with others.
+
+*/
+
+:root {
+    --bs-gray:#dedede;
+    --bs-gray-light: #f7f7f7;
+    --bs-primary:#e07f02;
+    --bs-primary-shadow:rgb(254, 196, 0, 0.5);
+    --bs-secondary: #161422;
+    --bs-secondarytwo: #201C30;
+    --bs-gray-500: #f2f2f2;
+    --bs-gray-500-thumb: #c2c2c2;
+    --bs-font-sans-serif:'Roboto',system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+    --bs-font-monospace:SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+    --bs-font-awesome: "FontAwesome";
+    --bs-gradient:linear-gradient(180deg,rgba(255,255,255,0.15),rgba(255,255,255,0));
+    --bs-theme-radius: 6.25rem;
+    --bs-transition: all .35s cubic-bezier(.645,.045,.355,1);
+}
+
+/*===== Home Slider Two =====*/
+
+.home-slider-two .main-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+.home-slider-two .main-slider .main-content {
+    backdrop-filter: blur(15px);
+    border-radius: 20px;
+    padding: 46px 50px;
+    box-sizing: border-box;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: linear-gradient(105.91deg, rgba(255, 255, 255, 0.2) 5.12%, rgba(255, 255, 255, 0.075) 87.57%);
+}
+.home-slider-two .main-content h5 {
+    font-size: 1.25rem;
+}
+.home-slider-two .main-content h3 {
+    font-size: 4.2rem;
+    font-weight: 900;
+}
+.home-slider-two .main-content .text-stroke {
+    color: var(--bs-primary);
+    -webkit-text-fill-color: transparent;
+    -webkit-text-stroke-width: 2px;
+    -webkit-text-stroke-color: var(--bs-primary);
+}
+.home-slider-two .follow-us {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 13%;
+    display: flex;
+    align-items: center;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    justify-content: center;
+    height: 100%;
+    width: 3%;
+    border-right: 1px solid rgba(196, 196, 196, 0.2);
+    z-index: 0;
+}
+.home-slider-two .follow-us .title {
+    margin-bottom: 25px;
+    letter-spacing: 8px;
+}
+.home-slider-two .follow-us .widget_social .circle {
+    margin-top: 0px;
+    background-color: transparent;
+}
+.home-slider-two .follow-us .widget_social .circle:hover,
+.home-slider-two .follow-us .widget_social .circle:focus-within {
+    background-color: var(--bs-primary);
+    color: #fff;
+}
+.home-slider-two .follow-us .widget_social .circle a:hover,
+.home-slider-two .follow-us .widget_social .circle a:focus {
+    color: #fff;
+}
+.home-slider-two .home-slider.owl-theme .owl-dots {
+    margin-top: 0;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3%;
+    right: 13%;
+    display: flex;
+    align-items: center;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    justify-content: center;
+    border-left: 1px solid rgba(196, 196, 196, 0.2);
+    z-index: 0;
+}
+.home-slider-two .home-slider.owl-theme .owl-dots .owl-dot {
+    background-color: transparent;
+    border: 5px solid #FFFFFF;
+    border-radius: 100%;
+    width: 26px;
+    height: 26px;
+    margin-top: 30px;
+}
+.home-slider-two .home-slider.owl-theme .owl-dots .owl-dot.active {
+    border-color: var(--bs-primary);
+}
+.home-slider-two .home-slider.owl-theme .owl-dots .owl-dot:first-child {
+    margin-top: 0;
+}
+.home-slider-two .home-slider.owl-theme .owl-dots .owl-dot span {
+    display: none;
+}
+.comment-form .comment-form-comment textarea{
+    color: var(--bs-gray-light);
+}
+.contact-area .contact-icon .contact-corn i{
+    -webkit-transition: all 0.3s;
+    transition: all 0.3s;
+}
+.contact-area:hover .contact-icon .contact-corn i,
+.contact-area:focus-within .contact-icon .contact-corn i{
+   color: var(--bs-primary);
+}
+.contact-area:hover .contact-info .title a,
+.contact-area:focus-within .contact-info .title a{
+   color: var(--bs-primary);
+}
+.contact-area .contact-info .title a:after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: -2px;
+    width: 0;
+    border-bottom: 1px solid var(--bs-primary);
+    transition: width .3s;
+}
+.contact-area .contact-info .title a:hover:after {
+    width: 100%;
+    left: 0;
+}
+/*===== // =====*/
+.has-background.wp-block-post-author {
+    padding: 1rem;
+}
