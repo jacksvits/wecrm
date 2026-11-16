@@ -2607,15 +2607,15 @@ export function TaskDetail() {
 
                   {/* Input row */}
                   <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                    <div style={{ position: "relative", flex: 1 }}>
-                    {/* Скрепка внутри поля ввода */}
-                    <div style={{ position: "absolute", left: 4, top: "50%", transform: "translateY(-50%)", zIndex: 2 }}>
+                    <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+                    {/* Кнопка вложения («+» без фона) внутри поля ввода */}
+                    <div style={{ position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)", zIndex: 2 }}>
                       <FileUpload
                         entityType="comment"
                         entityId={id!}
                         onUpload={handleFileUpload}
                         isDark={isDark}
-                        variant="button"
+                        variant="plain"
                         multiple={true}
                       />
                     </div>
@@ -2626,9 +2626,9 @@ export function TaskDetail() {
                       placeholder="Написать сообщение..."
                       rows={1}
                       style={{
-                        flex: 1,
+                        width: "100%",
                         padding: "10px 14px",
-                        paddingLeft: 46,
+                        paddingLeft: 48,
                         borderRadius: 20,
                         border: "1px solid var(--border-color)",
                         background: "var(--bg-input)",

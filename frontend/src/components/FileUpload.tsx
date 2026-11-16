@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../api/client';
 import { FileAttachment } from '../types';
 
-export function FileUpload({ entityType, entityId, onUpload, isDark, variant = 'default', multiple = false }: { entityType: string; entityId: string; onUpload: (a: FileAttachment) => void; isDark?: boolean; variant?: 'default' | 'button'; multiple?: boolean }) {
+export function FileUpload({ entityType, entityId, onUpload, isDark, variant = 'default', multiple = false }: { entityType: string; entityId: string; onUpload: (a: FileAttachment) => void; isDark?: boolean; variant?: 'default' | 'button' | 'plain'; multiple?: boolean }) {
   const [loading, setLoading] = useState(false);
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -21,6 +21,30 @@ export function FileUpload({ entityType, entityId, onUpload, isDark, variant = '
       e.target.value = '';
     }
   };
+
+  // Иконка без фона (например «+» внутри поля ввода)
+  if (variant === 'plain') {
+    return (
+      <label style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 36,
+        height: 36,
+        cursor: loading ? 'not-allowed' : 'pointer',
+        color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)',
+        fontSize: 24,
+        fontWeight: 500,
+        lineHeight: 1,
+        userSelect: 'none',
+        flexShrink: 0,
+        transition: 'color 0.2s ease',
+      }}>
+        {loading ? '⏳' : '+'}
+        <input type="file" multiple={multiple} onChange={handleChange} style={{ display: 'none' }} disabled={loading} />
+      </label>
+    );
+  }
 
   if (variant === 'button') {
     return (
