@@ -5,12 +5,19 @@ import { getPipLabel, splitPipKey } from "../pip";
 
 const STORAGE_KEY = "camera_pip_ids";
 const STORAGE_WIDTH = "camera_pip_width";
+const STORAGE_PANEL_WIDTH = "camera_pip_panel_width";
 const STORAGE_POS = "camera_pip_position";
 const DESKTOP_MIN = 1024;
 const MIN_W = 160;
 const HEADER_H = 25; // заголовок окна
 const GAP = 10;      // отступ между окнами
 const DEFAULT_ASPECT = 16 / 9; // до загрузки первого снимка
+
+// Панель справа (режим «В панели»)
+const PANEL_MIN_W = 200;
+const PANEL_MAX_W = 560;
+const PANEL_DEFAULT_W = 300;
+const PANEL_PADDING = 10; // внутренние отступы панели по бокам
 
 function loadPipIds(): string[] {
   try {
@@ -37,28 +44,43 @@ function clampW(w: number): number {
 }
 
 // Расположение стека окон «картинка в картинке» по правому краю
-type PipPosition = "top" | "middle" | "bottom";
+// либо отдельная панель справа на всю высоту экрана
+type PipPosition = "top" | "middle" | "bottom" | "panel";
 
 const POSITIONS: { value: PipPosition; label: string }[] = [
   { value: "top", label: "Справа вверху" },
   { value: "middle", label: "Справа по центру" },
   { value: "bottom", label: "Справа внизу" },
+  { value: "panel", label: "В панели" },
 ];
 
 function loadPosition(): PipPosition {
   try {
     const p = localStorage.getItem(STORAGE_POS);
-    if (p === "top" || p === "middle" || p === "bottom") return p;
+    if (p === "top" || p === "middle" || p === "bottom" || p === "panel") return p;
   } catch {}
   return "top";
 }
 
+function loadPanelWidth(): number {
+  try {
+    const w = parseInt(localStorage.getItem(STORAGE_PANEL_WIDTH) || "", 10);
+    if (Number.isFinite(w) && w >= PANEL_MIN_W) return w;
+  } catch {}
+  return PANEL_DEFAULT_W;
+}
+
+function clampPanelW(w: number): number {
+  const max = Math.min(PANEL_MAX_W, Math.floor(window.innerWidth * 0.6));
+  return Math.max(PANEL_MIN_W, Math.min(w, max));
+}
+
 // Глобальный overlay «картинка в картинке» (только десктоп): маленькие окна
-// камер у правого края поверх всех страниц. Расположение стека окон
-// настраивается кнопкой ⚙ под окнами: справа вверху / по центру / внизу.
-// Размер окна меняется «ручкой» в левом нижнем углу — пропорционально
-// картинке (пропорции определяются по фактическому снимку камеры).
-// Состояние в localStorage.
+// камер у правого края поверх всех страниц либо отдельная панель справа.
+// Расположение настраивается кнопкой ⚙: справа вверху / по центру / внизу /
+// в панели. Размер окна меняется «ручкой» в левом нижнем углу —
+// пропорционально картинке. Ширину панели меняет «ручка» на её левом краю,
+// камеры внутри масштабируются под ширину панели. Состояние в localStorage.
 export function CameraPipOverlay() {
   const [pipIds, setPipIds] = useState<string[]>(loadPipIds);
   const [cameras, setCameras] = useState<any[]>([]);
@@ -69,7 +91,9 @@ export function CameraPipOverlay() {
   const [cloudRefreshKey, setCloudRefreshKey] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [width, setWidth] = useState<number>(loadWidth);
-  // Расположение стека окон: справа вверху / по центру / внизу
+  // Ширина панели (режим «В панели»)
+  const [panelWidth, setPanelWidth] = useState<number>(loadPanelWidth);
+  // Расположение стека окон: справа вверху / по центру / внизу / в панели
   const [position, setPosition] = useState<PipPosition>(loadPosition);
   const [posMenuOpen, setPosMenuOpen] = useState<boolean>(false);
   const [viewportH, setViewportH] = useState<number>(() => window.innerHeight);
@@ -78,7 +102,8 @@ export function CameraPipOverlay() {
   const [isDesktop, setIsDesktop] = useState<boolean>(
     () => typeof window !== "undefined" && window.innerWidth >= DESKTOP_MIN,
   );
-  const dragRef = useRef<{ pointerId: number; startX: number; startW: number } | null>(null);
+  // target: "win" — «ручка» размера окна, "panel" — «ручка» ширины панели
+  const dragRef = useRef<{ pointerId: number; startX: number; startW: number; target: "win" | "panel" } | null>(null);
 
   // Только десктоп: отслеживаем ширину окна
   useEffect(() => {
@@ -93,6 +118,11 @@ export function CameraPipOverlay() {
   useEffect(() => {
     try { localStorage.setItem(STORAGE_WIDTH, String(width)); } catch {}
   }, [width]);
+
+  // Сохраняем ширину панели
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_PANEL_WIDTH, String(panelWidth)); } catch {}
+  }, [panelWidth]);
 
   // Сохраняем расположение стека окон
   useEffect(() => {
@@ -131,6 +161,7 @@ export function CameraPipOverlay() {
     const onStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) sync();
       if (e.key === STORAGE_POS) setPosition(loadPosition());
+      if (e.key === STORAGE_PANEL_WIDTH) setPanelWidth(loadPanelWidth());
     };
     const onToggle = (e: Event) => {
       const d = (e as CustomEvent).detail;
@@ -150,17 +181,25 @@ export function CameraPipOverlay() {
     };
   }, []);
 
-  // Растяжение «ручкой» в левом нижнем углу: тянем влево — окно растёт
+  // Растяжение «ручкой» в левом нижнем углу окна: тянем влево — окно растёт
   const startResize = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    dragRef.current = { pointerId: e.pointerId, startX: e.clientX, startW: width };
+    dragRef.current = { pointerId: e.pointerId, startX: e.clientX, startW: width, target: "win" };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  // «Ручка» ширины панели на её левом краю: тянем влево — панель расширяется
+  const startPanelResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    dragRef.current = { pointerId: e.pointerId, startX: e.clientX, startW: panelWidth, target: "panel" };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
   const onResizeMove = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return;
-    setWidth(clampW(d.startW + (d.startX - e.clientX)));
+    const next = d.startW + (d.startX - e.clientX);
+    if (d.target === "win") setWidth(clampW(next));
+    else setPanelWidth(clampPanelW(next));
   };
   const endResize = (e: React.PointerEvent) => {
     if (dragRef.current?.pointerId === e.pointerId) dragRef.current = null;
@@ -174,9 +213,107 @@ export function CameraPipOverlay() {
     });
   };
 
+  // Кадр окна: локальные — живой MJPEG-поток, облачные/RTSP — снапшот по токену
+  const token = localStorage.getItem("token") || "";
+  const renderFrame = (w: { key: string; kind: string; id: string; label: string }, imgH: number, imgStyle: React.CSSProperties) =>
+    w.kind === "local" ? (
+      <CameraStreamImage
+        cameraId={w.id}
+        refreshKey={refreshKey}
+        alt={w.label}
+        onClick={() => setExpandedId(w.key)}
+        onLoad={(e) => {
+          const img = e.target as HTMLImageElement;
+          if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+            const a = img.naturalWidth / img.naturalHeight;
+            setAspects((prev) => (prev[w.key] === a ? prev : { ...prev, [w.key]: a }));
+          }
+        }}
+        style={imgStyle}
+      />
+    ) : (
+      <img
+        src={
+          w.kind === "tapo"
+            ? `/api/tapo-plugin/snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&ts=${cloudRefreshKey}`
+            : w.kind === "tapoc"
+              ? `/api/tapo-plugin/cloud-snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&k=${cloudRefreshKey}`
+              : `/api/hikvision-plugin/snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&ts=${cloudRefreshKey}`
+        }
+        alt={w.label}
+        onLoad={(e) => {
+          const img = e.target as HTMLImageElement;
+          if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+            const a = img.naturalWidth / img.naturalHeight;
+            setAspects((prev) => (prev[w.key] === a ? prev : { ...prev, [w.key]: a }));
+          }
+        }}
+        style={imgStyle}
+      />
+    );
+
+  // Меню выбора расположения (⚙): общее для режима окон и режима панели
+  const renderPosMenu = () => (
+    <>
+      {posMenuOpen && (
+        <>
+          {/* Прозрачный фон для закрытия меню по клику вне его */}
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 2999 }}
+            onClick={() => setPosMenuOpen(false)}
+          />
+          <div
+            style={{
+              position: "absolute", top: 34, right: 0, zIndex: 3000,
+              background: "var(--bg-card)", border: "1px solid var(--border-color)",
+              borderRadius: 10, boxShadow: "var(--shadow)", padding: 6, minWidth: 172,
+            }}
+          >
+            <div style={{ fontSize: 11, color: "var(--text-muted)", padding: "2px 10px 6px" }}>
+              Расположение окон
+            </div>
+            {POSITIONS.map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => { setPosition(value); setPosMenuOpen(false); }}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  gap: 8, width: "100%", padding: "7px 10px", border: "none", borderRadius: 8,
+                  background: position === value ? "var(--bg-hover)" : "none",
+                  color: "var(--text-primary)", fontSize: 13, cursor: "pointer", textAlign: "left",
+                }}
+              >
+                <span>{label}</span>
+                <span style={{ color: "#007AFF", fontSize: 12, opacity: position === value ? 1 : 0 }}>
+                  ✓
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+
+  const gearButton = (
+    <button
+      onClick={() => setPosMenuOpen((v) => !v)}
+      title="Расположение окон камер"
+      style={{
+        width: 28, height: 28, borderRadius: "50%",
+        background: "var(--bg-card)", border: "1px solid var(--border-color)",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.25)", cursor: "pointer",
+        color: posMenuOpen ? "#007AFF" : "var(--text-muted)",
+        fontSize: 14, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 0,
+      }}
+    >
+      ⚙
+    </button>
+  );
+
   // Окна всех вкладок видеорегистратора: локальные (поток MJPEG), Tapo RTSP,
   // Tapo-облако и Hik-Connect — снапшоты по токену, обновляются с refreshKey.
-  const token = localStorage.getItem("token") || "";
   const pipWindows = pipIds
     .map((key) => {
       const { kind, id } = splitPipKey(key);
@@ -192,6 +329,147 @@ export function CameraPipOverlay() {
   // PiP — только на десктопной версии
   if (!isDesktop || pipWindows.length === 0) return null;
 
+  // Развёрнутый просмотр — только для локальных камер (живой MJPEG-поток)
+  const expandedWin = expandedId ? pipWindows.find((w) => w.key === expandedId) : null;
+  const expanded = expandedWin && expandedWin.kind === "local" ? expandedWin.cam : null;
+
+  // ===== Режим «В панели»: камеры в отдельной панели справа на всю высоту =====
+  if (position === "panel") {
+    const innerW = panelWidth - PANEL_PADDING * 2;
+    return (
+      <>
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: panelWidth,
+            zIndex: 2500,
+            background: "var(--bg-card)",
+            borderLeft: "1px solid var(--border-color)",
+            boxShadow: "-8px 0 30px rgba(0,0,0,0.25)",
+            display: "flex",
+            flexDirection: "column",
+            paddingTop: "env(safe-area-inset-top, 0px)",
+            paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          }}
+        >
+          {/* Шапка панели: заголовок + настройки */}
+          <div
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "8px 12px",
+              borderBottom: "1px solid var(--border-color)",
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>
+              Камеры
+            </span>
+            <div style={{ position: "relative" }}>
+              {gearButton}
+              {renderPosMenu()}
+            </div>
+          </div>
+          {/* Список камер — скроллится при переполнении */}
+          <div style={{ flex: 1, overflowY: "auto", padding: PANEL_PADDING, display: "flex", flexDirection: "column", gap: GAP }}>
+            {pipWindows.map((w) => {
+              const aspect = aspects[w.key] || DEFAULT_ASPECT;
+              const imgH = Math.max(56, Math.round(innerW / aspect));
+              return (
+                <div
+                  key={w.key}
+                  style={{
+                    width: "100%",
+                    background: "var(--bg-card)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    flexShrink: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      height: HEADER_H - 1, padding: "0 8px", cursor: "pointer",
+                    }}
+                    onClick={() => { if (w.kind === "local") setExpandedId(w.key); }}
+                    title={w.kind === "local" ? "Развернуть" : w.label}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {w.label}
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); close(w.key); }}
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        color: "var(--text-muted)", fontSize: 13, padding: "0 2px", lineHeight: 1,
+                      }}
+                      title="Закрыть"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div style={{ position: "relative" }}>
+                    {renderFrame(w, imgH, { width: "100%", height: imgH, objectFit: "cover", display: "block", background: "#000", cursor: w.kind === "local" ? "pointer" : "default" })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* «Ручка» ширины панели — левый край */}
+          <div
+            onPointerDown={startPanelResize}
+            onPointerMove={onResizeMove}
+            onPointerUp={endResize}
+            onPointerCancel={endResize}
+            title="Изменить ширину панели"
+            style={{
+              position: "absolute", left: -3, top: 0, bottom: 0, width: 7,
+              cursor: "ew-resize", touchAction: "none", zIndex: 2,
+            }}
+          />
+        </div>
+
+        {/* Развёрнутый просмотр */}
+        {expanded && (
+          <div
+            style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              background: "#000", zIndex: 3001,
+              display: "flex", flexDirection: "column",
+            }}
+            onClick={() => setExpandedId(null)}
+          >
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "calc(12px + env(safe-area-inset-top, 0)) 20px 12px", background: "rgba(0,0,0,0.8)",
+            }}>
+              <span style={{ color: "#fff", fontSize: 15, fontWeight: 500 }}>{expanded.label || "Камера"}</span>
+              <button
+                onClick={() => setExpandedId(null)}
+                style={{ background: "none", border: "none", color: "#fff", fontSize: 20, cursor: "pointer", padding: "4px 8px" }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              <CameraStreamImage
+                cameraId={expanded.id}
+                refreshKey={refreshKey}
+                alt={expanded.label || "Камера"}
+                style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // ===== Режим окон поверх контента: вертикальный стек у правого края =====
   // Вертикальный стек с учётом фактической высоты каждого окна
   const stack = pipWindows.map((w) => {
     const aspect = aspects[w.key] || DEFAULT_ASPECT;
@@ -214,10 +492,6 @@ export function CameraPipOverlay() {
   const btnTop = position === "bottom"
     ? Math.max(4, stackStart - 36)
     : Math.min(stackEnd + 4, viewportH - 32);
-
-  // Развёрнутый просмотр — только для локальных камер (живой MJPEG-поток)
-  const expandedWin = expandedId ? pipWindows.find((w) => w.key === expandedId) : null;
-  const expanded = expandedWin && expandedWin.kind === "local" ? expandedWin.cam : null;
 
   return (
     <>
@@ -260,41 +534,7 @@ export function CameraPipOverlay() {
             </button>
           </div>
           <div style={{ position: "relative" }}>
-            {w.kind === "local" ? (
-              <CameraStreamImage
-                cameraId={w.id}
-                refreshKey={refreshKey}
-                alt={w.label}
-                onClick={() => setExpandedId(w.key)}
-                onLoad={(e) => {
-                  const img = e.target as HTMLImageElement;
-                  if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                    const a = img.naturalWidth / img.naturalHeight;
-                    setAspects((prev) => (prev[w.key] === a ? prev : { ...prev, [w.key]: a }));
-                  }
-                }}
-                style={{ width: "100%", height: imgH, objectFit: "cover", cursor: "pointer" }}
-              />
-            ) : (
-              <img
-                src={
-                  w.kind === "tapo"
-                    ? `/api/tapo-plugin/snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&ts=${cloudRefreshKey}`
-                    : w.kind === "tapoc"
-                      ? `/api/tapo-plugin/cloud-snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&k=${cloudRefreshKey}`
-                      : `/api/hikvision-plugin/snapshot/${encodeURIComponent(w.id)}?token=${encodeURIComponent(token)}&ts=${cloudRefreshKey}`
-                }
-                alt={w.label}
-                onLoad={(e) => {
-                  const img = e.target as HTMLImageElement;
-                  if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                    const a = img.naturalWidth / img.naturalHeight;
-                    setAspects((prev) => (prev[w.key] === a ? prev : { ...prev, [w.key]: a }));
-                  }
-                }}
-                style={{ width: "100%", height: imgH, objectFit: "cover", display: "block", background: "#000" }}
-              />
-            )}
+            {renderFrame(w, imgH, { width: "100%", height: imgH, objectFit: "cover", display: "block", background: "#000" })}
             {/* «Ручка» изменения размера — левый нижний угол */}
             <div
               onPointerDown={startResize}
@@ -327,57 +567,8 @@ export function CameraPipOverlay() {
             zIndex: 3000,
           }}
         >
-          <button
-            onClick={() => setPosMenuOpen((v) => !v)}
-            title="Расположение окон камер"
-            style={{
-              width: 28, height: 28, borderRadius: "50%",
-              background: "var(--bg-card)", border: "1px solid var(--border-color)",
-              boxShadow: "0 4px 14px rgba(0,0,0,0.25)", cursor: "pointer",
-              color: posMenuOpen ? "#007AFF" : "var(--text-muted)",
-              fontSize: 14, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center",
-              padding: 0,
-            }}
-          >
-            ⚙
-          </button>
-          {posMenuOpen && (
-            <>
-              {/* Прозрачный фон для закрытия меню по клику вне его */}
-              <div
-                style={{ position: "fixed", inset: 0, zIndex: 2999 }}
-                onClick={() => setPosMenuOpen(false)}
-              />
-              <div
-                style={{
-                  position: "absolute", top: 34, right: 0, zIndex: 3000,
-                  background: "var(--bg-card)", border: "1px solid var(--border-color)",
-                  borderRadius: 10, boxShadow: "var(--shadow)", padding: 6, minWidth: 172,
-                }}
-              >
-                <div style={{ fontSize: 11, color: "var(--text-muted)", padding: "2px 10px 6px" }}>
-                  Расположение окон
-                </div>
-                {POSITIONS.map(({ value, label }) => (
-                  <button
-                    key={value}
-                    onClick={() => { setPosition(value); setPosMenuOpen(false); }}
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      gap: 8, width: "100%", padding: "7px 10px", border: "none", borderRadius: 8,
-                      background: position === value ? "var(--bg-hover)" : "none",
-                      color: "var(--text-primary)", fontSize: 13, cursor: "pointer", textAlign: "left",
-                    }}
-                  >
-                    <span>{label}</span>
-                    <span style={{ color: "#007AFF", fontSize: 12, opacity: position === value ? 1 : 0 }}>
-                      ✓
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          {gearButton}
+          {renderPosMenu()}
         </div>
       )}
 
