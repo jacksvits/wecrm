@@ -345,8 +345,9 @@ export function CameraPipOverlay() {
             right: 0,
             bottom: 0,
             width: panelWidth,
-            zIndex: 2500,
-            background: "var(--bg-card)",
+            // Панель поверх всего интерфейса (чат 1500, модалки 3001, тосты 9000+)
+            zIndex: 5000,
+            background: "var(--bg-sidebar)",
             borderLeft: "1px solid var(--border-color)",
             boxShadow: "-8px 0 30px rgba(0,0,0,0.25)",
             display: "flex",
