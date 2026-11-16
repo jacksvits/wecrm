@@ -34,6 +34,8 @@ model Role {
   showCalendarMetric Boolean @default(true) @map("show_calendar_metric")
   // «Системный обработчик»: пользователи роли не учитываются в виджете push-уведомлений на странице Директора
   isSystemHandler Boolean @default(false) @map("is_system_handler")
+  // «Сотрудник»: роль помечается как сотрудник (используется как фильтр в выборках пользователей)
+  isEmployee Boolean @default(false) @map("is_employee")
   notifyOnNewTask    Boolean @default(true)  @map("notify_on_new_task")
   notifyOnNewDeal    Boolean @default(false) @map("notify_on_new_deal")
   notifyOnNewComment Boolean @default(false) @map("notify_on_new_comment")
