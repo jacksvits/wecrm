@@ -38,7 +38,7 @@ export function FileUpload({ entityType, entityId, onUpload, isDark, variant = '
         lineHeight: '36px',
         textAlign: 'center',
         boxSizing: 'border-box',
-        padding: '0 5px 9px 0',
+        padding: '0px 0px 9px 0px',
         userSelect: 'none',
         flexShrink: 0,
         transition: 'color 0.2s ease',
