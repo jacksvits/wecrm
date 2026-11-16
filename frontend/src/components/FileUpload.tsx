@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../api/client';
 import { FileAttachment } from '../types';
 
-export function FileUpload({ entityType, entityId, onUpload, isDark, variant = 'default', multiple = false }: { entityType: string; entityId: string; onUpload: (a: FileAttachment) => void; isDark?: boolean; variant?: 'default' | 'button'; multiple?: boolean }) {
+export function FileUpload({ entityType, entityId, onUpload, isDark, variant = 'default', multiple = false }: { entityType: string; entityId: string; onUpload: (a: FileAttachment) => void; isDark?: boolean; variant?: 'default' | 'button' | 'pill'; multiple?: boolean }) {
   const [loading, setLoading] = useState(false);
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -21,6 +21,32 @@ export function FileUpload({ entityType, entityId, onUpload, isDark, variant = '
       e.target.value = '';
     }
   };
+
+  // Широкая скруглённая «пилюля» со скрепкой (обсуждения задач)
+  if (variant === 'pill') {
+    return (
+      <label style={{
+        height: 40,
+        padding: '0 16px',
+        borderRadius: 20,
+        border: 'none',
+        background: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)',
+        color: isDark ? 'rgba(255,255,255,0.70)' : 'rgba(0,0,0,0.50)',
+        fontSize: 14,
+        cursor: loading ? 'not-allowed' : 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        flexShrink: 0,
+        whiteSpace: 'nowrap',
+        transition: 'all 0.2s ease',
+      }}>
+        {loading ? '⏳' : '📎'}
+        {loading ? 'Загрузка...' : 'Прикрепить файл'}
+        <input type="file" multiple={multiple} onChange={handleChange} style={{ display: 'none' }} disabled={loading} />
+      </label>
+    );
+  }
 
   if (variant === 'button') {
     return (

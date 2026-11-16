@@ -2498,7 +2498,7 @@ export function TaskDetail() {
                       entityId={id!}
                       onUpload={handleFileUpload}
                       isDark={isDark}
-                      variant="button"
+                      variant="pill"
                       multiple={true}
                     />
                     {!isLinkedViewer && (
