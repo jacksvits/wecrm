@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { Reminder, Status } from '../types';
@@ -29,6 +29,8 @@ export function Reminders() {
   const { user: currentUser } = useAuth();
   // Модальное окно создания напоминания (открыто по прямой ссылке /reminders/new)
   const [showNew, setShowNew] = useState(location.pathname === '/reminders/new');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const taskId = searchParams.get('taskId');
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [search, setSearch] = useState('');
@@ -62,13 +64,14 @@ export function Reminders() {
         q: search.trim() || undefined,
         statusId: statusId || undefined,
         filter,
+        taskId: taskId || undefined,
       });
       setReminders(data || []);
     } catch (e) {
       console.error('Ошибка загрузки напоминаний:', e);
     }
     setLoading(false);
-  }, [search, statusId, filter]);
+  }, [search, statusId, filter, taskId]);
 
   useEffect(() => { loadStatuses(); }, [loadStatuses]);
   useEffect(() => { loadReminders(); }, [loadReminders]);
@@ -104,6 +107,18 @@ export function Reminders() {
       {/* Шапка */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>Напоминания</h2>
+        {taskId && (
+          <span style={{ padding: '3px 10px', borderRadius: 12, fontSize: 12, background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            Только напоминания задачи
+            <span
+              onClick={() => { searchParams.delete('taskId'); setSearchParams(searchParams, { replace: true }); }}
+              style={{ cursor: 'pointer', opacity: 0.7 }}
+              title='Сбросить фильтр'
+            >
+              ✕
+            </span>
+          </span>
+        )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button style={chip(view === 'list')} onClick={() => setView('list')}>Список</button>
           <button style={chip(view === 'calendar')} onClick={() => setView('calendar')}>Календарь</button>

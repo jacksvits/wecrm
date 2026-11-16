@@ -64,7 +64,7 @@ async function getDefaultStatusId(): Promise<string | null> {
 router.get('/', async (req, res) => {
   try {
     const user = (req as any).user;
-    const { q, statusId, filter, from, to } = req.query;
+    const { q, statusId, filter, from, to, taskId } = req.query;
 
     const where: any = {
       OR: [
@@ -77,6 +77,9 @@ router.get('/', async (req, res) => {
     else if (filter !== 'all') where.completedAt = null;
 
     if (statusId) where.statusId = statusId as string;
+
+    // Фильтр по задаче: напоминания, привязанные к карточке задачи
+    if (taskId) where.taskId = taskId as string;
 
     // Календарь: диапазон дат по remindAt (YYYY-MM-DD)
     if (from || to) {
@@ -145,7 +148,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const user = (req as any).user;
-    const { title, content, remindAt, notifyBeforeMin, repeat, repeatEndAt, statusId, recipientIds } = req.body;
+    const { title, content, remindAt, notifyBeforeMin, repeat, repeatEndAt, statusId, recipientIds, taskId } = req.body;
 
     if (!title?.trim()) {
       return res.status(400).json({ error: 'Заголовок обязателен' });
@@ -178,6 +181,7 @@ router.post('/', async (req, res) => {
         notifyBeforeMin: Math.max(0, Math.min(10080, parseInt(notifyBeforeMin) || 0)),
         repeat: REPEATS.includes(repeat) ? repeat : 'none',
         repeatEndAt: repeatEndAt ? new Date(repeatEndAt) : null,
+        taskId: taskId || null,
       },
       include: includeFull,
     });

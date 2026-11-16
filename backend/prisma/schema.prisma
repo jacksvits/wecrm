@@ -516,6 +516,7 @@ model Task {
   assignees     TaskAssignee[]
   curators      TaskCurator[]
   comments      Comment[]
+  reminders     Reminder[]
   activities    Activity[]
   history       TaskHistory[]
   calls         Call[]
@@ -1072,10 +1073,13 @@ model Reminder {
   completedAt     DateTime? @map("completed_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
+  taskId          String?   @map("task_id")
+  task            Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
   sharedWith      ReminderRecipient[]
 
   @@index([userId])
   @@index([remindAt])
+  @@index([taskId])
   @@map("reminders")
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../api/client";
@@ -304,6 +304,14 @@ export function TaskDetail() {
   const [pendingAttachments, setPendingAttachments] = useState<FileAttachment[]>([]);
   const [isInternalComment, setIsInternalComment] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
+  const [taskRemindersCount, setTaskRemindersCount] = useState(0);
+
+  // Количество напоминаний, привязанных к задаче
+  const loadTaskReminders = useCallback(() => {
+    if (!id) return;
+    api.reminders.list({ taskId: id }).then(list => setTaskRemindersCount(list.length)).catch(() => {});
+  }, [id]);
+  useEffect(() => { loadTaskReminders(); }, [loadTaskReminders]);
   const [pinningCommentId, setPinningCommentId] = useState<string | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -2525,6 +2533,7 @@ export function TaskDetail() {
                         <button
                           type="button"
                           onClick={() => setShowReminderModal(true)}
+                          title='Новое напоминание'
                           style={{
                             display: "flex",
                             alignItems: "center",
@@ -2540,8 +2549,30 @@ export function TaskDetail() {
                             transition: "all 0.2s ease",
                           }}
                         >
-                          🔔 Новое напоминание
+                          🔔 {taskRemindersCount > 0 ? '+' : 'Новое напоминание'}
                         </button>
+                        {taskRemindersCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/reminders?taskId=${id}`)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 5,
+                              padding: "5px 12px",
+                              borderRadius: 8,
+                              border: "1px solid var(--border-color)",
+                              background: "var(--bg-input)",
+                              color: "var(--text-secondary)",
+                              fontSize: 13,
+                              cursor: "pointer",
+                              whiteSpace: "nowrap",
+                              transition: "all 0.2s ease",
+                            }}
+                          >
+                            Напоминаний: {taskRemindersCount}
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -3559,7 +3590,12 @@ export function TaskDetail() {
           </div>
         </div>
       )}{" "}
-      {showReminderModal && <ReminderModal onClose={() => setShowReminderModal(false)} />}{" "}
+      {showReminderModal && (
+        <ReminderModal
+          taskId={id}
+          onClose={() => { setShowReminderModal(false); loadTaskReminders(); }}
+        />
+      )}{" "}
     </div>
   );
 }

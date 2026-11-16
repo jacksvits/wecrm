@@ -224,13 +224,14 @@ promoBlocks: { list: (): Promise<PromoBlock[]> => fetchApi('/api/promo-blocks'),
     delete: (id: string) => fetchApi(`/api/notes/${id}`, { method: 'DELETE' }),
   },
   reminders: {
-    list: (params?: { q?: string; statusId?: string; filter?: string; from?: string; to?: string }): Promise<Reminder[]> => {
+    list: (params?: { q?: string; statusId?: string; filter?: string; from?: string; to?: string; taskId?: string }): Promise<Reminder[]> => {
       const qs = new URLSearchParams();
       if (params?.q) qs.set('q', params.q);
       if (params?.statusId) qs.set('statusId', params.statusId);
       if (params?.filter) qs.set('filter', params.filter);
       if (params?.from) qs.set('from', params.from);
       if (params?.to) qs.set('to', params.to);
+      if (params?.taskId) qs.set('taskId', params.taskId);
       const str = qs.toString();
       return fetchApi(`/api/reminders${str ? `?${str}` : ''}`);
     },

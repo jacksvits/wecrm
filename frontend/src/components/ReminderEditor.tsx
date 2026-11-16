@@ -30,7 +30,7 @@ const toLocalDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${
 
 // Форма напоминания (создание/редактирование), onDone — после сохранения или отмены,
 // onCreated — с созданным напоминанием (для баннера уведомления)
-function ReminderForm({ reminderId, onDone, onCreated }: { reminderId?: string; onDone: () => void; onCreated?: (reminder: Reminder) => void }) {
+function ReminderForm({ reminderId, onDone, onCreated, taskId }: { reminderId?: string; onDone: () => void; onCreated?: (reminder: Reminder) => void; taskId?: string }) {
   const isEdit = !!reminderId;
   const { user: currentUser } = useAuth();
 
@@ -219,7 +219,8 @@ function ReminderForm({ reminderId, onDone, onCreated }: { reminderId?: string; 
       if (isEdit && reminderId) {
         await api.reminders.update(reminderId, data);
       } else {
-        const created = await api.reminders.create(data);
+        // При создании из карточки задачи напоминание привязывается к задаче
+        const created = await api.reminders.create({ ...data, taskId: taskId || undefined });
         onCreated?.(created);
       }
       onDone();
@@ -392,7 +393,7 @@ export function ReminderEditor() {
 // Модальное окно создания напоминания (адаптировано под мобильные: на узком экране — почти на весь экран).
 // После создания показывает баннер сверху по центру: кликабельное название напоминания
 // и круглый таймер 10 секунд, после которого баннер закрывается.
-export function ReminderModal({ onClose }: { onClose: () => void }) {
+export function ReminderModal({ onClose, taskId }: { onClose: () => void; taskId?: string }) {
   const navigate = useNavigate();
   const [created, setCreated] = useState<{ id: string; title: string } | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(10);
@@ -479,6 +480,7 @@ export function ReminderModal({ onClose }: { onClose: () => void }) {
           <ReminderForm
             onDone={onClose}
             onCreated={r => setCreated({ id: r.id, title: r.title })}
+            taskId={taskId}
           />
         </div>
       </div>

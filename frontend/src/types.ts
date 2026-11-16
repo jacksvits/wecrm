@@ -111,6 +111,7 @@ export interface Reminder {
   repeat: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
   repeatEndAt?: string | null;
   completedAt?: string | null;
+  taskId?: string | null;
   sharedWith?: ReminderRecipient[];
   createdAt: string;
   updatedAt: string;
