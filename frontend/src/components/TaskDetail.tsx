@@ -2493,14 +2493,6 @@ export function TaskDetail() {
                 >
                   {/* Toolbar */}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <FileUpload
-                      entityType="comment"
-                      entityId={id!}
-                      onUpload={handleFileUpload}
-                      isDark={isDark}
-                      variant="pill"
-                      multiple={true}
-                    />
                     {!isLinkedViewer && (
 <button
                       type="button"
@@ -2615,6 +2607,18 @@ export function TaskDetail() {
 
                   {/* Input row */}
                   <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                    <div style={{ position: "relative", flex: 1 }}>
+                    {/* Скрепка внутри поля ввода */}
+                    <div style={{ position: "absolute", left: 4, top: "50%", transform: "translateY(-50%)", zIndex: 2 }}>
+                      <FileUpload
+                        entityType="comment"
+                        entityId={id!}
+                        onUpload={handleFileUpload}
+                        isDark={isDark}
+                        variant="button"
+                        multiple={true}
+                      />
+                    </div>
                     <textarea
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
@@ -2624,6 +2628,7 @@ export function TaskDetail() {
                       style={{
                         flex: 1,
                         padding: "10px 14px",
+                        paddingLeft: 46,
                         borderRadius: 20,
                         border: "1px solid var(--border-color)",
                         background: "var(--bg-input)",
@@ -2637,6 +2642,7 @@ export function TaskDetail() {
                         maxHeight: 120,
                       }}
                     />
+                    </div>
                     <button
                       onClick={handleAddComment}
                       disabled={!newComment.trim() && !pendingAttachments.length}
