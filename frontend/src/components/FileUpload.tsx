@@ -33,7 +33,7 @@ export function FileUpload({ entityType, entityId, onUpload, isDark, variant = '
         height: 36,
         cursor: loading ? 'not-allowed' : 'pointer',
         color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)',
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: 500,
         lineHeight: 1,
         userSelect: 'none',

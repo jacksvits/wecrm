@@ -2609,7 +2609,7 @@ export function TaskDetail() {
                   <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                     <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
                     {/* Кнопка вложения («+» без фона) внутри поля ввода */}
-                    <div style={{ position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)", zIndex: 2 }}>
+                    <div style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", zIndex: 2 }}>
                       <FileUpload
                         entityType="comment"
                         entityId={id!}
@@ -2635,7 +2635,7 @@ export function TaskDetail() {
                         color: "var(--text-primary)",
                         fontSize: 15,
                         fontFamily: "inherit",
-                        lineHeight: 1.4,
+                        lineHeight: "20px",
                         resize: "none",
                         outline: "none",
                         minHeight: 40,
@@ -2647,16 +2647,19 @@ export function TaskDetail() {
                       onClick={handleAddComment}
                       disabled={!newComment.trim() && !pendingAttachments.length}
                       style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: "50%",
+                        width: 36,
+                        height: 36,
                         border: "none",
-                        background:
+                        background: "transparent",
+                        color:
                           newComment.trim() || pendingAttachments.length
-                            ? "linear-gradient(135deg, #007aff 0%, #5856d6 100%)"
-                            : "rgba(142,142,147,0.30)",
-                        color: "#fff",
-                        fontSize: 20,
+                            ? "#007AFF"
+                            : isDark
+                              ? "rgba(255,255,255,0.25)"
+                              : "rgba(0,0,0,0.25)",
+                        fontSize: 26,
+                        lineHeight: 1,
+                        padding: 0,
                         cursor:
                           newComment.trim() || pendingAttachments.length
                             ? "pointer"
@@ -2665,11 +2668,7 @@ export function TaskDetail() {
                         alignItems: "center",
                         justifyContent: "center",
                         flexShrink: 0,
-                        boxShadow:
-                          newComment.trim() || pendingAttachments.length
-                            ? "0 4px 16px rgba(0,122,255,0.40)"
-                            : "none",
-                        transition: "all 0.2s ease",
+                        transition: "color 0.2s ease",
                       }}
                     >
                       ↑
