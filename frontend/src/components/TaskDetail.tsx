@@ -2658,10 +2658,12 @@ export function TaskDetail() {
                           newComment.trim() || pendingAttachments.length
                             ? "#007AFF"
                             : isDark
-                              ? "rgba(255,255,255,0.25)"
-                              : "rgba(0,0,0,0.25)",
-                        fontSize: 26,
-                        lineHeight: 1,
+                              ? "rgba(255,255,255,0.45)"
+                              : "rgba(0,0,0,0.35)",
+                        fontSize: 22,
+                        fontWeight: 300,
+                        lineHeight: "36px",
+                        textAlign: "center",
                         padding: 0,
                         cursor:
                           newComment.trim() || pendingAttachments.length
