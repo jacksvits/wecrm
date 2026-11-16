@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
-import { Status, User } from '../types';
+import { Role, Status, User } from '../types';
 import ReactQuill from './LazyQuill' ;
 
 const quillModules = {
@@ -53,9 +53,12 @@ export function ReminderEditor() {
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState('');
 
-  // Список пользователей, с которыми можно поделиться напоминанием
+  // Список сотрудников, с которыми можно поделиться напоминанием
+  // (показываем только пользователей с ролью «Сотрудник»)
   useEffect(() => {
-    api.users.list().then(list => setUsers(list.filter(u => u.id !== currentUser?.id))).catch(() => {});
+    api.users.list().then(list => setUsers(list.filter(u =>
+      u.id !== currentUser?.id && (u.role as Role | undefined)?.isEmployee === true
+    ))).catch(() => {});
   }, [currentUser?.id]);
 
   const inputStyle: React.CSSProperties = {
@@ -252,7 +255,7 @@ export function ReminderEditor() {
       {/* Поделиться с пользователями */}
       {users.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Поделиться с пользователями</label>
+          <label style={labelStyle}>Поделиться с сотрудниками</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {users.map(u => (
               <label
