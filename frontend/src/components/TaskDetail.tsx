@@ -3507,6 +3507,11 @@ export function TaskDetail() {
               width: vitrineWidth ?? undefined,
               top: vitrineGeom?.top ?? 180,
               height: vitrineGeom?.height ?? "calc(100vh - 280px)",
+              // Панель выезжает от левого края панели камер (там же лепесток);
+              // панель камер закрыта — от правого края экрана. Transition right
+              // добавлен к transform-переходу класса, иначе inline его затирает
+              right: camPanelOffset > 0 ? camPanelOffset : undefined,
+              transition: "transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), right 0.15s ease",
             }}
           >
             <div className="task-vitrine-head">
