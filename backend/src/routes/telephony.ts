@@ -20,6 +20,7 @@ import {
 import fs from "fs";
 import path from "path";
 import { randomUUID, createHmac, createHash } from "crypto";
+import { spawnSync } from "child_process";
 const router = Router();
 import { uploadsRoot, tenantUploadPrefix } from "../lib/tenant.js";
 // Директория записей текущего tenant'а (с префиксом /t-<slug>, см. lib/tenant.ts)
@@ -28,6 +29,30 @@ const recordsDir = () => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 };
+
+// Транскодирование записи в AAC/M4A: iOS Safari не поддерживает «телефонный»
+// MPEG-2.5 Layer III (8 кГц, 24 kbps), которым кодирует запись АТС Novofon —
+// <audio> показывает 0:00 и неактивный Play на iPhone. AAC/M4A играет везде.
+// Возвращает null при недоступности/сбое ffmpeg — тогда сохраняем оригинал.
+function transcodeRecordToM4a(input: Buffer): Buffer | null {
+  try {
+    const res = spawnSync(
+      "ffmpeg",
+      ["-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-vn",
+        "-c:a", "aac", "-b:a", "32k", "-ar", "16000", "-ac", "1",
+        "-movflags", "+faststart", "-f", "ipod", "pipe:1"],
+      { input, maxBuffer: 64 * 1024 * 1024, timeout: 120000 },
+    );
+    if (res.status !== 0 || !res.stdout || res.stdout.length === 0) {
+      console.error(`[Novofon] ffmpeg transcode failed: ${(res.stderr || "").toString().slice(0, 300)}`);
+      return null;
+    }
+    return res.stdout;
+  } catch (e: any) {
+    console.error(`[Novofon] ffmpeg transcode error: ${e?.message}`);
+    return null;
+  }
+}
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function downloadRecordWithRetry(
   url: string,
@@ -1064,8 +1089,12 @@ async function attachCallRecord(
     }
     const filename = record.data?.file_name || `record_${call.pbxCallId}.mp3`;
     const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const localPath = path.join(recordsDir(), `${randomUUID()}_${safeName}`);
-    fs.writeFileSync(localPath, Buffer.from(buffer));
+    // iOS Safari не играет MPEG-2.5 L3 (8 кГц) — сохраняем в AAC/M4A,
+    // при сбое транскодирования остаёмся на оригинале
+    const m4a = transcodeRecordToM4a(Buffer.from(buffer));
+    const finalName = m4a ? safeName.replace(/\.mp3$/i, "") + ".m4a" : safeName;
+    const localPath = path.join(recordsDir(), `${randomUUID()}_${finalName}`);
+    fs.writeFileSync(localPath, m4a || Buffer.from(buffer));
     await prisma.call.update({
       where: { id: call.id },
       data: {
