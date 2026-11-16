@@ -2605,20 +2605,25 @@ export function TaskDetail() {
                     </div>
                   )}
 
-                  {/* Input row */}
-                  <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                    <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
-                    {/* Кнопка вложения («+» без фона) внутри поля ввода */}
-                    <div style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", zIndex: 2 }}>
-                      <FileUpload
-                        entityType="comment"
-                        entityId={id!}
-                        onUpload={handleFileUpload}
-                        isDark={isDark}
-                        variant="plain"
-                        multiple={true}
-                      />
-                    </div>
+                  {/* Input row: единое поле на всю ширину — «+», ввод и отправка внутри */}
+                  <div style={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    borderRadius: 20,
+                    border: "1px solid var(--border-color)",
+                    background: "var(--bg-input)",
+                    padding: "0 8px 0 4px",
+                  }}>
+                    <FileUpload
+                      entityType="comment"
+                      entityId={id!}
+                      onUpload={handleFileUpload}
+                      isDark={isDark}
+                      variant="plain"
+                      multiple={true}
+                    />
                     <textarea
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
@@ -2626,23 +2631,21 @@ export function TaskDetail() {
                       placeholder="Написать сообщение..."
                       rows={1}
                       style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        paddingLeft: 48,
-                        borderRadius: 20,
-                        border: "1px solid var(--border-color)",
-                        background: "var(--bg-input)",
+                        flex: 1,
+                        minWidth: 0,
+                        border: "none",
+                        outline: "none",
+                        background: "transparent",
+                        padding: "10px 4px",
                         color: "var(--text-primary)",
                         fontSize: 15,
                         fontFamily: "inherit",
                         lineHeight: "20px",
                         resize: "none",
-                        outline: "none",
                         minHeight: 40,
                         maxHeight: 120,
                       }}
                     />
-                    </div>
                     <button
                       onClick={handleAddComment}
                       disabled={!newComment.trim() && !pendingAttachments.length}
