@@ -129,6 +129,12 @@ export function CameraPipOverlay() {
     try { localStorage.setItem(STORAGE_POS, position); } catch {}
   }, [position]);
 
+  // Уведомляем Layout об изменении состояния панели (открыта/ширина/камеры),
+  // чтобы он резервировал место под панель (margin-right у контента)
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("camera-pip-panel"));
+  }, [pipIds, position, panelWidth]);
+
   // Отслеживаем высоту окна для позиционирования стека (центр/низ)
   useEffect(() => {
     const onResize = () => setViewportH(window.innerHeight);
@@ -345,8 +351,9 @@ export function CameraPipOverlay() {
             right: 0,
             bottom: 0,
             width: panelWidth,
-            // Панель поверх всего интерфейса (чат 1500, модалки 3001, тосты 9000+)
-            zIndex: 5000,
+            // Место под панель резервирует Layout (margin-right у контента) —
+            // как левая панель меню: ничего не перекрывается
+            zIndex: 30,
             background: "var(--bg-sidebar)",
             borderLeft: "1px solid var(--border-color)",
             boxShadow: "-8px 0 30px rgba(0,0,0,0.25)",
