@@ -87,6 +87,22 @@ export function TaskList() {
       return next;
     });
   };
+  // Свернутые колонки статусов на канбан-доске (десктоп): ключ — имя статуса.
+  // Сворачивание — клик по количеству в заголовке, разворачивание — клик по пилюле
+  const [collapsedStatuses, setCollapsedStatuses] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("kanbanCollapsedStatuses") || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const toggleStatus = (name: string) => {
+    setCollapsedStatuses((prev) => {
+      const next = { ...prev, [name]: !prev[name] };
+      localStorage.setItem("kanbanCollapsedStatuses", JSON.stringify(next));
+      return next;
+    });
+  };
   // Mobile kanban states
   const [isMobile, setIsMobile] = useState(false);
   const [mobileColumnIndex, setMobileColumnIndex] = useState(0);
@@ -1313,6 +1329,8 @@ export function TaskList() {
           const statusTasks = rootTasks.filter((t) => t.status === status.name);
           const projectGroups = groupByProject(statusTasks);
           const isEmpty = statusTasks.length === 0;
+          const collapsed = !!collapsedStatuses[status.name];
+          const pill = isEmpty || collapsed;
 
           // On mobile: show only selected column
           if (isMobile && status.name !== currentMobileStatus?.name)
@@ -1322,8 +1340,8 @@ export function TaskList() {
             <div
               key={status.name}
               style={{
-                minWidth: isMobile ? "100%" : isEmpty ? 48 : 280,
-                flex: isMobile ? "none" : isEmpty ? "0 0 auto" : 1,
+                minWidth: isMobile ? "100%" : pill ? 48 : 280,
+                flex: isMobile ? "none" : pill ? "0 0 auto" : 1,
                 flexShrink: 0,
                 display: "flex",
                 flexDirection: "column",
@@ -1334,16 +1352,19 @@ export function TaskList() {
               {" "}
               {!isMobile && (
                 <div
+                  onClick={collapsed && !isEmpty ? () => toggleStatus(status.name) : undefined}
+                  title={collapsed && !isEmpty ? `Развернуть колонку «${status.label}»` : undefined}
                   style={{
                     display: "flex",
-                    justifyContent: isEmpty ? "center" : "space-between",
+                    justifyContent: pill ? "center" : "space-between",
                     alignItems: "center",
-                    padding: isEmpty ? "12px 4px" : "8px 0",
-                    background: isEmpty ? status.color : "transparent",
-                    borderRadius: isEmpty ? 12 : 0,
-                    writingMode: isEmpty ? "vertical-rl" : "horizontal-tb",
-                    textOrientation: isEmpty ? "mixed" : "initial",
-                    minHeight: isEmpty ? 120 : "auto",
+                    padding: pill ? "12px 4px" : "8px 0",
+                    background: pill ? status.color : "transparent",
+                    borderRadius: pill ? 12 : 0,
+                    writingMode: pill ? "vertical-rl" : "horizontal-tb",
+                    textOrientation: pill ? "mixed" : "initial",
+                    minHeight: pill ? 120 : "auto",
+                    cursor: collapsed && !isEmpty ? "pointer" : "default",
                   }}
                 >
                   {" "}
@@ -1351,20 +1372,25 @@ export function TaskList() {
                     style={{
                       fontSize: 13,
                       fontWeight: 500,
-                      color: isEmpty ? status.textColor : "inherit",
-                      letterSpacing: isEmpty ? "0.05em" : "normal",
+                      color: pill ? status.textColor : "inherit",
+                      letterSpacing: pill ? "0.05em" : "normal",
                     }}
                   >
                     {status.label}
+                    {pill && statusTasks.length > 0 ? ` (${statusTasks.length})` : ""}
                   </span>{" "}
-                  {!isEmpty && (
+                  {!pill && (
                     <span
+                      onClick={() => toggleStatus(status.name)}
+                      title={`Свернуть колонку «${status.label}»`}
                       style={{
                         fontSize: 12,
                         padding: "2px 8px",
                         borderRadius: 10,
                         background: status.color,
                         color: status.textColor,
+                        cursor: "pointer",
+                        userSelect: "none",
                       }}
                     >
                       {statusTasks.length}
@@ -1386,7 +1412,7 @@ export function TaskList() {
                   Задач со статусом «{status.label}» нет
                 </div>
               )}
-              {!isEmpty && (
+              {!(isMobile ? isEmpty : pill) && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {projectGroups.map((group) => {
                     const gKey = status.name + "|" + group.id;
