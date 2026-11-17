@@ -173,7 +173,7 @@ function WidgetHeader({ title, badge, badgeBg, badgeColor, source = "demo" }: {
   badge?: string;
   badgeBg?: string;
   badgeColor?: string;
-  source?: "demo" | "metrika";
+  source?: "demo" | "metrika" | "crm";
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -200,19 +200,19 @@ function WidgetHeader({ title, badge, badgeBg, badgeColor, source = "demo" }: {
         {title}
       </span>
       <span
-        title={source === "metrika" ? "Данные Яндекс Метрики" : "Демо-данные — виджет будет настроен отдельно"}
+        title={source === "metrika" ? "Данные Яндекс Метрики" : source === "crm" ? "Данные CRM" : "Демо-данные — виджет будет настроен отдельно"}
         style={{
           marginLeft: "auto",
           flexShrink: 0,
           fontSize: 10,
           padding: "2px 7px",
           borderRadius: 8,
-          background: source === "metrika" ? "#dcfce7" : "#fef3c7",
-          color: source === "metrika" ? "#166534" : "#92400e",
+          background: source === "metrika" ? "#dcfce7" : source === "crm" ? "#dbeafe" : "#fef3c7",
+          color: source === "metrika" ? "#166534" : source === "crm" ? "#1d4ed8" : "#92400e",
           fontWeight: 600,
         }}
       >
-        {source === "metrika" ? "Метрика" : "Демо"}
+        {source === "metrika" ? "Метрика" : source === "crm" ? "CRM" : "Демо"}
       </span>
     </div>
   );
@@ -911,6 +911,65 @@ export function AdTitlesWidget() {
         leftHeader="Заголовок страницы"
       />
       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>демо</div>
+    </>
+  );
+}
+
+// ---------- Виджет «Просмотры новостей» (журнал просмотров CRM) ----------
+const NEWS_PERIODS = [
+  { key: "today", label: "Сегодня" },
+  { key: "7d", label: "7 дней" },
+  { key: "month", label: "Месяц" },
+] as const;
+
+export function AdNewsViewsWidget() {
+  const [period, setPeriod] = useState<string>("7d");
+  const [rows, setRows] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setLoaded(false);
+    api.news.newsViewsTop(period)
+      .then((d: any) => { if (alive) { setRows(Array.isArray(d) ? d : []); setLoaded(true); } })
+      .catch(() => { if (alive) { setRows([]); setLoaded(true); } });
+    return () => { alive = false; };
+  }, [period]);
+  const periodLabel = NEWS_PERIODS.find((p) => p.key === period)?.label || period;
+  return (
+    <>
+      <WidgetHeader title="Просмотры новостей" badge="📰" badgeBg="#8b5cf6" source="crm" />
+      <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
+        {NEWS_PERIODS.map((p) => (
+          <button
+            key={p.key}
+            onClick={() => setPeriod(p.key)}
+            style={{
+              flex: 1,
+              padding: "4px 0",
+              borderRadius: 8,
+              border: "1px solid var(--border-color)",
+              background: period === p.key ? "var(--accent, #007AFF)" : "transparent",
+              color: period === p.key ? "#fff" : "var(--text-secondary)",
+              fontSize: 11,
+              fontWeight: period === p.key ? 600 : 400,
+              cursor: "pointer",
+            }}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      {loaded && rows.length > 0 && (
+        <>
+          <StatTable rows={rows.map((r: any) => ({ label: r.title, value: r.views }))} leftHeader="Новость" />
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>{periodLabel.toLowerCase()} · журнал просмотров CRM</div>
+        </>
+      )}
+      {loaded && rows.length === 0 && (
+        <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "14px 4px" }}>
+          Просмотров за выбранный период пока нет — журнал ведётся с момента обновления, статистика накапливается
+        </div>
+      )}
     </>
   );
 }

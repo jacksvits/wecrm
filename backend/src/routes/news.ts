@@ -116,6 +116,8 @@ router.get('/public/:slug', async (req, res) => {
       where: { id: news.id },
       data: { views: { increment: 1 } },
     });
+    // журнал просмотров — источник статистики «Сегодня / 7 дней / Месяц» для виджета директора
+    prisma.newsView.create({ data: { newsId: news.id } }).catch(() => {});
 
     const reactionCounts = await prisma.newsReaction.groupBy({
       by: ['type'],
@@ -152,6 +154,8 @@ router.get('/public/post/:idOrSlug', async (req, res) => {
     if (!news) return res.status(404).json({ error: 'Новость не найдена' });
     // Просмотр учитывается, как на странице новости в CRM
     await prisma.news.update({ where: { id: news.id }, data: { views: { increment: 1 } } }).catch(() => {});
+    // журнал просмотров — источник статистики «Сегодня / 7 дней / Месяц» для виджета директора
+    prisma.newsView.create({ data: { newsId: news.id } }).catch(() => {});
     res.json(news);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -309,6 +313,50 @@ router.get('/pinned', async (_req, res) => {
 });
 
 /**
+ * GET /api/news/views/top?period=today|7d|month
+ * Топ новостей по просмотрам за период — виджет «Просмотры новостей» на вкладке
+ * «Рекламная статистика» (страница директора). Источник — журнал news_views.
+ */
+router.get('/views/top', requireUser, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (user.role !== 'admin') return res.status(403).json({ error: 'Нет прав' });
+    const period = String(req.query.period || '7d');
+    const from = new Date();
+    if (period === 'today') from.setHours(0, 0, 0, 0);
+    else if (period === 'month') from.setMonth(from.getMonth() - 1);
+    else from.setDate(from.getDate() - 7);
+    const grouped = await prisma.newsView.groupBy({
+      by: ['newsId'],
+      where: { createdAt: { gte: from } },
+      _count: { _all: true },
+      orderBy: { _count: { newsId: 'desc' } },
+      take: 15,
+    });
+    if (!grouped.length) return res.json([]);
+    const newsList = await prisma.news.findMany({
+      where: { id: { in: grouped.map((g) => g.newsId) } },
+      select: { id: true, title: true, slug: true, views: true, publishedAt: true },
+    });
+    const byId = new Map(newsList.map((n) => [n.id, n]));
+    res.json(
+      grouped
+        .filter((g) => byId.has(g.newsId))
+        .map((g) => ({
+          id: g.newsId,
+          title: byId.get(g.newsId)!.title,
+          slug: byId.get(g.newsId)!.slug,
+          views: g._count._all,
+          totalViews: byId.get(g.newsId)!.views,
+        }))
+    );
+  } catch (err: any) {
+    console.error('[news:views-top]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/news/:id
  * Получить новость по ID
  */
@@ -362,6 +410,8 @@ router.get('/:id', async (req, res) => {
       where: { id: req.params.id },
       data: { views: { increment: 1 } },
     });
+    // журнал просмотров — источник статистики «Сегодня / 7 дней / Месяц» для виджета директора
+    prisma.newsView.create({ data: { newsId: news.id } }).catch(() => {});
 
     // Статистика реакций и реакция текущего пользователя
     const [reactionCounts, myReaction] = await Promise.all([

@@ -23,7 +23,7 @@ import { useAuth } from "../hooks/useAuth";
 import { FinanceAnalyticsWidget } from "./accounting/FinanceAnalyticsWidget";
 import { FinanceDocumentsWidget } from "./accounting/FinanceDocumentsWidget";
 import { FinanceReconciliationWidget } from "./accounting/FinanceReconciliationWidget";
-import { AdSocialWidget, AdExpensesWidget, AdChannelsWidget, AdCacWidget, AdLeadsWidget, AdDomainsWidget, AdConversionsWidget, AdDemographicsWidget, AdGeoWidget, AdDurationWidget, AdDepthWidget, AdBounceWidget, AdAttendanceWidget, AdSourcesDailyWidget, AdPagesWidget, AdTitlesWidget } from "./AdStatistics";
+import { AdSocialWidget, AdExpensesWidget, AdChannelsWidget, AdCacWidget, AdLeadsWidget, AdDomainsWidget, AdConversionsWidget, AdDemographicsWidget, AdGeoWidget, AdDurationWidget, AdDepthWidget, AdBounceWidget, AdAttendanceWidget, AdSourcesDailyWidget, AdPagesWidget, AdTitlesWidget, AdNewsViewsWidget } from "./AdStatistics";
 
 type WidgetSize = "small" | "medium" | "large";
 type WidgetId = string;
@@ -67,6 +67,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "ad-sources-daily", size: "large", label: "Источники трафика: динамика", tab: "Рекламная статистика" },
   { id: "ad-pages", size: "medium", label: "Просмотры URL", tab: "Рекламная статистика" },
   { id: "ad-titles", size: "medium", label: "Заголовки страниц", tab: "Рекламная статистика" },
+  { id: "ad-news-views", size: "medium", label: "Просмотры новостей", tab: "Рекламная статистика" },
   { id: "widget-email-filter-log", size: "medium", label: "Журнал срабатываний почты", tab: "Основное" },
   // === Вкладка: Биллинг ===
   { id: "widget-billing-subscriptions", size: "medium", label: "Подписки пользователей", tab: "Биллинг" },
@@ -553,6 +554,8 @@ export function Director() {
         return <AdPagesWidget />;
       case "ad-titles":
         return <AdTitlesWidget />;
+      case "ad-news-views":
+        return <AdNewsViewsWidget />;
       case "stat-beget":
         return (
           <>

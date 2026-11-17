@@ -1140,6 +1140,7 @@ model News {
   pinnedToHome  Boolean  @default(false) @map("pinned_to_home")
   publishedAt   DateTime? @map("published_at")
   views         Int      @default(0)
+  viewsLog      NewsView[]
   vkPostId      Int?     @map("vk_post_id")
   vkPublishedAt DateTime? @map("vk_published_at")
   vkPublishError String? @map("vk_publish_error")
@@ -1160,6 +1161,16 @@ model News {
   @@index([categoryId])
   @@index([authorId])
   @@map("news")
+}
+
+model NewsView {
+  id        String   @id @default(uuid())
+  newsId    String   @map("news_id")
+  news      News     @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([newsId, createdAt])
+  @@map("news_views")
 }
 
 model NewsHistory {
