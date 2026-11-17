@@ -192,6 +192,11 @@ var woocommerce_params = {"ajax_url":"/wp-admin/admin-ajax.php","wc_ajax_url":"/
 .tenant-menu a:hover{color:#fb8c00;}
 @media (max-width: 1199px){.tenant-menu{gap:14px;}.tenant-menu a{font-size:13px;}}
 @media (max-width: 991px){.tenant-menu-wrapper{display:none;}}
+
+.tenant-login-wrapper{display:flex;align-items:center;margin-left:4px;}
+.tenant-login-btn{color:#ffffff;font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.4px;text-decoration:none;white-space:nowrap;line-height:1;padding:10px 18px;border:1px solid rgba(255,255,255,0.5);border-radius:22px;transition:color .2s ease,border-color .2s ease;}
+.tenant-login-btn:hover{color:#fb8c00;border-color:#fb8c00;}
+@media (max-width: 575px){.tenant-login-btn{padding:8px 14px;font-size:13px;}}
 </style>
 </head>
 <body class="archive post-type-archive post-type-archive-product wp-custom-logo wp-theme-decorme wp-child-theme-interio btn-svg theme-decorme woocommerce-shop woocommerce woocommerce-page woocommerce-no-js hfeed" >
@@ -226,23 +231,10 @@ var woocommerce_params = {"ajax_url":"/wp-admin/admin-ajax.php","wc_ajax_url":"/
 															<li class="tenant-menu-wrapper">
 													<nav class="tenant-menu" id="tenant-header-menu" aria-label="Меню"></nav>
 												</li>
-														<li class="cart-wrapper">
-						<button type="button" class="header-cart"><i class="fa fa-shopping-cart"></i>
-																<span>0</span>
-															</button>
-						<!-- Shopping Cart -->
-						<div class="shopping-cart">
-							
-
-	<p class="woocommerce-mini-cart__empty-message">В корзине нет товаров.</p>
-
-
-
-
-						</div>
-						<!--end shopping-cart -->
-					</li>
-																										<li class="content-list">
+																										<li class="tenant-login-wrapper">
+												<a class="tenant-login-btn" id="tenant-login-btn" href="https://stihlpsk.welans.cc/">Войти</a>
+											</li>
+													<li class="content-list">
 												<aside class="widget widget-contact">
 													<div class="contact-area">
 														<div class="contact-info">
@@ -432,24 +424,33 @@ var e="script#wp-emoji-settings",t=document.querySelector(e);if(!(t instanceof H
 </script>
 <script id="tenant-header-menu-js">
 document.addEventListener('DOMContentLoaded', function () {
-  var box = document.getElementById('tenant-header-menu');
-  if (!box) return;
-  fetch('/api/header-menu-links', { headers: { 'Accept': 'application/json' } })
-    .then(function (r) { if (!r.ok) throw new Error('menu http ' + r.status); return r.json(); })
-    .then(function (items) {
-      (items || []).forEach(function (i) {
-        if (!i || i.isActive === false || !i.title || !i.url) return;
-        var a = document.createElement('a');
-        a.href = i.url;
-        a.textContent = i.title;
-        if (/^https?:\/\//i.test(i.url) && i.url.indexOf(window.location.host) === -1) {
-          a.target = '_blank'; a.rel = 'noopener';
-        }
-        box.appendChild(a);
-      });
-    })
-    .catch(function () { });
+  var menuBox = document.getElementById('tenant-header-menu');
+  if (menuBox) {
+    fetch('/api/header-menu-links', { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { if (!r.ok) throw new Error('menu http ' + r.status); return r.json(); })
+      .then(function (items) {
+        (items || []).forEach(function (i) {
+          if (!i || i.isActive === false || !i.title || !i.url) return;
+          var a = document.createElement('a');
+          a.href = i.url;
+          a.textContent = i.title;
+          if (/^https?:\/\//i.test(i.url) && i.url.indexOf(window.location.host) === -1) {
+            a.target = '_blank'; a.rel = 'noopener';
+          }
+          menuBox.appendChild(a);
+        });
+      })
+      .catch(function () { });
+  }
+  var loginBtn = document.getElementById('tenant-login-btn');
+  if (loginBtn) {
+    fetch('/api/branding', { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { if (!r.ok) throw new Error('branding http ' + r.status); return r.json(); })
+      .then(function (b) { if (b && b.loginUrl) loginBtn.href = b.loginUrl; })
+      .catch(function () { });
+  }
 });
 </script>
+
 </body>
 </html>
