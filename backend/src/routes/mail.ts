@@ -132,7 +132,7 @@ function findByName(nodes: any[], names: string[]): string | null {
 }
 
 // Открывает IMAP-подключение на время операции и гарантированно закрывает его
-async function withImap<T>(account: MailAccountRow, fn: (client: ImapFlow) => Promise<T>): Promise<T> {
+export async function withImap<T>(account: MailAccountRow, fn: (client: ImapFlow) => Promise<T>): Promise<T> {
   const client = new ImapFlow({
     host: account.imapHost,
     port: account.imapPort,
