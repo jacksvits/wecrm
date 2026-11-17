@@ -18,7 +18,7 @@
   try {
     var q = new URLSearchParams(location.search).get('back') || '';
     // возврат разрешён только на публичные домены WeLANS (welans.ru, welans.click)
-    if (/^https:\/\/(www\.)?(welans\.ru|welans\.click|welans\.org)\//.test(q)) back = q;
+    if (/^https:\/\/(www\.)?(welans\.ru|welans\.click|welans\.org|stihlpsk\.ru)\//.test(q)) back = q;
   } catch (e) {}
   function done(hash) {
     location.replace(back.split('#')[0] + hash);
