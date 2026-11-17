@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import sharp from 'sharp';
 import { prisma } from '../lib/prisma.js';
-import { uploadsRoot, tenantUploadPrefix, pinTenantContext } from '../lib/tenant.js';
+import { uploadsRoot, tenantUploadPrefix, pinTenantContext, currentTenant } from '../lib/tenant.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -69,6 +69,9 @@ router.get('/', async (_req, res) => {
             ? fileUrl('splash.mp4', branding.updatedAt)
             : branding.splashPath)
         : null,
+      // URL страницы авторизации tenant'а для кнопки «Войти» на публичных страницах
+      // сторонних доменов (PublicAuthArea): главная организация — null (фронт ведёт на welans.cc)
+      loginUrl: (() => { const t = currentTenant(); return t && !t.isMain ? `https://${t.slug}.welans.cc/login` : null; })(),
       updatedAt: branding?.updatedAt || null,
     });
   } catch (err: any) {

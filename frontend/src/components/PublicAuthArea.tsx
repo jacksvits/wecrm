@@ -1,5 +1,7 @@
 // Публичный блок авторизации для шапок страниц витрины, файлов и новостей.
-// Гостю — кнопка «Войти» на страницу авторизации https://welans.cc; авторизованному —
+// Гостю — кнопка «Войти»: на welans-доменах — https://welans.cc, на домене tenant'а
+// (сторонние домены вроде stihlpsk.ru) — на страницу авторизации tenant'а
+// (поле loginUrl публичного /api/branding → https://<slug>.welans.cc/login). Авторизованному —
 // его аватарка (как на главной welans.ru: круглая, зелёный контур, инициалы при
 // отсутствии фото), клик ведёт на страницу профиля https://welans.cc/profile.
 // На домене welans.cc сессия известна сразу (useAuth — общий localStorage токена).
@@ -76,6 +78,16 @@ export function usePublicUser(): PublicUser | undefined {
 
 export default function PublicAuthArea({ mobile = false }: { mobile?: boolean }) {
   const user = usePublicUser();
+  const crmHost = isCrmHost();
+  // URL авторизации tenant'а со сторонних доменов (кнопка «Войти») — из публичного брендинга
+  const [tenantLoginUrl, setTenantLoginUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (crmHost) return;
+    fetch('/api/branding', { headers: { Accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => setTenantLoginUrl(b && b.loginUrl ? String(b.loginUrl) : null))
+      .catch(() => { /* остаётся дефолт https://welans.cc */ });
+  }, [crmHost]);
   // Состояние сессии ещё неизвестно — готовится редирект на мост
   if (user === undefined) return null;
   if (!user) {
@@ -88,7 +100,8 @@ export default function PublicAuthArea({ mobile = false }: { mobile?: boolean })
       color: '#fff', fontSize: 14, fontWeight: 600, textDecoration: 'none',
       boxShadow: '0 4px 20px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)',
     };
-    return <a href="https://welans.cc/" style={loginBtnStyle}>Войти</a>;
+    const loginHref = crmHost || !tenantLoginUrl ? 'https://welans.cc/' : tenantLoginUrl;
+    return <a href={loginHref} style={loginBtnStyle}>Войти</a>;
   }
   const avatarUrl = user.avatar
     ? (String(user.avatar).indexOf('http') === 0 ? user.avatar : 'https://welans.cc' + user.avatar)
