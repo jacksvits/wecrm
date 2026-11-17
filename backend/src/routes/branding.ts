@@ -71,7 +71,7 @@ router.get('/', async (_req, res) => {
         : null,
       // URL страницы авторизации tenant'а для кнопки «Войти» на публичных страницах
       // сторонних доменов (PublicAuthArea): главная организация — null (фронт ведёт на welans.cc)
-      loginUrl: (() => { const t = currentTenant(); return t && !t.isMain ? `https://${t.slug}.welans.cc/login` : null; })(),
+      loginUrl: (() => { const t = currentTenant(); return t && !t.isMain ? `https://${t.slug}.welans.cc/` : null; })(),
       updatedAt: branding?.updatedAt || null,
     });
   } catch (err: any) {
