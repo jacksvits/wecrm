@@ -9,6 +9,36 @@ import { formatDateTime, toDateTimeLocalValue, fromDateTimeLocalValue, nowDateTi
 import { TaskCalendar } from "./TaskCalendar";
 import { Avatar } from "./Avatar";
 import ReactQuill from './LazyQuill' ;
+import type { ReactNode } from "react";
+// Подписи-заголовки секций и полей в модалке создания/редактирования задачи
+const TaskFormSectionTitle = ({ children }: { children: ReactNode }) => (
+  <div
+    style={{
+      fontSize: 12,
+      fontWeight: 600,
+      color: "var(--text-muted)",
+      textTransform: "uppercase",
+      letterSpacing: ".04em",
+      borderBottom: "1px solid var(--border-color)",
+      paddingBottom: 6,
+    }}
+  >
+    {children}
+  </div>
+);
+const TaskFormFieldLabel = ({ children }: { children: ReactNode }) => (
+  <div
+    style={{
+      fontSize: 11,
+      color: "var(--text-muted)",
+      textTransform: "uppercase",
+      letterSpacing: "0.05em",
+      marginBottom: 4,
+    }}
+  >
+    {children}
+  </div>
+);
 const priorityLabels: Record<string, string> = {
   low: "Низкий",
   medium: "Средний",
@@ -1638,10 +1668,12 @@ export function TaskList() {
             <h3 style={{ margin: "0 0 16px" }}>
               {editingId ? "Редактировать задачу" : "Новая задача"}
             </h3>{" "}
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {" "}
-              <input
-                placeholder="Название"
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <TaskFormSectionTitle>Основное</TaskFormSectionTitle>
+                <div>
+                <TaskFormFieldLabel>Название задачи</TaskFormFieldLabel>
+                <input
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 required
@@ -1651,7 +1683,10 @@ export function TaskList() {
                   border: "1px solid var(--border-color)",
                 }}
               />{" "}
-              <ReactQuill
+              </div>
+                            <div>
+                <TaskFormFieldLabel>Описание</TaskFormFieldLabel>
+                <ReactQuill
                 theme="snow"
                 value={form.description}
                 onChange={(value) => setForm({ ...form, description: value })}
@@ -1668,7 +1703,13 @@ export function TaskList() {
                 }}
                 formats={["header", "bold", "italic", "underline", "strike", "list", "bullet", "color", "background", "link"]}
               />{" "}
-              <select
+              </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <TaskFormSectionTitle>Параметры</TaskFormSectionTitle>
+                <div>
+                <TaskFormFieldLabel>Статус задачи</TaskFormFieldLabel>
+                <select
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
                 style={{
@@ -1684,7 +1725,10 @@ export function TaskList() {
                   </option>
                 ))}{" "}
               </select>{" "}
-              <select
+              </div>
+                            <div>
+                <TaskFormFieldLabel>Приоритет</TaskFormFieldLabel>
+                <select
                 value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: e.target.value })}
                 style={{
@@ -1699,9 +1743,14 @@ export function TaskList() {
                 <option value="high">Высокий</option>
                 <option value="urgent">Срочный</option>{" "}
               </select>{" "}
-              <input
+              </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <TaskFormSectionTitle>Сроки</TaskFormSectionTitle>
+                <div>
+                <TaskFormFieldLabel>Дата начала</TaskFormFieldLabel>
+                <input
                 type="datetime-local"
-                title="Начало срока"
                 value={form.startDate}
                 onChange={(e) => setForm({ ...form, startDate: e.target.value })}
                 style={{
@@ -1710,9 +1759,11 @@ export function TaskList() {
                   border: "1px solid var(--border-color)",
                 }}
               />{" "}
-              <input
+              </div>
+                            <div>
+                <TaskFormFieldLabel>Дата завершения</TaskFormFieldLabel>
+                <input
                 type="datetime-local"
-                title="Срок"
                 value={form.dueDate}
                 onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
                 style={{
@@ -1721,7 +1772,13 @@ export function TaskList() {
                   border: "1px solid var(--border-color)",
                 }}
               />{" "}
-              <select
+              </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <TaskFormSectionTitle>Связи и участники</TaskFormSectionTitle>
+                <div>
+                <TaskFormFieldLabel>Проект</TaskFormFieldLabel>
+                <select
                 value={form.projectId}
                 onChange={(e) =>
                   setForm({ ...form, projectId: e.target.value })
@@ -1740,7 +1797,10 @@ export function TaskList() {
                   </option>
                 ))}{" "}
               </select>{" "}
-              {/* Поле поиска контакта с выпадающим списком — как в новой сделке */}
+              </div>
+                            <div>
+                <TaskFormFieldLabel>Контакт</TaskFormFieldLabel>
+                {/* Поле поиска контакта с выпадающим списком — как в новой сделке */}
               <div ref={contactDropdownRef} style={{ position: "relative" }}>
                 <input
                   placeholder="Поиск контакта..."
@@ -1813,7 +1873,10 @@ export function TaskList() {
                   </div>
                 )}
               </div>{" "}
-              <select
+              </div>
+                            <div>
+                <TaskFormFieldLabel>Ответственные</TaskFormFieldLabel>
+                <select
                 multiple
                 value={form.assigneeIds}
                 onChange={(e) => {
@@ -1836,7 +1899,10 @@ export function TaskList() {
                   </option>
                 ))}{" "}
               </select>{" "}
-              <select
+              </div>
+                            <div>
+                <TaskFormFieldLabel>Наблюдатели</TaskFormFieldLabel>
+                <select
                 multiple
                 value={form.curatorIds}
                 onChange={(e) =>
@@ -1860,10 +1926,12 @@ export function TaskList() {
                     </option>
                   ))}
               </select>{" "}
-              {preselectedParentId && (
+              </div>
+                            {preselectedParentId && (
                 <input type="hidden" value={preselectedParentId} />
               )}{" "}
-            </div>{" "}
+              </div>
+              </div>{" "}
             <div
               style={{
                 display: "flex",
