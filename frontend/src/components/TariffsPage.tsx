@@ -38,6 +38,8 @@ export default function TariffsPage() {
   const brandLogo = useBrandLogo(false);
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // Период оплаты: помесячно или год со скидкой 15%
+  const [period, setPeriod] = useState<'month' | 'year'>('month');
 
   useEffect(() => {
     fetch('/api/platform/tariffs')
@@ -86,6 +88,32 @@ export default function TariffsPage() {
           </p>
         </div>
 
+        {sorted.some((t) => (t.price ?? 0) > 0) && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+            <div style={{ display: 'inline-flex', background: 'var(--bg-secondary, #fff)', border: '1px solid var(--border-color, #e0e0e0)', borderRadius: 12, padding: 4, gap: 4 }}>
+              {([['month', 'Помесячно'], ['year', 'На год −15%']] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setPeriod(value)}
+                  style={{
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '8px 18px',
+                    borderRadius: 9,
+                    fontSize: 14,
+                    fontWeight: period === value ? 600 : 400,
+                    color: period === value ? '#fff' : 'var(--text-secondary, #555)',
+                    background: period === value ? 'linear-gradient(135deg, #007aff, #5856d6, #af52de)' : 'transparent',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {loaded && sorted.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted, #888)' }}>Тарифы временно недоступны. Попробуйте позже.</div>
         ) : (
@@ -126,14 +154,18 @@ export default function TariffsPage() {
                   <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, color: 'var(--text-color, #1a1a1a)' }}>{t.name}</div>
                   <div style={{ marginBottom: 12 }}>
                     <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-color, #1a1a1a)' }}>
-                      {isFree ? '0 ₽' : `${Number(t.price).toLocaleString('ru-RU')} ₽`}
+                      {isFree ? '0 ₽' : period === 'year' && yPrice != null ? `${yPrice.toLocaleString('ru-RU')} ₽` : `${Number(t.price).toLocaleString('ru-RU')} ₽`}
                     </span>
-                    {!isPromo && <span style={{ fontSize: 14, color: 'var(--text-muted, #888)' }}> /мес</span>}
+                    {!isPromo && <span style={{ fontSize: 14, color: 'var(--text-muted, #888)' }}> {period === 'year' && !isFree ? '/год' : '/мес'}</span>}
                     {t.renewMonths ? (
                       <div style={{ fontSize: 13, color: '#22c55e', fontWeight: 600, marginTop: 2 }}>
                         первые {t.renewMonths} {monthsLabel(t.renewMonths)} бесплатно
                       </div>
-                    ) : yPrice != null ? (
+                    ) : period === 'year' && yPrice != null && !isFree ? (
+                      <div style={{ fontSize: 13, color: 'var(--text-muted, #888)', marginTop: 2 }}>
+                        ≈ {Math.round(yPrice / 12).toLocaleString('ru-RU')} ₽/мес
+                      </div>
+                    ) : yPrice != null && !isFree ? (
                       <div style={{ fontSize: 13, color: 'var(--text-muted, #888)', marginTop: 2 }}>
                         или {yPrice.toLocaleString('ru-RU')} ₽/год <span style={{ color: '#22c55e', fontWeight: 600 }}>−15%</span>
                       </div>
