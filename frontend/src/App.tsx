@@ -114,6 +114,8 @@ if (location.pathname === '/register') { return ( <Suspense fallback={null}><Ins
       const shareToken = location.pathname.slice(3).split('/')[0] ;
       if (shareToken) { return ( <Suspense fallback={null}><SharedFilePage token={shareToken} /></Suspense> ) ; }
     }
+    // Публичная страница тарифов доступна и на welans.click (регистрация ведёт на welans.cc)
+    if (location.pathname === '/tariffs') { return ( <Suspense fallback={null}><InstallAppBanner /><TariffsPage /></Suspense> ) ; }
     if (location.pathname !== '/shop' && location.pathname !== '/vitrine') { return ( <Suspense fallback={null}><PublicFiles /></Suspense> ) ; }
   }
   // Публичные новости на welans.ru: лента /news, детальная /news/:id и старые ссылки /<slug>/
