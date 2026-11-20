@@ -176,11 +176,15 @@ router.get('/tariffs', async (_req, res) => {
     for (const cat of categories) {
       for (const p of cat.products) {
         const prices = (p.prices || []).map((x: any) => Number(x.price)).filter((n: number) => Number.isFinite(n));
+        const minPrice = prices.length ? Math.min(...prices) : null;
+        const maxPrice = prices.length ? Math.max(...prices) : null;
         out.push({
           productId: p.id,
           name: p.name,
           description: p.description || '',
-          price: prices.length ? Math.min(...prices) : null,
+          price: minPrice,
+          // Годовая цена — если вид цен «на год» дороже месячного
+          priceRubYear: minPrice != null && maxPrice != null && maxPrice > minPrice ? maxPrice : null,
           categoryName: cat.name,
           renewMonths: p.crmRenewMonths ?? null,
         });

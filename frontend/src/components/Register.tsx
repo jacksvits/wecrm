@@ -147,10 +147,12 @@ export function Register() {
                               <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                                 <b style={{ fontSize: 14 }}>{t.name}</b>
                                 <span style={{ fontSize: 14, color: '#16a34a', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                  {t.price != null ? Number(t.price).toLocaleString('ru-RU') + ' ₽' : 'по запросу'}
+                                  {payPeriod === 'year' && (t as any).priceRubYear != null
+                                    ? Number((t as any).priceRubYear).toLocaleString('ru-RU') + ' ₽/год'
+                                    : t.price != null ? Number(t.price).toLocaleString('ru-RU') + ' ₽' : 'по запросу'}
                                 </span>
                               </span>
-                              {t.description && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.description}</span>}
+                              {t.description && <span className='rich-text' style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)' }} dangerouslySetInnerHTML={{ __html: t.description }} />}
                               {t.renewMonths && <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Срок продления: {t.renewMonths === 1 ? '1 месяц' : t.renewMonths === 2 ? '2 месяца' : '3 месяца'}</span>}
                             </span>
                           </label>
