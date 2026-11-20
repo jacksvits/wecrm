@@ -166,6 +166,7 @@ function LoginBrandSplash() {
 // (backend/src/routes/menu-links.ts). После загрузки из /api/menu-links заменяются настройками организации.
 const DEFAULT_MENU_LINKS = [
   { key: 'presentation', title: 'Презентация', url: '/presentation', isActive: true },
+  { key: 'tariffs', title: 'Тарифы', url: '/tariffs', isActive: true },
   { key: 'catalog', title: 'Каталог', url: 'https://welans.cc/shop', isActive: true },
   { key: 'files', title: 'Файлы', url: 'https://welans.click', isActive: true },
   { key: 'news', title: 'Новости', url: 'https://welans.ru/news', isActive: true },

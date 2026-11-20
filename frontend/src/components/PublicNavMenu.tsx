@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 type NavItem = { key: string; title: string; url: string; isActive: boolean; sortOrder: number };
 
 const DEFAULT_ITEMS: NavItem[] = [
+  { key: "tariffs", title: "Тарифы", url: "https://welans.cc/tariffs", isActive: true, sortOrder: 0 },
   { key: "news", title: "Новости", url: "https://welans.ru/news", isActive: true, sortOrder: 0 },
   { key: "catalog", title: "Каталог", url: "https://welans.cc/shop", isActive: true, sortOrder: 1 },
   { key: "files", title: "Файлы", url: "https://welans.click/", isActive: true, sortOrder: 2 },

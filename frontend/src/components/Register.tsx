@@ -29,9 +29,15 @@ export function Register() {
 
   useEffect(() => {
     if (!mainHost) return
+    // Предвыбор тарифа по ссылке со страницы тарифов: /register?plan=<productId>
+    const preset = new URLSearchParams(window.location.search).get('plan')
     fetch('/api/platform/tariffs')
       .then((r) => (r.ok ? r.json() : []))
-      .then((list) => setTariffs(Array.isArray(list) ? list : []))
+      .then((list) => {
+        const arr = Array.isArray(list) ? list : []
+        setTariffs(arr)
+        if (preset && arr.some((t: any) => t.productId === preset)) setPlanId(preset)
+      })
       .catch(() => {})
   }, [mainHost])
 

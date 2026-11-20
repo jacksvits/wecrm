@@ -7,6 +7,7 @@ const router = Router();
 // Меню в шапке публичных страниц (Настройки → Системные → Шапка): новости, каталог, файлы.
 // Per-tenant, как и menu_links. Дефолты дублируются на фронте (PublicNavMenu.tsx).
 export const HEADER_MENU_DEFAULTS = [
+  { key: 'tariffs', title: 'Тарифы', url: 'https://welans.cc/tariffs' },
   { key: 'news', title: 'Новости', url: 'https://welans.ru/news' },
   { key: 'catalog', title: 'Каталог', url: 'https://welans.cc/shop' },
   { key: 'files', title: 'Файлы', url: 'https://welans.click' },

@@ -8,6 +8,7 @@ const router = Router();
 // Дефолты дублируются на фронте (Login.tsx) — пока админ ничего не сохранял, работают прежние ссылки.
 export const MENU_LINK_DEFAULTS = [
   { key: 'presentation', title: 'Презентация', url: '/presentation' },
+  { key: 'tariffs', title: 'Тарифы', url: '/tariffs' },
   { key: 'catalog', title: 'Каталог', url: 'https://welans.cc/shop' },
   { key: 'files', title: 'Файлы', url: 'https://welans.click' },
   { key: 'news', title: 'Новости', url: 'https://welans.ru/news' },
