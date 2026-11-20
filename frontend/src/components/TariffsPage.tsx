@@ -39,7 +39,7 @@ export default function TariffsPage() {
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [loaded, setLoaded] = useState(false);
   // Период оплаты: помесячно или год со скидкой 15%
-  const [period, setPeriod] = useState<'month' | 'year'>('month');
+  const [periodState, setPeriodState] = useState<'month' | 'year'>('month');
 
   useEffect(() => {
     fetch('/api/platform/tariffs')
@@ -67,7 +67,10 @@ export default function TariffsPage() {
 
   // Регистрация живёт только на welans.cc — с других доменов ведём на абсолютный адрес
   const mainHost = window.location.hostname === 'welans.cc' || window.location.hostname === 'www.welans.cc';
-  const registerUrl = (planId: string) => (mainHost ? `/register?plan=${planId}` : `https://welans.cc/register?plan=${planId}`);
+  const registerUrl = (planId: string, paid: boolean) => {
+    const period = paid && periodState === 'year' ? '&period=year' : '';
+    return mainHost ? `/register?plan=${planId}${period}` : `https://welans.cc/register?plan=${planId}${period}`;
+  };
 
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-color, #f5f5f7)', overflowY: 'auto' }}>
@@ -95,16 +98,16 @@ export default function TariffsPage() {
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setPeriod(value)}
+                  onClick={() => setPeriodState(value)}
                   style={{
                     border: 'none',
                     cursor: 'pointer',
                     padding: '8px 18px',
                     borderRadius: 9,
                     fontSize: 14,
-                    fontWeight: period === value ? 600 : 400,
-                    color: period === value ? '#fff' : 'var(--text-secondary, #555)',
-                    background: period === value ? 'linear-gradient(135deg, #007aff, #5856d6, #af52de)' : 'transparent',
+                    fontWeight: periodState === value ? 600 : 400,
+                    color: periodState === value ? '#fff' : 'var(--text-secondary, #555)',
+                    background: periodState === value ? 'linear-gradient(135deg, #007aff, #5856d6, #af52de)' : 'transparent',
                   }}
                 >
                   {label}
@@ -154,14 +157,14 @@ export default function TariffsPage() {
                   <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, color: 'var(--text-color, #1a1a1a)' }}>{t.name}</div>
                   <div style={{ marginBottom: 12 }}>
                     <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-color, #1a1a1a)' }}>
-                      {isFree ? '0 ₽' : period === 'year' && yPrice != null ? `${yPrice.toLocaleString('ru-RU')} ₽` : `${Number(t.price).toLocaleString('ru-RU')} ₽`}
+                      {isFree ? '0 ₽' : periodState === 'year' && yPrice != null ? `${yPrice.toLocaleString('ru-RU')} ₽` : `${Number(t.price).toLocaleString('ru-RU')} ₽`}
                     </span>
-                    {!isPromo && <span style={{ fontSize: 14, color: 'var(--text-muted, #888)' }}> {period === 'year' && !isFree ? '/год' : '/мес'}</span>}
+                    {!isPromo && <span style={{ fontSize: 14, color: 'var(--text-muted, #888)' }}> {periodState === 'year' && !isFree ? '/год' : '/мес'}</span>}
                     {t.renewMonths ? (
                       <div style={{ fontSize: 13, color: '#22c55e', fontWeight: 600, marginTop: 2 }}>
                         первые {t.renewMonths} {monthsLabel(t.renewMonths)} бесплатно
                       </div>
-                    ) : period === 'year' && yPrice != null && !isFree ? (
+                    ) : periodState === 'year' && yPrice != null && !isFree ? (
                       <div style={{ fontSize: 13, color: 'var(--text-muted, #888)', marginTop: 2 }}>
                         ≈ {Math.round(yPrice / 12).toLocaleString('ru-RU')} ₽/мес
                       </div>
@@ -173,7 +176,7 @@ export default function TariffsPage() {
                   </div>
                   <div className="rich-text" style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-secondary, #444)', flex: 1, marginBottom: 16 }} dangerouslySetInnerHTML={{ __html: t.description }} />
                   <a
-                    href={registerUrl(t.productId)}
+                    href={registerUrl(t.productId, !isFree && !isPromo)}
                     style={{
                       display: 'block',
                       textAlign: 'center',

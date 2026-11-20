@@ -1559,11 +1559,12 @@ const CRM_PLUGIN_FALLBACK: { key: string; label: string }[] = [
 
 function ProductModal({ product, categories, onClose, onSaved }: { product: Product | 'new'; categories: ProductCategory[]; onClose: () => void; onSaved: () => void }) {
   const isNew = product === 'new';
-  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages: string[]; payLink: string; crmRenewMonths: string; crmCameras: boolean; crmSubscriptions: boolean; crmAccounting: boolean; crmVideoNotes: boolean; crmCalls: boolean; crmIntegrations: string[]; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; syncToWb: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
+  const [form, setForm] = useState<{ name: string; kind: 'product' | 'service' | 'crm_subscription'; crmAllowedPages: string[]; payLink: string; payLinkYear: string; crmRenewMonths: string; crmCameras: boolean; crmSubscriptions: boolean; crmAccounting: boolean; crmVideoNotes: boolean; crmCalls: boolean; crmIntegrations: string[]; sku: string; unit: string; barcode: string; weight: string; width: string; height: string; depth: string; brand: string; tnved: string; syncToVk: boolean; syncToOzon: boolean; syncToWb: boolean; onVitrine: boolean; isSubscription: boolean; description: string; tags: string[] }>({
     name: isNew ? '' : product.name,
     kind: isNew ? 'product' : (product.kind as any) || 'product',
     crmAllowedPages: isNew ? [] : (Array.isArray((product as any).crmAllowedPages) ? (product as any).crmAllowedPages : []),
     payLink: isNew ? '' : ((product as any).payLink || ''),
+    payLinkYear: isNew ? '' : ((product as any).payLinkYear || ''),
     crmRenewMonths: isNew ? '' : ((product as any).crmRenewMonths != null ? String((product as any).crmRenewMonths) : ''),
     crmCameras: isNew ? false : ((product as any).crmCameras === true),    sku: isNew ? '' : product.sku || '',
     crmSubscriptions: isNew ? false : ((product as any).crmSubscriptions === true),
@@ -1731,6 +1732,21 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
     />
     <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
       Если пусто — при оплате покажутся реквизиты из карточки организации (раздел Платформа).
+    </div>
+  </div>
+)}
+{form.kind === 'crm_subscription' && (
+  <div style={{ marginTop: 8 }}>
+    <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Оплата 1 год</label>
+    <input
+      type='text'
+      value={form.payLinkYear}
+      onChange={(e) => setForm({ ...form, payLinkYear: e.target.value })}
+      placeholder='https://... (платёжная страница на 12 месяцев со скидкой 15%)'
+      style={{ width: '100%', padding: '9px 11px', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', border: '1px solid var(--border-color)', background: 'var(--bg-input, var(--bg-secondary))', color: 'var(--text-primary)' }}
+    />
+    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+      Используется, если клиент на странице тарифов выбрал оплату «На год −15%». Если пусто — год оплачивается по месячной ссылке.
     </div>
   </div>
 )}

@@ -220,14 +220,20 @@ router.get('/pay-info', async (req, res) => {
   let planName = tenant.plan || 'standard';
   let priceRub: number | null = tenant.pricePerMonth != null ? tenant.pricePerMonth / 100 : null;
   let payLink: string | null = null;
+  let payLinkYear: string | null = null;
+  let priceRubYear: number | null = null;
   if (tenant.planProductId) {
-    const product = await (platformPrisma as any).product.findUnique({ where: { id: tenant.planProductId } });
+    const product = await (platformPrisma as any).product.findUnique({ where: { id: tenant.planProductId }, include: { prices: true } });
     if (product) {
       planName = product.name;
       payLink = product.payLink || null;
-      if (priceRub == null) {
-        const prices = (product.prices || []).map((x: any) => Number(x.price)).filter((n: number) => Number.isFinite(n));
-        if (prices.length) priceRub = Math.min(...prices);
+      payLinkYear = product.payLinkYear || null;
+      const prices = ((product.prices || []) as any[]).map((x: any) => Number(x.price)).filter((n: number) => Number.isFinite(n));
+      if (prices.length) {
+        // Месячная цена — минимальная, годовая — максимальная (виды цен «Подписка месяц»/«Подписка на год»)
+        if (priceRub == null) priceRub = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        if (maxPrice > Math.min(...prices)) priceRubYear = maxPrice;
       }
     }
   }
@@ -237,7 +243,9 @@ router.get('/pay-info', async (req, res) => {
     status: tenant.status,
     planName,
     priceRub,
+    priceRubYear,
     payLink,
+    payLinkYear,
     paymentInfo: tenant.paymentInfo || '',
     contactEmail: 'info@welans.ru',
   });

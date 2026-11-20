@@ -26,11 +26,14 @@ export function Register() {
   const [pay, setPay] = useState<any | null>(null)
   const [paySent, setPaySent] = useState(false)
   const [showPayDetails, setShowPayDetails] = useState(false)
+  // Период оплаты из ?period=year (ссылка со страницы тарифов)
+  const [payPeriod, setPayPeriod] = useState<'month' | 'year'>('month')
 
   useEffect(() => {
     if (!mainHost) return
     // Предвыбор тарифа по ссылке со страницы тарифов: /register?plan=<productId>
     const preset = new URLSearchParams(window.location.search).get('plan')
+    if (new URLSearchParams(window.location.search).get('period') === 'year') setPayPeriod('year')
     fetch('/api/platform/tariffs')
       .then((r) => (r.ok ? r.json() : []))
       .then((list) => {
@@ -189,14 +192,35 @@ export function Register() {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                       <b style={{ fontSize: 15 }}>Тариф: {pay.planName}</b>
-                      {pay.priceRub != null && (
+                      {(payPeriod === 'year' && pay.priceRubYear != null ? pay.priceRubYear : pay.priceRub) != null && (
                         <span style={{ fontSize: 15, color: '#16a34a', fontWeight: 600 }}>
-                          {Number(pay.priceRub).toLocaleString('ru-RU')} ₽
+                          {Number(payPeriod === 'year' && pay.priceRubYear != null ? pay.priceRubYear : pay.priceRub).toLocaleString('ru-RU')} ₽
                         </span>
                       )}
                     </div>
-                                        <button
+                    {pay.payLinkYear && (
+                      <div style={{ display: 'flex', gap: 4, background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 3, marginBottom: 10 }}>
+                        {([['month', 'Месяц'], ['year', 'Год −15%']] as const).map(([value, label]) => (
+                          <button
+                            key={value}
+                            type='button'
+                            onClick={() => setPayPeriod(value)}
+                            style={{
+                              flex: 1, border: 'none', cursor: 'pointer', padding: '8px 10px', borderRadius: 8, fontSize: 13,
+                              fontWeight: payPeriod === value ? 600 : 400,
+                              color: payPeriod === value ? '#fff' : 'var(--text-secondary)',
+                              background: payPeriod === value ? 'linear-gradient(135deg, #007aff, #5856d6, #af52de)' : 'transparent',
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button
                       onClick={async () => {
+                        // Годовая оплата — сразу годовая платёжная страница из карточки тарифа
+                        if (payPeriod === 'year' && pay.payLinkYear) { window.open(pay.payLinkYear, '_blank'); return }
                         try {
                           const r = await fetch('/api/platform/pay-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: pay.slug }) });
                           const d = await r.json();
@@ -207,7 +231,7 @@ export function Register() {
                       }}
                       className='login-btn-primary'
                       style={{ width: '100%', padding: '12px', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 600 }}>
-                      Оплатить {pay.priceRub != null ? Number(pay.priceRub).toLocaleString('ru-RU') + ' ₽' : 'подписку'}
+                      Оплатить {payPeriod === 'year' && pay.priceRubYear != null ? Number(pay.priceRubYear).toLocaleString('ru-RU') : pay.priceRub != null ? Number(pay.priceRub).toLocaleString('ru-RU') : ''} ₽
                     </button>
                     {showPayDetails && !pay.payLink && (
                       <div style={{ marginTop: 10 }}>
