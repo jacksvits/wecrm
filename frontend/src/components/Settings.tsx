@@ -417,7 +417,6 @@ export function Settings() {
         {/* Модальное окно настроек плагина */}
         {selected && (
           <div
-            onClick={closePluginModal}
             style={{
               position: "fixed",
               inset: 0,
@@ -496,7 +495,6 @@ export function Settings() {
         {/* Модальное окно справки по плагину */}
         {helpSlug && (
           <div
-            onClick={() => setHelpSlug(null)}
             style={{
               position: "fixed",
               inset: 0,
