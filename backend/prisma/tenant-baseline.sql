@@ -1245,6 +1245,7 @@ CREATE TABLE public.products (
     tnved text,
     crm_allowed_pages jsonb,
     pay_link text,
+    pay_link_year text,
     crm_cameras boolean DEFAULT false NOT NULL,
     crm_subscriptions boolean DEFAULT false NOT NULL,
     crm_accounting boolean DEFAULT false NOT NULL,
@@ -5527,6 +5528,7 @@ INSERT INTO public._prisma_migrations VALUES ('6dfb49b6-8052-4904-b422-e263be7ce
 INSERT INTO public._prisma_migrations VALUES ('972f8618-bb28-44ec-ac2a-a11523af5355', '6d69615cfbf40a957c02b4846ff0a46bce1cf9e40526d2edd9e920ed75f35a70', '2026-11-08 23:22:25.04589+00', '20261109050000_tenant_task_numbering', NULL, NULL, '2026-11-08 23:22:24.875745+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('9f124072-5108-4620-a62b-3afe8f682417', '6be59fa9d6517b6bbd2edf61445078eec83ffd763ffbd535661f5d9e11fb9578', '2026-11-09 14:39:40.024844+00', '20261109120000_seo_yandex_metrika', NULL, NULL, '2026-11-09 14:39:40.01575+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('7c4b1040-4fec-4d9c-a94d-362584e12be5', '2d00e2c73a13186b03a79de88f61f0232b0ff834f48e165fdcfcffcf7ae96aad', '2026-11-09 22:02:24.902836+00', '20261110000000_add_wordpress_news_source', NULL, NULL, '2026-11-09 22:02:24.890336+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('d93b9e04-2a78-4941-b7d2-b87506d46f7a', '6606499034afa052119d6d49a66a086e96089bf9257284be09b70eca0ec5ee39', '2026-11-21 12:14:12.518015+00', '20261121120000_products_pay_link_year', NULL, NULL, '2026-11-21 12:14:12.5+00', 1);
 
 
 --
