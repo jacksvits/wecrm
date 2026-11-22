@@ -1534,7 +1534,8 @@ html, body { overflow-x: hidden; overflow-x: clip; } /* clip: не ломает 
   --text-muted: #98a2ae;
   --border-color: #2a323d;
   --shadow: none;
-  min-height: calc(100vh - 72px);
+  min-height: 100vh;
+  min-height: 100dvh;
   margin: -24px -24px 0;
   padding: 20px 24px 28px;
   background: #0e1217;
@@ -1618,7 +1619,7 @@ html, body { overflow-x: hidden; overflow-x: clip; } /* clip: не ломает 
   .ad-dashboard-meta { align-items: flex-start; }
 }
 @media (max-width: 640px) {
-  .director-command-page { min-height: calc(100vh - 120px); margin: -8px -8px 0; padding: 16px 12px 24px; }
+  .director-command-page { margin: -8px -8px 0; padding: 16px 12px 24px; }
   .ad-page-title { font-size: 24px; }
   .ad-page-header { align-items: flex-start !important; }
   .ad-page-header > div:last-child { width: 100%; justify-content: space-between; gap: 6px; }
