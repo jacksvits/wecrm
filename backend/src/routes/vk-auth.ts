@@ -55,6 +55,39 @@ function deleteVkIdSession(state: string) {
   saveVkIdSessions();
 }
 
+/**
+ * fetch с ретраями для вызовов id.vk.ru: кратковременные сетевые сбои
+ * (ECONNREFUSED при перезапуске сетевых сервисов сервера) не должны срывать вход.
+ * 3 попытки, задержка 800/1600 мс, таймаут каждой — 20 с.
+ */
+async function vkFetchWithRetry(url: string, init: RequestInit, attempt = 0): Promise<globalThis.Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err: any) {
+    if (attempt < 2) {
+      const delay = 800 * (attempt + 1);
+      console.warn(`[VK ID Auth] fetch failed (попытка ${attempt + 1}/3):`, err?.cause?.code || err?.name || err?.message, `— повтор через ${delay} мс`);
+      await new Promise((r) => setTimeout(r, delay));
+      return vkFetchWithRetry(url, init, attempt + 1);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// Дедупликация callback: браузеры (особенно iOS Safari/PWA) иногда запрашивают
+// callback URL дважды — двойной тап, повторная навигация, восстановление вкладки.
+// Раньше первый запрос гасил state, а второй получал invalid_state и выкидывал
+// пользователя на страницу входа — VK-авторизация «зацикливалась». Теперь итог
+// первого callback переиспользуется: параллельные дубли ждут тот же промис,
+// поздние дубли получают сохранённый редирект (90 секунд).
+const pendingVkCallbacks = new Map<string, Promise<string>>();
+const recentVkCallbacks = new Map<string, { redirect: string; expires: number }>();
+const VK_CALLBACK_RESULT_TTL = 90 * 1000;
+
 router.get('/config', async (_req, res) => {
   const cfg = await getAuthConfig();
   if (!cfg.appId) {
@@ -96,12 +129,9 @@ async function downloadVkAvatar(url: string): Promise<string | null> {
 async function completeVkIdAuth(code: string, deviceId: string, state: string, codeVerifier: string) {
   const cfg = await getAuthConfig();
   if (!cfg.isActive) return { ok: false as const, errorKey: 'disabled' as const, message: 'Вход через VK ID отключён администратором' };
-  const tokenController = new AbortController();
-  const tokenTimeout = setTimeout(() => tokenController.abort(), 20000);
-  const tokenRes = await fetch('https://id.vk.ru/oauth2/auth', {
+  const tokenRes = await vkFetchWithRetry('https://id.vk.ru/oauth2/auth', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    signal: tokenController.signal,
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code,
@@ -112,7 +142,6 @@ async function completeVkIdAuth(code: string, deviceId: string, state: string, c
       code_verifier: codeVerifier,
     }),
   });
-  clearTimeout(tokenTimeout);
   const tokenData: any = await tokenRes.json();
   if (tokenData.error) {
     console.error('[VK ID Auth] Token exchange error:', tokenData);
@@ -124,18 +153,14 @@ async function completeVkIdAuth(code: string, deviceId: string, state: string, c
     return { ok: false as const, errorKey: 'no_token' as const, message: 'Failed to obtain access token from VK ID' };
   }
 
-  const userController = new AbortController();
-  const userTimeout = setTimeout(() => userController.abort(), 20000);
-  const userRes = await fetch('https://id.vk.ru/oauth2/user_info', {
+  const userRes = await vkFetchWithRetry('https://id.vk.ru/oauth2/user_info', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       'Authorization': `Bearer ${access_token}`,
     },
-    signal: userController.signal,
     body: new URLSearchParams({ client_id: cfg.appId }),
   });
-  clearTimeout(userTimeout);
   const userData: any = await userRes.json();
   // Не пишем персональные данные VK в серверный журнал.
 
@@ -290,25 +315,58 @@ router.get('/callback', rejectBlockedIp, rateLimit({ prefix: 'vk-callback', wind
       console.error('[VK Callback] Missing params:', req.query);
       return res.redirect('/?vk_error=missing_params');
     }
+    const stateKey = state as string;
+    // Параллельный дубль того же callback — ждём и переиспользуем итог первого запроса
+    const pending = pendingVkCallbacks.get(stateKey);
+    if (pending) {
+      console.log('[VK Callback] Параллельный дубль state, ждём итог первого запроса:', stateKey);
+      try {
+        return res.redirect(await pending);
+      } catch {
+        return res.redirect('/?vk_error=server_error');
+      }
+    }
     // Серверный PKCE: сессия создана в GET /login-url, verifier не покидает сервер
-    const session = vkIdSessions.get(state as string);
+    const session = vkIdSessions.get(stateKey);
     if (!session || session.expires < Date.now()) {
+      // Поздний дубль (state уже погашен первым запросом) — повторяем сохранённый итог
+      const recent = recentVkCallbacks.get(stateKey);
+      if (recent && recent.expires > Date.now()) {
+        console.log('[VK Callback] Дубль запроса, повторяем сохранённый итог для state:', stateKey);
+        return res.redirect(recent.redirect);
+      }
       console.error('[VK Callback] Unknown or expired state:', state);
       return res.redirect('/?vk_error=invalid_state');
     }
-    deleteVkIdSession(state as string);
+    deleteVkIdSession(stateKey);
 
     // ВАЖНО: при type=code_v2 VK возвращает СВОЙ device_id в callback
     // (длинный base64url, ~96 символов) — обмен кода на токен требует именно его,
     // а не device_id из authorize-запроса (иначе id.vk.ru: «invalid device id provided»).
-    const result = await completeVkIdAuth(code as string, device_id as string, state as string, session.verifier);
-    if (!result.ok) {
-      return res.redirect(`/?vk_error=${result.errorKey}`);
+    // Обмен выполняется ровно один раз: промис кладём в pendingVkCallbacks ДО await,
+    // чтобы параллельный дубль получил тот же результат.
+    const execPromise = (async (): Promise<string> => {
+      const result = await completeVkIdAuth(code as string, device_id as string, stateKey, session.verifier);
+      if (!result.ok) {
+        return `/?vk_error=${result.errorKey}`;
+      }
+      await recordAuthEvent(req, { login: result.user.email, userId: result.user.id, authMethod: 'vk-id' });
+      // JWT в fragment (#), чтобы он не попадал в access-логи nginx.
+      // Fragment не отправляется на сервер — фронтенд заберёт его из location.hash.
+      return `/#vk_token=${result.token}`;
+    })();
+    pendingVkCallbacks.set(stateKey, execPromise);
+    try {
+      const redirect = await execPromise;
+      recentVkCallbacks.set(stateKey, { redirect, expires: Date.now() + VK_CALLBACK_RESULT_TTL });
+      // чистка просроченных итогов
+      for (const [k, v] of recentVkCallbacks) {
+        if (v.expires < Date.now()) recentVkCallbacks.delete(k);
+      }
+      return res.redirect(redirect);
+    } finally {
+      pendingVkCallbacks.delete(stateKey);
     }
-    await recordAuthEvent(req, { login: result.user.email, userId: result.user.id, authMethod: 'vk-id' });
-    // JWT в fragment (#), чтобы он не попадал в access-логи nginx.
-    // Fragment не отправляется на сервер — фронтенд заберёт его из location.hash.
-    return res.redirect(`/#vk_token=${result.token}`);
   } catch (err: any) {
     console.error('[VK Callback Error]', err);
     res.redirect('/?vk_error=server_error');
