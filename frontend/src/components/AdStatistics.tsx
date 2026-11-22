@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { api } from "../api/client";
 
 /**
@@ -59,6 +59,161 @@ function Sparkline({ data, color, height = 36 }: { data: number[]; color: string
       {line && <path d={`${line} L${w},${h} L0,${h} Z`} fill={color} opacity={0.08} stroke="none" />}
       {line && <path d={line} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />}
     </svg>
+  );
+}
+
+// ---------- Командный центр: иконки, KPI и графики с осями ----------
+type CommandIconName = "depth" | "bounce" | "time" | "traffic" | "sources";
+
+function CommandIcon({ name, color }: { name: CommandIconName; color: string }) {
+  const paths: Record<CommandIconName, React.ReactNode> = {
+    depth: <><path d="M12 3v18" /><path d="m7 8 5-5 5 5" /><path d="m7 16 5 5 5-5" /></>,
+    bounce: <><path d="m6 6 12 12" /><path d="M18 6 6 18" /></>,
+    time: <><circle cx="12" cy="13" r="8" /><path d="M12 9v5l3 2" /><path d="M9 2h6" /></>,
+    traffic: <><path d="m4 18 5-6 4 3 7-9" /><path d="M15 6h5v5" /></>,
+    sources: <><path d="M3 7c3-3 6 3 9 0s6 3 9 0" /><path d="M3 12c3-3 6 3 9 0s6 3 9 0" /><path d="M3 17c3-3 6 3 9 0s6 3 9 0" /></>,
+  };
+  return (
+    <svg className="ad-command-icon" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {paths[name]}
+    </svg>
+  );
+}
+
+function CommandHeader({ title, icon, iconColor, source = "Метрика" }: {
+  title: string;
+  icon: CommandIconName;
+  iconColor: string;
+  source?: string;
+}) {
+  return (
+    <div className="ad-command-header">
+      <CommandIcon name={icon} color={iconColor} />
+      <span className="ad-command-title">{title}</span>
+      <span className="ad-command-source">{source}</span>
+    </div>
+  );
+}
+
+function CommandSparkline({ data, color }: { data: number[]; color: string }) {
+  const gradientId = `spark-${useId().replace(/:/g, "")}`;
+  const values = data.length > 1 ? data : [data[0] || 0, data[0] || 0];
+  const w = 420;
+  const h = 84;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const pts: Pt[] = values.map((v, i) => ({
+    x: (i / (values.length - 1)) * w,
+    y: h - 5 - ((v - min) / range) * (h - 12),
+  }));
+  const line = smoothPath(pts);
+  const last = pts[pts.length - 1];
+  return (
+    <div className="ad-command-spark">
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.22} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        {line && <path d={`${line} L${w},${h} L0,${h} Z`} fill={`url(#${gradientId})`} />}
+        {line && <path d={line} fill="none" stroke={color} strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+        {last && <circle cx={last.x} cy={last.y} r={2.6} fill={color} />}
+      </svg>
+    </div>
+  );
+}
+
+const SHORT_MONTHS = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+function shortDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) return value;
+  return `${Number(match[3])} ${SHORT_MONTHS[Number(match[2]) - 1]}`;
+}
+
+function lastNDays(count: number): string[] {
+  return Array.from({ length: count }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - count + 1 + i);
+    return date.toISOString().slice(0, 10);
+  });
+}
+
+function dateTicks(dates: string[], count = 6): string[] {
+  if (!dates.length) return [];
+  const ticks = Math.min(count, dates.length);
+  const indexes = Array.from({ length: ticks }, (_, i) => Math.round((i * (dates.length - 1)) / Math.max(ticks - 1, 1)));
+  return [...new Set(indexes)].map((i) => shortDate(dates[i]));
+}
+
+function CommandLineChart({ seriesList, dates, colors, area = false, ticks = 6 }: {
+  seriesList: number[][];
+  dates: string[];
+  colors: string[];
+  area?: boolean;
+  ticks?: number;
+}) {
+  const gradientId = `chart-${useId().replace(/:/g, "")}`;
+  const safeSeries = seriesList.map((series) => series.length > 1 ? series : [series[0] || 0, series[0] || 0]);
+  const all = safeSeries.flat();
+  const max = Math.max(...all, 0) * 1.08 || 1;
+  const w = 800;
+  const h = 240;
+  const top = 8;
+  const bottom = 8;
+  const right = 5;
+  const plotH = h - top - bottom;
+  const labels = Array.from({ length: 5 }, (_, i) => fmtInt(max * (1 - i / 4)));
+  return (
+    <div className="ad-command-chart">
+      <div className="ad-chart-main">
+        <div className="ad-y-labels">{labels.map((label, i) => <span key={i}>{label}</span>)}</div>
+        <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label="Динамика показателей">
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={colors[0]} stopOpacity={0.26} />
+              <stop offset="100%" stopColor={colors[0]} stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          {labels.map((_, i) => {
+            const y = top + (i * plotH) / 4;
+            return <line key={i} x1={0} y1={y} x2={w} y2={y} className="ad-chart-grid" />;
+          })}
+          {safeSeries.map((series, si) => {
+            const pts: Pt[] = series.map((v, i) => ({
+              x: (i / Math.max(series.length - 1, 1)) * (w - right),
+              y: top + (1 - v / max) * plotH,
+            }));
+            const line = smoothPath(pts);
+            if (!line) return null;
+            return (
+              <g key={si}>
+                {area && si === 0 && <path d={`${line} L${pts[pts.length - 1].x},${h - bottom} L0,${h - bottom} Z`} fill={`url(#${gradientId})`} />}
+                <path d={line} fill="none" stroke={colors[si]} strokeWidth={si === 0 ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" opacity={0.96} />
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div className="ad-chart-x-labels">{dateTicks(dates, ticks).map((label, i) => <span key={`${label}-${i}`}>{label}</span>)}</div>
+    </div>
+  );
+}
+
+function CommandLegend({ items }: { items: { name: string; value: number; color: string }[] }) {
+  return (
+    <div className="ad-command-legend">
+      {items.map((item) => (
+        <div className="ad-legend-item" key={item.name}>
+          <span className="ad-legend-dot" style={{ background: item.color }} />
+          <span className="ad-legend-name" title={item.name}>{item.name}</span>
+          <strong>{fmtInt(item.value)}</strong>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -264,7 +419,7 @@ function fmtInt(n: number): string {
 function pctDelta(cur: number, prev: number): string {
   if (!prev) return "";
   const d = ((cur - prev) / prev) * 100;
-  return `${d > 0 ? "+" : ""}${d.toFixed(1)}%`;
+  return `${d > 0 ? "+" : ""}${d.toFixed(1).replace(".", ",")}%`;
 }
 
 function buildDemoData(seed: number) {
@@ -423,60 +578,66 @@ export function AdLeadsWidget() {
 
 export function AdDomainsWidget() {
   const demo = useMemo(() => buildDemoData(DEMO_SEED), []);
+  const demoDates = useMemo(() => lastNDays(30), []);
   const { data, connected } = useMetrikaSummary();
 
   if (connected && data?.summary && data?.daily?.length) {
     const s = data.summary;
-    const visits = data.daily.map((d: any) => d.visits);
+    const daily: any[] = data.daily;
+    const stats = [
+      { label: "визиты", cur: s.visits, prev: s.visitsPrev, color: "#579df2" },
+      { label: "просмотры", cur: s.pageviews, prev: s.pageviewsPrev, color: "#2cc9b3" },
+      { label: "посетители", cur: s.users, prev: s.usersPrev, color: "#f2b84f" },
+    ];
     return (
-      <>
-        <WidgetHeader title="Трафик сайта" badge="⌁" badgeBg="#0ea5e9" source="metrika" />
-        <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
-          {[
-            { label: "визиты", cur: s.visits, prev: s.visitsPrev, color: "#007AFF" },
-            { label: "просмотры", cur: s.pageviews, prev: s.pageviewsPrev, color: "#10b981" },
-            { label: "посетители", cur: s.users, prev: s.usersPrev, color: "#f59e0b" },
-          ].map((k) => {
+      <div className="ad-command-content ad-traffic-content">
+        <CommandHeader title="Трафик сайта" icon="traffic" iconColor="#579df2" source="Яндекс Метрика" />
+        <div className="ad-traffic-stats">
+          {stats.map((k) => {
             const delta = pctDelta(k.cur, k.prev);
             return (
-              <div key={k.label} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <span style={{ fontSize: 20, fontWeight: 800, color: k.color, letterSpacing: -0.5 }}>{fmtInt(k.cur)}</span>
-                <span style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", gap: 4, alignItems: "center" }}>
+              <div className="ad-traffic-stat" key={k.label}>
+                <span className="ad-traffic-value" style={{ color: k.color }}>{fmtInt(k.cur)}</span>
+                <span className="ad-traffic-label">
                   {k.label}
-                  {delta && (
-                    <span style={{ fontWeight: 600, color: delta.startsWith("+") ? "#16a34a" : "#dc2626" }}>{delta}</span>
-                  )}
+                  {delta && <b className={delta.startsWith("+") ? "is-good" : "is-bad"}>{delta}</b>}
                 </span>
               </div>
             );
           })}
         </div>
-        <Sparkline data={visits} color="#007AFF" height={56} />
+        <CommandLineChart
+          seriesList={[daily.map((d) => d.visits || 0)]}
+          dates={daily.map((d) => d.date)}
+          colors={["#579df2"]}
+          area
+        />
         {data.perCounter?.length > 1 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div className="ad-counter-list">
             {data.perCounter.map((c: any) => (
-              <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                <span style={{ color: "var(--text-primary)", fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>счётчик {c.name}</span>
-                <span style={{ color: "var(--text-secondary)" }}>{fmtInt(c.visits)} визитов</span>
+              <div key={c.name}>
+                <span>счётчик {c.name}</span>
+                <strong>{fmtInt(c.visits)} визитов</strong>
               </div>
             ))}
           </div>
         )}
-        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>за 30 дней · Яндекс Метрика</div>
-      </>
+        <div className="ad-command-footer"><span>Динамика визитов</span><span>за 30 дней · к предыдущему периоду</span></div>
+      </div>
     );
   }
 
   return (
-    <>
-      <WidgetHeader title="Посещаемость по доменам" badge="⌁" badgeBg="#0ea5e9" />
-      <MultiLineChart
+    <div className="ad-command-content ad-traffic-content">
+      <CommandHeader title="Посещаемость по доменам" icon="traffic" iconColor="#579df2" source="Демо" />
+      <CommandLineChart
         seriesList={demo.trafficSeries.map((t) => t.data)}
-        labels={demo.trafficSeries.map((t) => t.label)}
+        dates={demoDates}
         colors={demo.trafficSeries.map((t) => t.color)}
       />
-      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>последние 30 дней · демо</div>
-    </>
+      <CommandLegend items={demo.trafficSeries.map((t) => ({ name: t.label, value: t.data.reduce((a, b) => a + b, 0), color: t.color }))} />
+      <div className="ad-command-footer"><span>Посещаемость по доменам</span><span>последние 30 дней · демо</span></div>
+    </div>
   );
 }
 
@@ -569,7 +730,7 @@ export function AdGeoWidget() {
 
 
 // ---------- Группированные столбцы по дням (стиль Метрики) ----------
-const METRIKA_SERIES_COLORS = ["#7b61ff", "#ff4fa3", "#00b8a9", "#ff9800", "#2196f3"];
+const METRIKA_SERIES_COLORS = ["#8b7df2", "#f074a8", "#2cc9b3", "#f2b84f", "#579df2"];
 
 function GroupedBars({ dates, series, height = 150 }: {
   dates: string[];
@@ -672,7 +833,7 @@ function StatTable({ rows, leftHeader }: { rows: { label: string; value: number 
 }
 
 // ---------- KPI-виджет вовлечённости (Время / Глубина / Отказы) ----------
-function EngagementKpi({ title, badge, badgeBg, value, delta, invert, spark, color }: {
+function EngagementKpi({ title, badgeBg, value, delta, invert, spark, color }: {
   title: string;
   badge: string;
   badgeBg: string;
@@ -683,19 +844,20 @@ function EngagementKpi({ title, badge, badgeBg, value, delta, invert, spark, col
   color: string;
 }) {
   const good = invert ? delta.startsWith("-") : delta.startsWith("+");
+  const icon: CommandIconName = title === "Глубина просмотра" ? "depth" : title === "Отказы" ? "bounce" : "time";
   return (
-    <>
-      <WidgetHeader title={title} badge={badge} badgeBg={badgeBg} source="metrika" />
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 26, fontWeight: 800, color: "var(--text-primary)", letterSpacing: -0.5 }}>{value}</span>
+    <div className="ad-command-content ad-kpi-content">
+      <CommandHeader title={title} icon={icon} iconColor={color || badgeBg} />
+      <div className="ad-kpi-main">
+        <span className="ad-kpi-value">{value}</span>
         {delta && (
-          <span style={{ fontSize: 12, fontWeight: 600, color: good ? "#16a34a" : "#dc2626" }}>
+          <span className={`ad-delta ${good ? "is-good" : "is-bad"}`}>
             {delta.startsWith("-") ? "▼" : "▲"} {delta.replace(/^[-+]/, "")}
           </span>
         )}
       </div>
-      <Sparkline data={spark} color={color} height={36} />
-    </>
+      <CommandSparkline data={spark} color={color} />
+    </div>
   );
 }
 
@@ -821,40 +983,46 @@ export function AdSourcesDailyWidget() {
     const names = ["Прямые заходы", "Поисковые системы", "Переходы по ссылкам"];
     return names.map((name, i) => ({ name, values: genSeries(DEMO_SEED + 40 + i, 30, 2, 60 - i * 15) }));
   }, []);
+  const demoDates = useMemo(() => lastNDays(30), []);
+  const palette = ["#8b7df2", "#f074a8", "#2cc9b3", "#f2b84f", "#579df2"];
+
   if (connected && data?.sourcesDaily?.series?.length) {
     const sd = data.sourcesDaily;
+    const items = sd.series.map((s: any, i: number) => ({
+      name: s.name,
+      value: s.values.reduce((a: number, b: number) => a + b, 0),
+      color: palette[i % palette.length],
+    }));
+    const total = items.reduce((a: number, item: { value: number }) => a + item.value, 0);
+    const delta = data.summary ? pctDelta(data.summary.visits, data.summary.visitsPrev) : "";
     return (
-      <>
-        <WidgetHeader title="Источники трафика" badge="≋" badgeBg="#ff4fa3" source="metrika" />
-        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Визиты</div>
-        <MultiLineChart
-          seriesList={sd.series.map((s: any) => s.values)}
-          labels={sd.series.map((s: any) => s.name)}
-          colors={sd.series.map((_: any, i: number) => METRIKA_SERIES_COLORS[i % 5])}
-          showLegend={false}
-        />
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 2 }}>
-          {sd.series.map((s: any, i: number) => (
-            <span key={s.name} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-secondary)" }}>
-              <span style={{ width: 9, height: 9, borderRadius: 2, background: METRIKA_SERIES_COLORS[i % 5] }} />
-              {s.name}
-              <b style={{ color: "var(--text-primary)" }}>{fmtInt(s.values.reduce((a: number, b: number) => a + b, 0))}</b>
-            </span>
-          ))}
+      <div className="ad-command-content ad-sources-content">
+        <CommandHeader title="Источники трафика" icon="sources" iconColor="#f074a8" source="Визиты" />
+        <div className="ad-sources-summary">
+          <span className="ad-sources-total">{fmtInt(total)}</span>
+          <span>всего визитов</span>
+          {delta && <span className={`ad-delta ${delta.startsWith("+") ? "is-good" : "is-bad"}`}>{delta.startsWith("-") ? "▼" : "▲"} {delta.replace(/^[-+]/, "")}</span>}
         </div>
-      </>
+        <CommandLineChart
+          seriesList={sd.series.map((s: any) => s.values)}
+          dates={sd.dates || []}
+          colors={items.map((item: { color: string }) => item.color)}
+          ticks={4}
+        />
+        <CommandLegend items={items} />
+      </div>
     );
   }
+
+  const items = demo.map((s, i) => ({ name: s.name, value: s.values.reduce((a, b) => a + b, 0), color: palette[i] }));
+  const total = items.reduce((a, item) => a + item.value, 0);
   return (
-    <>
-      <WidgetHeader title="Источники трафика" badge="≋" badgeBg="#ff4fa3" />
-      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Визиты</div>
-      <MultiLineChart
-        seriesList={demo.map((s) => s.values)}
-        labels={demo.map((s) => s.name)}
-        colors={METRIKA_SERIES_COLORS.slice(0, 3)}
-      />
-    </>
+    <div className="ad-command-content ad-sources-content">
+      <CommandHeader title="Источники трафика" icon="sources" iconColor="#f074a8" source="Демо" />
+      <div className="ad-sources-summary"><span className="ad-sources-total">{fmtInt(total)}</span><span>визитов за период</span></div>
+      <CommandLineChart seriesList={demo.map((s) => s.values)} dates={demoDates} colors={palette.slice(0, 3)} ticks={4} />
+      <CommandLegend items={items} />
+    </div>
   );
 }
 

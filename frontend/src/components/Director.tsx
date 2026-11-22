@@ -128,6 +128,19 @@ function span(size: WidgetSize): number {
   return size === "small" ? 1 : size === "medium" ? 2 : 4;
 }
 
+function commandSpan(widget: WidgetDef): number {
+  if (["ad-depth", "ad-bounce", "ad-duration"].includes(widget.id)) return 4;
+  if (widget.id === "ad-domains") return 7;
+  if (widget.id === "ad-sources-daily") return 5;
+  return widget.size === "small" ? 3 : widget.size === "medium" ? 6 : 12;
+}
+
+function commandMinHeight(widget: WidgetDef): number {
+  if (["ad-depth", "ad-bounce", "ad-duration"].includes(widget.id)) return 210;
+  if (widget.id === "ad-domains" || widget.id === "ad-sources-daily") return 520;
+  return widget.size === "small" ? 170 : widget.size === "medium" ? 280 : 360;
+}
+
 function SortableWidget({
   widget,
   onHide,
@@ -146,6 +159,7 @@ function SortableWidget({
     isDragging,
   } = useSortable({ id: widget.id });
 
+  const isCommand = widget.tab === "Рекламная статистика";
   const dndStyle = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -156,25 +170,26 @@ function SortableWidget({
   return (
     <div
       ref={setNodeRef}
+      className={isCommand ? `ad-command-widget ad-span-${commandSpan(widget)}` : undefined}
       style={{
-        padding: 20,
-        borderRadius: 16,
-        background: "var(--bg-card)",
-        border: "1px solid var(--border-color)",
-        boxShadow: "var(--shadow)",
+        padding: isCommand ? undefined : 20,
+        borderRadius: isCommand ? undefined : 16,
+        background: isCommand ? undefined : "var(--bg-card)",
+        border: isCommand ? undefined : "1px solid var(--border-color)",
+        boxShadow: isCommand ? undefined : "var(--shadow)",
         cursor: "grab",
         position: "relative",
-        gridColumn: `span ${span(widget.size)}`,
-        minHeight: widget.size === "small" ? 100 : widget.size === "medium" ? 220 : 280,
+        gridColumn: isCommand ? undefined : `span ${span(widget.size)}`,
+        minHeight: isCommand ? commandMinHeight(widget) : widget.size === "small" ? 100 : widget.size === "medium" ? 220 : 280,
         ...dndStyle,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-2px)";
-        e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)";
+        if (!isCommand) e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = isCommand ? "0 10px 30px rgba(0,0,0,0.28)" : "0 8px 24px rgba(0,0,0,0.12)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "none";
-        e.currentTarget.style.boxShadow = "var(--shadow)";
+        if (!isCommand) e.currentTarget.style.transform = "none";
+        e.currentTarget.style.boxShadow = isCommand ? "none" : "var(--shadow)";
       }}
     >
       {/* Drag handle */}
@@ -183,16 +198,19 @@ function SortableWidget({
         {...listeners}
         style={{
           position: "absolute",
-          top: 8,
-          right: 28,
-          width: 16,
-          height: 16,
-          opacity: 0.25,
+          top: isCommand ? 0 : 8,
+          right: isCommand ? 42 : 28,
+          width: isCommand ? 44 : 16,
+          height: isCommand ? 44 : 16,
+          display: isCommand ? "flex" : undefined,
+          alignItems: isCommand ? "center" : undefined,
+          justifyContent: isCommand ? "center" : undefined,
+          opacity: isCommand ? 0.5 : 0.25,
           cursor: "grab",
         }}
         title="Перетащите"
       >
-        <svg viewBox="0 0 16 16" fill="currentColor" style={{ color: "var(--text-muted)" }}>
+        <svg viewBox="0 0 16 16" fill="currentColor" style={{ color: "var(--text-muted)", width: isCommand ? 16 : undefined, height: isCommand ? 16 : undefined }}>
           <circle cx="4" cy="4" r="1.5" /><circle cx="8" cy="4" r="1.5" /><circle cx="12" cy="4" r="1.5" />
           <circle cx="4" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="12" cy="8" r="1.5" />
           <circle cx="4" cy="12" r="1.5" /><circle cx="8" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" />
@@ -203,10 +221,10 @@ function SortableWidget({
         onClick={(e) => { e.stopPropagation(); onHide(widget.id); }}
         style={{
           position: "absolute",
-          top: 6,
-          right: 6,
-          width: 20,
-          height: 20,
+          top: isCommand ? 0 : 6,
+          right: isCommand ? 0 : 6,
+          width: isCommand ? 44 : 20,
+          height: isCommand ? 44 : 20,
           borderRadius: "50%",
           border: "none",
           background: "transparent",
@@ -993,15 +1011,18 @@ export function Director() {
 
   const activeWidget = activeId ? ALL_WIDGETS.find((w) => w.id === activeId) : null;
 
+  const isCommandPage = activeTab === "Рекламная статистика";
+
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>Директор</h2>
+    <div className={isCommandPage ? "director-command-page" : undefined}>
+      <div className={isCommandPage ? "ad-page-header" : undefined} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <h2 className={isCommandPage ? "ad-page-title" : undefined} style={{ margin: 0, fontSize: isCommandPage ? undefined : 18 }}>Директор</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ display: "flex", gap: 4, background: "var(--bg-input)", borderRadius: 10, padding: 4 }}>
+          <div className={isCommandPage ? "ad-command-tabs" : undefined} style={{ display: "flex", gap: 4, background: "var(--bg-input)", borderRadius: 10, padding: 4 }}>
             {((u2 => { let list = TABS; if (u2?.crmBilling === false) list = list.filter(t2 => t2 !== 'Биллинг'); if (u2?.crmAccounting === false) list = list.filter(t2 => t2 !== 'Бухгалтерия'); return list; })(user)).map((tab) => (
               <button
                 key={tab}
+                className={isCommandPage ? "ad-command-tab" : undefined}
                 onClick={() => setActiveTab(tab)}
                 style={{
                   padding: "6px 16px",
@@ -1033,11 +1054,24 @@ export function Director() {
               transition: "all 0.15s",
             }}
             title="Настройки виджетов"
+            className={isCommandPage ? "ad-settings-button" : undefined}
           >
-            ⚙️
+            {isCommandPage ? (
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15a1.7 1.7 0 0 0-1.55-1.03H3v-4h.08A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63a1.7 1.7 0 0 0 1-1.55V3h4v.08A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9a1.7 1.7 0 0 0 1.55 1.03H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z" />
+              </svg>
+            ) : "⚙️"}
           </button>
         </div>
       </div>
+
+      {isCommandPage && (
+        <div className="ad-dashboard-meta">
+          <div className="ad-data-source"><span className="ad-live-dot" />Яндекс Метрика · данные за период</div>
+          <div>Последние 30 дней · сравнение с предыдущим периодом</div>
+        </div>
+      )}
 
       {!showWidgetSettings ? (
         <DndContext
@@ -1048,10 +1082,11 @@ export function Director() {
         >
           <SortableContext items={visibleWidgets.map((w) => w.id)} strategy={rectSortingStrategy}>
             <div
+              className={isCommandPage ? "ad-command-grid" : undefined}
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: 12,
+                gridTemplateColumns: isCommandPage ? undefined : "repeat(4, 1fr)",
+                gap: isCommandPage ? undefined : 12,
                 marginBottom: 24,
               }}
             >
@@ -1065,16 +1100,17 @@ export function Director() {
           <DragOverlay>
             {activeWidget ? (
               <div
+                className={activeWidget.tab === "Рекламная статистика" ? `ad-command-widget ad-span-${commandSpan(activeWidget)}` : undefined}
                 style={{
-                  padding: 20,
-                  borderRadius: 16,
-                  background: "var(--bg-card)",
-                  border: "2px solid #007AFF",
+                  padding: activeWidget.tab === "Рекламная статистика" ? undefined : 20,
+                  borderRadius: activeWidget.tab === "Рекламная статистика" ? undefined : 16,
+                  background: activeWidget.tab === "Рекламная статистика" ? undefined : "var(--bg-card)",
+                  border: activeWidget.tab === "Рекламная статистика" ? "1px solid #579df2" : "2px solid #007AFF",
                   boxShadow: "0 12px 32px rgba(0,0,0,0.2)",
                   cursor: "grabbing",
                   opacity: 0.95,
-                  gridColumn: `span ${span(activeWidget.size)}`,
-                  minHeight: activeWidget.size === "small" ? 100 : activeWidget.size === "medium" ? 220 : 280,
+                  gridColumn: activeWidget.tab === "Рекламная статистика" ? undefined : `span ${span(activeWidget.size)}`,
+                  minHeight: activeWidget.tab === "Рекламная статистика" ? commandMinHeight(activeWidget) : activeWidget.size === "small" ? 100 : activeWidget.size === "medium" ? 220 : 280,
                 }}
               >
                 {renderWidgetContent(activeWidget)}
