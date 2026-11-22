@@ -257,6 +257,39 @@ export function Login() {
     setPendingRedirect(true)
   }, [])
 
+  // Фолбэк VK ID: state в query (?vk_state=...) — обмениваем на токен через API.
+  // Нужен, когда браузер (iOS Safari/PWA) теряет fragment #vk_token после
+  // OAuth-редиректа: тогда вход «зацикливался» на странице логина.
+  useEffect(() => {
+    if (window.location.hash.startsWith('#vk_token=')) return
+    const vkState = new URLSearchParams(window.location.search).get('vk_state')
+    if (!vkState) return
+    let cancelled = false
+    fetch(`${API_URL}/api/vk/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: vkState }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return
+        if (data?.token) {
+          localStorage.setItem('token', data.token)
+          // Полная перезагрузка: AuthContext подхватит токен при монтировании
+          window.location.href = window.location.pathname
+        } else {
+          setError('Сессия входа устарела. Попробуйте ещё раз.')
+          window.history.replaceState({}, document.title, window.location.pathname)
+        }
+      })
+      .catch(() => {
+        if (cancelled) return
+        setError('Ошибка входа через VK. Попробуйте ещё раз.')
+        window.history.replaceState({}, document.title, window.location.pathname)
+      })
+    return () => { cancelled = true }
+  }, [])
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const vkError = params.get('vk_error')

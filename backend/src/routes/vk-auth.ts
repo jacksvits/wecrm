@@ -85,7 +85,8 @@ async function vkFetchWithRetry(url: string, init: RequestInit, attempt = 0): Pr
 // первого callback переиспользуется: параллельные дубли ждут тот же промис,
 // поздние дубли получают сохранённый редирект (90 секунд).
 const pendingVkCallbacks = new Map<string, Promise<string>>();
-const recentVkCallbacks = new Map<string, { redirect: string; expires: number }>();
+interface VkCallbackResult { redirect: string; token?: string; user?: unknown; expires: number }
+const recentVkCallbacks = new Map<string, VkCallbackResult>();
 const VK_CALLBACK_RESULT_TTL = 90 * 1000;
 
 router.get('/config', async (_req, res) => {
@@ -345,20 +346,29 @@ router.get('/callback', rejectBlockedIp, rateLimit({ prefix: 'vk-callback', wind
     // а не device_id из authorize-запроса (иначе id.vk.ru: «invalid device id provided»).
     // Обмен выполняется ровно один раз: промис кладём в pendingVkCallbacks ДО await,
     // чтобы параллельный дубль получил тот же результат.
-    const execPromise = (async (): Promise<string> => {
+    interface VkExecOutcome { redirect: string; token?: string; user?: unknown }
+    const execPromise = (async (): Promise<VkExecOutcome> => {
       const result = await completeVkIdAuth(code as string, device_id as string, stateKey, session.verifier);
       if (!result.ok) {
-        return `/?vk_error=${result.errorKey}`;
+        return { redirect: `/?vk_error=${result.errorKey}` };
       }
       await recordAuthEvent(req, { login: result.user.email, userId: result.user.id, authMethod: 'vk-id' });
-      // JWT в fragment (#), чтобы он не попадал в access-логи nginx.
-      // Fragment не отправляется на сервер — фронтенд заберёт его из location.hash.
-      return `/#vk_token=${result.token}`;
+      // Основной путь: state в query (?vk_state=) — токен фронтенд обменяет через
+      // POST /api/vk/exchange. Fragment #vk_token оставлен как фолбэк: iOS Safari
+      // после OAuth-редиректа может потерять fragment, query — никогда.
+      return { redirect: `/?vk_state=${stateKey}#vk_token=${result.token}`, token: result.token, user: result.user };
     })();
-    pendingVkCallbacks.set(stateKey, execPromise);
+    const redirectPromise = execPromise.then((o) => o.redirect);
+    pendingVkCallbacks.set(stateKey, redirectPromise);
     try {
-      const redirect = await execPromise;
-      recentVkCallbacks.set(stateKey, { redirect, expires: Date.now() + VK_CALLBACK_RESULT_TTL });
+      const outcome = await execPromise;
+      const redirect = outcome.redirect;
+      recentVkCallbacks.set(stateKey, {
+        redirect,
+        token: outcome.token,
+        user: outcome.user,
+        expires: Date.now() + VK_CALLBACK_RESULT_TTL,
+      });
       // чистка просроченных итогов
       for (const [k, v] of recentVkCallbacks) {
         if (v.expires < Date.now()) recentVkCallbacks.delete(k);
@@ -371,6 +381,22 @@ router.get('/callback', rejectBlockedIp, rateLimit({ prefix: 'vk-callback', wind
     console.error('[VK Callback Error]', err);
     res.redirect('/?vk_error=server_error');
   }
+});
+
+/**
+ * POST /api/vk/exchange
+ * Обмен state (из ?vk_state= после callback) на JWT. Фолбэк для браузеров,
+ * где fragment #vk_token после OAuth-редиректа теряется (iOS Safari/PWA).
+ * state — неугадываемый UUID, результат живёт 90 секунд после callback.
+ */
+router.post('/exchange', rejectBlockedIp, rateLimit({ prefix: 'vk-exchange', windowMs: 15 * 60_000, max: 30 }), async (req: Request, res: Response) => {
+  const state = typeof req.body?.state === 'string' ? req.body.state : '';
+  if (!state) return res.status(400).json({ error: 'Missing state' });
+  const recent = recentVkCallbacks.get(state);
+  if (!recent || recent.expires < Date.now() || !recent.token) {
+    return res.status(410).json({ error: 'Сессия входа устарела. Попробуйте ещё раз.' });
+  }
+  res.json({ token: recent.token, user: recent.user });
 });
 
 router.get('/status', async (_req, res) => {
