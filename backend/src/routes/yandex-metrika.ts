@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { tenantKey } from '../lib/tenant.js';
 
 /**
  * Плагин «Яндекс Метрика».
@@ -71,8 +72,12 @@ function parseTable(data: any): { headers: string[]; rows: any[][] } {
   const headers = [...dimensions, ...metrics].map((h) => h.replace(/^ym:[sd]:/, ''));
   const rows: any[][] = [];
   for (const item of data?.data ?? []) {
-    const dims: any[] = (item.dimensions ?? []).map((d: any) => {
-      if (d && typeof d === 'object') return d?.name ?? d?.id ?? 'Прочие';
+    const dims: any[] = (item.dimensions ?? []).map((d: any, index: number) => {
+      if (d && typeof d === 'object') {
+        // Для этих справочников name локализован ('PC', 'New users'), а id стабилен.
+        if (['ym:s:deviceCategory', 'ym:s:isNewUser'].includes(dimensions[index])) return d?.id ?? d?.name ?? 'other';
+        return d?.name ?? d?.id ?? 'Прочие';
+      }
       return d ?? 'Прочие';
     });
     // В данных id счётчика возвращается просто числом — подставляем имя из запроса
@@ -170,180 +175,187 @@ router.get('/status', async (_req, res) => {
 
 // ---------- Статистика для виджетов директора ----------
 
-// GET /api/yandex-metrika/summary — сводка: KPI, динамика по дням, источники, возраст, география
-router.get('/summary', async (_req, res) => {
+const summaryPending = new Map<string, Promise<any>>();
+
+function isoDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function shiftDay(value: string, days: number): string {
+  const d = new Date(`${value}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return isoDay(d);
+}
+
+function daysInclusive(date1: string, date2: string): number {
+  return Math.round((new Date(`${date2}T00:00:00Z`).getTime() - new Date(`${date1}T00:00:00Z`).getTime()) / 86400000) + 1;
+}
+
+function validIsoDay(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && isoDay(parsed) === value;
+}
+
+// Несколько запросов выполняются параллельно, но без превышения лимитов API.
+async function mapLimit<T>(jobs: Array<() => Promise<T>>, limit = 4): Promise<T[]> {
+  const results = new Array<T>(jobs.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, jobs.length) }, async () => {
+    while (next < jobs.length) {
+      const index = next++;
+      results[index] = await jobs[index]();
+    }
+  }));
+  return results;
+}
+
+function optionalReport(report: Promise<any>, name: string): Promise<any> {
+  return report.catch((err) => {
+    console.warn(`[yandex-metrika] optional report ${name}:`, err.message);
+    return null;
+  });
+}
+
+// GET /api/yandex-metrika/summary?date1=YYYY-MM-DD&date2=YYYY-MM-DD&counter=...&refresh=1
+// Единая сводка для всех виджетов: выбранный период, предыдущий период и фильтр счётчика.
+router.get('/summary', async (req, res) => {
   try {
     const s = await prisma.yandexMetrikaSettings.findUnique({ where: { id: 1 } });
     if (!s?.isActive || !s.token || !s.counterId) {
       return res.status(400).json({ error: 'Плагин «Яндекс Метрика» не подключён' });
     }
-    const ids = s.counterId.trim();
-    const counters = ids.split(',').map((c) => c.trim()).filter(Boolean);
-    const cacheKey = `summary:${ids}`;
-    const cached = getCached(cacheKey);
-    if (cached) return res.json(cached);
 
-    const num = (v: any) => Number(v ?? 0) || 0;
+    const today = isoDay(new Date());
+    const date2 = validIsoDay(req.query.date2) ? req.query.date2 : today;
+    const date1 = validIsoDay(req.query.date1) ? req.query.date1 : shiftDay(date2, -29);
+    if (date1 > date2) return res.status(400).json({ error: 'Начало периода позже его окончания' });
+    const days = daysInclusive(date1, date2);
+    if (days < 1) return res.status(400).json({ error: 'Некорректный диапазон дат' });
+    if (days > 366) return res.status(400).json({ error: 'Максимальный период — 366 дней' });
 
-    // 1. KPI за 30 дней + предыдущие 30 дней (дельта)
-    const kpiMetrics = 'ym:s:visits,ym:s:pageviews,ym:s:users,ym:s:avgVisitDuration,ym:s:pageDepth,ym:s:bounceRate';
-    const kpi = await metrikaRequest(s.token, { ids, metrics: kpiMetrics, date1: '30daysAgo', date2: 'today' });
-    const kpiPrev = await metrikaRequest(s.token, { ids, metrics: kpiMetrics, date1: '60daysAgo', date2: '31daysAgo' });
-    const m = (d: any, i: number) => num(totalsRow(d)[i]);
-    const summary = {
-      visits: m(kpi, 0),
-      pageviews: m(kpi, 1),
-      users: m(kpi, 2),
-      avgSessionDuration: m(kpi, 3),
-      pageDepth: m(kpi, 4),
-      bounceRate: m(kpi, 5),
-      visitsPrev: m(kpiPrev, 0),
-      pageviewsPrev: m(kpiPrev, 1),
-      usersPrev: m(kpiPrev, 2),
-      avgSessionDurationPrev: m(kpiPrev, 3),
-      pageDepthPrev: m(kpiPrev, 4),
-      bounceRatePrev: m(kpiPrev, 5),
-    };
+    const counters = s.counterId.split(',').map((c) => c.trim()).filter(Boolean);
+    const requestedCounter = String(req.query.counter || '').trim();
+    if (requestedCounter && !counters.includes(requestedCounter)) {
+      return res.status(400).json({ error: 'Неизвестный счётчик' });
+    }
+    const ids = requestedCounter || counters.join(',');
+    const prevDate2 = shiftDay(date1, -1);
+    const prevDate1 = shiftDay(prevDate2, -(days - 1));
+    const cacheKey = `summary:${tenantKey()}:${ids}:${date1}:${date2}`;
+    const refresh = req.query.refresh === '1';
+    if (!refresh) {
+      const cached = getCached(cacheKey);
+      if (cached) return res.json(cached);
+      const running = summaryPending.get(cacheKey);
+      if (running) return res.json(await running);
+    }
 
-    // 2. Динамика по дням (визиты/просмотры/посетители + вовлечённость)
-    const dailyData = await metrikaRequest(s.token, {
-      ids,
-      metrics: kpiMetrics,
-      dimensions: 'ym:s:date',
-      date1: '30daysAgo',
-      date2: 'today',
-      sort: 'ym:s:date',
-      limit: 100,
-    });
-    const daily = parseTable(dailyData).rows.map((r) => ({
-      date: String(r[0] ?? ''),
-      visits: num(r[1]),
-      pageviews: num(r[2]),
-      users: num(r[3]),
-      avgSessionDuration: num(r[4]),
-      pageDepth: num(r[5]),
-      bounceRate: num(r[6]),
-    }));
+    const build = async () => {
+      const num = (v: any) => Number(v ?? 0) || 0;
+      const base = { ids, date1, date2 };
+      const kpiMetrics = 'ym:s:visits,ym:s:pageviews,ym:s:users,ym:s:avgVisitDuration,ym:s:pageDepth,ym:s:bounceRate';
 
-    // 3. По доменам/счётчикам (если счётчиков несколько)
-    let perCounter: { name: string; visits: number }[] = [];
-    if (counters.length > 1) {
-      const perData = await metrikaRequest(s.token, {
-        ids,
-        metrics: 'ym:s:visits',
-        dimensions: 'ym:s:counterID',
-        date1: '30daysAgo',
-        date2: 'today',
-        sort: '-ym:s:visits',
-        limit: 20,
+      const [
+        kpi, kpiPrev, dailyData, perData, srcData, ageData, geoData, citiesData,
+        srcDailyData, pagesData, titlesData, devicesData, newVisitorsData, landingData,
+      ] = await mapLimit([
+        () => metrikaRequest(s.token, { ...base, metrics: kpiMetrics }),
+        () => metrikaRequest(s.token, { ids, metrics: kpiMetrics, date1: prevDate1, date2: prevDate2 }),
+        () => metrikaRequest(s.token, { ...base, metrics: kpiMetrics, dimensions: 'ym:s:date', sort: 'ym:s:date', limit: 400 }),
+        () => counters.length > 1
+          ? metrikaRequest(s.token, { ...base, metrics: 'ym:s:visits', dimensions: 'ym:s:counterID', sort: '-ym:s:visits', limit: 20 })
+          : Promise.resolve(null),
+        () => metrikaRequest(s.token, { ...base, metrics: 'ym:s:visits', dimensions: 'ym:s:lastTrafficSource', sort: '-ym:s:visits', limit: 20 }),
+        () => metrikaRequest(s.token, { ...base, metrics: 'ym:s:visits', dimensions: 'ym:s:ageInterval', limit: 10 }),
+        () => metrikaRequest(s.token, { ...base, metrics: 'ym:s:visits', dimensions: 'ym:s:regionCountry', sort: '-ym:s:visits', limit: 50 }),
+        () => optionalReport(metrikaRequest(s.token, { ...base, metrics: 'ym:s:visits', dimensions: 'ym:s:regionCity', sort: '-ym:s:visits', limit: 50 }), 'cities'),
+        () => metrikaRequest(s.token, { ...base, metrics: 'ym:s:visits', dimensions: 'ym:s:date,ym:s:lastTrafficSource', sort: 'ym:s:date', limit: 10000 }),
+        () => metrikaRequest(s.token, { ...base, metrics: 'ym:pv:pageviews', dimensions: 'ym:pv:URL', sort: '-ym:pv:pageviews', limit: 50 }),
+        () => metrikaRequest(s.token, { ...base, metrics: 'ym:pv:pageviews', dimensions: 'ym:pv:title', sort: '-ym:pv:pageviews', limit: 50 }),
+        () => optionalReport(metrikaRequest(s.token, { ...base, metrics: 'ym:s:visits', dimensions: 'ym:s:deviceCategory', sort: '-ym:s:visits', limit: 10 }), 'devices'),
+        () => optionalReport(metrikaRequest(s.token, { ...base, metrics: 'ym:s:visits', dimensions: 'ym:s:isNewUser', sort: '-ym:s:visits', limit: 10 }), 'new-visitors'),
+        () => optionalReport(metrikaRequest(s.token, { ...base, metrics: 'ym:s:visits', dimensions: 'ym:s:startURL', sort: '-ym:s:visits', limit: 50 }), 'landing-pages'),
+      ], 4);
+
+      const m = (d: any, i: number) => num(totalsRow(d)[i]);
+      const summary = {
+        visits: m(kpi, 0), pageviews: m(kpi, 1), users: m(kpi, 2),
+        avgSessionDuration: m(kpi, 3), pageDepth: m(kpi, 4), bounceRate: m(kpi, 5),
+        visitsPrev: m(kpiPrev, 0), pageviewsPrev: m(kpiPrev, 1), usersPrev: m(kpiPrev, 2),
+        avgSessionDurationPrev: m(kpiPrev, 3), pageDepthPrev: m(kpiPrev, 4), bounceRatePrev: m(kpiPrev, 5),
+      };
+      const daily = parseTable(dailyData).rows.map((r) => ({
+        date: String(r[0] ?? ''), visits: num(r[1]), pageviews: num(r[2]), users: num(r[3]),
+        avgSessionDuration: num(r[4]), pageDepth: num(r[5]), bounceRate: num(r[6]),
+      }));
+      const perCounter = parseTable(perData).rows.map((r) => ({ name: String(r[0] ?? ''), visits: num(r[1]) }));
+      const sources = parseTable(srcData).rows.map((r) => ({ name: sourceName(String(r[0] ?? '—')), visits: num(r[1]) }));
+
+      const ageOrder = ['under 18', '18-24', '25-34', '35-44', '45-54', '55-64', 'over 64'];
+      const ageLabels: Record<string, string> = {
+        'under 18': '<18', '18-24': '18–24', '25-34': '25–34', '35-44': '35–44',
+        '45-54': '45–54', '55-64': '55–64', 'over 64': '65+',
+      };
+      const ages = parseTable(ageData).rows
+        .map((r) => ({ label: ageLabels[String(r[0])] ?? String(r[0]), sort: ageOrder.indexOf(String(r[0])), visits: num(r[1]) }))
+        .filter((a) => a.sort >= 0).sort((a, b) => a.sort - b.sort)
+        .map(({ label, visits }) => ({ label, visits }));
+
+      const geo = parseTable(geoData).rows.map((r) => ({ name: String(r[0] ?? '—'), visits: num(r[1]) }));
+      const cities = parseTable(citiesData).rows.map((r) => ({ name: String(r[0] ?? '—'), visits: num(r[1]) }));
+
+      const srcRows = parseTable(srcDailyData).rows;
+      const srcTotals = new Map<string, number>();
+      for (const r of srcRows) {
+        const name = sourceName(String(r[1] ?? '—'));
+        srcTotals.set(name, (srcTotals.get(name) ?? 0) + num(r[2]));
+      }
+      const topSources = [...srcTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map((e) => e[0]);
+      const srcDates = [...new Set(srcRows.map((r) => String(r[0])))].sort();
+      const srcIndex = new Map(topSources.map((name, i) => [name, i]));
+      const dateIndex = new Map(srcDates.map((d, i) => [d, i]));
+      const matrix = topSources.map(() => srcDates.map(() => 0));
+      for (const r of srcRows) {
+        const si = srcIndex.get(sourceName(String(r[1] ?? '—')));
+        const di = dateIndex.get(String(r[0]));
+        if (si === undefined || di === undefined) continue;
+        matrix[si][di] = num(r[2]);
+      }
+      const sourcesDaily = { dates: srcDates, series: topSources.map((name, i) => ({ name, values: matrix[i] })) };
+
+      const pages = parseTable(pagesData).rows.map((r) => ({ url: String(r[0] ?? '—'), views: num(r[1]) }));
+      const titles = parseTable(titlesData).rows.map((r) => ({ title: String(r[0] ?? '—'), views: num(r[1]) }));
+      const deviceNames: Record<string, string> = { desktop: 'Компьютеры', mobile: 'Смартфоны', tablet: 'Планшеты', tv: 'Телевизоры', other: 'Другие' };
+      const devices = parseTable(devicesData).rows.map((r) => {
+        const raw = String(r[0] ?? 'other');
+        return { name: deviceNames[raw.toLowerCase()] ?? raw, visits: num(r[1]) };
       });
-      perCounter = parseTable(perData).rows.map((r) => ({ name: String(r[0] ?? ''), visits: num(r[1]) }));
-    }
+      const newVisitors = parseTable(newVisitorsData).rows.map((r) => {
+        const raw = String(r[0] ?? '').toLowerCase();
+        const isNew = /^(yes|true|1|нов)/.test(raw);
+        const isReturning = /^(no|false|0|верн)/.test(raw);
+        return { key: isNew ? 'new' : isReturning ? 'returning' : 'unknown', name: isNew ? 'Новые' : isReturning ? 'Вернувшиеся' : String(r[0] ?? 'Не определено'), visits: num(r[1]) };
+      });
+      const landingPages = parseTable(landingData).rows.map((r) => ({ url: String(r[0] ?? '—'), visits: num(r[1]) }));
 
-    // 4. Источники трафика
-    const srcData = await metrikaRequest(s.token, {
-      ids,
-      metrics: 'ym:s:visits',
-      dimensions: 'ym:s:lastTrafficSource',
-      date1: '30daysAgo',
-      date2: 'today',
-      sort: '-ym:s:visits',
-      limit: 10,
-    });
-    const sources = parseTable(srcData).rows.map((r) => ({ name: sourceName(String(r[0] ?? '—')), visits: num(r[1]) }));
-
-    // 5. Возраст аудитории
-    const ageData = await metrikaRequest(s.token, {
-      ids,
-      metrics: 'ym:s:visits',
-      dimensions: 'ym:s:ageInterval',
-      date1: '30daysAgo',
-      date2: 'today',
-      limit: 10,
-    });
-    const ageRows = parseTable(ageData).rows;
-    const ageOrder = ['under 18', '18-24', '25-34', '35-44', '45-54', '55-64', 'over 64'];
-    const ageLabels: Record<string, string> = {
-      'under 18': '<18', '18-24': '18–24', '25-34': '25–34', '35-44': '35–44',
-      '45-54': '45–54', '55-64': '55–64', 'over 64': '65+',
-    };
-    const ages = ageRows
-      .map((r) => ({ label: ageLabels[String(r[0])] ?? String(r[0]), sort: ageOrder.indexOf(String(r[0])), visits: num(r[1]) }))
-      .filter((a) => a.sort >= 0)
-      .sort((a, b) => a.sort - b.sort)
-      .map(({ label, visits }) => ({ label, visits }));
-
-    // 6. География (страны)
-    const geoData = await metrikaRequest(s.token, {
-      ids,
-      metrics: 'ym:s:visits',
-      dimensions: 'ym:s:regionCountry',
-      date1: '30daysAgo',
-      date2: 'today',
-      sort: '-ym:s:visits',
-      limit: 10,
-    });
-    const geo = parseTable(geoData).rows.map((r) => ({ name: String(r[0] ?? '—'), visits: num(r[1]) }));
-
-    // 7. Источники трафика по дням (динамика, топ-5 источников)
-    const srcDailyData = await metrikaRequest(s.token, {
-      ids,
-      metrics: 'ym:s:visits',
-      dimensions: 'ym:s:date,ym:s:lastTrafficSource',
-      date1: '30daysAgo',
-      date2: 'today',
-      sort: 'ym:s:date',
-      limit: 1000,
-    });
-    const srcRows = parseTable(srcDailyData).rows; // [date, source, visits]
-    const srcTotals = new Map<string, number>();
-    for (const r of srcRows) {
-      const name = sourceName(String(r[1] ?? '—'));
-      srcTotals.set(name, (srcTotals.get(name) ?? 0) + num(r[2]));
-    }
-    const topSources = [...srcTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map((e) => e[0]);
-    const srcDates = [...new Set(srcRows.map((r) => String(r[0])))].sort();
-    const srcIndex = new Map(topSources.map((name, i) => [name, i]));
-    const dateIndex = new Map(srcDates.map((d, i) => [d, i]));
-    const matrix = topSources.map(() => srcDates.map(() => 0));
-    for (const r of srcRows) {
-      const si = srcIndex.get(sourceName(String(r[1] ?? '—')));
-      const di = dateIndex.get(String(r[0]));
-      if (si === undefined || di === undefined) continue;
-      matrix[si][di] = num(r[2]);
-    }
-    const sourcesDaily = {
-      dates: srcDates,
-      series: topSources.map((name, i) => ({ name, values: matrix[i] })),
+      return {
+        summary, daily, perCounter, sources, ages, geo, cities, sourcesDaily, pages, titles,
+        devices, newVisitors, landingPages, counters, selectedCounter: requestedCounter || 'all',
+        period: { date1, date2, days, prevDate1, prevDate2 },
+        fetchedAt: new Date().toISOString(),
+      };
     };
 
-    // 8. Просмотры URL
-    const pagesData = await metrikaRequest(s.token, {
-      ids,
-      metrics: 'ym:pv:pageviews',
-      dimensions: 'ym:pv:URL',
-      date1: '30daysAgo',
-      date2: 'today',
-      sort: '-ym:pv:pageviews',
-      limit: 10,
-    });
-    const pages = parseTable(pagesData).rows.map((r) => ({ url: String(r[0] ?? '—'), views: num(r[1]) }));
-
-    // 9. Заголовки страниц
-    const titlesData = await metrikaRequest(s.token, {
-      ids,
-      metrics: 'ym:pv:pageviews',
-      dimensions: 'ym:pv:title',
-      date1: '30daysAgo',
-      date2: 'today',
-      sort: '-ym:pv:pageviews',
-      limit: 10,
-    });
-    const titles = parseTable(titlesData).rows.map((r) => ({ title: String(r[0] ?? '—'), views: num(r[1]) }));
-
-    const result = { summary, daily, perCounter, sources, ages, geo, sourcesDaily, pages, titles, fetchedAt: new Date().toISOString() };
-    setCached(cacheKey, result);
-    res.json(result);
+    const running = build();
+    summaryPending.set(cacheKey, running);
+    try {
+      const result = await running;
+      setCached(cacheKey, result);
+      res.json(result);
+    } finally {
+      summaryPending.delete(cacheKey);
+    }
   } catch (err: any) {
     console.error('[yandex-metrika] summary error:', err.message);
     res.status(err.status ?? 502).json({ error: err.message });

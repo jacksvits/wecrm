@@ -23,7 +23,7 @@ import { useAuth } from "../hooks/useAuth";
 import { FinanceAnalyticsWidget } from "./accounting/FinanceAnalyticsWidget";
 import { FinanceDocumentsWidget } from "./accounting/FinanceDocumentsWidget";
 import { FinanceReconciliationWidget } from "./accounting/FinanceReconciliationWidget";
-import { AdSocialWidget, AdExpensesWidget, AdChannelsWidget, AdCacWidget, AdLeadsWidget, AdDomainsWidget, AdConversionsWidget, AdDemographicsWidget, AdGeoWidget, AdDurationWidget, AdDepthWidget, AdBounceWidget, AdAttendanceWidget, AdSourcesDailyWidget, AdPagesWidget, AdTitlesWidget, AdNewsViewsWidget } from "./AdStatistics";
+import { AdStatisticsProvider, AdPeriodToolbar, AdSocialWidget, AdExpensesWidget, AdChannelsWidget, AdCacWidget, AdLeadsWidget, AdDomainsWidget, AdConversionsWidget, AdDemographicsWidget, AdGeoWidget, AdDurationWidget, AdDepthWidget, AdBounceWidget, AdAttendanceWidget, AdSourcesDailyWidget, AdPagesWidget, AdTitlesWidget, AdDevicesWidget, AdNewVisitorsWidget, AdLandingPagesWidget, AdNewsViewsWidget } from "./AdStatistics";
 
 type WidgetSize = "small" | "medium" | "large";
 type WidgetId = string;
@@ -65,8 +65,11 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "ad-bounce", size: "small", label: "Отказы", tab: "Рекламная статистика" },
   { id: "ad-attendance", size: "large", label: "Посещаемость сайта", tab: "Рекламная статистика" },
   { id: "ad-sources-daily", size: "large", label: "Источники трафика: динамика", tab: "Рекламная статистика" },
+  { id: "ad-devices", size: "medium", label: "Устройства", tab: "Рекламная статистика" },
+  { id: "ad-new-visitors", size: "medium", label: "Новые и вернувшиеся посетители", tab: "Рекламная статистика" },
   { id: "ad-pages", size: "medium", label: "Просмотры URL", tab: "Рекламная статистика" },
   { id: "ad-titles", size: "medium", label: "Заголовки страниц", tab: "Рекламная статистика" },
+  { id: "ad-landing-pages", size: "medium", label: "Страницы входа", tab: "Рекламная статистика" },
   { id: "ad-news-views", size: "medium", label: "Просмотры новостей", tab: "Рекламная статистика" },
   { id: "widget-email-filter-log", size: "medium", label: "Журнал срабатываний почты", tab: "Основное" },
   // === Вкладка: Биллинг ===
@@ -136,9 +139,9 @@ function commandSpan(widget: WidgetDef): number {
 }
 
 function commandMinHeight(widget: WidgetDef): number {
-  if (["ad-depth", "ad-bounce", "ad-duration"].includes(widget.id)) return 210;
-  if (widget.id === "ad-domains" || widget.id === "ad-sources-daily") return 520;
-  return widget.size === "small" ? 170 : widget.size === "medium" ? 280 : 360;
+  if (["ad-depth", "ad-bounce", "ad-duration"].includes(widget.id)) return 285;
+  if (widget.id === "ad-domains" || widget.id === "ad-sources-daily") return 540;
+  return widget.size === "small" ? 285 : widget.size === "medium" ? 390 : 430;
 }
 
 function SortableWidget({
@@ -184,12 +187,16 @@ function SortableWidget({
         ...dndStyle,
       }}
       onMouseEnter={(e) => {
-        if (!isCommand) e.currentTarget.style.transform = "translateY(-2px)";
-        e.currentTarget.style.boxShadow = isCommand ? "0 10px 30px rgba(0,0,0,0.28)" : "0 8px 24px rgba(0,0,0,0.12)";
+        if (!isCommand) {
+          e.currentTarget.style.transform = "translateY(-2px)";
+          e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)";
+        }
       }}
       onMouseLeave={(e) => {
-        if (!isCommand) e.currentTarget.style.transform = "none";
-        e.currentTarget.style.boxShadow = isCommand ? "none" : "var(--shadow)";
+        if (!isCommand) {
+          e.currentTarget.style.transform = "none";
+          e.currentTarget.style.boxShadow = "var(--shadow)";
+        }
       }}
     >
       {/* Drag handle */}
@@ -568,10 +575,16 @@ export function Director() {
         return <AdAttendanceWidget />;
       case "ad-sources-daily":
         return <AdSourcesDailyWidget />;
+      case "ad-devices":
+        return <AdDevicesWidget />;
+      case "ad-new-visitors":
+        return <AdNewVisitorsWidget />;
       case "ad-pages":
         return <AdPagesWidget />;
       case "ad-titles":
         return <AdTitlesWidget />;
+      case "ad-landing-pages":
+        return <AdLandingPagesWidget />;
       case "ad-news-views":
         return <AdNewsViewsWidget />;
       case "stat-beget":
@@ -1014,6 +1027,7 @@ export function Director() {
   const isCommandPage = activeTab === "Рекламная статистика";
 
   return (
+    <AdStatisticsProvider enabled={isCommandPage}>
     <div className={isCommandPage ? "director-command-page" : undefined}>
       <div className={isCommandPage ? "ad-page-header" : undefined} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <h2 className={isCommandPage ? "ad-page-title" : undefined} style={{ margin: 0, fontSize: isCommandPage ? undefined : 18 }}>Директор</h2>
@@ -1066,12 +1080,7 @@ export function Director() {
         </div>
       </div>
 
-      {isCommandPage && (
-        <div className="ad-dashboard-meta">
-          <div className="ad-data-source"><span className="ad-live-dot" />Яндекс Метрика · данные за период</div>
-          <div>Последние 30 дней · сравнение с предыдущим периодом</div>
-        </div>
-      )}
+      {isCommandPage && <AdPeriodToolbar />}
 
       {!showWidgetSettings ? (
         <DndContext
@@ -1105,7 +1114,7 @@ export function Director() {
                   padding: activeWidget.tab === "Рекламная статистика" ? undefined : 20,
                   borderRadius: activeWidget.tab === "Рекламная статистика" ? undefined : 16,
                   background: activeWidget.tab === "Рекламная статистика" ? undefined : "var(--bg-card)",
-                  border: activeWidget.tab === "Рекламная статистика" ? "1px solid #579df2" : "2px solid #007AFF",
+                  border: activeWidget.tab === "Рекламная статистика" ? "1px solid #6e5ac7" : "2px solid #007AFF",
                   boxShadow: "0 12px 32px rgba(0,0,0,0.2)",
                   cursor: "grabbing",
                   opacity: 0.95,
@@ -1221,5 +1230,6 @@ export function Director() {
 
       
     </div>
+    </AdStatisticsProvider>
   );
 }

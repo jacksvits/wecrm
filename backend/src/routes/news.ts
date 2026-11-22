@@ -322,16 +322,35 @@ router.get('/views/top', requireUser, async (req, res) => {
     const user = (req as any).user;
     if (user.role !== 'admin') return res.status(403).json({ error: 'Нет прав' });
     const period = String(req.query.period || '7d');
+    const date1 = String(req.query.date1 || '');
+    const date2 = String(req.query.date2 || '');
     const from = new Date();
-    if (period === 'today') from.setHours(0, 0, 0, 0);
+    let to: Date | undefined;
+    if (date1 || date2) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date1) || !/^\d{4}-\d{2}-\d{2}$/.test(date2)) {
+        return res.status(400).json({ error: 'Некорректный диапазон дат' });
+      }
+      if (date1 > date2) return res.status(400).json({ error: 'Начало периода позже его окончания' });
+      const parsedFrom = new Date(`${date1}T00:00:00.000Z`);
+      const parsedTo = new Date(`${date2}T00:00:00.000Z`);
+      if (Number.isNaN(parsedFrom.getTime()) || Number.isNaN(parsedTo.getTime()) || parsedFrom.toISOString().slice(0, 10) !== date1 || parsedTo.toISOString().slice(0, 10) !== date2) {
+        return res.status(400).json({ error: 'Некорректный диапазон дат' });
+      }
+      from.setTime(parsedFrom.getTime());
+      to = new Date(`${date2}T00:00:00.000Z`);
+      to.setUTCDate(to.getUTCDate() + 1);
+      if (from >= to) return res.status(400).json({ error: 'Некорректный диапазон дат' });
+    } else if (period === 'today') from.setHours(0, 0, 0, 0);
     else if (period === 'month') from.setMonth(from.getMonth() - 1);
     else from.setDate(from.getDate() - 7);
+    const createdAt: { gte: Date; lt?: Date } = { gte: from };
+    if (to) createdAt.lt = to;
     const grouped = await prisma.newsView.groupBy({
       by: ['newsId'],
-      where: { createdAt: { gte: from } },
+      where: { createdAt },
       _count: { _all: true },
       orderBy: { _count: { newsId: 'desc' } },
-      take: 15,
+      take: 50,
     });
     if (!grouped.length) return res.json([]);
     const newsList = await prisma.news.findMany({
