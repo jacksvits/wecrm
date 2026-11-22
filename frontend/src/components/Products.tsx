@@ -474,7 +474,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
     const collapsed = isCollapsed(key);
     const rows: ReactNode[] = [
       <tr key={key} style={{ background: depth === 0 ? 'var(--bg-hover)' : 'transparent', cursor: 'pointer' }} onClick={() => toggleGroup(key)}>
-        <td colSpan={6 + activePriceTypes.length} style={{
+        <td colSpan={7 + activePriceTypes.length} style={{
           ...tdStyle,
           fontWeight: depth === 0 ? 600 : 400,
           fontSize: depth === 0 ? 14 : 13,
@@ -884,7 +884,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
                 ))}
                 {visible.length === 0 && (
                   <tr>
-                    <td colSpan={6 + activePriceTypes.length} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <td colSpan={7 + activePriceTypes.length} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>
                       Позиции не найдены
                     </td>
                   </tr>
@@ -1360,6 +1360,14 @@ function ProductRow({ p, indent, priceTypes, totalStock, priceOf, onOpen, onDele
   const mainImage = (p.images || [])[0] || (defaultProductImage ? { url: defaultProductImage } : undefined);
   return (
     <tr style={{ opacity: p.isActive ? 1 : 0.5, cursor: 'pointer' }} onClick={onOpen}>
+      <td style={{ ...tdStyle, width: 1, whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          style={{ width: 15, height: 15, cursor: 'pointer' }}
+          checked={selected}
+          onChange={onToggle}
+        />
+      </td>
       <td style={{ ...tdStyle, paddingLeft: indent }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {mainImage ? (
