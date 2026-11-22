@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { Prisma } from '@prisma/client';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
@@ -12,6 +13,19 @@ import { generateUniqueArticle } from '../lib/article.js';
 const router = Router();
 import { uploadsRoot, tenantUploadPrefix, tenantContext } from '../lib/tenant.js';
 import { shopDirFor, shopUrlPrefix, moveEntry } from '../lib/shop-dir.js';
+
+// Колонки флагов вида цены вне схемы Prisma — имя колонки только из белого списка,
+// значение и id передаются bind-параметрами (защита от SQL-инъекций вместо
+// интерполяции строк в $executeRawUnsafe)
+const PRICE_TYPE_FLAG_COLUMNS = new Set(['for_vitrine', 'for_vk', 'for_ozon', 'for_wb', 'is_retail', 'for_cashless']);
+async function setPriceTypeFlag(column: string, id: string, value: boolean) {
+  if (!PRICE_TYPE_FLAG_COLUMNS.has(column)) throw new Error(`Неизвестная колонка флага: ${column}`);
+  await prisma.$executeRaw`UPDATE price_types SET ${Prisma.raw(column)} = ${value} WHERE id = ${id}`;
+}
+async function resetPriceTypeFlag(column: string) {
+  if (!PRICE_TYPE_FLAG_COLUMNS.has(column)) throw new Error(`Неизвестная колонка флага: ${column}`);
+  await prisma.$executeRaw`UPDATE price_types SET ${Prisma.raw(column)} = false`;
+}
 
 // Кэш отправлений OZON для виджета «Самые продаваемые» — выборка из кабинета идёт до 50 запросов, кэшируем на 10 минут.
 // Строго по тенантам: у каждой организации (и у главного домена) свой кабинет OZON и свои отправления.
@@ -209,7 +223,11 @@ async function recalcCategoryPaths(rootId: string): Promise<void> {
 // Подмешивает в цены товаров флаг «от» (колонка price_from вне схемы Prisma — как for_vitrine)
 async function withPriceFrom<T extends { prices?: any[] }>(products: T[]): Promise<T[]> {
   if (!products.length) return products;
-  const rows = await prisma.$queryRawUnsafe(`SELECT id, price_from FROM product_prices`) as any[];
+  // Только цены показываемых товаров — без полного скана product_prices
+  const priceIds = products.flatMap((p) => (p.prices || []).map((pr: any) => pr?.id).filter(Boolean));
+  if (!priceIds.length) return products;
+  const rows = await prisma.$queryRaw<{ id: string; price_from: boolean | null }[]>`
+    SELECT id, price_from FROM product_prices WHERE id IN (${Prisma.join(priceIds)})`;
   const flags = new Map(rows.map((r) => [r.id as string, !!r.price_from]));
   for (const p of products) {
     if (p.prices) p.prices = p.prices.map((pr: any) => ({ ...pr, priceFrom: flags.get(pr.id) ?? false }));
@@ -331,14 +349,14 @@ router.post('/meta/price-types', async (req, res) => {
     const priceType = await prisma.priceType.create({
       data: { name: name.trim(), label: label.trim(), color: color || '#f0f0f0', sortOrder: sortOrder ?? count + 1 },
     });
-    if (forVitrine) await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = true WHERE id = '${priceType.id}'`);
-    if (isRetail) await prisma.$executeRawUnsafe(`UPDATE price_types SET is_retail = true WHERE id = '${priceType.id}'`);
-    if (forCashless) await prisma.$executeRawUnsafe(`UPDATE price_types SET for_cashless = true WHERE id = '${priceType.id}'`);
-    if (forVk) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = true WHERE id = '${priceType.id}'`); }
+    if (forVitrine) await setPriceTypeFlag('for_vitrine', priceType.id, true);
+    if (isRetail) await setPriceTypeFlag('is_retail', priceType.id, true);
+    if (forCashless) await setPriceTypeFlag('for_cashless', priceType.id, true);
+    if (forVk) { await resetPriceTypeFlag('for_vk'); await setPriceTypeFlag('for_vk', priceType.id, true); }
     // опция «Ozon»: эксклюзивный флаг — отмеченным может быть только один вид цен
-    if (forOzon) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_ozon = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_ozon = true WHERE id = '${priceType.id}'`); }
+    if (forOzon) { await resetPriceTypeFlag('for_ozon'); await setPriceTypeFlag('for_ozon', priceType.id, true); }
     // опция «WB»: эксклюзивный флаг — отмеченным может быть только один вид цен
-    if (forWb) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_wb = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_wb = true WHERE id = '${priceType.id}'`); }
+    if (forWb) { await resetPriceTypeFlag('for_wb'); await setPriceTypeFlag('for_wb', priceType.id, true); }
     res.status(201).json(priceType);
   } catch (err: any) {
     if (err.code === 'P2002') return res.status(400).json({ error: 'Такой вид цены уже есть' });
@@ -362,28 +380,27 @@ router.patch('/meta/price-types/:id', async (req, res) => {
     if (isActive !== undefined) data.isActive = !!isActive;
     if (sortOrder !== undefined) data.sortOrder = Number(sortOrder);
     if (req.body.isRetail !== undefined) {
-      await prisma.$executeRawUnsafe(`UPDATE price_types SET is_retail = ${req.body.isRetail ? 'true' : 'false'} WHERE id = '${req.params.id}'`);
+      await setPriceTypeFlag('is_retail', req.params.id, !!req.body.isRetail);
     }
     if (req.body.forCashless !== undefined) {
-      await prisma.$executeRawUnsafe(`UPDATE price_types SET for_cashless = ${req.body.forCashless ? 'true' : 'false'} WHERE id = '${req.params.id}'`);
+      await setPriceTypeFlag('for_cashless', req.params.id, !!req.body.forCashless);
     }
     if (req.body.forVitrine !== undefined) {
-      if (req.body.forVitrine) await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = true WHERE id = '${req.params.id}'`);
-      else await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vitrine = false WHERE id = '${req.params.id}'`);
+      await setPriceTypeFlag('for_vitrine', req.params.id, !!req.body.forVitrine);
     }
     if (req.body.forVk !== undefined) {
-      if (req.body.forVk) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = true WHERE id = '${req.params.id}'`); }
-      else await prisma.$executeRawUnsafe(`UPDATE price_types SET for_vk = false WHERE id = '${req.params.id}'`);
+      if (req.body.forVk) { await resetPriceTypeFlag('for_vk'); await setPriceTypeFlag('for_vk', req.params.id, true); }
+      else await setPriceTypeFlag('for_vk', req.params.id, false);
     }
     // опция «Ozon»: эксклюзивный флаг — при включении снимаем с остальных видов цен
     if (req.body.forOzon !== undefined) {
-      if (req.body.forOzon) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_ozon = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_ozon = true WHERE id = '${req.params.id}'`); }
-      else await prisma.$executeRawUnsafe(`UPDATE price_types SET for_ozon = false WHERE id = '${req.params.id}'`);
+      if (req.body.forOzon) { await resetPriceTypeFlag('for_ozon'); await setPriceTypeFlag('for_ozon', req.params.id, true); }
+      else await setPriceTypeFlag('for_ozon', req.params.id, false);
     }
     // опция «WB»: эксклюзивный флаг — при включении снимаем с остальных видов цен
     if (req.body.forWb !== undefined) {
-      if (req.body.forWb) { await prisma.$executeRawUnsafe(`UPDATE price_types SET for_wb = false`); await prisma.$executeRawUnsafe(`UPDATE price_types SET for_wb = true WHERE id = '${req.params.id}'`); }
-      else await prisma.$executeRawUnsafe(`UPDATE price_types SET for_wb = false WHERE id = '${req.params.id}'`);
+      if (req.body.forWb) { await resetPriceTypeFlag('for_wb'); await setPriceTypeFlag('for_wb', req.params.id, true); }
+      else await setPriceTypeFlag('for_wb', req.params.id, false);
     }
     const priceType = await prisma.priceType.update({ where: { id: req.params.id }, data });
     res.json(priceType);

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
@@ -19,10 +20,14 @@ const productInclude = {
 
 // Флаги цен «на витрине» и «цена от» — raw-запросами (колонок for_vitrine и
 // price_from нет в схеме Prisma, добавляются напрямую в БД).
-async function loadPriceFlags() {
+// price_from подгружаем только для цен показываемых товаров — без полного скана product_prices.
+async function loadPriceFlags(priceIds: string[]) {
   const [vitrineRows, priceFromRows] = await Promise.all([
     prisma.$queryRawUnsafe(`SELECT id FROM price_types WHERE for_vitrine = true`) as Promise<any[]>,
-    prisma.$queryRawUnsafe(`SELECT id, price_from FROM product_prices`) as Promise<any[]>,
+    priceIds.length
+      ? prisma.$queryRaw<{ id: string; price_from: boolean | null }[]>`
+          SELECT id, price_from FROM product_prices WHERE id IN (${Prisma.join(priceIds)})`
+      : Promise.resolve([] as { id: string; price_from: boolean | null }[]),
   ]);
   return {
     vitrineIds: new Set((vitrineRows as any[]).map((r) => r.id as string)),
@@ -55,7 +60,10 @@ async function groupsWithItems(ownerId: string) {
     orderBy: { createdAt: 'asc' },
     include: { items: { orderBy: { createdAt: 'asc' }, include: { product: { include: productInclude } } } },
   });
-  const flags = await loadPriceFlags();
+  const priceIds = groups.flatMap((g) =>
+    g.items.flatMap((it) => (it.product?.prices || []).map((pr: any) => pr.id).filter(Boolean)),
+  );
+  const flags = await loadPriceFlags(priceIds);
   return groups.map((g) => annotateGroup(g, flags));
 }
 
@@ -190,7 +198,8 @@ router.get('/shared/:token', async (req: AuthRequest, res) => {
       ...sharedGroupInclude,
     });
     if (!group) return res.status(404).json({ error: 'Ссылка недействительна или устарела' });
-    const flags = await loadPriceFlags();
+    const priceIds = group.items.flatMap((it) => (it.product?.prices || []).map((pr: any) => pr.id).filter(Boolean));
+    const flags = await loadPriceFlags(priceIds);
     res.json({ ...annotateGroup(group, flags), sharedByName: group.owner.name });
   } catch (err: any) {
     console.error('[favorites:shared]', err);
