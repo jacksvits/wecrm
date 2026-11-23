@@ -242,7 +242,7 @@ router.get('/summary', async (req, res) => {
     const ids = requestedCounter || counters.join(',');
     const prevDate2 = shiftDay(date1, -1);
     const prevDate1 = shiftDay(prevDate2, -(days - 1));
-    const cacheKey = `summary:${tenantKey()}:${ids}:${date1}:${date2}`;
+    const cacheKey = `summary:${tenantKey()}:${requestedCounter || 'all'}:${ids}:${date1}:${date2}`;
     const refresh = req.query.refresh === '1';
     if (!refresh) {
       const cached = getCached(cacheKey);
