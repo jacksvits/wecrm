@@ -1056,7 +1056,7 @@ export function Director() {
             ))}
           </div>
           <button
-            onClick={() => setShowWidgetSettings(true)}
+            onClick={() => setShowWidgetSettings((visible) => !visible)}
             style={{
               padding: "6px 12px",
               borderRadius: 8,
