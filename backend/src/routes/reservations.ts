@@ -241,10 +241,14 @@ router.post('/:id/share', async (req: any, res) => {
       task = await prisma.task.findFirst({ where: { ticketNumber: parseInt(String(taskId), 10) }, select: { id: true } });
     }
     if (!task) return res.status(404).json({ error: `Задача с номером «${taskId}» не найдена` });
-    const r = await prisma.reservation.findUnique({ where: { id: req.params.id }, include: { contact: true } });
+    const r = await prisma.reservation.findUnique({ where: { id: req.params.id }, include: { contact: true, items: { include: { product: true } } } });
     if (!r) return res.status(404).json({ error: 'Резерв не найден' });
     const statusLabel = r.status === 'held' ? 'Отложено' : r.status === 'issued' ? 'Выдано' : r.status === 'paid' ? 'Оплачен' : r.status === 'completed' ? 'Завершён (списан)' : 'Отменено';
-    const text = `Резерв №${r.number} — ${r.contact.name} на сумму ${r.total.toFixed(2)} ₽ (${statusLabel}).`;
+    // Позиции резерва: без названий товара менеджер не видит, что именно отложено
+    const itemsLine = r.items.length
+      ? `\n${r.items.length === 1 ? 'Товар' : 'Товары'}: ${r.items.map((it: any) => `${it.product?.name || '—'} (${it.quantity} шт. × ${it.price.toFixed(2)} ₽)`).join(', ')}`
+      : '';
+    const text = `Резерв №${r.number} — ${r.contact.name} на сумму ${r.total.toFixed(2)} ₽ (${statusLabel}).${itemsLine}`;
     const comment = await prisma.comment.create({
       data: { taskId: task.id, authorId: req.user?.id, content: text },
     });
