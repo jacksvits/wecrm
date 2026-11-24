@@ -225,7 +225,7 @@ router.get('/:id/pdf', async (req, res) => {
   if (!r) return res.status(404).json({ error: 'Резерв не найден' });
   // Счёт на оплату по бланку: реквизиты тенанта (Настройки → Реквизиты) + покупатель из контакта
   const requisites = await prisma.organizationRequisites.findFirst();
-  const doc = buildInvoicePdf(r as any, requisites as any);
+  const doc = await buildInvoicePdf(r as any, requisites as any);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="schet-We-${r.number}.pdf"`);
   doc.pipe(res);
