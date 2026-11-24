@@ -195,10 +195,20 @@ function splitVkPrefix(content: string): { prefix: string; body: string } {
 // добавляем при сохранении: префиксы «Мы (ВК): » / «[Имя](url):», счётчик
 // «[N влож.]», заглушки для сообщений без текста
 function stripVkDecorations(content: string): string {
-  let t = splitVkPrefix(content).body;
+  let t = splitVkPrefix(content).body
+    .replace(/\n\n\[💬 Переписка в ВК\]\([^)]+\)\s*$/, '')
+    .replace(/\s*\[\d+ влож\.\]\s*$/, '');
   if (t === '📎 Вложение из ВК' || t === '📎 Вложение из ВК (исходящее)') t = '';
-  return t.replace(/\s*\[\d+ влож\.\]\s*$/, '').trim();
+  return t.trim();
 }
+
+// Ссылка на диалог с клиентом в сообщениях сообщества ВК
+function vkDialogUrl(groupId: number, peerId: number | bigint): string {
+  return `https://vk.com/gim${groupId}?sel=${peerId}`;
+}
+
+// Маркер ссылки на переписку в первом сообщении задачи из ВК
+const VK_DIALOG_LINK_RE = /\n\n\[💬 Переписка в ВК\]\([^)]+\)\s*$/;
 
 // Блокировки правок по id сообщения ВК: webhook (Callback API) и воркер
 // (история диалогов) работают параллельно — без блокировки одна правка
@@ -224,9 +234,10 @@ async function syncVkMessageEdit(comment: any, msg: VkMessage) {
 
     const suffix = msg.attachments?.length ? ` [${msg.attachments.length} влож.]` : '';
     const { prefix } = splitVkPrefix(actual.content);
+    const dialogLink = actual.content.match(VK_DIALOG_LINK_RE)?.[0] || '';
     // prefix + freshText гарантированно сходится: при следующем сравнении
     // stripVkDecorations вернёт ровно freshText
-    const newContent = prefix + freshText + suffix;
+    const newContent = prefix + freshText + suffix + dialogLink;
 
     await prisma.comment.update({
       where: { id: actual.id },
@@ -469,9 +480,11 @@ export async function processVkMessage(msg: VkMessage, settings: any) {
       const senderName = contact?.name || `VK ${fromId}`;
       const contactUrl = contactId ? `https://welans.cc/contacts/${contactId}` : null;
       const authorLink = contactUrl ? `[${senderName}](${contactUrl})` : senderName;
-      const firstMessageText = isOutgoing
+      // Под первым сообщением — ссылка на переписку с клиентом в сообщениях сообщества
+      const dialogLink = `\n\n[💬 Переписка в ВК](${vkDialogUrl(settings.groupId, fromId)})`;
+      const firstMessageText = (isOutgoing
         ? (text ? `Мы (ВК): ${text}` : '📎 Вложение из ВК (исходящее)')
-        : (text ? `${authorLink}:\n${text}` : '📎 Вложение из ВК');
+        : (text ? `${authorLink}:\n${text}` : '📎 Вложение из ВК')) + dialogLink;
       const firstComment = await prisma.comment.create({
         data: {
           content: firstMessageText,
