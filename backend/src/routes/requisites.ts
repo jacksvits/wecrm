@@ -156,6 +156,39 @@ async function lookupInnPb(inn: string, signal: AbortSignal): Promise<InnLookupR
   }
 }
 
+// === Подстановка банка по БИК: справочник ЦБ РФ (cbr.ru, кэш 24 ч) ===
+// Справочник БИК ЦБ содержит наименование и ИНН банка; корсчёт в нём отсутствует.
+let bicCache: { xml: string; at: number } | null = null;
+
+async function lookupBik(bik: string): Promise<{ bankName?: string; bankInn?: string }> {
+  if (!bicCache || Date.now() - bicCache.at > 24 * 60 * 60 * 1000) {
+    const res = await fetch('https://www.cbr.ru/scripts/XML_bic.asp');
+    if (!res.ok) throw new Error(`Справочник ЦБ недоступен (${res.status})`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    // Справочник отдаётся в windows-1251
+    bicCache = { xml: new TextDecoder('windows-1251').decode(buf), at: Date.now() };
+  }
+  const re = new RegExp(`<Record[^>]*>[^]*?<Bic>${bik}</Bic>[^]*?</Record>`);
+  const m = bicCache.xml.match(re);
+  if (!m) throw new Error('Банк с таким БИК не найден');
+  const name = m[0].match(/<ShortName>([^<]*)<\/ShortName>/)?.[1]?.trim();
+  const inn = m[0].match(/<Inn>([^<]*)<\/Inn>/)?.[1]?.trim();
+  if (!name) throw new Error('Банк с таким БИК не найден');
+  return { bankName: name, bankInn: inn || undefined };
+}
+
+router.get('/bik-lookup', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const bik = String(req.query.bik || '').replace(/\D/g, '');
+    if (bik.length !== 9) {
+      return res.status(400).json({ error: 'БИК должен содержать 9 цифр' });
+    }
+    res.json(await lookupBik(bik));
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Не удалось получить данные из справочника ЦБ' });
+  }
+});
+
 router.get('/inn-lookup', authMiddleware, adminOnly, async (req, res) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 25000);

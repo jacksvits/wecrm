@@ -535,6 +535,7 @@ promoBlocks: { list: (): Promise<PromoBlock[]> => fetchApi('/api/promo-blocks'),
     get: (): Promise<Record<string, string>> => fetchApi('/api/requisites'),
     save: (data: Record<string, string>) => fetchApi('/api/requisites', { method: 'PUT', body: JSON.stringify(data) }),
     innLookup: (inn: string): Promise<Record<string, string>> => fetchApi(`/api/requisites/inn-lookup?inn=${encodeURIComponent(inn)}`),
+    bikLookup: (bik: string): Promise<Record<string, string>> => fetchApi(`/api/requisites/bik-lookup?bik=${encodeURIComponent(bik)}`),
   },
 
   // Публичные юридические документы (доступны до авторизации; запись — только admin)

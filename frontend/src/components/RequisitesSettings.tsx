@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 
 // Под-вкладка «Реквизиты» (Настройки → Системные): реквизиты организации для подстановки в документы
@@ -44,6 +44,9 @@ export function RequisitesSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [bikLoading, setBikLoading] = useState(false);
+  // Последний БИК, по которому уже выполнялся запрос (чтобы не дёргать API на повторный blur)
+  const lastBikLookup = useRef<string>("");
 
   useEffect(() => {
     api.requisites
@@ -64,6 +67,23 @@ export function RequisitesSettings() {
       alert("Ошибка: " + e.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const fillByBik = async () => {
+    const bik = data.bik.replace(/\D/g, "");
+    if (bik.length !== 9) {
+      alert("Введите БИК (9 цифр)");
+      return;
+    }
+    setBikLoading(true);
+    try {
+      const r: Record<string, string> = await api.requisites.bikLookup(bik);
+      setData((d) => ({ ...d, bik, bankName: r.bankName || d.bankName }));
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    } finally {
+      setBikLoading(false);
     }
   };
 
@@ -124,8 +144,9 @@ export function RequisitesSettings() {
     <div>
       <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 14 }}>
         Реквизиты организации подставляются в документы (оферту, счета, договоры). По ИНН можно автоматически
-        получить наименование, ОГРН/ОГРНИП и юридический адрес из открытых данных ФНС. Банковские реквизиты в
-        открытом доступе не публикуются — заполните их вручную.
+        получить наименование, ОГРН/ОГРНИП и юридический адрес из открытых данных ФНС. Наименование банка
+        подставляется по БИК из справочника ЦБ (автоматически при вводе или кнопкой «Заполнить по БИК»).
+        Корреспондентский счёт в открытых справочниках не публикуется — заполните его вручную.
       </p>
 
       <div style={cardStyle}>
@@ -136,6 +157,7 @@ export function RequisitesSettings() {
               <input
                 value={data[f.key]}
                 onChange={(e) => set(f.key, e.target.value)}
+                onBlur={f.key === "bik" ? () => { const b = data.bik.replace(/\D/g, ""); if (b.length === 9 && b !== lastBikLookup.current) { lastBikLookup.current = b; fillByBik(); } } : undefined}
                 style={{ ...inputStyle, fontFamily: f.mono ? "ui-monospace, monospace" : undefined }}
               />
             </div>
@@ -174,6 +196,22 @@ export function RequisitesSettings() {
             }}
           >
             {lookupLoading ? "Запрос в ФНС..." : "Заполнить по ИНН"}
+          </button>
+          <button
+            onClick={fillByBik}
+            disabled={bikLoading}
+            title="Получить наименование банка из справочника ЦБ по указанному БИК (подставляется также при уходе из поля «БИК»)"
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              background: "transparent",
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border-color)",
+              cursor: "pointer",
+              fontSize: 14,
+            }}
+          >
+            {bikLoading ? "Запрос в ЦБ..." : "Заполнить по БИК"}
           </button>
         </div>
       </div>
