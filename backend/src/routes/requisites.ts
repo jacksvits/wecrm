@@ -168,11 +168,12 @@ async function lookupBik(bik: string): Promise<{ bankName?: string; bankInn?: st
     // Справочник отдаётся в windows-1251
     bicCache = { xml: new TextDecoder('windows-1251').decode(buf), at: Date.now() };
   }
-  const re = new RegExp(`<Record[^>]*>[^]*?<Bic>${bik}</Bic>[^]*?</Record>`);
-  const m = bicCache.xml.match(re);
-  if (!m) throw new Error('Банк с таким БИК не найден');
-  const name = m[0].match(/<ShortName>([^<]*)<\/ShortName>/)?.[1]?.trim();
-  const inn = m[0].match(/<Inn>([^<]*)<\/Inn>/)?.[1]?.trim();
+  // Разбираем справочник по записям, ищем запись с точным совпадением БИК
+  const records = bicCache.xml.match(/<Record[^>]*>[^]*?<\/Record>/g) || [];
+  const rec = records.find((r) => r.includes(`<Bic>${bik}</Bic>`));
+  if (!rec) throw new Error('Банк с таким БИК не найден');
+  const name = rec.match(/<ShortName>([^<]*)<\/ShortName>/)?.[1]?.trim();
+  const inn = rec.match(/<Inn>([^<]*)<\/Inn>/)?.[1]?.trim();
   if (!name) throw new Error('Банк с таким БИК не найден');
   return { bankName: name, bankInn: inn || undefined };
 }
