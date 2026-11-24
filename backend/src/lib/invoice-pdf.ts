@@ -192,8 +192,10 @@ export function buildInvoicePdf(
   let y = 116;
   const yBankEnd = y + 32;
   const yInnEnd = yBankEnd + 16;
-  const yPolEnd = yInnEnd + 18;
-  const yNazEnd = yPolEnd + 18; // совпадает с низом правого блока (116+84)
+  const yPolEnd = yInnEnd + 20;
+  const yNazEnd = yPolEnd + 20; // низ таблицы (88pt)
+  const yBlock = yInnEnd; // правая секция: блок из 3 строк ниже двух «Сч. №»
+  const blockRow = (yNazEnd - yBlock) / 3;
 
   doc.lineWidth(0.6).strokeColor('#111');
   // внешняя рамка и горизонтали
@@ -202,15 +204,15 @@ export function buildInvoicePdf(
   doc.moveTo(L, yInnEnd).lineTo(R, yInnEnd).stroke();
   doc.moveTo(L, yPolEnd).lineTo(X, yPolEnd).stroke(); // только левая секция («Назначение платежа»)
   doc.moveTo(X, y + 16).lineTo(R, y + 16).stroke(); // БИК
-  doc.moveTo(X, yPolEnd).lineTo(R, yPolEnd).stroke();
-  doc.moveTo(X, yPolEnd + 12).lineTo(R, yPolEnd + 12).stroke(); // Наз. пл.
-  doc.moveTo(X, yPolEnd + 24).lineTo(R, yPolEnd + 24).stroke(); // Код
+  doc.moveTo(X, yBlock).lineTo(R, yBlock).stroke();
+  doc.moveTo(X, yBlock + blockRow).lineTo(R, yBlock + blockRow).stroke(); // Наз. пл.
+  doc.moveTo(X, yBlock + 2 * blockRow).lineTo(R, yBlock + 2 * blockRow).stroke(); // Код
   // вертикали
   doc.moveTo(X, y).lineTo(X, yNazEnd).stroke();
   doc.moveTo(120, yBankEnd).lineTo(120, yInnEnd).stroke(); // ИНН | КПП
   doc.moveTo(XL, y).lineTo(XL, yNazEnd).stroke();
-  doc.moveTo(XM, yPolEnd).lineTo(XM, yNazEnd).stroke();
-  doc.moveTo(XR, yPolEnd).lineTo(XR, yNazEnd).stroke();
+  doc.moveTo(XM, yBlock).lineTo(XM, yNazEnd).stroke();
+  doc.moveTo(XR, yBlock).lineTo(XR, yNazEnd).stroke();
 
   // подпись поля (мелкая)
   const labTop = (x: number, yy: number, s: string | null | undefined, wdt = 90) =>
@@ -223,14 +225,14 @@ export function buildInvoicePdf(
   doc.font('reg').fontSize(8.5).fillColor('#111').text(v(req?.inn) || '—', L + 2, yBankEnd + 7.5, { width: 66, lineGap: 0 });
   labTop(122, yBankEnd, 'КПП', X - 122);
   doc.font('reg').fontSize(9).fillColor('#111').text(v(req?.fullName) || '—', L + 2, yInnEnd + 2.5, { width: X - L - 4, lineGap: 0 });
-  labTop(L, yInnEnd + 11, 'Получатель');
+  labTop(L, yInnEnd + 10.5, 'Получатель');
   doc.font('reg').fontSize(9.5).fillColor('#111').text(
     `Оплата заказа клиента №We-${r.number} от ${dateShort(billDate)}`,
     L + 2,
-    yPolEnd + 2.5,
+    yPolEnd + 2,
     { width: X - L - 4, lineGap: 0 },
   );
-  labTop(L, yPolEnd + 11.5, 'Назначение платежа');
+  labTop(L, yPolEnd + 12, 'Назначение платежа');
 
   // правая секция: БИК и счета (подпись сверху, значение под ней)
   labTop(X, y, 'БИК');
@@ -240,15 +242,17 @@ export function buildInvoicePdf(
   labTop(X, yBankEnd, 'Сч. №');
   doc.font('reg').fontSize(9).fillColor('#111').text(v(req?.account) || '—', XL + 2, yBankEnd + 4, { width: R - XL - 4, lineGap: 0 });
   // три строки «Вид оп.» / «Наз. пл.» / «Код» с подколонкой «Срок плат.» / «Очер. плат.» / «Рез. поле»
-  labTop(X, yPolEnd, 'Вид оп.');
-  doc.font('reg').fontSize(9).fillColor('#111').text('01', XL + 2, yPolEnd + 2, { width: XM - XL - 2, lineGap: 0 });
-  labTop(XM, yPolEnd, 'Срок плат.', XR - XM);
-  labTop(X, yPolEnd + 12, 'Наз. пл.');
-  labTop(XM, yPolEnd + 12, 'Очер. плат.', XR - XM);
-  doc.font('reg').fontSize(9).fillColor('#111').text('5', XR + 2, yPolEnd + 14, { width: R - XR - 4, align: 'center', lineGap: 0 });
-  labTop(X, yPolEnd + 24, 'Код');
-  doc.font('reg').fontSize(7.5).fillColor('#111').text(`3К261100WE ${String(r.number).padStart(10, '0')}`, XL + 2, yPolEnd + 25.5, { width: XM - XL - 2, lineGap: 0 });
-  labTop(XM, yPolEnd + 24, 'Рез. поле', XR - XM);
+  const r1 = yBlock + blockRow;
+  const r2 = yBlock + 2 * blockRow;
+  labTop(X, yBlock, 'Вид оп.');
+  doc.font('reg').fontSize(9).fillColor('#111').text('01', XL + 2, yBlock + 2, { width: XM - XL - 2, lineGap: 0 });
+  labTop(XM, yBlock, 'Срок плат.', XR - XM);
+  labTop(X, r1, 'Наз. пл.');
+  labTop(XM, r1, 'Очер. плат.', XR - XM);
+  doc.font('reg').fontSize(9).fillColor('#111').text('5', XR + 2, r1 + 2.2, { width: R - XR - 4, align: 'center', lineGap: 0 });
+  labTop(X, r2, 'Код');
+  doc.font('reg').fontSize(7.5).fillColor('#111').text(`3К261100WE ${String(r.number).padStart(10, '0')}`, XL + 2, r2 + 2.6, { width: XM - XL - 2, lineGap: 0 });
+  labTop(XM, r2, 'Рез. поле', XR - XM);
 
   // === Заголовок ===
   y = yNazEnd + 14;
