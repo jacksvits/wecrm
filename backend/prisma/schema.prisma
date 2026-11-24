@@ -1878,6 +1878,24 @@ model AutoReplyTrigger {
 
 // Публичные юридические документы: договор оферты и политика конфиденциальности
 // Хранятся одной строкой (singleton) и редактируются администратором через WYSIWYG
+// Реквизиты организации (Настройки → Системные → Реквизиты) — для подстановки в документы
+model OrganizationRequisites {
+  id           Int      @id @default(1)
+  fullName     String   @default("")
+  inn          String   @default("")
+  ogrn         String   @default("")
+  bankName     String   @default("")
+  bik          String   @default("")
+  account      String   @default("")
+  corrAccount  String   @default("")
+  legalAddress String   @default("")
+  actualAddress String  @default("")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("organization_requisites")
+}
+
 model LegalDocument {
   id        Int      @id @default(1)
   offer     String   @default("")

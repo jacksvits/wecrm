@@ -530,6 +530,13 @@ promoBlocks: { list: (): Promise<PromoBlock[]> => fetchApi('/api/promo-blocks'),
     reconciliationUnmatch: (documentId: string) => fetchApi('/api/accounting/reconciliation/unmatch', { method: 'POST', body: JSON.stringify({ documentId }) }),
   },
 
+  // Реквизиты организации (Настройки → Системные → Реквизиты)
+  requisites: {
+    get: (): Promise<Record<string, string>> => fetchApi('/api/requisites'),
+    save: (data: Record<string, string>) => fetchApi('/api/requisites', { method: 'PUT', body: JSON.stringify(data) }),
+    innLookup: (inn: string): Promise<Record<string, string>> => fetchApi(`/api/requisites/inn-lookup?inn=${encodeURIComponent(inn)}`),
+  },
+
   // Публичные юридические документы (доступны до авторизации; запись — только admin)
   legal: {
     get: (slug: 'offer' | 'privacy' | 'cookies'): Promise<{ slug: string; title: string; content: string; updatedAt: string | null }> => fetchApi(`/api/legal/${slug}`),

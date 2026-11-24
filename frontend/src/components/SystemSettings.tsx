@@ -12,6 +12,7 @@ import AdBlocks from "./AdBlocks";
 import LoginSlides from "./LoginSlides";
 import { CallHistory } from "./CallHistory";
 import { SeoSettings } from "./SeoSettings";
+import { RequisitesSettings } from "./RequisitesSettings";
 import { MenuLinksSettings } from "./MenuLinksSettings";
 import { HeaderMenuSettings } from "./HeaderMenuSettings";
 import { safeHtml } from '../lib/safeHtml';
@@ -40,7 +41,7 @@ const TAB_CONFIGS = [
   { key: "games", label: "Игры", defaultPath: "/volume3/GAME" },
 ];
 
-type SystemSubTab = "design" | "themes" | "storage" | "promo" | "ads" | "slides" | "calls" | "handler" | "autoreply" | "legal" | "seo" | "menu";
+type SystemSubTab = "design" | "themes" | "storage" | "promo" | "ads" | "slides" | "calls" | "handler" | "autoreply" | "legal" | "requisites" | "seo" | "menu";
 type MenuSection = "auth" | "header";
 
 export function SystemSettings() {
@@ -1608,6 +1609,9 @@ export function SystemSettings() {
         {catalogAllowed && (<button style={subTabStyle(subTab === "legal")} onClick={() => setSubTab("legal")}>
           Документы
         </button>)}
+        <button style={subTabStyle(subTab === "requisites")} onClick={() => setSubTab("requisites")}>
+          Реквизиты
+        </button>
         <button style={subTabStyle(subTab === "seo")} onClick={() => setSubTab("seo")}>
           SEO
         </button>
@@ -1616,7 +1620,7 @@ export function SystemSettings() {
         </button>
       </div>
 
-      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "ads" ? <AdBlocks /> : subTab === "slides" ? <LoginSlides /> : subTab === "calls" ? <CallHistory /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : subTab === "seo" ? <SeoSettings /> : subTab === "menu" ? renderMenuSection() : renderLegal()}
+      {subTab === "design" ? renderDesign() : subTab === "themes" ? renderThemes() : subTab === "storage" ? renderStorage() : subTab === "promo" ? <PromoBlocks /> : subTab === "ads" ? <AdBlocks /> : subTab === "slides" ? <LoginSlides /> : subTab === "calls" ? <CallHistory /> : subTab === "handler" ? renderHandler() : subTab === "autoreply" ? renderAutoReply() : subTab === "seo" ? <SeoSettings /> : subTab === "requisites" ? <RequisitesSettings /> : subTab === "menu" ? renderMenuSection() : renderLegal()}
     </div>
   );
 }

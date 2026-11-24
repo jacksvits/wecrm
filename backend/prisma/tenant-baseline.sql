@@ -1083,6 +1083,26 @@ CREATE TABLE public.onec_sync_lock (
 );
 
 
+
+--
+-- Name: organization_requisites; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_requisites (
+    id integer DEFAULT 1 NOT NULL,
+    "fullName" text DEFAULT ''::text NOT NULL,
+    inn text DEFAULT ''::text NOT NULL,
+    ogrn text DEFAULT ''::text NOT NULL,
+    "bankName" text DEFAULT ''::text NOT NULL,
+    bik text DEFAULT ''::text NOT NULL,
+    account text DEFAULT ''::text NOT NULL,
+    "corrAccount" text DEFAULT ''::text NOT NULL,
+    "legalAddress" text DEFAULT ''::text NOT NULL,
+    "actualAddress" text DEFAULT ''::text NOT NULL,
+    created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp(3) without time zone NOT NULL
+);
+
 --
 -- Name: ozon_seller_settings; Type: TABLE; Schema: public; Owner: -
 --
@@ -5535,6 +5555,7 @@ INSERT INTO public._prisma_migrations VALUES ('d93b9e04-2a78-4941-b7d2-b87506d46
 -- Data for Name: _prisma_migrations; Type: TABLE DATA; Schema: public; Owner: -
 --
 
+INSERT INTO public._prisma_migrations VALUES ('7d2e9b4a-1c3f-4a8d-b2e5-6f0a1c3d5e78', 'c1b969021850c5476070a5b0e8f8b9a981cf5c02c545e7f7aa10eaf0f426bf98', '2026-11-24 08:30:00+00', '20261124083000_organization_requisites', NULL, NULL, '2026-11-24 08:30:00+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('8f4c2a91-3b7d-4e5f-9c1a-2d8e6f0a4b55', 'f95e762bc00b1c661244bd81d2d3790e97ff0af341c31b5ba239151d126f3238', '2026-11-23 22:55:00+00', '20261123225500_comment_edited_at', NULL, NULL, '2026-11-23 22:55:00+00', 1);
 
 
