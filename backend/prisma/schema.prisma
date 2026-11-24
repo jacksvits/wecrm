@@ -1890,6 +1890,9 @@ model OrganizationRequisites {
   corrAccount  String   @default("")
   legalAddress String   @default("")
   actualAddress String  @default("")
+  // Система налогообложения и ставка НДС для итогов документов (счетов)
+  taxSystem    String   @default("osno")
+  vatRate      String   @default("none")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

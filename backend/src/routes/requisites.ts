@@ -15,7 +15,12 @@ const adminOnly = (req: AuthRequest, res: any, next: any) => {
 // Поля реквизитов, возвращаемые/принимаемые эндпоинтами
 const FIELDS = [
   'fullName', 'inn', 'ogrn', 'bankName', 'bik', 'account', 'corrAccount', 'legalAddress', 'actualAddress',
+  'taxSystem', 'vatRate',
 ] as const;
+
+// Допустимые значения — зеркало списков в RequisitesSettings.tsx и invoice-pdf.ts
+const TAX_SYSTEM_VALUES = ['osno', 'usn6', 'usn15', 'ausn8', 'ausn22', 'psn', 'npd4', 'npd6', 'esxhn'] as const;
+const VAT_RATE_VALUES = ['none', '5', '7', '10', '22'] as const;
 
 function toPlain(row: any) {
   const out: Record<string, string> = {};
@@ -39,6 +44,8 @@ const requisitesSchema = z.object({
   corrAccount: z.string().max(30).optional(),
   legalAddress: z.string().max(500).optional(),
   actualAddress: z.string().max(500).optional(),
+  taxSystem: z.enum(TAX_SYSTEM_VALUES).optional(),
+  vatRate: z.enum(VAT_RATE_VALUES).optional(),
 });
 
 router.put('/', authMiddleware, adminOnly, async (req, res) => {

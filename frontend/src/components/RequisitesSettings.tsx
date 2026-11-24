@@ -13,6 +13,8 @@ type Requisites = {
   corrAccount: string;
   legalAddress: string;
   actualAddress: string;
+  taxSystem: string;
+  vatRate: string;
 };
 
 const EMPTY: Requisites = {
@@ -25,6 +27,8 @@ const EMPTY: Requisites = {
   corrAccount: "",
   legalAddress: "",
   actualAddress: "",
+  taxSystem: "osno",
+  vatRate: "none",
 };
 
 const FIELDS: { key: keyof Requisites; label: string; hint?: string; half?: boolean; mono?: boolean }[] = [
@@ -37,6 +41,27 @@ const FIELDS: { key: keyof Requisites; label: string; hint?: string; half?: bool
   { key: "corrAccount", label: "Корреспондентский счёт", mono: true },
   { key: "legalAddress", label: "Юридический адрес" },
   { key: "actualAddress", label: "Физический адрес" },
+];
+
+// Системы налогообложения и ставки НДС для документов (счетов): зеркало backend/src/lib/invoice-pdf.ts
+const TAX_SYSTEMS = [
+  { value: "osno", label: "ОСНО" },
+  { value: "usn6", label: "УСН 6%" },
+  { value: "usn15", label: "УСН 15%" },
+  { value: "ausn8", label: "АУСН 8%" },
+  { value: "ausn22", label: "АУСН 22%" },
+  { value: "psn", label: "ПСН" },
+  { value: "npd4", label: "НПД 4%" },
+  { value: "npd6", label: "НПД 6%" },
+  { value: "esxhn", label: "ЕСХН" },
+];
+
+const VAT_RATES = [
+  { value: "none", label: "без НДС" },
+  { value: "5", label: "НДС 5%" },
+  { value: "7", label: "НДС 7%" },
+  { value: "10", label: "НДС 10%" },
+  { value: "22", label: "НДС 22%" },
 ];
 
 export function RequisitesSettings() {
@@ -139,6 +164,10 @@ export function RequisitesSettings() {
     outline: "none",
     boxSizing: "border-box",
   };
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle,
+    cursor: "pointer",
+  };
 
   return (
     <div>
@@ -162,6 +191,33 @@ export function RequisitesSettings() {
               />
             </div>
           ))}
+          {/* Система налогообложения и ставка НДС — итоги документов (счетов) считаются по этим параметрам */}
+          <div>
+            <label style={labelStyle}>Система налогообложения</label>
+            <select
+              value={data.taxSystem}
+              onChange={(e) => set("taxSystem", e.target.value)}
+              style={selectStyle}
+            >
+              {TAX_SYSTEMS.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Ставка НДС</label>
+            <select
+              value={data.vatRate}
+              onChange={(e) => set("vatRate", e.target.value)}
+              disabled={data.taxSystem !== "osno"}
+              title={data.taxSystem !== "osno" ? "НДС применяется только на ОСНО" : undefined}
+              style={{ ...selectStyle, opacity: data.taxSystem !== "osno" ? 0.6 : 1, cursor: data.taxSystem !== "osno" ? "not-allowed" : "pointer" }}
+            >
+              {VAT_RATES.map((v) => (
+                <option key={v.value} value={v.value}>{v.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 20, flexWrap: "wrap" }}>

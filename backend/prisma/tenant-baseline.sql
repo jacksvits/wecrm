@@ -1099,6 +1099,8 @@ CREATE TABLE public.organization_requisites (
     "corrAccount" text DEFAULT ''::text NOT NULL,
     "legalAddress" text DEFAULT ''::text NOT NULL,
     "actualAddress" text DEFAULT ''::text NOT NULL,
+    "taxSystem" text DEFAULT 'osno'::text NOT NULL,
+    "vatRate" text DEFAULT 'none'::text NOT NULL,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp(3) without time zone NOT NULL
 );
@@ -5555,6 +5557,7 @@ INSERT INTO public._prisma_migrations VALUES ('d93b9e04-2a78-4941-b7d2-b87506d46
 -- Data for Name: _prisma_migrations; Type: TABLE DATA; Schema: public; Owner: -
 --
 
+INSERT INTO public._prisma_migrations VALUES ('9a1f63c0-4e8b-4c7d-a1d2-3b5e7f9c0a41', '543b4bff62d4a7a415e6e8fedd05a30c484a8a024e80ffd036d0b03af2725a4f', '2026-11-24 12:00:00+00', '20261124120000_organization_requisites_tax', NULL, NULL, '2026-11-24 12:00:00+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('7d2e9b4a-1c3f-4a8d-b2e5-6f0a1c3d5e78', 'c1b969021850c5476070a5b0e8f8b9a981cf5c02c545e7f7aa10eaf0f426bf98', '2026-11-24 08:30:00+00', '20261124083000_organization_requisites', NULL, NULL, '2026-11-24 08:30:00+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('8f4c2a91-3b7d-4e5f-9c1a-2d8e6f0a4b55', 'f95e762bc00b1c661244bd81d2d3790e97ff0af341c31b5ba239151d126f3238', '2026-11-23 22:55:00+00', '20261123225500_comment_edited_at', NULL, NULL, '2026-11-23 22:55:00+00', 1);
 

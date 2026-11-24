@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { buildReservationPdf } from '../lib/reservation-pdf.js';
+import { buildInvoicePdf } from '../lib/invoice-pdf.js';
 import { createNotification } from '../lib/notifications.js';
 
 const router = Router();
@@ -223,9 +223,11 @@ router.get('/:id/pdf', async (req, res) => {
     include: { items: { include: { product: true } }, contact: true, warehouse: true, user: true },
   });
   if (!r) return res.status(404).json({ error: 'Резерв не найден' });
-  const doc = buildReservationPdf(r as any);
+  // Счёт на оплату по бланку: реквизиты тенанта (Настройки → Реквизиты) + покупатель из контакта
+  const requisites = await prisma.organizationRequisites.findFirst();
+  const doc = buildInvoicePdf(r as any, requisites as any);
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="reservation-${r.number}.pdf"`);
+  res.setHeader('Content-Disposition', `attachment; filename="schet-We-${r.number}.pdf"`);
   doc.pipe(res);
   doc.end();
 });
