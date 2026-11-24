@@ -2062,6 +2062,14 @@ export function TaskDetail() {
                           >
                             {formatCommentDateTime(pinnedComment.createdAt)}
                           </span>
+                          {pinnedComment.editedAt && (
+                            <span
+                              title={`Отредактировано: ${formatCommentDateTime(pinnedComment.editedAt)}`}
+                              style={{ fontSize: 11, color: "var(--text-muted)" }}
+                            >
+                              (ред.)
+                            </span>
+                          )}
                           <button
                             onClick={() => handleTogglePinComment(pinnedComment.id)}
                             title={pinnedComment.pinnedAt ? "Открепить сообщение" : "Закрепить сообщение"}
@@ -2278,7 +2286,18 @@ export function TaskDetail() {
                                 }}
                               >
                                 {formatCommentDateTime(c.createdAt)}
-                              </span>{" "}
+                              </span>
+                              {c.editedAt && (
+                                <span
+                                  title={`Отредактировано: ${formatCommentDateTime(c.editedAt)}`}
+                                  style={{
+                                    fontSize: 11,
+                                    color: isMe ? "rgba(255,255,255,0.75)" : "var(--text-muted)",
+                                  }}
+                                >
+                                  (ред.)
+                                </span>
+                              )}{" "}
                               <button
                                 onClick={() => handleTogglePinComment(c.id)}
                                 title={c.pinnedAt ? "Открепить сообщение" : "Закрепить сообщение"}

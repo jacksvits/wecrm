@@ -700,6 +700,9 @@ model Comment {
   isInternal   Boolean @default(false) @map("is_internal")
   // Время закрепления сообщения в обсуждении задачи; null — сообщение не закреплено
   pinnedAt    DateTime? @map("pinned_at")
+  // Время последней правки текста сообщения (синхронизация правок из ВК);
+  // null — сообщение не редактировалось
+  editedAt    DateTime? @map("edited_at")
 
   @@index([taskId, pinnedAt])
   @@map("comments")

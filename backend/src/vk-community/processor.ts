@@ -175,47 +175,68 @@ async function downloadVkAttachment(
   }
 }
 
+// Строгое выделение служебного префикса автора. Распознаём ТОЛЬКО форматы,
+// которые добавляет сам процессор («Мы (ВК): », «[Имя](ссылка):\n») — иначе
+// тело сообщения, содержащее «…:\n», принималось за префикс: при правке
+// текст задваивался, сравнение не сходилось и каждый тик воркера порождал
+// новое ложное «сообщение отредактировано».
+function splitVkPrefix(content: string): { prefix: string; body: string } {
+  if (content.startsWith('Мы (ВК): ')) {
+    return { prefix: 'Мы (ВК): ', body: content.slice('Мы (ВК): '.length) };
+  }
+  const md = content.match(/^\[[^\]]*\]\([^)]*\):\n/);
+  if (md) {
+    return { prefix: md[0], body: content.slice(md[0].length) };
+  }
+  return { prefix: '', body: content };
+}
+
 // Возвращает исходный текст сообщения без служебных пометок, которые мы
 // добавляем при сохранении: префиксы «Мы (ВК): » / «[Имя](url):», счётчик
 // «[N влож.]», заглушки для сообщений без текста
 function stripVkDecorations(content: string): string {
-  let t = content;
-  if (t.startsWith('Мы (ВК): ')) {
-    t = t.slice('Мы (ВК): '.length);
-  } else {
-    const sep = t.indexOf(':\n'); // формат «[Имя](ссылка):\nтекст»
-    if (sep !== -1) t = t.slice(sep + 2);
-  }
+  let t = splitVkPrefix(content).body;
   if (t === '📎 Вложение из ВК' || t === '📎 Вложение из ВК (исходящее)') t = '';
   return t.replace(/\s*\[\d+ влож\.\]\s*$/, '').trim();
 }
 
-// Синхронизация правки сообщения ВК: текст изменился — обновляем комментарий
-// и добавляем запись в обсуждение, чтобы был виден факт правки
+// Блокировки правок по id сообщения ВК: webhook (Callback API) и воркер
+// (история диалогов) работают параллельно — без блокировки одна правка
+// обрабатывалась дважды и порождала дублирующие записи
+const vkEditInFlight = new Set<number>();
+
+// Синхронизация правки сообщения ВК: текст изменился — обновляем сам
+// комментарий и ставим метку editedAt (видна в интерфейсе как «(ред.)»).
+// Отдельные служебные сообщения в обсуждении не создаём.
 async function syncVkMessageEdit(comment: any, msg: VkMessage) {
-  const freshText = (msg.text || '').trim();
-  const storedText = stripVkDecorations(comment.content);
-  if (storedText === freshText || !freshText) return;
+  if (vkEditInFlight.has(msg.id)) return;
+  vkEditInFlight.add(msg.id);
+  try {
+    const freshText = (msg.text || '').trim();
+    if (!freshText) return;
 
-  const suffix = msg.attachments?.length ? ` [${msg.attachments.length} влож.]` : '';
-  let newContent: string;
-  if (comment.content.startsWith('Мы (ВК): ')) {
-    newContent = `Мы (ВК): ${freshText}${suffix}`;
-  } else {
-    const sep = comment.content.indexOf(':\n');
-    const prefix = sep !== -1 ? comment.content.slice(0, sep + 2) : '';
-    newContent = prefix + freshText + suffix;
+    // Перечитываем комментарий из БД: параллельный обработчик мог успеть
+    // его обновить — снимок из аргумента уже неактуален
+    const actual = await prisma.comment.findUnique({ where: { id: comment.id } });
+    if (!actual) return;
+    const storedText = stripVkDecorations(actual.content);
+    if (storedText === freshText) return;
+
+    const suffix = msg.attachments?.length ? ` [${msg.attachments.length} влож.]` : '';
+    const { prefix } = splitVkPrefix(actual.content);
+    // prefix + freshText гарантированно сходится: при следующем сравнении
+    // stripVkDecorations вернёт ровно freshText
+    const newContent = prefix + freshText + suffix;
+
+    await prisma.comment.update({
+      where: { id: actual.id },
+      data: { content: newContent, editedAt: new Date() },
+    });
+    console.log(`[VK Processor] Msg ${msg.id} edited, comment ${actual.id} updated`);
+    broadcast(CHANNELS.COMMENTS, { action: 'update', entity: 'comment', taskId: actual.taskId });
+  } finally {
+    vkEditInFlight.delete(msg.id);
   }
-
-  await prisma.comment.update({ where: { id: comment.id }, data: { content: newContent } });
-  await prisma.comment.create({
-    data: {
-      content: '✏️ Сообщение отредактировано',
-      authorId: comment.authorId,
-      taskId: comment.taskId,
-    },
-  });
-  console.log(`[VK Processor] Msg ${msg.id} edited, comment ${comment.id} updated`);
 }
 
 export async function processVkMessage(msg: VkMessage, settings: any) {
