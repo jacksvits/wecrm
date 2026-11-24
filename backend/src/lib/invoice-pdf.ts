@@ -1,8 +1,12 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
-import bwipjs from 'bwip-js';
 
 const FONT_CANDIDATES = [
+  // Liberation Sans — метрики Arial, шрифт бланка-образца (пакет fonts-liberation в Dockerfile)
+  {
+    regular: '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+    bold: '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+  },
   {
     regular: '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
     bold: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
@@ -102,29 +106,20 @@ const dateShort = (d: Date) =>
   `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 const dateTitle = (d: Date) => `${d.getDate()} ${MONTHS_NOM[d.getMonth()]} ${d.getFullYear()} г.`;
 
-function initials(name: string): string {
-  const p = name.trim().split(/\s+/);
-  if (p.length === 0 || !p[0]) return name;
-  if (p.length === 1) return p[0];
-  let s = p[0];
-  for (let i = 1; i < Math.min(p.length, 3); i++) s += ' ' + p[i].charAt(0).toUpperCase() + '.';
-  return s;
-}
-
 /**
  * Счёт на оплату — точная копия бланка-образца (счёт We-130 от 01.11.2026):
- * логотип и предупреждение сверху, штрихкод Code128, образец платёжного поручения
- * из 9 полей, подчёркнутый заголовок, Поставщик/Покупатель строкой во всю ширину,
- * таблица позиций, итоги с учётом системы налогообложения («Без налога (НДС)» / НДС),
- * сумма прописью и блок подписей. «Действителен до» = дата счёта + 7 дней.
+ * логотип и предупреждение сверху (логотип тенанта из настроек брендинга),
+ * образец платёжного поручения из 9 полей, подчёркнутый заголовок,
+ * Поставщик/Покупатель строкой во всю ширину, таблица позиций, итоги с учётом
+ * системы налогообложения («Без налога (НДС)» / НДС), сумма прописью и блок
+ * подписей. «Действителен до» = дата счёта + 7 дней.
  */
-export async function buildInvoicePdf(
+export function buildInvoicePdf(
   r: {
     number: number;
     createdAt: Date;
     total: number;
     contact: { name: string; inn?: string | null; ogrn?: string | null; legalAddress?: string | null } | null;
-    user: { name: string } | null;
     items: Array<{ quantity: number; price: number; sum: number; product: { name: string; unit: string } }>;
   },
   req: {
@@ -139,6 +134,7 @@ export async function buildInvoicePdf(
     taxSystem?: string;
     vatRate?: string;
   } | null,
+  logoPng?: Buffer | null,
 ) {
   const doc = new PDFDocument({ size: 'A4', margin: 50 });
   const fonts = resolveFonts();
@@ -163,10 +159,11 @@ export async function buildInvoicePdf(
   const vatSum = vatPct ? Math.round((subtotal * vatPct) / 100 * 100) / 100 : 0;
   const grand = Math.round((subtotal + vatSum) * 100) / 100;
 
-  const v = (s: string | null | undefined) => (s && s.trim() ? s : '—');
+  const v = (s: string | null | undefined) => (s && s.trim() ? s : '');
 
-  // === Шапка: логотип, предупреждение, штрихкод ===
-  doc.image(Buffer.from(LOGO_PNG_BASE64, 'base64'), L, 40, { height: 26 });
+  // === Шапка: логотип тенанта (fallback — логотип платформы), предупреждение ===
+  if (logoPng) doc.image(logoPng, L, 40, { height: 26 });
+  else doc.image(Buffer.from(LOGO_PNG_BASE64, 'base64'), L, 40, { height: 26 });
 
   doc
     .font('reg')
@@ -181,19 +178,6 @@ export async function buildInvoicePdf(
       36,
       { width: 270, align: 'center', lineGap: 0.5 },
     );
-
-  try {
-    const png = await bwipjs.toBuffer({
-      bcid: 'code128',
-      text: `We-${r.number}-${dateShort(billDate)}`,
-      scale: 2,
-      height: 12,
-      includetext: false,
-    });
-    doc.image(png, R - 110, 38, { width: 110 });
-  } catch {
-    // штрихкод — декоративный элемент; при сбое библиотеки счёт остаётся валидным
-  }
 
   // === Образец заполнения платёжного поручения ===
   doc.font('bold').fontSize(10).text('Образец заполнения платёжного поручения', L, 104, { width: W, align: 'center' });
@@ -231,8 +215,8 @@ export async function buildInvoicePdf(
   const labTop = (x: number, yy: number, s: string | null | undefined, wdt = 90) =>
     doc.font('reg').fontSize(6).fillColor('#333').text(s || '', x + 2, yy + 1.5, { width: wdt - 4, lineGap: 0 });
   // значение под подписью (для строк 15–16 px)
-  const valBelow = (x: number, yy: number, s: string | null | undefined, wdt: number, size = 8) =>
-    doc.font('reg').fontSize(size).fillColor('#111').text(v(s), x + 2, yy + 8, { width: wdt - 4, lineGap: 0 });
+  const valBelow = (x: number, yy: number, s: string | null | undefined, wdt: number, size = 8.5) =>
+    doc.font('reg').fontSize(size).fillColor('#111').text(v(s), x + 2, yy + 6.2, { width: wdt - 4, lineGap: 0 });
   // подпись и значение в одну строку (микро-строки 8 px: «Вид оп. 01»)
   const micro = (x: number, yy: number, wdt: number, label: string | null | undefined, value: string | null | undefined) => {
     labTop(x, yy, label, wdt);
@@ -240,29 +224,29 @@ export async function buildInvoicePdf(
   };
 
   // левая секция
-  doc.font('reg').fontSize(9.5).fillColor('#111').text(v(req?.bankName), L + 2, y + 2, { width: X - L - 4, lineGap: 0 }); // ООО "Банк Точка" г. Москва
+  doc.font('reg').fontSize(9.5).fillColor('#111').text(v(req?.bankName) || '—', L + 2, y + 2, { width: X - L - 4, lineGap: 0 }); // ООО "Банк Точка" г. Москва
   labTop(L, y + 19, 'Банк получателя');
   labTop(L, yBankEnd, 'ИНН');
-  valBelow(L, yBankEnd, req?.inn, 78);
+  valBelow(L, yBankEnd, req?.inn || '—', 78);
   labTop(130, yBankEnd, 'КПП', X - 130);
   valBelow(130, yBankEnd, '', X - 130);
   labTop(L, yInnEnd, 'Получатель');
-  valBelow(L, yInnEnd, req?.fullName, X - L, 8.5);
+  valBelow(L, yInnEnd, req?.fullName || '—', X - L, 8.5);
   doc.font('reg').fontSize(9.5).fillColor('#111').text(
     `Оплата заказа клиента №We-${r.number} от ${dateShort(billDate)}`,
     L + 2,
     yPolEnd + 2,
     { width: W - 4, lineGap: 0 },
   );
-  labTop(L, yPolEnd + 16, 'Назначение платежа');
+  labTop(L, yPolEnd + 17.5, 'Назначение платежа');
 
   // правая секция (подписи полей сверху, значения под ними)
   labTop(X, y, 'БИК');
-  valBelow(XL2, y, req?.bik, R - XL2);
+  valBelow(XL2, y, req?.bik || '—', R - XL2);
   labTop(X, y + 15, 'Сч. №');
-  valBelow(XL2, y + 15, req?.corrAccount, R - XL2);
+  valBelow(XL2, y + 15, req?.corrAccount || '—', R - XL2);
   labTop(X, yBankEnd, 'Сч. №');
-  valBelow(XL2, yBankEnd, req?.account, R - XL2);
+  valBelow(XL2, yBankEnd, req?.account || '—', R - XL2);
   // Вид оп. / Срок плат. / Очер. плат. (одна микро-строка)
   micro(X, yPolEnd, 110, 'Вид оп.', '01');
   micro(415, yPolEnd, 40, 'Срок плат.', '');
@@ -378,7 +362,7 @@ export async function buildInvoicePdf(
 
   // === Подписи ===
   ty += 14;
-  const signRows = ['Генеральный директор', 'Бухгалтер', 'Менеджер'];
+  const signRows = ['Генеральный директор', 'Бухгалтер'];
   signRows.forEach((label, idx) => {
     doc.font('reg').fontSize(9).text(label, L, ty, { width: 120, lineGap: 0 });
     // линия подписи
@@ -386,11 +370,7 @@ export async function buildInvoicePdf(
     doc.font('reg').fontSize(6.5).fillColor('#333').text('подпись', 185, ty + 14, { width: 160, align: 'center', lineGap: 0 });
     // линия расшифровки
     doc.moveTo(375, ty + 12).lineTo(R, ty + 12).stroke();
-    if (idx === 2 && r.user?.name) {
-      doc.font('bold').fontSize(9).fillColor('#111').text(initials(r.user.name), 375, ty + 14, { width: R - 375, align: 'center', lineGap: 0 });
-    } else {
-      doc.font('reg').fontSize(6.5).fillColor('#333').text('расшифровка подписи', 375, ty + 14, { width: R - 375, align: 'center', lineGap: 0 });
-    }
+    doc.font('reg').fontSize(6.5).fillColor('#333').text('расшифровка подписи', 375, ty + 14, { width: R - 375, align: 'center', lineGap: 0 });
     ty += 30;
   });
 

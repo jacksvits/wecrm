@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
+import fs from 'fs';
+import path from 'path';
 import { buildInvoicePdf } from '../lib/invoice-pdf.js';
+import { uploadsRoot } from '../lib/tenant.js';
 import { createNotification } from '../lib/notifications.js';
 
 const router = Router();
@@ -223,9 +226,20 @@ router.get('/:id/pdf', async (req, res) => {
     include: { items: { include: { product: true } }, contact: true, warehouse: true, user: true },
   });
   if (!r) return res.status(404).json({ error: 'Резерв не найден' });
-  // Счёт на оплату по бланку: реквизиты тенанта (Настройки → Реквизиты) + покупатель из контакта
+  // Счёт на оплату по бланку: реквизиты тенанта (Настройки → Реквизиты) + покупатель из контакта,
+  // логотип — из настроек брендинга текущего тенанта (fallback — логотип платформы)
   const requisites = await prisma.organizationRequisites.findFirst();
-  const doc = await buildInvoicePdf(r as any, requisites as any);
+  let logoBuf: Buffer | null = null;
+  try {
+    const branding = await prisma.branding.findFirst();
+    if (branding?.logoPath) {
+      const logoFile = path.join(uploadsRoot(), 'branding', 'logo.png');
+      if (fs.existsSync(logoFile)) logoBuf = fs.readFileSync(logoFile);
+    }
+  } catch {
+    // логотип не найден — в генераторе используется логотип платформы по умолчанию
+  }
+  const doc = buildInvoicePdf(r as any, requisites as any, logoBuf);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="schet-We-${r.number}.pdf"`);
   doc.pipe(res);
