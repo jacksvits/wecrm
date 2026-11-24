@@ -68,11 +68,36 @@ interface InnLookupResult {
   management?: string;
 }
 
-async function lookupInn(inn: string): Promise<InnLookupResult> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  try {
-    // Шаг 1: поиск по ИНН → токен записи
+// Запасной источник: официальный сервис ФНС egrul.nalog.ru.
+// Возвращает наименование, ОГРН и КПП; адрес в выдаче отсутствует.
+async function lookupInnEgrul(inn: string, signal: AbortSignal): Promise<InnLookupResult> {
+  const search = await fetch('https://egrul.nalog.ru/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ query: inn }).toString(),
+    signal,
+  });
+  if (!search.ok) throw new Error(`Сервис ФНС ответил ${search.status}`);
+  const searchJson: any = await search.json();
+  const token = searchJson?.t;
+  if (!token || searchJson?.captchaRequired) throw new Error('Организация с таким ИНН не найдена');
+
+  const res = await fetch(`https://egrul.nalog.ru/search-result/${encodeURIComponent(token)}`, { signal });
+  if (!res.ok) throw new Error(`Сервис ФНС ответил ${res.status}`);
+  const resJson: any = await res.json();
+  const row = resJson?.rows?.[0];
+  if (!row) throw new Error('Организация с таким ИНН не найдена');
+  return {
+    fullName: row.n || row.c || undefined,
+    inn: row.i || inn,
+    ogrn: row.o || undefined,
+    kpp: row.p || undefined,
+  };
+}
+
+async function lookupInnPb(inn: string, signal: AbortSignal): Promise<InnLookupResult> {
+  // Шаг 1: поиск по ИНН → токен записи
+  {
     const search = await fetch('https://pb.nalog.ru/search-proc.json', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
@@ -82,7 +107,7 @@ async function lookupInn(inn: string): Promise<InnLookupResult> {
         page: '1',
         r: String(Math.random()),
       }).toString(),
-      signal: controller.signal,
+      signal,
     });
     if (!search.ok) throw new Error(`Сервис ФНС ответил ${search.status}`);
     const searchJson: any = await search.json();
@@ -92,7 +117,7 @@ async function lookupInn(inn: string): Promise<InnLookupResult> {
     // Шаг 2: краткая карточка организации
     const card = await fetch(`https://pb.nalog.ru/company-proc.json?id=${encodeURIComponent(token)}&r=&_=${Date.now()}`, {
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      signal: controller.signal,
+      signal,
     });
     if (!card.ok) throw new Error(`Сервис ФНС ответил ${card.status}`);
     const cardJson: any = await card.json();
@@ -110,7 +135,7 @@ async function lookupInn(inn: string): Promise<InnLookupResult> {
     try {
       const details = await fetch(`https://pb.nalog.ru/details-proc.json?id=${encodeURIComponent(row.c || token)}&r=${encodeURIComponent(row.r || '')}&_=${Date.now()}`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        signal: controller.signal,
+        signal,
       });
       if (details.ok) {
         const d: any = await details.json();
@@ -128,20 +153,28 @@ async function lookupInn(inn: string): Promise<InnLookupResult> {
       // Детальная карточка недоступна — возвращаем то, что есть из краткой
     }
     return result;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
 router.get('/inn-lookup', authMiddleware, adminOnly, async (req, res) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 25000);
   try {
     const inn = String(req.query.inn || '').replace(/\D/g, '');
     if (inn.length !== 10 && inn.length !== 12) {
       return res.status(400).json({ error: 'ИНН должен содержать 10 или 12 цифр' });
     }
-    res.json(await lookupInn(inn));
+    let lastError: any = null;
+    // Основной источник — «Прозрачный бизнес» (pb.nalog.ru, с адресом), запасной — egrul.nalog.ru
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try { res.json(await lookupInnPb(inn, controller.signal)); return; } catch (e) { lastError = e; }
+    }
+    try { res.json(await lookupInnEgrul(inn, controller.signal)); return; } catch (e) { lastError = e; }
+    throw lastError;
   } catch (err: any) {
     res.status(502).json({ error: err.message || 'Не удалось получить данные из ФНС' });
+  } finally {
+    clearTimeout(timer);
   }
 });
 
