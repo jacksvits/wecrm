@@ -50,7 +50,10 @@ self.addEventListener('fetch', (event) => {
   // Все SPA-навигации (/, /chat, /tasks/123, ...) — always network first (NEVER cache):
   // иначе SW отдаёт из cache-first устаревший index.html со старым бандлом,
   // и новые роуты (/chat) «не открываются» до истечения кэша
-  if (event.request.mode === 'navigate') {
+  // Документные запросы: mode 'navigate' — обычные переходы, но Chrome присылает
+  // prefetch/спекулятивный пререндер с destination 'document' / Accept: text/html
+  // и mode != navigate — без этого они падали в «static files» и получали фейковый 404
+  if (event.request.mode === 'navigate' || event.request.destination === 'document' || (event.request.headers.get('accept') || '').includes('text/html')) {
     event.respondWith(
       fetch(event.request)
         .then((res) => {
@@ -153,6 +156,16 @@ async function cacheFirstWithNetworkFallback(request) {
     throw new Error('Network response not ok');
   } catch (err) {
     console.warn('[SW] Both cache and network failed:', request.url);
+    // Документный запрос (Accept: text/html), дошедший сюда в обход ветки навигации, —
+    // отдаём кэшированный index.html SPA, чтобы вкладка не получала пустой 404
+    if ((request.headers.get('accept') || '').includes('text/html')) {
+      const cached = (await caches.match('/index.html')) || (await caches.match('/'));
+      if (cached) return cached;
+      return new Response('Нет соединения с сервером. Проверьте интернет и обновите страницу.', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
     // Return empty fallback response to avoid "Failed to convert value to 'Response'"
     return new Response(null, { status: 404, statusText: 'Not Found' });
   }

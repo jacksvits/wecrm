@@ -163,7 +163,11 @@ function injectHeadScript(html: string, marker: string): Promise<void> {
   const jobs = Array.from(holder.querySelectorAll('script')).map(oldScript => new Promise<void>(resolve => {
     const ns = document.createElement('script');
     Array.from(oldScript.attributes).forEach(a => ns.setAttribute(a.name, a.value));
-    ns.textContent = oldScript.textContent || '';
+    // Ошибка выполнения вставляемого скрипта (VK is not defined и т.п.) уходит в
+    // window.onerror и НЕ ловится try/catch вокруг appendChild — оборачиваем сам код.
+    // var/функции верхнего уровня остаются script-scoped, семантика сниппетов не меняется
+    const inlineHead = oldScript.textContent || '';
+    ns.textContent = inlineHead ? `try{\n${inlineHead}\n}catch(e){console.warn('[ad-script]',e)}` : '';
     ns.dataset.adblock = marker;
     if (ns.src) {
       ns.onload = () => resolve();
@@ -253,7 +257,10 @@ function NewsAdScript({ block }: { block: AdBlock }) {
       root.querySelectorAll('script').forEach((oldScript) => {
         const s = document.createElement('script');
         Array.from(oldScript.attributes).forEach(a => s.setAttribute(a.name, a.value));
-        s.textContent = oldScript.textContent || '';
+        // см. injectHeadScript: ошибки выполнения скрипта не пробрасываются в вызывающий
+        // код — оборачиваем текст скрипта, чтобы VK is not defined не светился в консоли
+        const inlineCode = oldScript.textContent || '';
+        s.textContent = inlineCode ? `try{\n${inlineCode}\n}catch(e){console.warn('[ad-script]',e)}` : '';
         // Сторонний скрипт блока (VK-виджет и т.п.) падает с ReferenceError, если его
         // библиотека не загрузилась (блокировщик рекламы/сбой CDN) — ловим, чтобы не
         // рвать выполнение остальных блоков и не засорять консоль страницы ошибкой
