@@ -133,6 +133,9 @@ export function buildInvoicePdf(
     legalAddress?: string;
     taxSystem?: string;
     vatRate?: string;
+    directorName?: string;
+    directorPosition?: string;
+    phone?: string;
   } | null,
   logoPng?: Buffer | null,
 ) {
@@ -268,6 +271,7 @@ export function buildInvoicePdf(
     req?.inn ? `ИНН ${req.inn}` : '',
     req?.ogrn ? `ОГРН ${req.ogrn}` : '',
     req?.legalAddress,
+    req?.phone ? `тел.: ${req.phone}` : '',
   ]);
   const buyer = joinParts([
     r.contact?.name,
@@ -361,7 +365,7 @@ export function buildInvoicePdf(
 
   // === Подписи ===
   ty += 14;
-  const signRows = ['Генеральный директор', 'Бухгалтер'];
+  const signRows = [req?.directorPosition || 'Генеральный директор', 'Бухгалтер'];
   signRows.forEach((label, idx) => {
     doc.font('reg').fontSize(9).text(label, L, ty, { width: 120, lineGap: 0 });
     // линия подписи
@@ -369,7 +373,11 @@ export function buildInvoicePdf(
     doc.font('reg').fontSize(6.5).fillColor('#333').text('подпись', 185, ty + 14, { width: 160, align: 'center', lineGap: 0 });
     // линия расшифровки
     doc.moveTo(375, ty + 12).lineTo(R, ty + 12).stroke();
-    doc.font('reg').fontSize(6.5).fillColor('#333').text('расшифровка подписи', 375, ty + 14, { width: R - 375, align: 'center', lineGap: 0 });
+    if (idx === 0 && req?.directorName) {
+      doc.font('reg').fontSize(9).fillColor('#111').text(req.directorName, 375, ty + 12.5, { width: R - 375, align: 'center', lineGap: 0 });
+    } else {
+      doc.font('reg').fontSize(6.5).fillColor('#333').text('расшифровка подписи', 375, ty + 14, { width: R - 375, align: 'center', lineGap: 0 });
+    }
     ty += 30;
   });
 

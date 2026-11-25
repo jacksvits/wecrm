@@ -15,7 +15,7 @@ const adminOnly = (req: AuthRequest, res: any, next: any) => {
 // Поля реквизитов, возвращаемые/принимаемые эндпоинтами
 const FIELDS = [
   'fullName', 'inn', 'ogrn', 'bankName', 'bik', 'account', 'corrAccount', 'legalAddress', 'actualAddress',
-  'taxSystem', 'vatRate',
+  'taxSystem', 'vatRate', 'directorName', 'directorPosition', 'phone',
 ] as const;
 
 // Допустимые значения — зеркало списков в RequisitesSettings.tsx и invoice-pdf.ts
@@ -46,6 +46,9 @@ const requisitesSchema = z.object({
   actualAddress: z.string().max(500).optional(),
   taxSystem: z.enum(TAX_SYSTEM_VALUES).optional(),
   vatRate: z.enum(VAT_RATE_VALUES).optional(),
+  directorName: z.string().max(200).optional(),
+  directorPosition: z.string().max(200).optional(),
+  phone: z.string().max(50).optional(),
 });
 
 router.put('/', authMiddleware, adminOnly, async (req, res) => {

@@ -15,6 +15,9 @@ type Requisites = {
   actualAddress: string;
   taxSystem: string;
   vatRate: string;
+  directorName: string;
+  directorPosition: string;
+  phone: string;
 };
 
 const EMPTY: Requisites = {
@@ -29,6 +32,9 @@ const EMPTY: Requisites = {
   actualAddress: "",
   taxSystem: "osno",
   vatRate: "none",
+  directorName: "",
+  directorPosition: "",
+  phone: "",
 };
 
 const FIELDS: { key: keyof Requisites; label: string; hint?: string; half?: boolean; mono?: boolean }[] = [
@@ -41,6 +47,9 @@ const FIELDS: { key: keyof Requisites; label: string; hint?: string; half?: bool
   { key: "corrAccount", label: "Корреспондентский счёт", mono: true },
   { key: "legalAddress", label: "Юридический адрес" },
   { key: "actualAddress", label: "Физический адрес" },
+  { key: "directorName", label: "Ф.И.О. руководителя", half: true },
+  { key: "directorPosition", label: "Должность руководителя", half: true },
+  { key: "phone", label: "Телефон организации", half: true },
 ];
 
 // Системы налогообложения и ставки НДС для документов (счетов): зеркало backend/src/lib/invoice-pdf.ts

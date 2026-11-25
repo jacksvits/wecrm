@@ -1893,6 +1893,10 @@ model OrganizationRequisites {
   // Система налогообложения и ставка НДС для итогов документов (счетов)
   taxSystem    String   @default("osno")
   vatRate      String   @default("none")
+  // Руководитель и телефон — для подписей и строки «Поставщик» в документах (счетах)
+  directorName     String @default("")
+  directorPosition String @default("")
+  phone            String @default("")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
