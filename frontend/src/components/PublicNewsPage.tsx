@@ -167,7 +167,7 @@ function injectHeadScript(html: string, marker: string): Promise<void> {
     // window.onerror и НЕ ловится try/catch вокруг appendChild — оборачиваем сам код.
     // var/функции верхнего уровня остаются script-scoped, семантика сниппетов не меняется
     const inlineHead = oldScript.textContent || '';
-    ns.textContent = inlineHead ? `try{\n${inlineHead}\n}catch(e){console.debug('[ad-script] skipped (lib not loaded):',e)}` : '';
+    ns.textContent = inlineHead ? `try{\n${inlineHead}\n}/* сторонняя библиотека виджета (VK и т.п.) заблокирована — тихо пропускаем */` : '';
     ns.dataset.adblock = marker;
     if (ns.src) {
       ns.onload = () => resolve();
@@ -260,7 +260,7 @@ function NewsAdScript({ block }: { block: AdBlock }) {
         // см. injectHeadScript: ошибки выполнения скрипта не пробрасываются в вызывающий
         // код — оборачиваем текст скрипта, чтобы VK is not defined не светился в консоли
         const inlineCode = oldScript.textContent || '';
-        s.textContent = inlineCode ? `try{\n${inlineCode}\n}catch(e){console.debug('[ad-script] skipped (lib not loaded):',e)}` : '';
+        s.textContent = inlineCode ? `try{\n${inlineCode}\n}/* сторонняя библиотека виджета (VK и т.п.) заблокирована — тихо пропускаем */` : '';
         // Сторонний скрипт блока (VK-виджет и т.п.) падает с ReferenceError, если его
         // библиотека не загрузилась (блокировщик рекламы/сбой CDN) — ловим, чтобы не
         // рвать выполнение остальных блоков и не засорять консоль страницы ошибкой

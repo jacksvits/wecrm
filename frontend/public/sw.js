@@ -164,7 +164,8 @@ async function cacheFirstWithNetworkFallback(request) {
     }
     throw new Error('Network response not ok');
   } catch (err) {
-    console.warn('[SW] Both cache and network failed:', request.url);
+    // ВРЕМЕННАЯ ДИАГНОСТИКА: кто шлёт падающие запросы (mode/dest/accept/purpose/ошибка)
+    console.warn('[SW] DIAG fail:', request.url, '| mode:', request.mode, '| dest:', request.destination, '| accept:', request.headers.get('accept'), '| sec-purpose:', request.headers.get('Sec-Purpose'), '| err:', err && err.name, err && err.message);
     // Документный запрос (Accept: text/html), дошедший сюда в обход ветки навигации, —
     // отдаём кэшированный index.html SPA, чтобы вкладка не получала пустой 404
     if ((request.headers.get('accept') || '').includes('text/html')) {
