@@ -141,9 +141,18 @@ async function networkFirstWithCacheFallback(request) {
     console.warn('[SW] Network failed, trying cache:', request.url);
     const cached = await caches.match(request);
     if (cached) return cached;
-    console.warn('[SW] No cache fallback for:', request.url);
-    // Return empty fallback response to avoid "Failed to convert value to 'Response'"
-    return new Response(null, { status: 404, statusText: 'Not Found' });
+    // Документ без сети и кэша — отдаём кэш SPA
+    if ((request.headers.get('accept') || '').includes('text/html') || request.destination === 'document' || request.mode === 'navigate') {
+      const idx = (await caches.match('/index.html')) || (await caches.match('/'));
+      if (idx) return idx;
+      return new Response('Нет соединения с сервером. Проверьте интернет и обновите страницу.', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+    // Не подменяем сбой фейковым 404 (ложный «Failed to load resource» в консоли страницы)
+    console.debug('[SW] asset failed (offline/blocked):', request.url);
+    return Response.error();
   }
 }
 
@@ -164,11 +173,8 @@ async function cacheFirstWithNetworkFallback(request) {
     }
     throw new Error('Network response not ok');
   } catch (err) {
-    // ВРЕМЕННАЯ ДИАГНОСТИКА: кто шлёт падающие запросы (mode/dest/accept/purpose/ошибка)
-    console.warn('[SW] DIAG fail:', request.url, '| mode:', request.mode, '| dest:', request.destination, '| accept:', request.headers.get('accept'), '| sec-purpose:', request.headers.get('Sec-Purpose'), '| err:', err && err.name, err && err.message);
-    // Документный запрос (Accept: text/html), дошедший сюда в обход ветки навигации, —
-    // отдаём кэшированный index.html SPA, чтобы вкладка не получала пустой 404
-    if ((request.headers.get('accept') || '').includes('text/html')) {
+    // Документ без сети и кэша — отдаём кэш SPA
+    if ((request.headers.get('accept') || '').includes('text/html') || request.destination === 'document' || request.mode === 'navigate') {
       const cached = (await caches.match('/index.html')) || (await caches.match('/'));
       if (cached) return cached;
       return new Response('Нет соединения с сервером. Проверьте интернет и обновите страницу.', {
@@ -176,8 +182,10 @@ async function cacheFirstWithNetworkFallback(request) {
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       });
     }
-    // Return empty fallback response to avoid "Failed to convert value to 'Response'"
-    return new Response(null, { status: 404, statusText: 'Not Found' });
+    // Не подменяем сбой (offline/блокировщик/abort) фейковым 404 — в консоли страницы
+    // иначе появляется ложный «Failed to load resource: 404». Честная сетевая ошибка.
+    console.debug('[SW] request failed (offline/blocked):', request.url);
+    return Response.error();
   }
 }
 
