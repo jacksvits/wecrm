@@ -42,6 +42,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Спекулятивный предзагрузчик Chrome (настройка «Предзагружать страницы», hover/paste) —
+  // не перехватываем: браузер нередко обрывает такие запросы (AbortError в SW превращался
+  // в фейковый пустой 404 и «Failed to load resource» в консоли). Реальный переход по
+  // ссылке придёт отдельным запросом с mode: 'navigate' и пройдёт нормально.
+  const purpose = (event.request.headers.get('Sec-Purpose') || event.request.headers.get('Purpose') || '').toLowerCase();
+  if (purpose.includes('prefetch') || purpose.includes('prerender')) {
+    return;
+  }
+
   // API and uploads — always network
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/')) {
     return;
