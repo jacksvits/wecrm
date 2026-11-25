@@ -1,9 +1,24 @@
 import { Router } from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import sharp from 'sharp';
+import { uploadsRoot, tenantUploadPrefix } from '../lib/tenant.js';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
+
+// Загрузка штампа (PNG) — multer в память, файл пишем через sharp в uploads/branding/stamp.png
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    // отклоняем молча: роут ответит 400, если файл не прошёл фильтр
+    cb(null, ['image/png'].includes(file.mimetype));
+  },
+});
 
 const adminOnly = (req: AuthRequest, res: any, next: any) => {
   if (req.user?.role !== 'admin') {
@@ -31,7 +46,12 @@ function toPlain(row: any) {
 // Все авторизованные пользователи могут читать реквизиты (нужны для документов)
 router.get('/', authMiddleware, async (_req, res) => {
   const row = await prisma.organizationRequisites.findFirst();
-  res.json(toPlain(row));
+  if (!row) return res.json({});
+  const plain = toPlain(row);
+  if (row!.stampPath) {
+    plain.stampUrl = `${tenantUploadPrefix() || '/uploads'}/branding/stamp.png?v=${row!.updatedAt.getTime()}`;
+  }
+  res.json(plain);
 });
 
 const requisitesSchema = z.object({
@@ -219,6 +239,28 @@ router.get('/inn-lookup', authMiddleware, adminOnly, async (req, res) => {
     res.status(502).json({ error: err.message || 'Не удалось получить данные из ФНС' });
   } finally {
     clearTimeout(timer);
+  }
+});
+
+// Загрузка/замена штампа (PNG с прозрачностью) — файл в uploads/branding/stamp.png, путь — в реквизитах
+router.post('/stamp', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+    const dir = path.join(uploadsRoot(), 'branding');
+    fs.mkdirSync(dir, { recursive: true });
+    await sharp(req.file.buffer)
+      .resize(500, 500, { fit: 'inside', withoutEnlargement: true })
+      .png({ quality: 90 })
+      .toFile(path.join(dir, 'stamp.png'));
+    const stampPath = '/uploads/branding/stamp.png';
+    await prisma.organizationRequisites.upsert({
+      where: { id: 1 },
+      create: { id: 1, stampPath },
+      update: { stampPath },
+    });
+    res.json({ stampUrl: `${tenantUploadPrefix() || '/uploads'}/branding/stamp.png?v=${Date.now()}` });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
   }
 });
 

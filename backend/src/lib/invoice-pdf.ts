@@ -140,6 +140,7 @@ export async function buildInvoicePdf(
     phone?: string;
   } | null,
   logoPng?: Buffer | null,
+  stampPng?: Buffer | null,
 ) {
   const doc = new PDFDocument({ size: 'A4', margin: 50 });
   const fonts = resolveFonts();
@@ -404,6 +405,10 @@ export async function buildInvoicePdf(
       doc.font('reg').fontSize(9).fillColor('#111').text(req.directorName, 375, ty + 12.5, { width: R - 375, align: 'center', lineGap: 0 });
     } else {
       doc.font('reg').fontSize(6.5).fillColor('#333').text('расшифровка подписи', 375, ty + 14, { width: R - 375, align: 'center', lineGap: 0 });
+    }
+    // Штамп поверх полей подписи руководителя (линия + расшифровка)
+    if (idx === 0 && stampPng) {
+      doc.image(stampPng, 385, ty - 26, { fit: [155, 58] });
     }
     ty += 30;
   });

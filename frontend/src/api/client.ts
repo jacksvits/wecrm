@@ -532,6 +532,13 @@ promoBlocks: { list: (): Promise<PromoBlock[]> => fetchApi('/api/promo-blocks'),
 
   // Реквизиты организации (Настройки → Системные → Реквизиты)
   requisites: {
+    uploadStamp: async (file: File): Promise<{ stampUrl: string }> => {
+      const fd = new FormData();
+      fd.append('file', file);
+      const r = await fetch(`${API_URL}/api/requisites/stamp`, { method: 'POST', headers: { 'X-Auth-Token': getToken()! }, body: fd });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Ошибка загрузки штампа');
+      return r.json();
+    },
     get: (): Promise<Record<string, string>> => fetchApi('/api/requisites'),
     save: (data: Record<string, string>) => fetchApi('/api/requisites', { method: 'PUT', body: JSON.stringify(data) }),
     innLookup: (inn: string): Promise<Record<string, string>> => fetchApi(`/api/requisites/inn-lookup?inn=${encodeURIComponent(inn)}`),

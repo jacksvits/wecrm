@@ -16,6 +16,7 @@ type Requisites = {
   taxSystem: string;
   vatRate: string;
   directorName: string;
+  stampUrl?: string;
   directorPosition: string;
   phone: string;
 };
@@ -79,6 +80,9 @@ export function RequisitesSettings() {
   const [saving, setSaving] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [bikLoading, setBikLoading] = useState(false);
+  const [stampFile, setStampFile] = useState<File | null>(null);
+  const [stampPreview, setStampPreview] = useState<string | null>(null);
+  const [stampSaving, setStampSaving] = useState(false);
   // Последний БИК, по которому уже выполнялся запрос (чтобы не дёргать API на повторный blur)
   const lastBikLookup = useRef<string>("");
 
@@ -142,6 +146,24 @@ export function RequisitesSettings() {
       alert("Ошибка: " + e.message);
     } finally {
       setLookupLoading(false);
+    }
+  };
+
+  const uploadStamp = async () => {
+    if (!stampFile) {
+      alert("Выберите PNG-файл штампа");
+      return;
+    }
+    setStampSaving(true);
+    try {
+      const r: { stampUrl: string } = await api.requisites.uploadStamp(stampFile);
+      setStampPreview(r.stampUrl);
+      setStampFile(null);
+      alert("Штамп загружен");
+    } catch (e: any) {
+      alert("Ошибка: " + e.message);
+    } finally {
+      setStampSaving(false);
     }
   };
 
@@ -278,6 +300,52 @@ export function RequisitesSettings() {
           >
             {bikLoading ? "Запрос в ЦБ..." : "Заполнить по БИК"}
           </button>
+        </div>
+
+        {/* Штамп — подписывает документы (счета), PNG с прозрачностью */}
+        <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border-color)" }}>
+          <label style={labelStyle}>Штамп (PNG)</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+            {(stampPreview || data.stampUrl) && (
+              <img
+                src={stampPreview || data.stampUrl}
+                alt="Штамп"
+                style={{ maxWidth: 140, maxHeight: 140, objectFit: "contain", border: "1px dashed var(--border-color)", borderRadius: 8, background: "#fff" }}
+              />
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <input
+                type="file"
+                accept="image/png"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] || null;
+                  setStampFile(f);
+                  if (f) setStampPreview(URL.createObjectURL(f));
+                  else setStampPreview(null);
+                }}
+                style={{ fontSize: 13, color: "var(--text-secondary)" }}
+              />
+              <button
+                onClick={uploadStamp}
+                disabled={stampSaving || !stampFile}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 10,
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  border: "1px solid var(--border-color)",
+                  cursor: stampSaving || !stampFile ? "not-allowed" : "pointer",
+                  fontSize: 14,
+                  opacity: stampSaving || !stampFile ? 0.6 : 1,
+                }}
+              >
+                {stampSaving ? "Загрузка..." : "Загрузить штамп"}
+              </button>
+            </div>
+          </div>
+          <p style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
+            PNG с прозрачным фоном. Штамп размещается на счёте поверх полей подписи руководителя.
+          </p>
         </div>
       </div>
     </div>

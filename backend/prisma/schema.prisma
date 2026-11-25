@@ -1897,6 +1897,8 @@ model OrganizationRequisites {
   directorName     String @default("")
   directorPosition String @default("")
   phone            String @default("")
+  // Путь к файлу штампа (PNG) для подписи документов
+  stampPath        String @default("")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

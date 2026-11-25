@@ -239,7 +239,16 @@ router.get('/:id/pdf', async (req, res) => {
   } catch {
     // логотип не найден — в генераторе используется логотип платформы по умолчанию
   }
-  const doc = await buildInvoicePdf(r as any, requisites as any, logoBuf);
+  let stampBuf: Buffer | null = null;
+  try {
+    if (requisites?.stampPath) {
+      const stampFile = path.join(uploadsRoot(), 'branding', 'stamp.png');
+      if (fs.existsSync(stampFile)) stampBuf = fs.readFileSync(stampFile);
+    }
+  } catch {
+    // штамп не найден — счёт без штампа
+  }
+  const doc = await buildInvoicePdf(r as any, requisites as any, logoBuf, stampBuf);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="schet-We-${r.number}.pdf"`);
   doc.pipe(res);
