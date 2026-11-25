@@ -402,13 +402,15 @@ export async function buildInvoicePdf(
     // линия расшифровки
     doc.moveTo(375, ty + 12).lineTo(R, ty + 12).stroke();
     if (idx === 0 && req?.directorName) {
-      doc.font('reg').fontSize(9).fillColor('#111').text(req.directorName, 375, ty + 12.5, { width: R - 375, align: 'center', lineGap: 0 });
+      // Ф.И.О. — над чертой, справа (как в классических бланках)
+      doc.font('reg').fontSize(9).fillColor('#111').text(req.directorName, 375, ty + 1, { width: R - 375, align: 'right', lineGap: 0 });
     } else {
       doc.font('reg').fontSize(6.5).fillColor('#333').text('расшифровка подписи', 375, ty + 14, { width: R - 375, align: 'center', lineGap: 0 });
     }
     // Штамп поверх полей подписи руководителя (линия + расшифровка)
     if (idx === 0 && stampPng) {
-      doc.image(stampPng, 385, ty - 26, { fit: [155, 58] });
+      // Штамп увеличен в 2 раза, слева от подписи руководителя (классика: «подпись под печатью»)
+      doc.image(stampPng, 168, ty - 46, { fit: [215, 116] });
     }
     ty += 30;
   });
