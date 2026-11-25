@@ -254,7 +254,14 @@ function NewsAdScript({ block }: { block: AdBlock }) {
         const s = document.createElement('script');
         Array.from(oldScript.attributes).forEach(a => s.setAttribute(a.name, a.value));
         s.textContent = oldScript.textContent || '';
-        oldScript.replaceWith(s);
+        // Сторонний скрипт блока (VK-виджет и т.п.) падает с ReferenceError, если его
+        // библиотека не загрузилась (блокировщик рекламы/сбой CDN) — ловим, чтобы не
+        // рвать выполнение остальных блоков и не засорять консоль страницы ошибкой
+        try {
+          oldScript.replaceWith(s);
+        } catch (err) {
+          console.warn('[news-ad] script block failed (lib not loaded?):', err);
+        }
       });
     })();
     return () => { cancelled = true; };

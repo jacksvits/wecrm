@@ -129,7 +129,7 @@ async function networkFirstWithCacheFallback(request) {
     console.warn('[SW] Network failed, trying cache:', request.url);
     const cached = await caches.match(request);
     if (cached) return cached;
-    console.error('[SW] No cache fallback for:', request.url);
+    console.warn('[SW] No cache fallback for:', request.url);
     // Return empty fallback response to avoid "Failed to convert value to 'Response'"
     return new Response(null, { status: 404, statusText: 'Not Found' });
   }
@@ -152,7 +152,7 @@ async function cacheFirstWithNetworkFallback(request) {
     }
     throw new Error('Network response not ok');
   } catch (err) {
-    console.error('[SW] Both cache and network failed:', request.url);
+    console.warn('[SW] Both cache and network failed:', request.url);
     // Return empty fallback response to avoid "Failed to convert value to 'Response'"
     return new Response(null, { status: 404, statusText: 'Not Found' });
   }
