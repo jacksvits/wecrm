@@ -239,7 +239,7 @@ router.get('/:id/pdf', async (req, res) => {
   } catch {
     // логотип не найден — в генераторе используется логотип платформы по умолчанию
   }
-  const doc = buildInvoicePdf(r as any, requisites as any, logoBuf);
+  const doc = await buildInvoicePdf(r as any, requisites as any, logoBuf);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="schet-We-${r.number}.pdf"`);
   doc.pipe(res);

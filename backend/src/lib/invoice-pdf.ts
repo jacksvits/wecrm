@@ -1,5 +1,7 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
+import { toBuffer } from 'bwip-js';
+import iconv from 'iconv-lite';
 
 const FONT_CANDIDATES = [
   // Liberation Sans — метрики Arial, шрифт бланка-образца (пакет fonts-liberation в Dockerfile)
@@ -114,7 +116,7 @@ const dateTitle = (d: Date) => `${d.getDate()} ${MONTHS_NOM[d.getMonth()]} ${d.g
  * системы налогообложения («Без налога (НДС)» / НДС), сумма прописью и блок
  * подписей. «Действителен до» = дата счёта + 7 дней.
  */
-export function buildInvoicePdf(
+export async function buildInvoicePdf(
   r: {
     number: number;
     createdAt: Date;
@@ -163,6 +165,31 @@ export function buildInvoicePdf(
   const grand = Math.round((subtotal + vatSum) * 100) / 100;
 
   const v = (s: string | null | undefined) => (s && s.trim() ? s : '');
+
+  // QR-код для оплаты по реквизитам (ST0001 / ГОСТ Р 56042-2014) — справа вверху
+  try {
+    if (req?.bankName && req?.bik && req?.account && req?.corrAccount) {
+      const sumKop = Math.round(grand * 100);
+      const qrParts = [
+        'ST00012',
+        `Name=${req.fullName || ''}`,
+        `PersonalAcc=${req.account}`,
+        `BankName=${req.bankName}`,
+        `BIC=${req.bik}`,
+        `CorrespAcc=${req.corrAccount}`,
+        ...(req.inn ? [`PayeeINN=${req.inn}`] : []),
+        ...(sumKop > 0 ? [`Sum=${sumKop}`] : []),
+        `Purpose=Оплата по счёту №We-${r.number} от ${dateShort(billDate)}`,
+      ];
+      // ГОСТ требует windows-1251 — кодируем вручную (binarytext ожидает байты как latin1)
+      const qrText = iconv.encode(qrParts.join('|'), 'win1251').toString('latin1');
+      const qrOpts: any = { bcid: 'qrcode', text: qrText, binarytext: true, scale: 4, eclevel: 'M' };
+      const qrPng = await toBuffer(qrOpts);
+      doc.image(qrPng, R - 86, 26, { fit: [86, 86] });
+    }
+  } catch {
+    // QR — дополнение к бланку; при сбое генерации счёт остаётся валидным
+  }
 
   // === Шапка: логотип тенанта (fallback — логотип платформы), предупреждение ===
   if (logoPng) doc.image(logoPng, L, 40, { height: 26 });
