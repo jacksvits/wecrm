@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { buildSalePdf } from '../lib/sale-pdf.js';
+import { getSalePrefix, formatSaleNumber } from '../lib/number-prefixes.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -146,7 +147,7 @@ router.get('/:id/pdf', async (req, res) => {
   });
   if (!s) return res.status(404).json({ error: 'Продажа не найдена' });
   const doc = buildSalePdf({
-    number: s.number,
+    number: formatSaleNumber(await getSalePrefix(), s.number),
     createdAt: s.createdAt,
     total: Number(s.total),
     contact: s.contact,
@@ -154,7 +155,7 @@ router.get('/:id/pdf', async (req, res) => {
     items: s.items.map(it => ({ quantity: Number(it.quantity), price: Number(it.price), sum: Number(it.sum), product: it.product })),
   });
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="nakladnaya-${String(s.number).padStart(6, '0')}.pdf"`);
+  res.setHeader('Content-Disposition', `attachment; filename="nakladnaya-${formatSaleNumber(await getSalePrefix(), s.number)}.pdf"`);
   doc.pipe(res);
   doc.end();
 });

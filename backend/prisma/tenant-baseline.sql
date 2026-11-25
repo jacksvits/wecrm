@@ -1037,6 +1037,18 @@ CREATE TABLE public.notes (
 
 
 --
+-- Name: number_prefix_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.number_prefix_settings (
+    id integer DEFAULT 1 NOT NULL,
+    reserve_prefix text DEFAULT ''::text NOT NULL,
+    sale_prefix text DEFAULT ''::text NOT NULL,
+    updated_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: notifications; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2758,6 +2770,14 @@ ALTER TABLE ONLY public.news_tags
 
 ALTER TABLE ONLY public.notes
     ADD CONSTRAINT notes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: number_prefix_settings number_prefix_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.number_prefix_settings
+    ADD CONSTRAINT number_prefix_settings_pkey PRIMARY KEY (id);
 
 
 --
@@ -5562,6 +5582,7 @@ INSERT INTO public._prisma_migrations VALUES ('d93b9e04-2a78-4941-b7d2-b87506d46
 --
 
 INSERT INTO public._prisma_migrations VALUES ('8f2b4c6d-9a3e-4e5b-c1d7-4a6b8e2f5c19', ' + SHA + ', '2026-11-25 05:40:00+00', '20261125054000_organization_requisites_stamp', NULL, NULL, '2026-11-25 05:40:00+00', 1);
+INSERT INTO public._prisma_migrations VALUES ('6e3a1d9c-5b7f-4e2a-9c8d-1f4e6a0b3d52', 'iq9hNpW5MQRolRgguQBmj7JsuZ8COeqz8ihct+BWYWs=', '2026-11-25 08:30:00+00', '20261125083000_number_prefix_settings', NULL, NULL, '2026-11-25 08:30:00+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('4c7d9e2a-8b1f-4d3c-b6a5-2e8f1c4d7b03', 'db2fbd74b356fe57b346c90b9b8311d2a304b897f1afa0b26e4b53cc5aa68882', '2026-11-25 01:00:00+00', '20261125010000_organization_requisites_director', NULL, NULL, '2026-11-25 01:00:00+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('9a1f63c0-4e8b-4c7d-a1d2-3b5e7f9c0a41', '543b4bff62d4a7a415e6e8fedd05a30c484a8a024e80ffd036d0b03af2725a4f', '2026-11-24 12:00:00+00', '20261124120000_organization_requisites_tax', NULL, NULL, '2026-11-24 12:00:00+00', 1);
 INSERT INTO public._prisma_migrations VALUES ('7d2e9b4a-1c3f-4a8d-b2e5-6f0a1c3d5e78', 'c1b969021850c5476070a5b0e8f8b9a981cf5c02c545e7f7aa10eaf0f426bf98', '2026-11-24 08:30:00+00', '20261124083000_organization_requisites', NULL, NULL, '2026-11-24 08:30:00+00', 1);

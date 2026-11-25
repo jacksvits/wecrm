@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { platformPrisma, invalidateTenantCache, tenantKey } from '../lib/tenant.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { loadTokens, refreshTokens, tochkaRequest } from './tochka.js';
+import { getSalePrefix, formatSaleNumber } from '../lib/number-prefixes.js';
 
 const router = Router();
 
@@ -217,14 +218,16 @@ router.post('/pay', authMiddleware, async (req: AuthRequest, res) => {
 
     // Один платёж на заказ: повторное нажатие возвращает существующую ссылку (свежую)
     // Номер заказа для банка: WE- + номер продажи с ведущими нулями (9 цифр), виден клиенту на странице оплаты
-    const orderId = `WE-${String(sale.number).padStart(9, '0')}`;
+    // Номер заказа для банка: префикс заказов (настройка Каталога, по умолчанию WE-) + 9 цифр
+    const salePrefix = await getSalePrefix();
+    const orderId = formatSaleNumber(salePrefix, sale.number);
     const existing = await prisma.tochkaAcquiringPayment.findUnique({ where: { orderId } });
     if (existing?.status === 'paid') return res.status(400).json({ error: 'Заказ уже оплачен' });
     if (existing?.paymentUrl && existing.createdAt.getTime() > Date.now() - 24 * 3600 * 1000) {
       return res.json({ orderId, paymentUrl: existing.paymentUrl, paymentId: existing.paymentId, amount: existing.amount });
     }
 
-    const purpose = `Оплата заказа №${sale.number}${sale.contact ? ` (${sale.contact.name})` : ''}`.slice(0, 140);
+    const purpose = `Оплата заказа №${formatSaleNumber(salePrefix, sale.number)}${sale.contact ? ` (${sale.contact.name})` : ''}`.slice(0, 140);
     // Создание платёжной ссылки; при конфликте paymentLinkId («заказ существует» в банке)
     // пересоздаём с уникальным суффиксом — ссылки одноразовые на стороне банка
     let paymentLinkId = orderId;

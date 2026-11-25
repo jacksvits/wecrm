@@ -24,7 +24,7 @@ const MONTHS = ['января', 'февраля', 'марта', 'апреля', 
 // Накладная по бланку: шапка «Кому/От кого», таблица позиций,
 // итог, НДС, подписи «Сдал/Принял»
 export function buildSalePdf(s: {
-  number: number; createdAt: Date; total: number;
+  number: number | string; createdAt: Date; total: number;
   contact: { name: string } | null;
   user: { name: string } | null;
   items: Array<{ quantity: number; price: number; sum: number; product: { name: string; unit: string } }>;

@@ -39,6 +39,15 @@ const STOCK_TABS = [
 const KIND_LABELS: Record<string, string> = { product: 'Товар', service: 'Услуга' };
 const KIND_COLORS: Record<string, string> = { product: '#dbeafe', service: '#ede9fe' };
 
+// ===== Префиксы номеров резервов и заказов =====
+// Задаются администратором кнопкой-шестерёнкой справа от поиска на вкладках «Резервы» и «Заказы».
+// Номер документа хранится как число — префикс применяется при отображении, поэтому смена
+// префикса мгновенно действует и на уже созданные резервы и заказы.
+const RESERVE_DEFAULT_PREFIX = '00We-';
+const SALE_DEFAULT_PREFIX = 'WE-';
+const fmtReserveNo = (prefix: string, n: number) => `${(prefix || '').trim() || RESERVE_DEFAULT_PREFIX}${String(n).padStart(6, '0')}`;
+const fmtSaleNo = (prefix: string, n: number) => `${(prefix || '').trim() || SALE_DEFAULT_PREFIX}${String(n).padStart(9, '0')}`;
+
 const fmtMoney = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
 const inputStyle: React.CSSProperties = { padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', width: '100%', boxSizing: 'border-box' };
 const btnPrimary: React.CSSProperties = { padding: '8px 16px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' };
@@ -75,6 +84,14 @@ export function Products() {
   const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);
   const [importXlsOpen, setImportXlsOpen] = useState(false);
   const [q, setQ] = useState('');
+  // Префиксы номеров резервов и заказов: настройка администратором (шестерёнка справа от поиска).
+  // Пустое значение = префикс по умолчанию (00We- / WE-).
+  const [prefixes, setPrefixes] = useState<{ reservePrefix: string; salePrefix: string }>({ reservePrefix: '', salePrefix: '' });
+  useEffect(() => {
+    api.numberPrefixes.get().then(setPrefixes).catch(() => { /* недоступно — остаются префиксы по умолчанию */ });
+  }, []);
+  // Открытая модалка настройки префикса: резервы или заказы
+  const [prefixModal, setPrefixModal] = useState<'reserve' | 'sale' | null>(null);
   const [whFilter, setWhFilter] = useState('all');
   // Сортировка таблицы «Склад»: текст — А→Я/Я→А, числа — по убыванию/возрастанию
   const [stockSort, setStockSort] = useState<{ key: 'name' | 'warehouse' | 'quantity' | 'reserved' | 'available'; dir: 'asc' | 'desc' } | null>(null);
@@ -730,14 +747,15 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
       )}
 
       {/* Поиск по каталогу */}
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
           value={q}
           onChange={e => setQ(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
           placeholder="Поиск: название, артикул, категория"
           style={{
-            width: '100%',
+            flex: 1,
+            minWidth: 0,
             padding: '8px 14px',
             borderRadius: 12,
             border: '1px solid var(--border-color)',
@@ -748,14 +766,37 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
             boxSizing: 'border-box',
           }}
         />
+        {/* Настройка префикса номеров резервов/заказов — только администратор */}
+        {isAdmin && (effectiveTab === 'reserves' || effectiveTab === 'sales') && (
+          <button
+            onClick={() => setPrefixModal(effectiveTab === 'reserves' ? 'reserve' : 'sale')}
+            title={effectiveTab === 'reserves' ? 'Префикс номеров резервов' : 'Префикс номеров заказов'}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, flexShrink: 0, borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-muted)', cursor: 'pointer' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+        )}
       </div>
+
+      {/* Модалка настройки префикса номеров (только администратор) */}
+      {prefixModal && (
+        <NumberPrefixModal
+          type={prefixModal}
+          initial={prefixModal === 'reserve' ? prefixes.reservePrefix : prefixes.salePrefix}
+          onClose={() => setPrefixModal(null)}
+          onSaved={setPrefixes}
+        />
+      )}
 
       {/* ===== Витрина ===== */}
       {tab === 'vitrine' && <Vitrine search={q} />}
 
       {/* ===== Резервы ===== */}
-      {tab === 'reserves' && <ReservesTab />}
-      {tab === 'sales' && <SalesTab />}
+      {tab === 'reserves' && <ReservesTab prefixes={prefixes} />}
+      {tab === 'sales' && <SalesTab prefixes={prefixes} />}
 
       {/* ===== Подписки ===== */}
       {tab === 'subscriptions' && <SubscriptionsTab />}
@@ -1008,6 +1049,7 @@ const [reserveDetail, setReserveDetail] = useState<{ product: Product; warehouse
         <ReserveDetailModal
           product={reserveDetail.product}
           warehouseId={reserveDetail.warehouseId}
+          prefixes={prefixes}
           onClose={() => setReserveDetail(null)}
         />
       )}
@@ -2269,9 +2311,64 @@ function PriceTypeModal({ priceType, onClose, onSaved }: { priceType: PriceType 
   );
 }
 
+// Модал настройки префикса номеров резервов/заказов (кнопка-шестерёнка у поиска Каталога).
+// Только администратор. Префикс — до 3 символов; пусто = префикс по умолчанию.
+// Номер хранится как число, префикс применяется при отображении — новый префикс
+// мгновенно действует и на уже созданные документы.
+function NumberPrefixModal({ type, initial, onClose, onSaved }: {
+  type: 'reserve' | 'sale';
+  initial: string;
+  onClose: () => void;
+  onSaved: (prefixes: { reservePrefix: string; salePrefix: string }) => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const isReserve = type === 'reserve';
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const updated = await api.numberPrefixes.save(isReserve ? { reservePrefix: value } : { salePrefix: value });
+      onSaved(updated);
+      onClose();
+    } catch (e: any) {
+      alert(e.message || e.error || 'Ошибка сохранения');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+        <h3 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 600 }}>{isReserve ? 'Префикс номеров резервов' : 'Префикс номеров заказов'}</h3>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+          {isReserve ? 'Номер резерва отображается как «префикс + 6 цифр»' : 'Номер заказа отображается как «префикс + 9 цифр»'}
+        </div>
+        <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Префикс</label>
+        <input
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          maxLength={3}
+          placeholder={isReserve ? 'Например: РЗ-' : 'Например: ЗК-'}
+          style={{ ...inputStyle, fontSize: 16, fontWeight: 600, letterSpacing: '0.05em' }}
+        />
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.5 }}>
+          До 3 символов. Применяется ко всем номерам, включая уже созданные.
+          Очистите поле, чтобы вернуть префикс по умолчанию ({isReserve ? RESERVE_DEFAULT_PREFIX : SALE_DEFAULT_PREFIX}).
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
+          <button onClick={onClose} style={btnGhost}>Отмена</button>
+          <button onClick={save} disabled={busy} style={btnPrimary}>{busy ? 'Сохранение...' : 'Сохранить'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Модал детализации резерва: кем и под каким номером зарезервирован товар
 // (открывается по клику на количество в колонке «Резерв» таблицы «Склад»)
-function ReserveDetailModal({ product, warehouseId, onClose }: { product: Product; warehouseId: string | null; onClose: () => void }) {
+function ReserveDetailModal({ product, warehouseId, prefixes, onClose }: { product: Product; warehouseId: string | null; prefixes: { reservePrefix: string; salePrefix: string }; onClose: () => void }) {
   const [items, setItems] = useState<any[] | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -2310,7 +2407,7 @@ function ReserveDetailModal({ product, warehouseId, onClose }: { product: Produc
               <tbody>
                 {items.map((it: any) => (
                   <tr key={it.id}>
-                    <td style={{ ...tdStyle, fontWeight: 600, whiteSpace: 'nowrap' }}>00We-{String(it.reservation.number).padStart(6, '0')}</td>
+                    <td style={{ ...tdStyle, fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtReserveNo(prefixes.reservePrefix, it.reservation.number)}</td>
                     <td style={tdStyle}>{it.reservation.user?.name || '—'}</td>
                     <td style={tdStyle}>{it.reservation.contact?.name || '—'}</td>
                     {!warehouseId && <td style={tdStyle}>{it.reservation.warehouse?.name || '—'}</td>}
@@ -2330,7 +2427,7 @@ function ReserveDetailModal({ product, warehouseId, onClose }: { product: Produc
   );
 }
 
-function ReservesTab() {
+function ReservesTab({ prefixes }: { prefixes: { reservePrefix: string; salePrefix: string } }) {
   const { user } = useAuth();
   // Администратор и менеджер видят все кнопки действий, остальным — только «Счёт» и «Отменить»
   const isPrivileged = ['admin', 'manager'].includes((user as any)?.role) || !!(user as any)?.stockAccess;
@@ -2484,7 +2581,7 @@ function ReservesTab() {
                     >
                       {expandedRes === r.id ? '▾' : '▸'}
                     </button>
-                    <span>00We-{String(r.number).padStart(6, '0')}</span>
+                    <span>{fmtReserveNo(prefixes.reservePrefix, r.number)}</span>
                   </div>
                 </td>
                 <td style={tdStyle}>{new Date(r.createdAt).toLocaleString('ru-RU')}</td>
@@ -2527,7 +2624,7 @@ function ReservesTab() {
               {expandedRes === r.id && (
                 <tr>
                   <td colSpan={8} style={{ ...tdStyle, background: 'var(--bg-hover)', padding: '10px 16px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Состав резерва 00We-{String(r.number).padStart(6, '0')}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Состав резерва {fmtReserveNo(prefixes.reservePrefix, r.number)}</div>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                       <thead>
                         <tr>
@@ -2567,7 +2664,7 @@ function ReservesTab() {
       {editRes && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
           <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 20, width: 560, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3 style={{ margin: '0 0 14px' }}>Резерв 00We-{String(editRes.number).padStart(6, '0')}</h3>
+            <h3 style={{ margin: '0 0 14px' }}>Резерв {fmtReserveNo(prefixes.reservePrefix, editRes.number)}</h3>
             {isPrivileged && (
               <>
                 <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Номер</label>
@@ -2870,7 +2967,7 @@ function SubscriptionsTab() {
 }
 
 // Продажи (реализация) с корзины витрины; оплата — позже
-function SalesTab() {
+function SalesTab({ prefixes }: { prefixes: { reservePrefix: string; salePrefix: string } }) {
   const { user } = useAuth();
   // Только администратор и менеджер могут менять статусы заказов
   const canChangeStatus = ['admin', 'manager'].includes((user as any)?.role);
@@ -2894,6 +2991,9 @@ function SalesTab() {
   };
   const salesRef = useRef<any[]>([]);
   salesRef.current = sales;
+  // Актуальный префикс заказов для автоопроса статуса оплат (интервал не пересоздаётся)
+  const prefixesRef = useRef(prefixes);
+  prefixesRef.current = prefixes;
 
   const load = () => api.sales.list().then(setSales).catch(() => {});
   useEffect(() => {
@@ -2907,9 +3007,15 @@ function SalesTab() {
       for (const s of salesRef.current) {
         if (s.status === 'new' && s.paymentMethod === 'tochka') {
           try {
-            const st: any = await api.tochkaAcquiring.paymentStatus(`WE-${String(s.number).padStart(9, '0')}`);
+            const st: any = await api.tochkaAcquiring.paymentStatus(fmtSaleNo(prefixesRef.current.salePrefix, s.number));
             if (st.status === 'paid' || st.status === 'failed') changed = true;
-          } catch { /* повторим на следующем тике */ }
+          } catch {
+            // Оплата могла быть создана до смены префикса — проверяем ещё и прежним префиксом
+            try {
+              const st: any = await api.tochkaAcquiring.paymentStatus(fmtSaleNo('', s.number));
+              if (st.status === 'paid' || st.status === 'failed') changed = true;
+            } catch { /* повторим на следующем тике */ }
+          }
         }
       }
       if (changed) load();
@@ -2927,8 +3033,8 @@ function SalesTab() {
     } catch (e: any) { alert(e.message || 'Ошибка смены статуса'); }
   };
 
-  // Номер продажи = номер заказа в банке: WE- + 9 цифр
-  const saleNo = (s: any) => `WE-${String(s.number).padStart(9, '0')}`;
+  // Номер продажи = номер заказа в банке: префикс заказов (по умолчанию WE-) + 9 цифр
+  const saleNo = (s: any) => fmtSaleNo(prefixes.salePrefix, s.number);
 
   const statusLabel = (s: string) => s === 'new' ? 'Новый' : s === 'paid' ? 'Оплачен' : s === 'cancelled' ? 'Отменён' : s === 'refund' ? 'Возврат' : s;
   const statusColor = (s: string) => s === 'paid' ? '#16a34a' : s === 'new' ? '#d97706' : s === 'refund' ? '#7c3aed' : 'var(--text-muted)';

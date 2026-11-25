@@ -6,6 +6,7 @@ import path from 'path';
 import { buildInvoicePdf } from '../lib/invoice-pdf.js';
 import { uploadsRoot } from '../lib/tenant.js';
 import { createNotification } from '../lib/notifications.js';
+import { getReservePrefix, formatReserveNumber } from '../lib/number-prefixes.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -145,6 +146,7 @@ router.post('/', async (req: any, res) => {
         select: { id: true },
       });
       const authorName = req.user?.name || 'Пользователь';
+      const reservePrefix = await getReservePrefix();
       await Promise.all(
         recipients
           .filter((u) => u.id !== req.user?.id)
@@ -153,7 +155,7 @@ router.post('/', async (req: any, res) => {
               userId: u.id,
               type: 'system',
               title: 'Новый резерв',
-              body: `${authorName} создал резерв №${result.number} — ${result.contact?.name} на сумму ${result.total.toFixed(2)} ₽`,
+              body: `${authorName} создал резерв №${formatReserveNumber(reservePrefix, result.number)} — ${result.contact?.name} на сумму ${result.total.toFixed(2)} ₽`,
               entityType: 'reservation',
               entityId: result.id,
               url: '/products',
@@ -175,6 +177,7 @@ router.post('/:id/issue', async (req: any, res) => {
     const result = await prisma.$transaction(async (tx) => {
       const r = await tx.reservation.findUnique({ where: { id: req.params.id }, include: { items: true } });
       if (!r) throw new Error('Резерв не найден');
+      const reservePrefix = await getReservePrefix();
       // Атомарная смена статуса до списания: условный UPDATE применится один раз,
       // параллельный повторный запрос получит count=0 и откатится — остатки не спишутся дважды
       const flip = await tx.reservation.updateMany({
@@ -203,7 +206,7 @@ router.post('/:id/issue', async (req: any, res) => {
             warehouseId: r.warehouseId,
             quantity: it.quantity,
             price: it.price,
-            comment: `Резерв №${r.number}`,
+            comment: `Резерв №${formatReserveNumber(reservePrefix, r.number)}`,
             userId: req.user?.id,
           },
         });
@@ -250,7 +253,7 @@ router.get('/:id/pdf', async (req, res) => {
   }
   const doc = await buildInvoicePdf(r as any, requisites as any, logoBuf, stampBuf);
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="schet-We-${r.number}.pdf"`);
+  res.setHeader('Content-Disposition', `attachment; filename="schet-${formatReserveNumber(await getReservePrefix(), r.number)}.pdf"`);
   doc.pipe(res);
   doc.end();
 });
@@ -273,7 +276,7 @@ router.post('/:id/share', async (req: any, res) => {
     const itemsLine = r.items.length
       ? `\n${r.items.length === 1 ? 'Товар' : 'Товары'}: ${r.items.map((it: any) => `${it.product?.name || '—'} (${it.quantity} шт. × ${it.price.toFixed(2)} ₽)`).join(', ')}`
       : '';
-    const text = `Резерв №${r.number} — ${r.contact.name} на сумму ${r.total.toFixed(2)} ₽ (${statusLabel}).${itemsLine}`;
+    const text = `Резерв №${formatReserveNumber(await getReservePrefix(), r.number)} — ${r.contact.name} на сумму ${r.total.toFixed(2)} ₽ (${statusLabel}).${itemsLine}`;
     const comment = await prisma.comment.create({
       data: { taskId: task.id, authorId: req.user?.id, content: text },
     });
@@ -292,6 +295,7 @@ router.patch('/:id', async (req: any, res) => {
       const { contactId, userId, number, comment, items, status } = req.body || {};
       // Админ/менеджер могут резервировать в минус — без проверки свободного остатка
       const canMinus = ['admin', 'manager'].includes(req.user?.role) || !!req.user?.stockAccess;
+      const reservePrefix = await getReservePrefix();
       // Смена автора или номера резерва — только администратор и менеджер
       if ((userId || number !== undefined) && !['admin', 'manager'].includes(req.user?.role) && !req.user?.stockAccess) {
         throw new Error('Только администратор или менеджер может менять автора или номер резерва');
@@ -364,11 +368,11 @@ router.patch('/:id', async (req: any, res) => {
           });
           if (dq < 0) {
             await tx.stockMovement.create({
-              data: { type: 'outcome', productId: it.productId, warehouseId: r.warehouseId, quantity: it.quantity, price: it.price, comment: `Резерв №${r.number}`, userId: req.user?.id },
+              data: { type: 'outcome', productId: it.productId, warehouseId: r.warehouseId, quantity: it.quantity, price: it.price, comment: `Резерв №${formatReserveNumber(reservePrefix, r.number)}`, userId: req.user?.id },
             });
           } else if (dq > 0) {
             await tx.stockMovement.create({
-              data: { type: 'income', productId: it.productId, warehouseId: r.warehouseId, quantity: it.quantity, price: it.price, comment: `Возврат из резерва №${r.number}`, userId: req.user?.id },
+              data: { type: 'income', productId: it.productId, warehouseId: r.warehouseId, quantity: it.quantity, price: it.price, comment: `Возврат из резерва №${formatReserveNumber(reservePrefix, r.number)}`, userId: req.user?.id },
             });
           }
         }

@@ -2592,3 +2592,17 @@ model HeaderMenuLink {
 
   @@map("header_menu_links")
 }
+
+
+// Префиксы номеров резервов и заказов (Каталог — кнопка-шестерёнка у поиска, только админы).
+// Префикс — свободное поле до 3 символов; пустое значение = префикс по умолчанию (00We- / WE-).
+// Номер хранится по-прежнему как Int — префикс применяется при отображении, поэтому смена
+// префикса мгновенно «перезаписывает» номера всех существующих резервов и заказов.
+model NumberPrefixSettings {
+  id            Int      @id @default(1)
+  reservePrefix String   @default("") @map("reserve_prefix")
+  salePrefix    String   @default("") @map("sale_prefix")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("number_prefix_settings")
+}
