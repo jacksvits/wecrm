@@ -288,23 +288,54 @@ async function getDefaultMeta(canonicalPath: string): Promise<PageMeta> {
 
 // Отдача публичной страницы с подставленными метатегами.
 // nginx welans.ru: proxy_pass http://127.0.0.1:4000/api/seo/page$request_uri
+// Честный 404: нераспознанный путь без расширения файла получает статус 404 и noindex —
+// иначе поисковик копит «мягкие 404» (SPA-оболочка со статусом 200 на любой адрес).
 router.use('/page', async (req, res) => {
   try {
     const original = req.originalUrl.replace(/^\/api\/seo\/page/, '') || '/';
     const path = original.split('?')[0];
-    const segments = path.split('/').filter(Boolean);
+    // Нормализация: /shop/ → /shop (кроме корня)
+    const normalized = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
+    const segments = normalized.split('/').filter(Boolean);
+
+    // Статические страницы SPA, существующие на welans.ru
+    const staticPages = ['/shop', '/vitrine', '/offer', '/privacy', '/cookies', '/tariffs', '/register', '/presentation', '/org-login'];
 
     let meta: PageMeta | null = null;
+    let notFound = false;
     if (segments.length === 1 && segments[0] === 'news') {
       meta = { title: NEWS_LIST_TITLE, description: NEWS_LIST_DESCRIPTION, canonical: `${SITE_URL}/news` };
-    } else if (
-      segments.length === 1 ||
-      (segments.length === 2 && segments[0] === 'news' && segments[1] !== 'public')
-    ) {
-      // /<slug>/ или /news/<id> — страница новости; нет такой — метатеги по умолчанию
-      const idOrSlug = decodeURIComponent(segments.length === 1 ? segments[0] : segments[1]);
-      meta = await getNewsMeta(idOrSlug);
+    } else if (segments.length === 2 && segments[0] === 'news' && segments[1] !== 'public') {
+      // /news/<id> — детальная новость; нет такой — честный 404
+      meta = await getNewsMeta(decodeURIComponent(segments[1]));
+      if (!meta) notFound = true;
+    } else if (segments.length === 1 && staticPages.includes(`/${segments[0]}`)) {
+      meta = await getDefaultMeta(normalized);
+    } else if (segments.length === 1) {
+      // /<slug> — старые адреса новостей; нет такой новости — честный 404
+      meta = await getNewsMeta(decodeURIComponent(segments[0]));
+      if (!meta) notFound = true;
+    } else if (normalized !== '/') {
+      const lastSegment = normalized.split('/').pop() || '';
+      // Файлы с расширением nginx отдаёт статикой напрямую (сюда — только страховка) — прежнее поведение;
+      // многосегментный путь без расширения — таких страниц на сайте нет: 404
+      if (!lastSegment.includes('.')) notFound = true;
     }
+
+    if (notFound) {
+      const html = await loadIndexHtml();
+      const body = injectMeta(html, {
+        title: 'Страница не найдена — WeLANS',
+        description: 'Такой страницы нет на сайте WeLANS. Перейдите на главную страницу или в каталог.',
+        canonical: SITE_URL,
+      }).replace(
+        '</head>',
+        '<meta name="robots" content="noindex,follow">\n' +
+          '<noscript><div style="max-width:560px;margin:80px auto;padding:0 16px;font-family:sans-serif;text-align:center"><h1>Страница не найдена</h1><p>Такой страницы нет на сайте WeLANS — возможно, ссылка устарела.</p><p><a href="/">На главную</a> · <a href="/shop">Каталог</a></p></div></noscript>\n</head>'
+      );
+      return res.status(404).type('html').set('Cache-Control', 'no-cache').send(body);
+    }
+
     if (!meta) meta = await getDefaultMeta(path);
 
     const html = await loadIndexHtml();
