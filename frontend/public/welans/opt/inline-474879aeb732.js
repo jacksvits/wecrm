@@ -1,1 +1,0 @@
-rcl_do_action("rcl_footer")
