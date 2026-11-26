@@ -125,6 +125,11 @@ if (location.pathname === '/register') { return ( <Suspense fallback={null}><Ins
     if (/^\/news\/?$/.test(location.pathname)) {
       return <Suspense fallback={null}><PublicNewsPage consent={!user} /></Suspense> ;
     }
+    // SEO-страница категории новостей (/news/category/<slug>) — H1/фильтр/мета от категории
+    const newsCategoryMatch = location.pathname.match(/^\/news\/category\/([^/]+)$/);
+    if (newsCategoryMatch) {
+      return <Suspense fallback={null}><PublicNewsPage consent={!user} categorySlug={decodeURIComponent(newsCategoryMatch[1])} /></Suspense> ;
+    }
     const newsIdMatch = location.pathname.match(/^\/news\/(?!public(?:\/|$))([^/]+)$/);
     if (newsIdMatch) {
       return <Suspense fallback={null}><PublicNewsDetail id={newsIdMatch[1]} consent={!user} /></Suspense> ;

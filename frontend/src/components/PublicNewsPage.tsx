@@ -348,7 +348,7 @@ function NewsAdCard({ block, wide }: { block: AdBlock; wide?: boolean }) {
   );
 }
 
-export function PublicNewsList({ consent = true, seoTitle, seoDescription }: { consent?: boolean; seoTitle?: string; seoDescription?: string }) {
+export function PublicNewsList({ consent = true, seoTitle, seoDescription, categorySlug }: { consent?: boolean; seoTitle?: string; seoDescription?: string; categorySlug?: string }) {
   usePageSeo({
     title: seoTitle || 'WeLANS - Новости',
     description: seoDescription || 'Новости WeLANS — коротко о свежем: ИТ-консалтинг, инфраструктура, проекты и анонсы компании.',
@@ -368,13 +368,30 @@ export function PublicNewsList({ consent = true, seoTitle, seoDescription }: { c
   const [tag, setTag] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
+
+  const catName = categorySlug ? categories.find((c: any) => c.slug === categorySlug)?.name : undefined;
+  usePageSeo({
+    title: catName ? `${catName} — WeLANS` : (seoTitle || 'WeLANS - Новости'),
+    description: catName
+      ? `Новости и статьи раздела «${catName}»: кейсы внедрений, обновления сервиса и материалы для бизнеса.`
+      : (seoDescription || 'Новости WeLANS — коротко о свежем: ИТ-консалтинг, инфраструктура, проекты и анонсы компании.'),
+    canonical: categorySlug ? `${window.location.origin}/news/category/${categorySlug}` : `${window.location.origin}/news`,
+  });
   const limit = 24;
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
   useEffect(() => {
-    api.news.categories().then((res: any) => setCategories(Array.isArray(res) ? res : res?.categories ?? [])).catch(() => {});
+    api.news.categories().then((res: any) => {
+      const data = Array.isArray(res) ? res : res?.categories ?? [];
+      setCategories(data);
+      // SEO-страница категории (/news/category/<slug>): фильтруем список по id категории
+      if (categorySlug) {
+        const cat = data.find((c: any) => c.slug === categorySlug);
+        if (cat) setCategory(cat.id);
+      }
+    }).catch(() => {});
     api.news.tags().then((res: any) => setTags(Array.isArray(res) ? res : res?.tags ?? [])).catch(() => {});
-  }, []);
+  }, [categorySlug]);
 
   useEffect(() => {
     const t = setTimeout(() => { setQ(qInput); setPage(1); }, 400);
@@ -403,6 +420,7 @@ export function PublicNewsList({ consent = true, seoTitle, seoDescription }: { c
         consent={consent}
       />
       <div style={{ padding: '16px 24px 40px' }}>
+        {catName && <h1 style={{ margin: '0 0 16px', fontSize: 24, fontWeight: 600, color: 'var(--text-primary)' }}>{catName}</h1>}
         {/* Фильтры */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
           <select value={category} style={selectStyle} onChange={(e) => { setCategory(e.target.value); setSubcategory(''); setPage(1); }}>
@@ -731,11 +749,11 @@ export function PublicNewsDetail({ id, slug, consent = true, fetchByIdOrSlug, br
 }
 
 /** Публичная страница новостей для гостей: /news — список, /news/:id — детальная */
-export function PublicNewsPage({ consent = true }: { consent?: boolean }) {
+export function PublicNewsPage({ consent = true, categorySlug }: { consent?: boolean; categorySlug?: string }) {
   const { pathname } = useLocation();
   const detailMatch = pathname.match(/^\/news\/([^/]+)$/);
   if (detailMatch) {
     return <PublicNewsDetail id={detailMatch[1]} consent={consent} />;
   }
-  return <PublicNewsList consent={consent} />;
+  return <PublicNewsList consent={consent} categorySlug={categorySlug} />;
 }

@@ -98,12 +98,27 @@ router.get('/sitemap.xml', async (_req, res) => {
   }
 });
 
-// Статические страницы: главная (снимок старого сайта) и лента новостей
-router.get('/sitemap-static.xml', (_req, res) => {
-  res
-    .type('application/xml')
-    .set('Cache-Control', 'no-cache')
-    .send(urlSet([{ loc: `${SITE_URL}/` }, { loc: `${SITE_URL}/news` }]));
+// Статические страницы: главная (снимок старого сайта), лента новостей и SEO-страницы категорий
+router.get('/sitemap-static.xml', async (_req, res) => {
+  try {
+    const cats = await prisma.newsCategory.findMany({ select: { slug: true } });
+    res
+      .type('application/xml')
+      .set('Cache-Control', 'no-cache')
+      .send(
+        urlSet([
+          { loc: `${SITE_URL}/` },
+          { loc: `${SITE_URL}/news` },
+          ...cats.map((c) => ({ loc: `${SITE_URL}/news/category/${encodeURIComponent(c.slug)}` })),
+        ])
+      );
+  } catch (err) {
+    console.error('[seo:sitemap-static]', err);
+    res
+      .type('application/xml')
+      .set('Cache-Control', 'no-cache')
+      .send(urlSet([{ loc: `${SITE_URL}/` }, { loc: `${SITE_URL}/news` }]));
+  }
 });
 
 // Часть новостей: /sitemap/news-<N>.xml (N с 1)
@@ -213,6 +228,8 @@ type PageMeta = {
   canonical: string;
   ogType?: string;
   ogImage?: string | null;
+  // Schema.org JSON-LD (например NewsArticle для детальных страниц новостей)
+  jsonLd?: Record<string, unknown>;
 };
 
 // Вписывает метатеги в <head>: шаблонные description/canonical/og из index.html удаляются,
@@ -232,6 +249,9 @@ function injectMeta(html: string, meta: PageMeta) {
     `<meta property="og:type" content="${meta.ogType || 'website'}">`,
   ];
   if (meta.ogImage) tags.push(`<meta property="og:image" content="${escapeHtml(absoluteUrl(meta.ogImage))}">`);
+  if (meta.jsonLd) {
+    tags.push(`<script type="application/ld+json">${JSON.stringify(meta.jsonLd).replace(/</g, '\\u003c')}</script>`);
+  }
   return out.replace('</head>', `${tags.join('\n')}\n</head>`);
 }
 
@@ -244,7 +264,7 @@ async function findPublicNews(idOrSlug: string) {
         publicNewsWhere,
       ],
     },
-    select: { id: true, title: true, slug: true, summary: true, content: true, coverImage: true },
+    select: { id: true, title: true, slug: true, summary: true, content: true, coverImage: true, publishedAt: true, updatedAt: true, author: { select: { name: true } } },
   });
 }
 
@@ -257,15 +277,75 @@ async function getNewsMeta(idOrSlug: string): Promise<PageMeta | null> {
   if (cached && Date.now() - cached.at < NEWS_META_TTL_MS) return cached.meta;
   const news = await findPublicNews(idOrSlug);
   if (!news) return null;
+  const description = makeDescription(stripHtml(news.summary || '') || stripHtml(news.content));
+  const canonical = `${SITE_URL}/${encodeURIComponent(news.slug || news.id)}/`;
   const meta: PageMeta = {
     title: `${news.title} — WeLANS`,
-    description: makeDescription(stripHtml(news.summary || '') || stripHtml(news.content)),
-    canonical: `${SITE_URL}/${encodeURIComponent(news.slug || news.id)}/`,
+    description,
+    canonical,
     ogType: 'article',
     ogImage: news.coverImage,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'NewsArticle',
+      headline: news.title,
+      description,
+      datePublished: news.publishedAt?.toISOString(),
+      dateModified: (news.updatedAt || news.publishedAt)?.toISOString(),
+      author: news.author?.name ? { '@type': 'Person', name: news.author.name } : { '@type': 'Organization', name: 'WeLANS' },
+      publisher: { '@type': 'Organization', name: 'WeLANS', logo: { '@type': 'ImageObject', url: `${SITE_URL}/icon-512.png` } },
+      mainEntityOfPage: { '@type': 'WebPage', '@id': canonical },
+      ...(news.coverImage ? { image: [absoluteUrl(news.coverImage)] } : {}),
+    },
   };
   newsMetaCache.set(idOrSlug, { meta, at: Date.now() });
   return meta;
+}
+
+// SEO-страницы категорий новостей: /news/category/<slug> (метатеги из категории)
+const categoryMetaCache = new Map<string, { meta: PageMeta | null; at: number }>();
+
+async function getCategoryMeta(slug: string): Promise<PageMeta | null> {
+  const cached = categoryMetaCache.get(slug);
+  if (cached && Date.now() - cached.at < NEWS_META_TTL_MS) return cached.meta;
+  const cat = await prisma.newsCategory.findUnique({ where: { slug }, select: { name: true, slug: true } });
+  const meta: PageMeta | null = cat
+    ? {
+        title: `${cat.name} — новости WeLANS`,
+        description: `Новости и статьи раздела «${cat.name}»: кейсы внедрений, обновления сервиса и материалы для бизнеса.`,
+        canonical: `${SITE_URL}/news/category/${encodeURIComponent(cat.slug)}`,
+      }
+    : null;
+  categoryMetaCache.set(slug, { meta, at: Date.now() });
+  return meta;
+}
+
+// Яндекс.Метрика: сниппет из настроек CRM (кэш 5 мин) — счётчик появляется на всех публичных страницах
+let metrikaSnippet: string | null | undefined;
+let metrikaSnippetAt = 0;
+
+async function getMetrikaSnippet(): Promise<string | null> {
+  if (metrikaSnippet !== undefined && Date.now() - metrikaSnippetAt < 5 * 60 * 1000) return metrikaSnippet;
+  try {
+    const s = await prisma.yandexMetrikaSettings.findUnique({ where: { id: 1 } });
+    metrikaSnippet = s?.isActive && s.counterId
+      ? [
+          '<!-- Yandex.Metrika counter -->',
+          '<script type="text/javascript">',
+          '   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};',
+          '   m[i].l=1*new Date();k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})',
+          '   (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");',
+          `   ym(${s.counterId}, "init", { clickmap: true, trackLinks: true, accurateTrackBounce: true, webvisor: true });`,
+          '</script>',
+          `<noscript><div><img src="https://mc.yandex.ru/watch/${s.counterId}" style="position:absolute; left:-9999px;" alt="" /></div></noscript>`,
+          '<!-- /Yandex.Metrika counter -->',
+        ].join('\n')
+      : null;
+  } catch {
+    metrikaSnippet = null;
+  }
+  metrikaSnippetAt = Date.now();
+  return metrikaSnippet;
 }
 
 // Метатеги по умолчанию: из SEO-настроек тенанта, если заполнены, иначе дефолты welans.ru
@@ -309,6 +389,10 @@ router.use('/page', async (req, res) => {
       // /news/<id> — детальная новость; нет такой — честный 404
       meta = await getNewsMeta(decodeURIComponent(segments[1]));
       if (!meta) notFound = true;
+    } else if (segments.length === 3 && segments[0] === 'news' && segments[1] === 'category') {
+      // /news/category/<slug> — SEO-страница категории новостей; нет такой — честный 404
+      meta = await getCategoryMeta(decodeURIComponent(segments[2]));
+      if (!meta) notFound = true;
     } else if (segments.length === 1 && staticPages.includes(`/${segments[0]}`)) {
       meta = await getDefaultMeta(normalized);
     } else if (segments.length === 1) {
@@ -324,7 +408,7 @@ router.use('/page', async (req, res) => {
 
     if (notFound) {
       const html = await loadIndexHtml();
-      const body = injectMeta(html, {
+      let body = injectMeta(html, {
         title: 'Страница не найдена — WeLANS',
         description: 'Такой страницы нет на сайте WeLANS. Перейдите на главную страницу или в каталог.',
         canonical: SITE_URL,
@@ -333,16 +417,21 @@ router.use('/page', async (req, res) => {
         '<meta name="robots" content="noindex,follow">\n' +
           '<noscript><div style="max-width:560px;margin:80px auto;padding:0 16px;font-family:sans-serif;text-align:center"><h1>Страница не найдена</h1><p>Такой страницы нет на сайте WeLANS — возможно, ссылка устарела.</p><p><a href="/">На главную</a> · <a href="/shop">Каталог</a></p></div></noscript>\n</head>'
       );
+      const metrika404 = await getMetrikaSnippet();
+      if (metrika404) body = body.replace('</head>', `${metrika404}\n</head>`);
       return res.status(404).type('html').set('Cache-Control', 'no-cache').send(body);
     }
 
     if (!meta) meta = await getDefaultMeta(path);
 
     const html = await loadIndexHtml();
+    let body = injectMeta(html, meta);
+    const metrika = await getMetrikaSnippet();
+    if (metrika) body = body.replace('</head>', `${metrika}\n</head>`);
     res
       .type('html')
       .set('Cache-Control', 'no-cache')
-      .send(injectMeta(html, meta));
+      .send(body);
   } catch (err) {
     console.error('[seo:page]', err);
     res.status(502).type('text/plain').send('Bad Gateway');
