@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wecrm-v10';
+const CACHE_NAME = 'wecrm-v11';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/favicon.ico',
@@ -74,7 +74,9 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then((res) => {
-          if (res && res.status === 200) return res;
+          // Сервер отвечает (в т.ч. честная 404/403 и редиректы 3xx) — показываем его страницу;
+          // в офлайн-фолбэк уходим только при 5xx или отсутствии ответа
+          if (res && res.status < 500) return res;
           throw new Error('Network failed for navigation');
         })
         .catch(async () => {
@@ -98,7 +100,9 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then((res) => {
-          if (res && res.status === 200) return res;
+          // Сервер отвечает (в т.ч. честная 404/403 и редиректы 3xx) — показываем его страницу;
+          // в офлайн-фолбэк уходим только при 5xx или отсутствии ответа
+          if (res && res.status < 500) return res;
           throw new Error('Network failed for index.html');
         })
         .catch(async () => {
