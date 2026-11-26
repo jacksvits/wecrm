@@ -14,6 +14,7 @@ import PublicAuthArea from './PublicAuthArea';
 import { usePublicUser } from './PublicAuthArea';
 import ReactQuill from './LazyQuill' ;
 import PublicNavMenu from './PublicNavMenu';
+import PublicNotFound from './PublicNotFound';
 import { AdBlock } from '../types';
 
 function stripHtml(html: string): string {
@@ -557,14 +558,8 @@ export function PublicNewsDetail({ id, slug, consent = true, fetchByIdOrSlug, br
   const [searchQ, setSearchQ] = useState('');
 
   if (notFound) {
-    return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-        <PublicNewsHeader query={searchQ} onSearch={setSearchQ} onSubmit={(v) => navigate(`/news?q=${encodeURIComponent(v)}`)} consent={consent} />
-        <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
-          Новость не найдена. <a href="/news" style={{ color: '#005BFF' }}>Ко всем новостям</a>
-        </div>
-      </div>
-    );
+    // Единая красивая страница 404 (фото на весь экран, «404» курсивом)
+    return <PublicNotFound />;
   }
   if (!news) {
     return (

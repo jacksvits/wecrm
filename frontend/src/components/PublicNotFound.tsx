@@ -1,5 +1,6 @@
 // Публичная страница 404 на welans.ru: неизвестный путь (backend уже ответил статусом 404).
-// Тот же каркас, что у страниц новостей: логотип, меню, блок авторизации, куки-баннер.
+// Шапка сайта без изменений (логотип, меню, вход). На весь экран — фоновое фото
+// с равномерным затемнением, по центру крупное «404» курсивом и подпись под ним.
 import PublicNavMenu from './PublicNavMenu';
 import PublicAuthArea from './PublicAuthArea';
 import { CookieConsent } from './CookieConsent';
@@ -8,7 +9,11 @@ import { useBrandLogo } from '../lib/branding';
 export default function PublicNotFound() {
   const logoUrl = useBrandLogo(false);
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary, #fff)', color: 'var(--text-primary, #111)' }}>
+    <div style={{ position: 'relative', minHeight: '100vh', overflow: 'hidden', background: '#14171c' }}>
+      {/* Фон: изображение на весь экран + затемнение, чтобы белый текст читался */}
+      <div style={{ position: 'absolute', inset: 0, background: 'url(/404.jpg) center / cover no-repeat #14171c' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0, 0, 0, 0.45)' }} />
+
       <header style={{
         position: 'sticky', top: 0, zIndex: 50,
         display: 'flex', alignItems: 'center', gap: 12,
@@ -26,18 +31,21 @@ export default function PublicNotFound() {
         <PublicAuthArea />
         <CookieConsent />
       </header>
-      <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px' }}>
-        <div style={{ maxWidth: 480, textAlign: 'center' }}>
-          <div style={{ fontSize: 72, fontWeight: 800, lineHeight: 1, color: 'var(--text-muted, #888)' }}>404</div>
-          <h1 style={{ fontSize: 24, margin: '16px 0 8px' }}>Страница не найдена</h1>
-          <p style={{ color: 'var(--text-muted, #666)', margin: '0 0 24px' }}>
-            Возможно, ссылка устарела или адрес введён с ошибкой.
-          </p>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="/" style={{ padding: '10px 20px', borderRadius: 12, background: 'var(--accent-color, #005BFF)', color: '#fff', textDecoration: 'none', fontWeight: 600 }}>На главную</a>
-            <a href="/shop" style={{ padding: '10px 20px', borderRadius: 12, border: '1px solid var(--border-color, #e0e0e0)', color: 'var(--text-primary, #111)', textDecoration: 'none', fontWeight: 600 }}>Каталог</a>
-          </div>
-        </div>
+
+      <main style={{
+        position: 'relative', zIndex: 1,
+        minHeight: 'calc(100vh - 57px)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: '40px 16px', textAlign: 'center',
+      }}>
+        <div style={{
+          fontSize: 'clamp(96px, 20vw, 220px)',
+          fontWeight: 800, fontStyle: 'italic', lineHeight: 1, color: '#fff',
+          textShadow: '0 4px 24px rgba(0, 0, 0, 0.35)',
+        }}>404</div>
+        <p style={{ margin: '16px 0 0', fontSize: 'clamp(16px, 2.4vw, 28px)', color: 'rgba(255, 255, 255, 0.92)' }}>
+          Ой, кажется страница ещё не готова.
+        </p>
       </main>
     </div>
   );
