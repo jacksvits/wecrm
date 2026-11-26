@@ -1,0 +1,331 @@
+#rcl-office {
+    background: inherit;
+    margin: auto;
+    max-width: 1150px !important;
+}
+
+.webx-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-left: -18px;
+    margin-right: -18px;
+}
+
+.webx-col-md-9,
+.webx-col-md-3 {
+    box-sizing: border-box;
+    padding-left: 18px;
+    padding-right: 18px;
+    position: relative;
+    width: 100%;
+}
+
+.webx-row .webx-col-md-3 + .webx-col-md-9 {
+    padding-left: 0;
+}
+
+#rcl-avatar {
+    display: block;
+    height: 100%;
+    max-height: calc(90vh - 40px);
+    overflow: hidden;
+    width: 100%;
+}
+
+#rcl-avatar img {
+    height: auto;
+    margin: 0;
+    width: 100%;
+}
+
+#rcl-avatar img,
+#lk-conteyner {
+    border: 2px solid #fff;
+    box-shadow: 0 .125rem .25rem rgb(0 0 0 / 8%);
+}
+
+#rcl-avatar .avatar-image {
+    display: flex;
+}
+
+#rcl-avatar .avatar-icons {
+    bottom: 6px;
+    position: absolute;
+    text-align: center;
+    width: 100%;
+}
+
+#rcl-avatar .rcl-avatar-icon {
+    display: inline-flex;
+    margin: 3px;
+}
+
+#lk-conteyner {
+    background-position: center center;
+    background-size: 100%;
+    box-sizing: border-box;
+    display: block;
+    height: 100%;
+    position: relative;
+    width: 100%;
+}
+
+#rcl-avatar .rcl-avatar-icon a,
+#webx-header .rcl-cover-icon {
+    background: #fff;
+    overflow: hidden;
+    padding: 10px;
+    transition: all .15s ease-in-out;
+}
+
+#webx-header .rcl-cover-icon {
+    display: inline-flex;
+    left: 6px;
+    margin: 0;
+    top: 6px;
+}
+
+body #rcl-office .webx_phone_menu:hover,
+#webx-header .rcl-cover-icon:hover,
+#rcl-avatar .rcl-avatar-icon a:hover {
+    opacity: .85;
+}
+
+#rcl-avatar .rcl-avatar-icon a:hover .rcli {
+    color: initial;
+}
+
+.webx-userinfo {
+    align-items: center;
+    box-shadow: 0 .125rem .25rem rgb(0 0 0 / 8%);
+    display: flex;
+    gap: 36px;
+    justify-content: space-between;
+}
+
+.webx-userinfo,
+.webx-area-tabs {
+    background: #fff;
+    font-size: 16px;
+    margin-top: 18px;
+    padding: 18px;
+}
+
+.webx-area-tabs {
+    box-shadow: 0 .125rem .25rem rgb(0 0 0 / 8%);
+    margin-bottom: 5px;
+}
+
+.webx-user-left {
+    display: flex;
+    flex-basis: 19%;
+    justify-content: center;
+    padding: 0;
+}
+
+.webx-user-name {
+    line-height: normal;
+    text-align: center;
+}
+
+.webx-user-right {
+    align-items: center;
+    display: flex;
+    flex-grow: 1;
+    gap: 12px;
+    justify-content: space-between;
+    overflow: hidden;
+}
+
+.webx-user-center .rcl-balance-widget {
+    max-width: initial;
+}
+
+#rcl-office .webx-user-center .balance-amount {
+    line-height: normal;
+    text-align: left;
+}
+
+#rcl-office .webx-user-center .amount-title {
+    display: inline-flex;
+    font-weight: 400;
+    margin-right: 5px;
+}
+
+#rcl-office .webx-user-center .amount-size {
+    align-items: center;
+    display: inline-flex;
+    font-size: inherit;
+    gap: 4px;
+}
+
+.webx-user-counters {
+    display: flex;
+    gap: 6px;
+    overflow: auto hidden;
+    padding: 0;
+    scrollbar-color: #bdbdbd #eee;
+    scrollbar-width: thin;
+    text-align: right;
+    align-items: center;
+}
+
+.webx-user-counters::-webkit-scrollbar {
+    height: 9px;
+}
+
+.webx-user-counters::-webkit-scrollbar-track {
+    background: #eee;
+}
+
+.webx-user-counters::-webkit-scrollbar-thumb {
+    background-color: #bdbdbd;
+}
+
+#rcl-office .webx-user-counters a {
+    background: inherit;
+    color: #000;
+    font-size: 16px;
+}
+
+.webx-area-menu {
+    margin-top: 18px;
+}
+
+#lk-menu a > .rcli {
+    margin-right: 5px;
+}
+
+#webx-content .rcl-notice {
+    border-radius: 1rem;
+}
+
+#webx-content .rcl-field-input input,
+.rcl-field-input select {
+    border-radius: 1rem;
+    height: 40px;
+    padding: 0 30px 0 18px;
+}
+
+#webx-content .rcl-public-box .rcl-form-field {
+    background-color: inherit;
+    border: 0;
+    padding: 0;
+}
+
+#webx-content .rcl-field-input textarea {
+    border: 1px solid #ddd;
+    border-radius: 0.5rem;
+}
+
+#webx-content .webx-area-menu a {
+    display: flex;
+    float: none;
+    font-size: 16px;
+    margin: 12px 0 0;
+    padding: 12px;
+    transition: none;
+    white-space: break-spaces;
+}
+
+#webx-content .webx-area-menu .rcl-tab-button:first-child a {
+    margin-top: 0;
+}
+
+#webx-content #tab-groups h3 {
+    padding: 5px 0 0;
+}
+
+body #rcl-office .webx_phone_menu {
+    align-items: center;
+    display: none;
+    gap: 5px;
+    justify-content: center;
+    line-height: normal;
+    text-align: center;
+}
+
+.webx_phone_menu + .webx_phone_block {
+    margin-top: 12px;
+}
+
+#rcl-office .rcl-subtab-menu {
+    background: inherit;
+    margin: 0;
+    padding: 0;
+}
+
+#rcl-office #create-group {
+    background: inherit;
+    margin-top: 5px;
+    padding: 0;
+    text-align: left;
+}
+
+#rcl-office #create-group a,
+#create-group input[type="text"] {
+    border-radius: 5px;
+    min-height: 40px;
+}
+
+#rcl-chat-noread-box .chat-contacts .more-contacts a {
+    color: #fff;
+}
+
+@media (min-width: 711px) {
+    .webx-col-md-3 {
+        flex: 0 0 25%;
+        max-width: 25%
+    }
+
+    .webx-col-md-9 {
+        flex: 0 0 75%;
+        max-width: 75%
+    }
+}
+
+@media (max-width: 710px) {
+    .webx-col-md-9,
+    .webx-col-md-3,
+    #webx-content .webx-area-tabs {
+        padding: 0;
+    }
+
+    body #rcl-office .webx_phone_menu {
+        display: flex;
+    }
+
+    #rcl-office #lk-conteyner,
+    body #rcl-office .webx_phone_block {
+        display: none;
+    }
+
+    #rcl-office .rcl-balance-widget .balance-amount {
+        text-align: center;
+    }
+
+    .webx-row {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    #rcl-office .webx-userinfo .webx-user-counters {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .webx-userinfo {
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .webx-user-right {
+        flex-direction: column;
+    }
+}
+
+@media screen and (min-width: 711px) {
+    .webx_phone_block {
+        display: block !important;
+    }
+}

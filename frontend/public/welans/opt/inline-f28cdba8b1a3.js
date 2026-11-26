@@ -1,0 +1,1 @@
+window._wca = window._wca || [];
