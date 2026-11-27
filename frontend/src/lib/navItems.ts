@@ -22,13 +22,8 @@ export const navItems: { path: string; label: string; icon: string; tenantOnly?:
   },
   {
     path: "/mail",
-    label: "Почтовый клиент",
+    label: "Почта",
     icon: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
-  },
-  {
-    path: "/schedule",
-    label: "Расписание",
-    icon: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2zM8 14h2v2H8v-2zm6 0h2v2h-2v-2z",
   },
   {
     path: "/deals",
@@ -59,16 +54,6 @@ export const navItems: { path: string; label: string; icon: string; tenantOnly?:
     path: "/news",
     label: "Новости",
     icon: "M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z",
-  },
-  {
-    label: "Заметки",
-    path: "/notes",
-    icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
-  },
-  {
-    label: "Напоминания",
-    path: "/reminders",
-    icon: "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9",
   },
   {
     path: "/files",
