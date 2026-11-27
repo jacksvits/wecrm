@@ -614,9 +614,9 @@ model TaskFavorite {
 // Момент прочтения обсуждения задачи пользователем (бейдж непрочитанных в канбане)
 model TaskCommentReadState {
   id         String   @id @default(cuid())
-  taskId     String
+  taskId     String   @map("task_id")
   task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId     String
+  userId     String   @map("user_id")
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   lastReadAt DateTime @default(now()) @map("last_read_at")
 
