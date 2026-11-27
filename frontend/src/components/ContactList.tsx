@@ -33,6 +33,32 @@ export function ContactList() {
   const location = useLocation();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [organizations, setOrganizations] = useState<Contact[]>([]);
+  // Поле «Организация» — поиск с автодополнением, как поле поиска контакта в новой задаче
+  const [orgText, setOrgText] = useState('');
+  const [showOrgDropdown, setShowOrgDropdown] = useState(false);
+  const orgDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Закрывать выпадающий список организаций при клике вне него
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (orgDropdownRef.current && !orgDropdownRef.current.contains(event.target as Node)) {
+        setShowOrgDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredOrganizations = organizations.filter((o) => {
+    if (!orgText.trim()) return true;
+    const q = orgText.toLowerCase();
+    return (
+      o.name.toLowerCase().includes(q) ||
+      (o.inn || '').toLowerCase().includes(q) ||
+      (o.phone || '').toLowerCase().includes(q) ||
+      (o.phones || []).some((p: string) => p.toLowerCase().includes(q))
+    );
+  });
   const [projects, setProjects] = useState<Project[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -402,6 +428,7 @@ export function ContactList() {
       tags: '', notes: '', inn: '', ogrn: '', legalAddress: '', position: '', birthDate: '', address: '', telegramUsername: '', organizationId: '',
       projectIds: [],
     });
+    setOrgText('');
     setShowModal(true);
   };
 
@@ -425,6 +452,7 @@ export function ContactList() {
       organizationId: contact.organizationId || '',
       projectIds: contact.projects?.map(p => p.project.id) || [],
     });
+    setOrgText(organizations.find(o => o.id === contact.organizationId)?.name || contact.organization?.name || '');
     setShowModal(true);
   };
 
@@ -983,12 +1011,42 @@ export function ContactList() {
               {form.kind === 'contact' && (
                 <>
                   <input placeholder="Должность" value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }} />
-                  <select value={form.organizationId} onChange={e => setForm({ ...form, organizationId: e.target.value })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14 }}>
-                    <option value="">— Без организации —</option>
-                    {organizations.map(org => (
-                      <option key={org.id} value={org.id}>{org.name}</option>
-                    ))}
-                  </select>
+                  {/* Поле поиска организации с выпадающим списком — как поле поиска контакта в новой задаче */}
+                  <div ref={orgDropdownRef} style={{ position: 'relative' }}>
+                    <input
+                      placeholder="Поиск организации..."
+                      value={orgText}
+                      onChange={e => { setOrgText(e.target.value); setShowOrgDropdown(true); if (!e.target.value) setForm({ ...form, organizationId: '' }); }}
+                      onFocus={() => setShowOrgDropdown(true)}
+                      style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
+                    />
+                    {form.organizationId && (
+                      <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+                        Выбрано: {organizations.find(o => o.id === form.organizationId)?.name || '—'}
+                      </div>
+                    )}
+                    {showOrgDropdown && (
+                      <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, maxHeight: 200, overflow: 'auto', zIndex: 300, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+                        <div onClick={() => { setForm({ ...form, organizationId: '' }); setOrgText(''); setShowOrgDropdown(false); }} style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>— Без организации —</div>
+                        {filteredOrganizations.length === 0 ? (
+                          <div style={{ padding: 10, fontSize: 13, color: 'var(--text-muted)' }}>Ничего не найдено</div>
+                        ) : (
+                          filteredOrganizations.map(org => (
+                            <div
+                              key={org.id}
+                              onClick={() => { setForm({ ...form, organizationId: org.id }); setOrgText(org.name); setShowOrgDropdown(false); }}
+                              style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--border-color)', background: form.organizationId === org.id ? 'rgba(0,0,0,0.05)' : undefined }}
+                            >
+                              <div style={{ fontWeight: 500 }}>{org.name}</div>
+                              {org.inn && (
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>ИНН: {org.inn}</div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div>
                     <label style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>Дата рождения</label>
                     <input type="date" value={form.birthDate} onChange={e => setForm({ ...form, birthDate: e.target.value })} style={{ padding: 10, borderRadius: 12, border: '1px solid var(--border-color)', fontSize: 14, width: '100%', boxSizing: 'border-box' }} />
