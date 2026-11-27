@@ -38,6 +38,12 @@ res.status(500).json({ error: err.message });
 router.get('/stream', authMiddleware, (req: AuthRequest, res) => { res.setHeader('Content-Type', 'text/event-stream');
 res.setHeader('Cache-Control', 'no-cache');
 res.setHeader('Connection', 'keep-alive');
+// Как в /api/events: отключаем сжатие (middleware compression буферизует
+// text/event-stream и уведомления доходят до клиента с задержкой/потерями)
+res.setHeader('Content-Encoding', 'identity');
+// Запрет буферизации на всех прокси по пути (nginx уже отдаёт без буфера,
+// но заголовок страхует от промежуточных прокси, напр. NAS reverse proxy)
+res.setHeader('X-Accel-Buffering', 'no');
 res.flushHeaders();
 req.setTimeout(0);
 res.setTimeout(0);

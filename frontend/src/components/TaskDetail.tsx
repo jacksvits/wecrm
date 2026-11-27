@@ -886,7 +886,12 @@ export function TaskDetail() {
         ? pendingAttachments.map((a) => a.id)
         : undefined;
       const comment = await api.comments.create(id!, content, attachmentIds, isLinkedViewer ? false : isInternalComment);
-      setComments((prev) => [...prev, comment]);
+      // SSE-событие new_comment от бэкенда может прийти раньше ответа API
+      // (broadcast делается до res.json) — тогда комментарий уже в списке,
+      // и без проверки он добавился бы второй раз
+      setComments((prev) =>
+        prev.some((c) => c.id === comment.id) ? prev : [...prev, comment]
+      );
       setNewComment("");
       setPendingAttachments([]);
       // «Инкогнито» не сбрасываем: режим держится, пока пользователь сам его не выключит
