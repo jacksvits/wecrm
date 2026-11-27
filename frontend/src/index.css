@@ -1780,3 +1780,6 @@ button.ad-legend-item:hover { background: #f6f3ff; }
 @media (prefers-reduced-motion: reduce) {
   .director-command-page *, .director-command-page *::before, .director-command-page *::after { transition: none !important; }
 }
+
+/* Левое меню: подсветка пунктов при наведении */
+.sidebar-nav-btn:hover { background: var(--bg-hover); }
