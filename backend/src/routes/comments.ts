@@ -8,7 +8,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { sendPushToUser } from '../lib/push.js';
 import { notificationEmitter } from '../lib/notifications.js';
-import { clearUserTaskListCache } from './tasks.js';
+import { clearUserTaskListCache, clearTaskListCache } from './tasks.js';
 import { processAutoReply } from '../lib/auto-reply.js';
 import { telegramFetch, TELEGRAM_API_BASE } from '../lib/telegram-api.js';
 import { htmlToText } from '../lib/html-to-text.js';
@@ -516,6 +516,9 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
     });
     const commentWithAttachments = { ...comment, attachments: newCommentAttachments };
     broadcast(CHANNELS.COMMENTS, { action: 'new_comment', entity: 'task', id: taskId, comment: commentWithAttachments });
+    // Новый комментарий меняет unreadCommentsCount в списке задач — сбрасываем
+    // кэш, иначе до конца TTL канбан получает устаревшие счётчики
+    clearTaskListCache();
 
     // Автоответчик: проверка триггеров по тексту комментария (не для внутренних)
     if (!comment.isInternal) {

@@ -21,6 +21,12 @@ export function clearUserTaskListCache(userId: string) {
   }
 }
 
+// Полный сброс кэша списка задач (напр. после нового комментария — меняются
+// счётчики непрочитанных у всех пользователей)
+export function clearTaskListCache() {
+  taskListCache.clear();
+}
+
 // Папка задач текущего tenant'а (для tenant'ов — с префиксом /t-<slug>, см. lib/tenant.ts).
 // Структура: tasks/<год>/<месяц>/<номер тикета> — см. lib/task-dir.ts
 
