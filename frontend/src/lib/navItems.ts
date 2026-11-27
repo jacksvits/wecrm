@@ -1,10 +1,5 @@
 export const navItems: { path: string; label: string; icon: string; tenantOnly?: boolean }[] = [
   {
-    path: "/platform",
-    label: "Платформа",
-    icon: "M3 3h8v8H3V3zm10 0h8v5h-8V3zM3 13h8v8H3v-8zm10 3h8v5h-8v-5zm0-6h8v4h-8v-4z",
-  },
-  {
     path: "/platform-support",
     label: "Поддержка",
     icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z",

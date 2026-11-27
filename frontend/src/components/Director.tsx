@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   DndContext,
   closestCenter,
@@ -25,9 +25,11 @@ import { FinanceDocumentsWidget } from "./accounting/FinanceDocumentsWidget";
 import { FinanceReconciliationWidget } from "./accounting/FinanceReconciliationWidget";
 import { AdStatisticsProvider, AdPeriodToolbar, AdSocialWidget, AdExpensesWidget, AdChannelsWidget, AdCacWidget, AdLeadsWidget, AdDomainsWidget, AdConversionsWidget, AdDemographicsWidget, AdGeoWidget, AdDurationWidget, AdDepthWidget, AdBounceWidget, AdAttendanceWidget, AdSourcesDailyWidget, AdPagesWidget, AdTitlesWidget, AdDevicesWidget, AdNewVisitorsWidget, AdLandingPagesWidget, AdNewsViewsWidget } from "./AdStatistics";
 
+const TenantsAdmin = lazy(() => import("./TenantsAdmin").then(m => ({ default: m.TenantsAdmin }))) ;
+
 type WidgetSize = "small" | "medium" | "large";
 type WidgetId = string;
-type WidgetTab = "Основное" | "Биллинг" | "Бухгалтерия" | "Рекламная статистика";
+type WidgetTab = "Основное" | "Биллинг" | "Бухгалтерия" | "Рекламная статистика" | "Платформа";
 
 interface WidgetDef {
   id: WidgetId;
@@ -87,7 +89,7 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "widget-finance-reconciliation", size: "medium", label: "Сверка с банком", tab: "Бухгалтерия" },
 ];
 
-const TABS: WidgetTab[] = ["Основное", "Биллинг", "Бухгалтерия", "Рекламная статистика"];
+const TABS: WidgetTab[] = ["Основное", "Биллинг", "Бухгалтерия", "Рекламная статистика", "Платформа"];
 
 const DEFAULT_VISIBLE = ALL_WIDGETS.map((w) => w.id);
 
@@ -300,7 +302,11 @@ export function Director() {
   const [monthTaskDetails, setMonthTaskDetails] = useState<Record<string, any[]>>({});
   const [monthTasksLoading, setMonthTasksLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<WidgetTab>("Основное");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<WidgetTab>(() => {
+    const t = searchParams.get("tab");
+    return (TABS as string[]).includes(t || "") ? (t as WidgetTab) : "Основное";
+  });
   useEffect(() => { const u3 = user as any; if (activeTab === 'Биллинг' && u3?.crmBilling === false) setActiveTab('Основное'); if (activeTab === 'Бухгалтерия' && u3?.crmAccounting === false) setActiveTab('Основное'); }, [activeTab, user]); const dealsAllowed = (() => { const ap = (user as any)?.allowedPages ; return !ap || ap.length === 0 || ap.includes('/deals') })();
   const [showWidgetSettings, setShowWidgetSettings] = useState(false);
 
@@ -1082,7 +1088,11 @@ export function Director() {
 
       {isCommandPage && <AdPeriodToolbar />}
 
-      {!showWidgetSettings ? (
+      {activeTab === "Платформа" ? (
+        <Suspense fallback={<div style={{ padding: 24, color: "var(--text-muted)" }}>Загрузка платформы…</div>}>
+          <TenantsAdmin />
+        </Suspense>
+      ) : !showWidgetSettings ? (
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
