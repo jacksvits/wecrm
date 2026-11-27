@@ -121,6 +121,56 @@ router.get('/sitemap-static.xml', async (_req, res) => {
   }
 });
 
+// Яндекс.Турбо: RSS-фид новостей — https://welans.ru/turbo.xml (через nginx).
+// Яндекс забирает фид и отдаёт новости в Турбо-формате; фид обязательно добавить
+// в Вебмастере: «Турбо-страницы и RTF» → «Источники» → RSS-канал.
+router.get('/turbo.xml', async (_req, res) => {
+  try {
+    const news = await prisma.news.findMany({
+      where: publicNewsWhere,
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 100,
+      select: { id: true, title: true, slug: true, summary: true, content: true, coverImage: true, publishedAt: true, createdAt: true, author: { select: { name: true } } },
+    });
+
+    // Контент Турбо-страниц: безопасная разметка, абсолютные https-ссылки и картинки
+    const sanitize = (html: string) =>
+      html
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+        .replace(/\son\w+="[^"]*"/gi, '')
+        .replace(/(src|href)=("|')([^"']*)\2/gi, (_m: string, attr: string, q: string, url: string) => `${attr}=${q}${absoluteUrl(String(url)).replace(/^http:\/\//i, 'https://')}${q}`)
+        .replace(/\]\]>/g, ']] >');
+
+    const items = news.map((n) => {
+      const link = `${SITE_URL}/${encodeURIComponent(n.slug || n.id)}/`;
+      const body = sanitize(n.content || n.summary || '');
+      const cover = n.coverImage ? absoluteUrl(n.coverImage).replace(/^http:\/\//i, 'https://') : null;
+      return [
+        '    <item turbo="true">',
+        `      <title>${escapeHtml(n.title)}</title>`,
+        `      <link>${escapeHtml(link)}</link>`,
+        `      <pubDate>${(n.publishedAt || n.createdAt).toUTCString()}</pubDate>`,
+        n.author?.name ? `      <author>${escapeHtml(n.author.name)}</author>` : '',
+        cover ? `      <enclosure url="${escapeHtml(cover)}"/>` : '',
+        `      <turbo:content><![CDATA[${cover ? `<img src="${escapeHtml(cover)}"/>` : ''}${body}]]></turbo:content>`,
+        '    </item>',
+      ].filter(Boolean).join('\n');
+    }).join('\n');
+
+    res
+      .type('application/xml')
+      .set('Cache-Control', 'no-cache')
+      .send(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<rss xmlns:yandex="http://news.yandex.ru" xmlns:media="http://search.yahoo.com/mrss/" xmlns:turbo="http://turbo.yandex.ru" version="2.0">\n<channel>\n<title>WeLANS — новости</title>\n<link>${SITE_URL}/news</link>\n<description>Новости и статьи WeLANS — коротко о свежем</description>\n<language>ru</language>\n${items}\n</channel>\n</rss>`
+      );
+  } catch (err) {
+    console.error('[seo:turbo]', err);
+    res.status(502).type('text/plain').send('Bad Gateway');
+  }
+});
+
 // Часть новостей: /sitemap/news-<N>.xml (N с 1)
 router.get('/sitemap/news-:page.xml', async (req, res) => {
   try {
