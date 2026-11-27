@@ -8,7 +8,7 @@ import { taskDirFor } from '../lib/task-dir.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { sendPushToRoleUsers, sendPushToUser } from '../lib/push.js';
-import { notifyRoleUsers } from '../lib/notifications.js';
+import { notifyRoleUsers, notificationEmitter } from '../lib/notifications.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -113,7 +113,7 @@ const createDiscussionMessage = async (taskId: string, userId: string, name: str
     const short = preview.length > 200 ? preview.slice(0, 200) + '…' : preview;
     for (const uid of notifyIds) {
       try {
-        await prisma.notification.create({
+        const notif = await prisma.notification.create({
           data: {
             userId: uid,
             type: 'comment',
@@ -124,6 +124,8 @@ const createDiscussionMessage = async (taskId: string, userId: string, name: str
             url: `/tasks/${task.id}`,
           },
         });
+        // Доставка в /api/notifications/stream (как в createNotification)
+        notificationEmitter.emit('notification', { userId: uid, notification: notif });
       } catch (e) { console.error('Failed to create notification:', e); }
       sendPushToUser(uid, { title: 'Тех. поддержка', body: `${name}: ${short}`, url: `/tasks/${task.id}` }, 'comment').catch(() => {});
     }

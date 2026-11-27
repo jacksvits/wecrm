@@ -7,6 +7,7 @@ import { addTaskCommentToTicket } from '../lib/support-ticket-tasks.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { sendPushToUser } from '../lib/push.js';
+import { notificationEmitter } from '../lib/notifications.js';
 import { processAutoReply } from '../lib/auto-reply.js';
 import { telegramFetch, TELEGRAM_API_BASE } from '../lib/telegram-api.js';
 import { htmlToText } from '../lib/html-to-text.js';
@@ -295,7 +296,7 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
     // Create in-app notifications
     for (const userId of notifyUserIds) {
       try {
-        await prisma.notification.create({
+        const notif = await prisma.notification.create({
           data: {
             userId,
             type: 'comment',
@@ -306,6 +307,9 @@ router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) =
             url: commentUrl,
           },
         });
+        // Эмитим в stream /api/notifications/stream — иначе уведомление
+        // лежит в БД, но до открытого колокольчика не доходит без перезагрузки
+        notificationEmitter.emit('notification', { userId, notification: notif });
       } catch (e) {
         console.error('Failed to create notification:', e);
       }

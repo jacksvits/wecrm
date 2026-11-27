@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware, optionalAuthMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
+import { notificationEmitter } from '../lib/notifications.js';
 import { publishNewsToVk } from '../lib/vk-wall.js';
 import { htmlToText } from '../lib/html-to-text.js';
 import fs from 'fs';
@@ -1145,7 +1146,7 @@ router.post('/:id/comments', requireUser, async (req, res) => {
     // Уведомляем автора новости (кроме самого комментатора)
     if (news.authorId !== user.id) {
       try {
-        await prisma.notification.create({
+        const notif = await prisma.notification.create({
           data: {
             userId: news.authorId,
             type: 'comment',
@@ -1155,6 +1156,8 @@ router.post('/:id/comments', requireUser, async (req, res) => {
             entityId: news.id,
           },
         });
+        // Доставка в /api/notifications/stream (как в createNotification)
+        notificationEmitter.emit('notification', { userId: news.authorId, notification: notif });
       } catch (e) {
         console.error('Failed to create notification:', e);
       }
