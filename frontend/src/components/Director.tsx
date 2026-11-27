@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { isMainPlatformHost } from "./TenantSwitcher";
 import {
   DndContext,
   closestCenter,
@@ -303,9 +304,11 @@ export function Director() {
   const [monthTasksLoading, setMonthTasksLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
+  const isMainHost = isMainPlatformHost();
   const [activeTab, setActiveTab] = useState<WidgetTab>(() => {
     const t = searchParams.get("tab");
-    return (TABS as string[]).includes(t || "") ? (t as WidgetTab) : "Основное";
+    const available = (TABS as string[]).filter(t2 => t2 !== "Платформа" || isMainHost);
+    return available.includes(t || "") ? (t as WidgetTab) : "Основное";
   });
   useEffect(() => { const u3 = user as any; if (activeTab === 'Биллинг' && u3?.crmBilling === false) setActiveTab('Основное'); if (activeTab === 'Бухгалтерия' && u3?.crmAccounting === false) setActiveTab('Основное'); }, [activeTab, user]); const dealsAllowed = (() => { const ap = (user as any)?.allowedPages ; return !ap || ap.length === 0 || ap.includes('/deals') })();
   const [showWidgetSettings, setShowWidgetSettings] = useState(false);
@@ -1039,7 +1042,7 @@ export function Director() {
         <h2 className={isCommandPage ? "ad-page-title" : undefined} style={{ margin: 0, fontSize: isCommandPage ? undefined : 18 }}>Директор</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div className={isCommandPage ? "ad-command-tabs" : undefined} style={{ display: "flex", gap: 4, background: "var(--bg-input)", borderRadius: 10, padding: 4 }}>
-            {((u2 => { let list = TABS; if (u2?.crmBilling === false) list = list.filter(t2 => t2 !== 'Биллинг'); if (u2?.crmAccounting === false) list = list.filter(t2 => t2 !== 'Бухгалтерия'); return list; })(user)).map((tab) => (
+            {((u2 => { let list = TABS.filter(t2 => t2 !== 'Платформа' || isMainHost); if (u2?.crmBilling === false) list = list.filter(t2 => t2 !== 'Биллинг'); if (u2?.crmAccounting === false) list = list.filter(t2 => t2 !== 'Бухгалтерия'); return list; })(user)).map((tab) => (
               <button
                 key={tab}
                 className={isCommandPage ? "ad-command-tab" : undefined}
