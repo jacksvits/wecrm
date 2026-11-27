@@ -109,6 +109,7 @@ model User {
   taskAssignments TaskAssignee[]
   taskCurations   TaskCurator[]
   taskFavorites   TaskFavorite[]
+  taskCommentReadStates TaskCommentReadState[]
   projectUsers    ProjectUser[]
   createdTasks    Task[]         @relation("CreatedTasks")
   supportTickets  Task[]         @relation("SupportTickets")
@@ -551,6 +552,7 @@ model Task {
   transactions TaskTransaction[]
   financeDocuments FinanceDocument[]
   favorites    TaskFavorite[]
+  commentReadStates TaskCommentReadState[]
 
   @@index([status])
   @@index([status, dueDate])
@@ -607,6 +609,20 @@ model TaskFavorite {
   @@index([userId])
   @@index([taskId, userId])
   @@map("task_favorites")
+}
+
+// Момент прочтения обсуждения задачи пользователем (бейдж непрочитанных в канбане)
+model TaskCommentReadState {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt DateTime @default(now()) @map("last_read_at")
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@map("task_comment_read_states")
 }
 
 // Группа избранных товаров витрины (личная у каждого пользователя)

@@ -216,8 +216,19 @@ export function TaskList() {
   };
 
   // Real-time updates for tasks
-  useRealtime(["tasks"], (data) => {
+  useRealtime(["tasks", "comments"], (data) => {
     if (data.entity === "task") loadTasks();
+    // Новый комментарий — сразу зажигаем бейдж непрочитанных на карточке канбана.
+    // Свои комментарии не считаем (обсуждение открыто = прочитано через markRead)
+    if (data.type === "new_comment" && data.comment && data.comment.authorId !== user?.id) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === data.comment.taskId
+            ? { ...t, unreadCommentsCount: (t.unreadCommentsCount || 0) + 1 }
+            : t
+        )
+      );
+    }
   });
 
   // Detect mobile viewport
@@ -1135,6 +1146,21 @@ export function TaskList() {
         >
           {priorityLabels[task.priority]}
         </span>{" "}
+        {(task.unreadCommentsCount || 0) > 0 && (
+          <span
+            title="Непрочитанные сообщения в обсуждении"
+            style={{
+              padding: "2px 6px",
+              borderRadius: 8,
+              fontSize: 10,
+              fontWeight: 600,
+              background: "#dbeafe",
+              color: "#1d4ed8",
+            }}
+          >
+            💬 {task.unreadCommentsCount}
+          </span>
+        )}
       </div>{" "}
       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
         {task.startDate ? `Начало: ${formatDateTime(task.startDate, user?.timezone)} · ` : ""}

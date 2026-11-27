@@ -8,6 +8,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { broadcast, CHANNELS } from '../lib/events.js';
 import { sendPushToUser } from '../lib/push.js';
 import { notificationEmitter } from '../lib/notifications.js';
+import { clearUserTaskListCache } from './tasks.js';
 import { processAutoReply } from '../lib/auto-reply.js';
 import { telegramFetch, TELEGRAM_API_BASE } from '../lib/telegram-api.js';
 import { htmlToText } from '../lib/html-to-text.js';
@@ -204,6 +205,24 @@ const isContactLinkedViewer = async (taskId: string, userId: string, role: strin
   if (task.curators.some(c => c.userId === userId)) return false;
   return task.contact?.userId === userId;
 };
+
+// Пометить обсуждение задачи прочитанным (сброс бейджа непрочитанных в канбане)
+router.post('/:taskId/comments/read', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    await prisma.taskCommentReadState.upsert({
+      where: { taskId_userId: { taskId: req.params.taskId, userId: req.user!.id } },
+      update: { lastReadAt: new Date() },
+      create: { taskId: req.params.taskId, userId: req.user!.id },
+    });
+    // Сбрасываем кэш списка задач пользователя — бейдж непрочитанных
+    // в канбане обновится при следующей загрузке, без ожидания TTL
+    clearUserTaskListCache(req.user!.id);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Failed to mark comments read:', e);
+    res.status(500).json({ error: 'Failed to mark comments read' });
+  }
+});
 
 router.post('/:taskId/comments', authMiddleware, async (req: AuthRequest, res) => {
   try {

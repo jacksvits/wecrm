@@ -736,6 +736,8 @@ export function TaskDetail() {
       }
       setTask(data);
       setComments(data.comments || []);
+      // Обсуждение открыто и загружено — сбрасываем бейдж непрочитанных в канбане
+      api.comments.markRead(data.id).catch(() => {});
       setTaskAttachments(data.attachments || []);
       loadTaskFiles();
       setEditForm({
