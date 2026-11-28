@@ -141,6 +141,50 @@ function commandSpan(widget: WidgetDef): number {
   return widget.size === "small" ? 3 : widget.size === "medium" ? 6 : 12;
 }
 
+// Детали push-подписки для аккордеона виджета «Push-уведомления пользователей»
+interface PushSubscriptionDetail {
+  id: string;
+  endpoint: string;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+interface PushUserDetail {
+  id: string;
+  name: string;
+  pushEnabled: boolean;
+  subscriptions: PushSubscriptionDetail[];
+}
+
+// «Chrome 120 · Android (моб.)» из User-Agent подписки
+function formatPushUserAgent(ua: string | null): string {
+  if (!ua) return 'Устройство не определено';
+  const browser = /Edg\//.test(ua) ? 'Edge'
+    : /YaBrowser\//.test(ua) ? 'Яндекс Браузер'
+    : /OPR\//.test(ua) ? 'Opera'
+    : /Chrome\//.test(ua) ? 'Chrome'
+    : /Firefox\//.test(ua) ? 'Firefox'
+    : /Safari\//.test(ua) ? 'Safari'
+    : 'Браузер';
+  const os = /Windows/.test(ua) ? 'Windows'
+    : /Android/.test(ua) ? 'Android'
+    : /iPhone|iPad|iPod/.test(ua) ? 'iOS'
+    : /Mac OS X/.test(ua) ? 'macOS'
+    : /Linux/.test(ua) ? 'Linux'
+    : '';
+  const mobile = /Mobile/.test(ua) ? ' (моб.)' : '';
+  return `${browser} · ${os}${mobile}`.replace(/ · $/, ' ');
+}
+
+// Только хост push-endpoint — весь URL показывать не нужно
+function pushEndpointHost(endpoint: string): string {
+  try {
+    return new URL(endpoint).host;
+  } catch {
+    return endpoint.slice(0, 48);
+  }
+}
+
 function commandMinHeight(widget: WidgetDef): number {
   if (["ad-depth", "ad-bounce", "ad-duration"].includes(widget.id)) return 285;
   if (widget.id === "ad-domains" || widget.id === "ad-sources-daily") return 540;
@@ -302,6 +346,10 @@ export function Director() {
   const [expandedTaskMonth, setExpandedTaskMonth] = useState<string | null>(null);
   const [monthTaskDetails, setMonthTaskDetails] = useState<Record<string, any[]>>({});
   const [monthTasksLoading, setMonthTasksLoading] = useState<string | null>(null);
+  // Детализация push-подписки по клику в виджете «Push-уведомления пользователей»
+  const [expandedPushUser, setExpandedPushUser] = useState<string | null>(null);
+  const [pushUserDetails, setPushUserDetails] = useState<Record<string, PushUserDetail | null>>({});
+  const [pushDetailLoading, setPushDetailLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const isMainHost = isMainPlatformHost();
@@ -415,6 +463,28 @@ export function Director() {
       setMonthTaskDetails((prev) => ({ ...prev, [key]: data?.tasks || [] }));
     } catch {}
     setMonthTasksLoading(null);
+  };
+
+  // Раскрытие пользователя: подгрузка деталей push-подписки (статус и устройства)
+  const togglePushUser = async (userId: string) => {
+    if (expandedPushUser === userId) {
+      setExpandedPushUser(null);
+      return;
+    }
+    setExpandedPushUser(userId);
+    if (userId in pushUserDetails) return;
+    setPushDetailLoading(userId);
+    try {
+      const token = localStorage.getItem('token');
+      const r = await fetch(`/api/users/push-status/${userId}`, {
+        headers: token ? { 'X-Auth-Token': token as string } : {},
+      });
+      const data = r.ok ? await r.json() : null;
+      setPushUserDetails((prev) => ({ ...prev, [userId]: data }));
+    } catch {
+      setPushUserDetails((prev) => ({ ...prev, [userId]: null }));
+    }
+    setPushDetailLoading(null);
   };
 
   const handleDragStart = (event: any) => setActiveId(event.active.id);
@@ -714,26 +784,67 @@ export function Director() {
               {pushStatusUsers.length === 0 ? (
                 <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Нет данных</div>
               ) : (
-                pushStatusUsers.map((u) => (
-                  <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10, background: "var(--bg-input)" }}>
-                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: u.avatar ? "transparent" : "var(--bg-hover)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, overflow: "hidden" }}>
-                      {u.avatar ? <img src={u.avatar} alt={u.name} style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} /> : u.name?.charAt(0).toUpperCase()}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{u.name}</div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{u.role?.label || u.role?.name}</div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: u.hasSubscription ? "#10b981" : "#ef4444" }} />
-                      <span style={{ fontSize: 12, color: u.hasSubscription ? "#10b981" : "#ef4444" }}>
-                        {u.hasSubscription ? "Вкл" : "Выкл"}
-                      </span>
-                      {u.subscriptionCount > 1 && (
-                        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>({u.subscriptionCount})</span>
+                pushStatusUsers.map((u) => {
+                  const pushOpen = expandedPushUser === u.id;
+                  const pushDetail = pushUserDetails[u.id];
+                  return (
+                    <div key={u.id}>
+                      <div
+                        onClick={() => togglePushUser(u.id)}
+                        title="Подробнее о статусе и устройствах"
+                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10, background: "var(--bg-input)", cursor: "pointer" }}
+                      >
+                        <div style={{ width: 32, height: 32, borderRadius: "50%", background: u.avatar ? "transparent" : "var(--bg-hover)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, overflow: "hidden" }}>
+                          {u.avatar ? <img src={u.avatar} alt={u.name} style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} /> : u.name?.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>{u.name}</div>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{u.role?.label || u.role?.name}</div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: u.hasSubscription ? "#10b981" : "#ef4444" }} />
+                          <span style={{ fontSize: 12, color: u.hasSubscription ? "#10b981" : "#ef4444" }}>
+                            {u.hasSubscription ? "Вкл" : "Выкл"}
+                          </span>
+                          {u.subscriptionCount > 1 && (
+                            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>({u.subscriptionCount})</span>
+                          )}
+                          <i className="fa-solid fa-chevron-down" style={{ fontSize: 10, color: "var(--text-muted)", transform: pushOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+                        </div>
+                      </div>
+                      {pushOpen && (
+                        <div style={{ margin: "4px 0 4px 16px", padding: "6px 10px", borderLeft: "2px solid var(--border-color)", fontSize: 11, color: "var(--text-muted)", display: "flex", flexDirection: "column", gap: 4 }}>
+                          {pushDetailLoading === u.id ? (
+                            <span>Загрузка…</span>
+                          ) : !pushDetail ? (
+                            <span>Не удалось загрузить данные</span>
+                          ) : (
+                            <>
+                              <div>
+                                Уведомления: {pushDetail.pushEnabled
+                                  ? <b style={{ color: "#10b981" }}>включены</b>
+                                  : <span>выключены</span>}
+                              </div>
+                              {pushDetail.subscriptions.length === 0 ? (
+                                <div>Устройства: подписок нет</div>
+                              ) : (
+                                pushDetail.subscriptions.map((s, i) => (
+                                  <div key={s.id} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                                    <span style={{ color: "var(--text-primary)" }}>{i + 1}. {formatPushUserAgent(s.userAgent)}</span>
+                                    <span>{pushEndpointHost(s.endpoint)} · подписка от {new Date(s.createdAt).toLocaleDateString("ru-RU")}</span>
+                                  </div>
+                                ))
+                              )}
+                              {pushDetail.subscriptions.length > 0 && !pushDetail.pushEnabled && (
+                                <div>Подписки есть, но уведомления отключены в профиле</div>
+                              )}
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </>

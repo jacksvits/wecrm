@@ -507,4 +507,35 @@ router.get('/push-status', adminOnly, async (_req, res) => {
   }
 });
 
+// Детали push-подписки пользователя для аккордеона в виджете Директора: статус и устройства
+router.get('/push-status/:id', adminOnly, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        name: true,
+        pushEnabled: true,
+        role: { select: { isSystemHandler: true } },
+        pushSubscriptions: {
+          select: { id: true, endpoint: true, userAgent: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+    if (!user || user.role?.isSystemHandler) {
+      res.status(404).json({ error: 'Пользователь не найден' });
+      return;
+    }
+    res.json({
+      id: user.id,
+      name: user.name,
+      pushEnabled: user.pushEnabled,
+      subscriptions: user.pushSubscriptions,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

@@ -23,13 +23,16 @@ const subscribeSchema = z.object({
 router.post('/subscribe', async (req: AuthRequest, res) => {
   try {
     const data = subscribeSchema.parse(req.body);
+    // User-Agent сохраняем для виджета Директора: показ устройств/браузеров в деталях подписки
+    const userAgent = (req.headers['user-agent'] as string) || null;
     await prisma.pushSubscription.upsert({
       where: { endpoint: data.endpoint },
-      update: { p256dh: data.keys.p256dh, auth: data.keys.auth, userId: req.user!.id },
+      update: { p256dh: data.keys.p256dh, auth: data.keys.auth, userId: req.user!.id, userAgent },
       create: {
         endpoint: data.endpoint,
         p256dh: data.keys.p256dh,
         auth: data.keys.auth,
+        userAgent,
         userId: req.user!.id,
       },
     });
