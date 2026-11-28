@@ -3,6 +3,7 @@ import { useAuth } from './useAuth';
 import { api } from '../api/client';
 import { updateAppBadge } from '../lib/appBadge';
 import { playNotificationSound } from '../lib/sound';
+import { isNotificationSuppressed } from '../lib/notificationSuppress';
 
 /**
  * Единый хук уведомлений для десктопной и мобильной версий.
@@ -31,6 +32,12 @@ export function useNotifications() {
     es.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === 'connected') return;
+      // Комментарий в обсуждении, которое пользователь прямо сейчас смотрит
+      // на экране, — пропускаем полностью: без звука и без обновления списка
+      // и счётчика (сообщение и так мгновенно приходит в открытый чат)
+      if (msg.type === 'notification' && msg.notification && isNotificationSuppressed(msg.notification)) {
+        return;
+      }
       loadNotifications();
       if (soundEnabled && msg.type === 'notification') {
         playNotificationSound((user as any)?.soundEnabled);

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api/client';
 import { playNotificationSound } from '../lib/sound';
+import { startViewingGlobalChat, isGlobalChatSoundMuted } from '../lib/notificationSuppress';
 import { ChatMessage, FileAttachment, User } from '../types';
 import { FileUpload } from './FileUpload';
 import { LinkifyText } from './LinkifyText';
@@ -142,6 +143,11 @@ export function GlobalChat() {
     setIsDark(localStorage.getItem('darkTheme') === 'true');
   }, []);
 
+  // Чат смонтирован = открыт на экране (страница /chat или плавающее окно).
+  // Пока он открыт и вкладка браузера видима, звук новых сообщений не играем —
+  // пользователь видит сообщение сразу, как в мессенджерах
+  useEffect(() => startViewingGlobalChat(), []);
+
   useEffect(() => {
     latestIdRef.current = messages[messages.length - 1]?.id;
   }, [messages]);
@@ -185,7 +191,7 @@ export function GlobalChat() {
               if (prev.some(m => m.id === msg.id)) return prev;
               return [...prev, msg];
             });
-            if (!initialLoadRef.current && msg.authorId !== user?.id) {
+            if (!initialLoadRef.current && msg.authorId !== user?.id && !isGlobalChatSoundMuted()) {
               playNotificationSound((user as any)?.soundEnabled);
             }
           }
@@ -214,7 +220,7 @@ export function GlobalChat() {
             const uniqueNew = newMsgs.filter(m => !existingIds.has(m.id));
             return [...prev, ...uniqueNew];
           });
-          if (!initialLoadRef.current && hasOthersMessages) {
+          if (!initialLoadRef.current && hasOthersMessages && !isGlobalChatSoundMuted()) {
             playNotificationSound((user as any)?.soundEnabled);
           }
         }

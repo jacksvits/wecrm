@@ -21,6 +21,7 @@ import { TaskFinanceDocuments } from "./accounting/TaskFinanceDocuments";
 import { LinkifyText } from "./LinkifyText";
 import { linkifyTaskTagsHtml, useTaskHashtagClick } from "../lib/taskHashtags";
 import { userOptionLabel } from "../lib/userOptionLabel";
+import { startViewingTaskDiscussion } from "../lib/notificationSuppress";
 import { Avatar } from "./Avatar";
 import { ContactPicker } from "./ContactPicker";
 import { TaskDiscussionContact, DiscussionContact } from "./TaskDiscussionContact";
@@ -543,6 +544,12 @@ export function TaskDetail() {
       loadFinances();
     }
   }, [activeTab, id]);
+  // Пока открыта вкладка «Обсуждение» и вкладка браузера видима, уведомления
+  // о комментариях этой задачи не показываем (см. useNotifications)
+  useEffect(() => {
+    if (!id || activeTab !== "comments") return;
+    return startViewingTaskDiscussion(id);
+  }, [id, activeTab]);
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
